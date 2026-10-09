@@ -646,7 +646,7 @@ fn validate_prepared_publication(request: &PublishReportRequest) -> Result<()> {
     );
     ensure!(
         prepared.report_path
-            == PathBuf::from(format!(
+            == Path::new(&format!(
                 "knowledge/software/ai-sdlc/{}.md",
                 prepared.experiment_id
             )),
