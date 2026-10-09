@@ -1,0 +1,20 @@
+{
+  "holdout_isolation": {
+    "private_root": "../holdout",
+    "optimizer_roots": [
+      "../optimizer"
+    ],
+    "shared_knowledge_roots": [
+      "../superpod"
+    ],
+    "shared_memory_roots": [
+      "../memory"
+    ]
+  },
+  "experiments": [
+    {
+      "experiment_id": "example-prompt-promotion-001",
+      "evaluation_receipt": "evaluation-receipt.json"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "holdout_isolation": {
+    "private_root": "../holdout",
+    "optimizer_roots": ["../optimizer"],
+    "shared_knowledge_roots": ["../superpod"],
+    "shared_memory_roots": ["../memory"]
+  },
+  "context_file": "context.json",
+  "evaluation_receipt": "evaluation-receipt.json",
+  "registry_file": "../evolution/prompts.json",
+  "candidate_version": "REPLACE_WITH_REGISTERED_CANDIDATE_VERSION",
+  "role": "research"
+}

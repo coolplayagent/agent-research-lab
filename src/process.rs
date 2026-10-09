@@ -12,6 +12,20 @@ use std::{
 
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 const MAX_OUTPUT: u64 = 16 * 1024 * 1024;
+thread_local! { static DEADLINE: std::cell::Cell<Option<Instant>> = const { std::cell::Cell::new(None) }; }
+pub struct DeadlineGuard(Option<Instant>);
+impl Drop for DeadlineGuard {
+    fn drop(&mut self) {
+        DEADLINE.set(self.0);
+    }
+}
+/// Bound a sequence of host adapter calls by one wall-clock deadline.
+pub fn deadline_scope(duration: Duration) -> DeadlineGuard {
+    let previous = DEADLINE.get();
+    let next = Instant::now() + duration;
+    DEADLINE.set(Some(previous.map_or(next, |old| old.min(next))));
+    DeadlineGuard(previous)
+}
 
 pub struct Process {
     child: Child,
@@ -109,6 +123,12 @@ impl Drop for Process {
 }
 
 pub fn capture(program: &str, args: &[String], cwd: &Path, timeout: Duration) -> Result<Output> {
+    let timeout = DEADLINE.get().map_or(timeout, |d| {
+        timeout.min(d.saturating_duration_since(Instant::now()))
+    });
+    if timeout.is_zero() {
+        bail!("host operation wall-clock budget exhausted");
+    }
     let path = std::env::temp_dir().join(format!(
         "agent-lab-capture-{}-{}",
         std::process::id(),

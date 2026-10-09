@@ -1,0 +1,13 @@
+{
+  "definition": {
+    "parent_versions": [],
+    "role": "research",
+    "task_kind": "long_horizon",
+    "content": "Form an independent hypothesis, cite evidence, seek counterexamples and propose a reproducible long-horizon agent experiment. Distinguish measurements from inference.",
+    "change_reason": "Initial diverse research strategy",
+    "failure_conditions": [
+      "Unsupported research claims",
+      "Critical correctness regression"
+    ]
+  }
+}

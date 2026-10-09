@@ -1,0 +1,439 @@
+{
+  "context_file": "context.json",
+  "holdout_isolation": {
+    "private_root": "../holdout",
+    "optimizer_roots": [
+      "../optimizer"
+    ],
+    "shared_knowledge_roots": [
+      "../superpod"
+    ],
+    "shared_memory_roots": [
+      "../memory"
+    ]
+  },
+  "observations": [
+    {
+      "trial_id": "family-0-seed-0",
+      "task_family": "family-0",
+      "partition": "holdout",
+      "variant": "baseline",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-baseline-v1",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": true,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    },
+    {
+      "trial_id": "family-0-seed-0",
+      "task_family": "family-0",
+      "partition": "holdout",
+      "variant": "candidate",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-candidate-v2",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": true,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    },
+    {
+      "trial_id": "family-0-seed-1",
+      "task_family": "family-0",
+      "partition": "holdout",
+      "variant": "baseline",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-baseline-v1",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": false,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    },
+    {
+      "trial_id": "family-0-seed-1",
+      "task_family": "family-0",
+      "partition": "holdout",
+      "variant": "candidate",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-candidate-v2",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": true,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    },
+    {
+      "trial_id": "family-0-seed-2",
+      "task_family": "family-0",
+      "partition": "holdout",
+      "variant": "baseline",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-baseline-v1",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": false,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    },
+    {
+      "trial_id": "family-0-seed-2",
+      "task_family": "family-0",
+      "partition": "holdout",
+      "variant": "candidate",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-candidate-v2",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": false,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    },
+    {
+      "trial_id": "family-1-seed-0",
+      "task_family": "family-1",
+      "partition": "holdout",
+      "variant": "baseline",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-baseline-v1",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": true,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    },
+    {
+      "trial_id": "family-1-seed-0",
+      "task_family": "family-1",
+      "partition": "holdout",
+      "variant": "candidate",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-candidate-v2",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": true,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    },
+    {
+      "trial_id": "family-1-seed-1",
+      "task_family": "family-1",
+      "partition": "holdout",
+      "variant": "baseline",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-baseline-v1",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": false,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    },
+    {
+      "trial_id": "family-1-seed-1",
+      "task_family": "family-1",
+      "partition": "holdout",
+      "variant": "candidate",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-candidate-v2",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": true,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    },
+    {
+      "trial_id": "family-1-seed-2",
+      "task_family": "family-1",
+      "partition": "holdout",
+      "variant": "baseline",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-baseline-v1",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": false,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    },
+    {
+      "trial_id": "family-1-seed-2",
+      "task_family": "family-1",
+      "partition": "holdout",
+      "variant": "candidate",
+      "snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-candidate-v2",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-memory-fixture-v1"
+      },
+      "success": false,
+      "duration_ms": 100,
+      "tokens": 100,
+      "critical_regression": false
+    }
+  ],
+  "ablations": [
+    {
+      "removed_component": "persistent_memory",
+      "ablated_snapshot": {
+        "source_commit": "source-fixture-v1",
+        "prompt_version": "prompt-candidate-v2",
+        "policy_version": "formal-policy-v1",
+        "superpod_commit": "superpod-fixture-v1",
+        "configuration_digest": "model-tools-no-memory-fixture-v1"
+      },
+      "observations": [
+        {
+          "trial_id": "family-0-seed-0",
+          "task_family": "family-0",
+          "partition": "holdout",
+          "variant": "baseline",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-no-memory-fixture-v1"
+          },
+          "success": true,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        },
+        {
+          "trial_id": "family-0-seed-0",
+          "task_family": "family-0",
+          "partition": "holdout",
+          "variant": "candidate",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-memory-fixture-v1"
+          },
+          "success": true,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        },
+        {
+          "trial_id": "family-0-seed-1",
+          "task_family": "family-0",
+          "partition": "holdout",
+          "variant": "baseline",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-no-memory-fixture-v1"
+          },
+          "success": false,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        },
+        {
+          "trial_id": "family-0-seed-1",
+          "task_family": "family-0",
+          "partition": "holdout",
+          "variant": "candidate",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-memory-fixture-v1"
+          },
+          "success": true,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        },
+        {
+          "trial_id": "family-0-seed-2",
+          "task_family": "family-0",
+          "partition": "holdout",
+          "variant": "baseline",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-no-memory-fixture-v1"
+          },
+          "success": false,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        },
+        {
+          "trial_id": "family-0-seed-2",
+          "task_family": "family-0",
+          "partition": "holdout",
+          "variant": "candidate",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-memory-fixture-v1"
+          },
+          "success": false,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        },
+        {
+          "trial_id": "family-1-seed-0",
+          "task_family": "family-1",
+          "partition": "holdout",
+          "variant": "baseline",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-no-memory-fixture-v1"
+          },
+          "success": true,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        },
+        {
+          "trial_id": "family-1-seed-0",
+          "task_family": "family-1",
+          "partition": "holdout",
+          "variant": "candidate",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-memory-fixture-v1"
+          },
+          "success": true,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        },
+        {
+          "trial_id": "family-1-seed-1",
+          "task_family": "family-1",
+          "partition": "holdout",
+          "variant": "baseline",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-no-memory-fixture-v1"
+          },
+          "success": false,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        },
+        {
+          "trial_id": "family-1-seed-1",
+          "task_family": "family-1",
+          "partition": "holdout",
+          "variant": "candidate",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-memory-fixture-v1"
+          },
+          "success": true,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        },
+        {
+          "trial_id": "family-1-seed-2",
+          "task_family": "family-1",
+          "partition": "holdout",
+          "variant": "baseline",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-no-memory-fixture-v1"
+          },
+          "success": false,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        },
+        {
+          "trial_id": "family-1-seed-2",
+          "task_family": "family-1",
+          "partition": "holdout",
+          "variant": "candidate",
+          "snapshot": {
+            "source_commit": "source-fixture-v1",
+            "prompt_version": "prompt-candidate-v2",
+            "policy_version": "formal-policy-v1",
+            "superpod_commit": "superpod-fixture-v1",
+            "configuration_digest": "model-tools-memory-fixture-v1"
+          },
+          "success": false,
+          "duration_ms": 100,
+          "tokens": 100,
+          "critical_regression": false
+        }
+      ]
+    }
+  ]
+}

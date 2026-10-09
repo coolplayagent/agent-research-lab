@@ -1,0 +1,16 @@
+[Unit]
+Description=AI-SDLC research lab (requires completed bootstrap acceptance)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/workspace/agent-research-lab
+ExecStart=/opt/workspace/agent-research-lab/bazel-bin/agent-research-lab --config /opt/workspace/agent-research-lab/local.toml run --continuous --seed
+Restart=on-failure
+RestartSec=60
+KillMode=control-group
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=default.target

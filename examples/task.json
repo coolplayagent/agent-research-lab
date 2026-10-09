@@ -1,0 +1,10 @@
+{
+  "id": "sdlc-recovery-baseline",
+  "role": "research",
+  "repository": "superpod",
+  "prompt": "Read knowledge/index.md and relevant agent collaboration research. Propose a reproducible AI-SDLC interruption/recovery experiment. Cite exact local source paths. Distinguish hypotheses from measurements. Return summary, findings, sources and limitations as JSON. Do not modify files or make external writes.",
+  "write": false,
+  "exploratory": false,
+  "dependencies": [],
+  "required_tools": []
+}

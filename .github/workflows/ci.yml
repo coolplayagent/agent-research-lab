@@ -10,6 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install Linux isolation runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bubblewrap
+          if test -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
       - uses: bazel-contrib/setup-bazel@0.15.0
         with:
           bazelisk-cache: true
