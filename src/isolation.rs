@@ -172,6 +172,13 @@ fn wrap_with_host(
         &worktree,
     )?;
     add_mount(&mut wrapped, "--bind", &logs, &logs)?;
+    // These host-created, immutable source worktrees contain the current checked
+    // upstream code, never experiment logs, memory, holdouts, or delivery authority.
+    let sources = state.join("sources");
+    if sources.exists() {
+        let sources = checked_directory(&sources)?;
+        add_mount(&mut wrapped, "--ro-bind", &sources, &sources)?;
+    }
     if tools.exists() {
         let tools = checked_directory(&tools)?;
         add_mount(&mut wrapped, "--ro-bind", &tools, &tools)?;
@@ -465,11 +472,14 @@ mod tests {
         let secret = state.join("private/answers.txt");
         let sibling = state.join("runs/task-two/report.txt");
         let source = state.join("tools/host-source.txt");
+        let current_source = state.join("sources/latest/code.txt");
+        fs::create_dir_all(current_source.parent().unwrap()).unwrap();
+        fs::write(&current_source, "latest pinned source").unwrap();
         fs::write(&secret, "private holdout").unwrap();
         fs::write(&sibling, "another agent").unwrap();
         fs::write(&source, "unchanged").unwrap();
         std::os::unix::fs::symlink(&secret, worktree.join("answer-link")).unwrap();
-        let script = "set -eu; test ! -e \"$1\"; test ! -e \"$2\"; test ! -e answer-link; if printf changed > \"$3\" 2>/dev/null; then exit 9; fi; printf own > artifact.txt; printf own-log > \"$4\"; test -d /proc/1; test \"$RELAY_MEMORY_HOME\" = \"$5\"";
+        let script = "set -eu; test ! -e \"$1\"; test ! -e \"$2\"; test ! -e answer-link; if printf changed > \"$3\" 2>/dev/null; then exit 9; fi; printf own > artifact.txt; printf own-log > \"$4\"; test -d /proc/1; test \"$RELAY_MEMORY_HOME\" = \"$5\"; test \"$(cat \"$6\")\" = 'latest pinned source'; if printf changed > \"$6\" 2>/dev/null; then exit 10; fi";
         let args = vec![
             "-c".into(),
             script.into(),
@@ -479,6 +489,7 @@ mod tests {
             utf8(&source).unwrap(),
             utf8(&logs.join("artifact.txt")).unwrap(),
             utf8(&logs.join("memory")).unwrap(),
+            utf8(&current_source).unwrap(),
         ];
         let (program, args) = wrap_agent("/bin/sh", &args, &state, &worktree, &logs, true).unwrap();
         let output = Command::new(program).args(args).output().unwrap();

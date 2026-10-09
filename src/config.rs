@@ -19,6 +19,14 @@ pub struct Config {
     pub task_timeout_seconds: u64,
     pub models: BTreeMap<String, String>,
     pub tools: BTreeMap<String, Tool>,
+    /// Production defaults to live upstream checks. Explicitly disabled only in offline fixtures.
+    #[serde(default = "latest_default")]
+    pub require_latest: bool,
+    #[serde(default)]
+    pub skills_manifest: Option<PathBuf>,
+}
+fn latest_default() -> bool {
+    true
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -34,6 +42,14 @@ impl Config {
         Ok(c)
     }
     pub fn validate(&self) -> Result<()> {
+        if self.require_latest
+            && self
+                .skills_manifest
+                .as_ref()
+                .is_none_or(|p| !p.is_absolute())
+        {
+            bail!("latest-baseline mode requires an absolute skills_manifest path");
+        }
         if self.schema_version != 1
             || self.max_agents == 0
             || self.max_agents > 3

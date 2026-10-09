@@ -4,6 +4,8 @@ pub mod config;
 pub mod delivery;
 pub mod evolution;
 pub mod evolution_cli;
+pub mod freshness;
+pub mod inputs;
 pub mod isolation;
 pub mod knowledge;
 pub mod process;

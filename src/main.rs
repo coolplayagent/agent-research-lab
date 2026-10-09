@@ -27,6 +27,12 @@ enum Commands {
         input: PathBuf,
     },
     Seed,
+    /// Fetch current upstream baselines and verify installed latest skills before research.
+    Refresh,
+    /// Compute the canonical installed-skill tree digest for a host manifest.
+    SkillDigest {
+        path: PathBuf,
+    },
     /// Execute queued jobs. A single controller owns admission and daily accounting.
     Run {
         #[arg(long)]
@@ -81,6 +87,9 @@ enum Commands {
 }
 fn execute(cli: Cli) -> Result<Value> {
     match cli.command {
+        Commands::SkillDigest { path } => {
+            Ok(json!({"sha256":agent_research_lab::freshness::skill_tree_digest(&path)?}))
+        }
         Commands::Evolution {
             action,
             input,
@@ -116,6 +125,9 @@ fn execute(cli: Cli) -> Result<Value> {
                     storage::read(&input)?,
                 )?)?),
                 Commands::Seed => runtime::seed(&c),
+                Commands::Refresh => Ok(serde_json::to_value(
+                    agent_research_lab::inputs::collect(&c)?,
+                )?),
                 Commands::Run {
                     continuous,
                     max_seconds,

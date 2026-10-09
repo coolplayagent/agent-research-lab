@@ -31,6 +31,22 @@ expected baseline or candidate binding. Unknown fields, including supplied
 `approved` flags, are errors. Receipts retain the context and observations so their
 decision can be recomputed. Missing evidence is a failure, never an approval.
 
+New evaluation requests also require the captured `upstream` repository, default
+branch and commit, plus a `skills_manifest` reference containing the exact host
+artifact path and SHA-256. Its baseline source must equal that captured default
+commit. Copy the complete verified skill manifest into host evidence storage;
+replace the example's path/hash placeholders with real installed tree/runtime
+digests and release identities. Production manifests include all seven tools.
+Do not point evaluation receipts at a mutable global manifest.
+
+Version-two receipts bind these upstream and skills identities into their evidence
+digest. Before promotion or an exploration-budget update, the host verifies the
+current GitHub default and latest skill releases and rehashes installed files.
+An advanced branch, newer skill release, changed artifact, or unavailable network
+requires fresh evaluation; two matching but old host files cannot approve a
+candidate. Fixed paired trials retain their original inputs while running.
+Historical unbound receipts remain readable, but cannot authorize new gates.
+
 Register `prompt-register.json` first, then replace the stable version placeholder
 in `prompt-portfolio.json` with the returned SHA-256. To propose a descendant, add
 the parent's version to `definition.parent_versions` and change its content and

@@ -42,3 +42,5 @@ verification_assets:
   - .bazelversion
   - .github/workflows/**
   - prompts/**
+  - research/**
+  - skills/**

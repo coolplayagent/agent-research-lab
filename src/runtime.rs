@@ -51,6 +51,8 @@ pub struct Job {
     pub source_commit: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub baseline_commit: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub research_inputs: Option<crate::inputs::ResearchInputs>,
     pub superpod_commit: String,
     pub prompt_digest: String,
     pub config_digest: String,
@@ -124,7 +126,21 @@ fn jobs(c: &Config) -> Result<Vec<Job>> {
         .collect()
 }
 
-pub fn enqueue(c: &Config, mut task: Task) -> Result<Job> {
+pub fn enqueue(c: &Config, task: Task) -> Result<Job> {
+    safe_id(&task.id)?;
+    let inputs = if job_path(c, &task.id).exists() {
+        None
+    } else {
+        crate::inputs::collect(c)?
+    };
+    enqueue_with_inputs(c, task, inputs)
+}
+
+fn enqueue_with_inputs(
+    c: &Config,
+    mut task: Task,
+    inputs: Option<crate::inputs::ResearchInputs>,
+) -> Result<Job> {
     safe_id(&task.id)?;
     if task.prompt_version.is_none() {
         task.prompt_version = if job_path(c, &task.id).exists() {
@@ -171,12 +187,29 @@ pub fn enqueue(c: &Config, mut task: Task) -> Result<Job> {
             .repository
             .clone()
     };
-    let mut commit = git(&repository, &["rev-parse", "HEAD"])?;
+    let mut commit = if let Some(inputs) = &inputs {
+        inputs
+            .repositories
+            .get(&task.repository)
+            .context("missing latest repository snapshot")?
+            .upstream
+            .commit
+            .clone()
+    } else {
+        git(&repository, &["rev-parse", "HEAD"])?
+    };
     let mut baseline_commit = None;
     if task.role == "review" {
         for id in &task.dependencies {
             let parent: Job = storage::read(&job_path(c, id))?;
             if parent.task.write && parent.task.repository == task.repository {
+                if let Some(inputs) = &inputs {
+                    ensure!(
+                        parent.source_commit
+                            == inputs.repositories[&task.repository].upstream.commit,
+                        "candidate baseline is no longer the latest default branch; rerun implementation"
+                    );
+                }
                 let receipt = committed_receipt(c, &workflow(c), &parent)?;
                 let candidate = receipt["candidate"]["candidate_commit"]
                     .as_str()
@@ -200,7 +233,11 @@ pub fn enqueue(c: &Config, mut task: Task) -> Result<Job> {
             }
         }
     }
-    let superpod_commit = git(&c.superpod, &["rev-parse", "HEAD"])?;
+    let superpod_commit = if let Some(inputs) = &inputs {
+        inputs.repositories["superpod"].upstream.commit.clone()
+    } else {
+        git(&c.superpod, &["rev-parse", "HEAD"])?
+    };
     let worktree = c.state_dir.join("worktrees").join(&task.id);
     fs::create_dir_all(worktree.parent().unwrap())?;
     if worktree.exists() {
@@ -220,11 +257,13 @@ pub fn enqueue(c: &Config, mut task: Task) -> Result<Job> {
             ],
         )?;
     }
-    let prompt_digest = storage::digest(rendered_task_prompt(c, &task)?.as_bytes());
+    let prompt_digest =
+        storage::digest(rendered_experiment_prompt(c, &task, inputs.as_ref())?.as_bytes());
     let job = Job {
         model: c.models[&task.role].clone(),
         source_commit: commit,
         baseline_commit,
+        research_inputs: inputs,
         superpod_commit,
         prompt_digest,
         config_digest: storage::digest(&serde_json::to_vec(c)?),
@@ -247,6 +286,9 @@ fn frozen_input(job: &Job) -> Value {
         "config_digest":job.config_digest,"worktree":job.worktree});
     if let Some(base) = &job.baseline_commit {
         value["baseline_commit"] = json!(base);
+    }
+    if let Some(inputs) = &job.research_inputs {
+        value["research_inputs"] = json!(inputs);
     }
     value
 }
@@ -285,6 +327,12 @@ fn prepare_retry(c: &Config, job: &mut Job) -> Result<()> {
 
 pub fn seed(c: &Config) -> Result<Value> {
     let day = crate::budget::day(now());
+    let inputs = crate::inputs::collect(c)?;
+    let config_id = storage::digest(&serde_json::to_vec(c)?);
+    let round = inputs
+        .as_ref()
+        .map(|v| format!("{day}-{}-{}", crate::inputs::cohort(v), &config_id[..6]))
+        .unwrap_or_else(|| day.to_string());
     let mut ids = Vec::new();
     for (topic, title) in [
         ("sdlc", "需求到 PR 的可验证自动交付"),
@@ -295,9 +343,9 @@ pub fn seed(c: &Config) -> Result<Value> {
         let independent = format!(
             "研究 {title}。只读分析固定的 SuperPOD 提交；给出有来源、可复现实验的假设。识别七个 coolplayagent CLI 的实际使用缺口。不得修改文件、安装、推送、发消息或合并。正文用中文，输出指定 JSON schema。"
         );
-        let research_id = format!("research-{day}-{topic}");
-        let critic_id = format!("critic-{day}-{topic}");
-        let synthesis_id = format!("synthesis-{day}-{topic}");
+        let research_id = format!("research-{round}-{topic}");
+        let critic_id = format!("critic-{round}-{topic}");
+        let synthesis_id = format!("synthesis-{round}-{topic}");
         for (id, role, prompt) in [
             (
                 research_id.clone(),
@@ -312,7 +360,7 @@ pub fn seed(c: &Config) -> Result<Value> {
                 ),
             ),
         ] {
-            enqueue(
+            enqueue_with_inputs(
                 c,
                 Task {
                     id: id.clone(),
@@ -327,10 +375,11 @@ pub fn seed(c: &Config) -> Result<Value> {
                     dependencies: vec![],
                     required_tools: vec![],
                 },
+                inputs.clone(),
             )?;
             ids.push(id);
         }
-        enqueue(
+        enqueue_with_inputs(
             c,
             Task {
                 id: synthesis_id.clone(),
@@ -347,6 +396,7 @@ pub fn seed(c: &Config) -> Result<Value> {
                 dependencies: vec![research_id, critic_id],
                 required_tools: vec![],
             },
+            inputs.clone(),
         )?;
         ids.push(synthesis_id);
     }
@@ -369,6 +419,18 @@ fn rendered_task_prompt(c: &Config, task: &Task) -> Result<String> {
         _ => include_str!("../prompts/research.md"),
     };
     Ok(format!("{role}\n{}", task.prompt))
+}
+
+fn rendered_experiment_prompt(
+    c: &Config,
+    task: &Task,
+    inputs: Option<&crate::inputs::ResearchInputs>,
+) -> Result<String> {
+    let mut prompt = rendered_task_prompt(c, task)?;
+    if let Some(inputs) = inputs {
+        prompt.push_str(&crate::inputs::prompt_context(inputs));
+    }
+    Ok(prompt)
 }
 
 fn committed_receipt(c: &Config, w: &Workflow, job: &Job) -> Result<Value> {
@@ -568,6 +630,15 @@ fn completed_dependencies(c: &Config, w: &Workflow, job: &Job) -> Result<Value> 
 }
 
 pub fn doctor(c: &Config, probe_models: bool) -> Result<Value> {
+    let latest_skills = if c.require_latest {
+        Some(crate::freshness::verify_skills(
+            c.skills_manifest
+                .as_ref()
+                .context("missing skills manifest")?,
+        )?)
+    } else {
+        None
+    };
     let mut results = Vec::new();
     for (name, tool) in &c.tools {
         let result = process::capture(
@@ -601,7 +672,7 @@ pub fn doctor(c: &Config, probe_models: bool) -> Result<Value> {
         }
     }
     Ok(
-        json!({"tools":results,"superpod":{"path":c.superpod,"commit":knowledge.as_ref().ok(),"error":knowledge.err().map(|e|e.to_string())},"model_probes":models,"daily_seconds":c.daily_seconds,"max_agents":c.max_agents}),
+        json!({"tools":results,"latest_skills":latest_skills,"superpod":{"path":c.superpod,"commit":knowledge.as_ref().ok(),"error":knowledge.err().map(|e|e.to_string())},"model_probes":models,"daily_seconds":c.daily_seconds,"max_agents":c.max_agents}),
     )
 }
 
@@ -667,7 +738,7 @@ pub fn run(c: &Config, continuous: bool, max_seconds: u64) -> Result<Value> {
     }
     let start = now();
     let mut last = start;
-    let mut seeded_day = None;
+    let mut next_seed_check = 0;
     let mut next_host_tick = 0_i64;
     let mut active: Vec<Active> = vec![];
     loop {
@@ -759,12 +830,14 @@ pub fn run(c: &Config, continuous: bool, max_seconds: u64) -> Result<Value> {
                                     ));
                                 }
                             }
-                            if let Err(error) = admit_followups(c, &a.job, &launch.log_dir) {
-                                storage::write(
-                                    &launch.log_dir.join("blocked-invalid-proposal.json"),
-                                    &json!({"status":"blocked_invalid_proposal","error":error.to_string()}),
-                                )?;
-                            }
+                            // Follow-ups may fetch remote baselines. Defer that
+                            // host work until no model leases need heartbeats.
+                            storage::write(
+                                &c.state_dir
+                                    .join("workflow/host-followups")
+                                    .join(format!("{}.json", a.job.run_id)),
+                                &json!({"task_id":a.job.task.id,"run_id":a.job.run_id}),
+                            )?;
                         } else {
                             defer_read_retry(
                                 &mut a.job,
@@ -809,6 +882,9 @@ pub fn run(c: &Config, continuous: bool, max_seconds: u64) -> Result<Value> {
             continue;
         }
         let mut host_progress = false;
+        if active.is_empty() && jobs(c)?.iter().all(|job| job.launch.is_none()) {
+            host_progress = drain_followups(c, &w)?;
+        }
         let outbox = c.state_dir.join("outbox");
         if active.is_empty()
             && outbox.exists()
@@ -841,7 +917,7 @@ pub fn run(c: &Config, continuous: bool, max_seconds: u64) -> Result<Value> {
                 last = completed;
                 match result {
                     Ok(entry) => {
-                        host_progress = entry.is_some();
+                        host_progress |= entry.is_some();
                         next_host_tick = completed + 1;
                     }
                     Err(error) => {
@@ -872,7 +948,14 @@ pub fn run(c: &Config, continuous: bool, max_seconds: u64) -> Result<Value> {
         pending.sort_by_key(|j| j.task.exploratory != track);
         let mut admitted = false;
         let mut retry_waiting = false;
+        // Remote checks can be slow. Verify only with no active leases, then
+        // admit one bounded cohort as a batch; never block a running heartbeat.
+        let may_admit = active.is_empty();
+        let mut checked_cohort: Option<String> = None;
         for mut job in pending {
+            if !may_admit {
+                break;
+            }
             if active.len() >= c.max_agents {
                 break;
             }
@@ -904,6 +987,39 @@ pub fn run(c: &Config, continuous: bool, max_seconds: u64) -> Result<Value> {
             }) {
                 continue;
             }
+            let cohort = job
+                .research_inputs
+                .as_ref()
+                .map(crate::inputs::cohort)
+                .unwrap_or_default();
+            if let Some(checked) = &checked_cohort {
+                if checked != &cohort {
+                    continue;
+                }
+            } else {
+                let remaining =
+                    ledger
+                        .budget
+                        .remaining(now(), c.daily_seconds)
+                        .min(if max_seconds > 0 {
+                            max_seconds.saturating_sub((now() - start).max(0) as u64)
+                        } else {
+                            u64::MAX
+                        });
+                let checked = {
+                    let _deadline = process::deadline_scope(Duration::from_secs(remaining.min(60)));
+                    crate::inputs::verify(c, job.research_inputs.as_ref())
+                };
+                if let Err(error) = checked {
+                    job.last_error = Some(format!(
+                        "latest-baseline admission blocked; preserve this experiment and enqueue a fresh cohort: {error:#}"
+                    ));
+                    job.retry_after = None;
+                    storage::write(&job_path(c, &job.task.id), &job)?;
+                    continue;
+                }
+                checked_cohort = Some(cohort);
+            }
             let availability = job.task.required_tools.iter().try_for_each(|name| {
                 let t = c
                     .tools
@@ -928,13 +1044,13 @@ pub fn run(c: &Config, continuous: bool, max_seconds: u64) -> Result<Value> {
             let bounded_remaining =
                 ledger
                     .budget
-                    .remaining(time, c.daily_seconds)
+                    .remaining(now(), c.daily_seconds)
                     .min(if max_seconds > 0 {
-                        max_seconds.saturating_sub((time - start).max(0) as u64)
+                        max_seconds.saturating_sub((now() - start).max(0) as u64)
                     } else {
                         u64::MAX
                     });
-            if bounded_remaining == 0 {
+            if bounded_remaining == 0 || c.state_dir.join("paused").exists() {
                 break;
             }
             match launch(c, &w, &mut job, bounded_remaining) {
@@ -984,9 +1100,9 @@ pub fn run(c: &Config, continuous: bool, max_seconds: u64) -> Result<Value> {
             if !continuous && !retry_waiting && !host_progress {
                 break;
             }
-            if continuous && seeded_day != Some(crate::budget::day(now())) {
+            if continuous && now() >= next_seed_check {
                 seed(c)?;
-                seeded_day = Some(crate::budget::day(now()));
+                next_seed_check = now() + 900;
             }
             std::thread::sleep(Duration::from_millis(200));
         } else {
@@ -998,12 +1114,17 @@ pub fn run(c: &Config, continuous: bool, max_seconds: u64) -> Result<Value> {
 
 fn launch(c: &Config, w: &Workflow, job: &mut Job, remaining: u64) -> Result<Process> {
     ensure!(remaining > 0, "execution budget exhausted");
+    if let Some(inputs) = &job.research_inputs {
+        crate::freshness::verify_installed_bytes(&inputs.skills)?;
+    }
     ensure!(
         git(&job.worktree, &["rev-parse", "HEAD"])? == job.source_commit,
         "worktree source commit changed"
     );
     ensure!(
-        storage::digest(rendered_task_prompt(c, &job.task)?.as_bytes()) == job.prompt_digest,
+        storage::digest(
+            rendered_experiment_prompt(c, &job.task, job.research_inputs.as_ref())?.as_bytes()
+        ) == job.prompt_digest,
         "frozen prompt changed"
     );
     ensure!(
@@ -1062,7 +1183,7 @@ fn launch(c: &Config, w: &Workflow, job: &mut Job, remaining: u64) -> Result<Pro
     let binding = json!({"source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,"config_digest":job.config_digest});
     let prompt = format!(
         "{}\n\nFrozen experiment bindings: {}\nUse only this task worktree. Do not create Git commits, change formal gates, access private evaluation holdouts, install tools globally, push or merge. Those operations belong to the host delivery adapters. Evidence missing means unverified.\n",
-        rendered_task_prompt(c, &job.task)?,
+        rendered_experiment_prompt(c, &job.task, job.research_inputs.as_ref())?,
         binding
     );
     let prompt = format!(
@@ -1164,8 +1285,8 @@ fn observed_tools(c: &Config, job: &Job) -> Result<Value> {
         ("codex", PathBuf::from(&c.codex)),
         ("workflow-cli", c.workflow.clone()),
     ];
-    for name in &job.task.required_tools {
-        paths.push((name.as_str(), c.tools[name].binary.clone()));
+    for (name, tool) in &c.tools {
+        paths.push((name.as_str(), tool.binary.clone()));
     }
     if job.task.use_memory {
         paths.push(("relay-memory", c.tools["relay-memory"].binary.clone()));
@@ -1249,6 +1370,46 @@ struct NextTask {
     write: bool,
     exploratory: bool,
 }
+fn drain_followups(c: &Config, w: &Workflow) -> Result<bool> {
+    let queue = c.state_dir.join("workflow/host-followups");
+    if !queue.exists() {
+        return Ok(false);
+    }
+    let mut paths = fs::read_dir(&queue)?
+        .map(|entry| entry.map(|e| e.path()))
+        .collect::<std::io::Result<Vec<_>>>()?;
+    paths.sort();
+    let Some(path) = paths
+        .into_iter()
+        .find(|p| p.extension().is_some_and(|s| s == "json"))
+    else {
+        return Ok(false);
+    };
+    let record: Value = storage::read(&path)?;
+    let id = record["task_id"]
+        .as_str()
+        .context("follow-up record missing task")?;
+    safe_id(id)?;
+    let job: Job = storage::read(&job_path(c, id))?;
+    ensure!(
+        record["run_id"] == job.run_id && job.launch.is_none(),
+        "follow-up record does not bind a settled task"
+    );
+    ensure!(
+        w.status(&job.run_id)?["status"] == "succeeded",
+        "follow-up parent is not successful"
+    );
+    let dir = c.state_dir.join("runs").join(&job.run_id);
+    if let Err(error) = admit_followups(c, &job, &dir) {
+        storage::write(
+            &dir.join("blocked-invalid-proposal.json"),
+            &json!({"status":"followup_blocked","error":error.to_string()}),
+        )?;
+    }
+    fs::remove_file(path)?;
+    Ok(true)
+}
+
 fn admit_followups(c: &Config, parent: &Job, dir: &Path) -> Result<()> {
     let receipt: Value = storage::read(&dir.join("receipt.json"))?;
     let proposals: Vec<NextTask> = serde_json::from_value(
@@ -1292,12 +1453,17 @@ fn admit_followups(c: &Config, parent: &Job, dir: &Path) -> Result<()> {
         );
     }
     let mut queued = vec![];
+    let inputs = if proposals.is_empty() {
+        None
+    } else {
+        crate::inputs::collect(c)?
+    };
     for (index, proposal) in proposals.into_iter().enumerate() {
         let id = format!(
             "followup-{}-{index}",
             &storage::digest(parent.run_id.as_bytes())[..16]
         );
-        enqueue(
+        enqueue_with_inputs(
             c,
             Task {
                 id: id.clone(),
@@ -1312,6 +1478,7 @@ fn admit_followups(c: &Config, parent: &Job, dir: &Path) -> Result<()> {
                 dependencies: vec![parent.task.id.clone()],
                 required_tools: vec![],
             },
+            inputs.clone(),
         )?;
         queued.push(id);
     }
@@ -1351,6 +1518,9 @@ fn validate_report(value: &Value) -> Result<()> {
 fn settle(w: &Workflow, job: &Job, observation: &ExitObservation) -> Result<bool> {
     let launch = job.launch.as_ref().context("missing launch receipt")?;
     let valid_report = (|| -> Result<Value> {
+        if let Some(inputs) = &job.research_inputs {
+            crate::freshness::verify_installed_bytes(&inputs.skills)?;
+        }
         ensure!(
             observation.success,
             "worker failed: {:?}; exit {:?}",
@@ -1391,7 +1561,7 @@ fn settle(w: &Workflow, job: &Job, observation: &ExitObservation) -> Result<bool
             } else {
                 None
             };
-            let receipt = json!({"agent_report":value,"source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,"model":job.model,"tools":launch.tools,"candidate":candidate,"claim":"process completed; research claims require independent evaluation"});
+            let receipt = json!({"agent_report":value,"source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,"model":job.model,"tools":launch.tools,"research_inputs":job.research_inputs,"candidate":candidate,"claim":"process completed; research claims require independent evaluation"});
             let receipt_path = launch.log_dir.join("receipt.json");
             storage::write(&receipt_path, &receipt)?;
             let outputs = json!({"result":serde_json::to_string(&receipt)?});
@@ -1663,6 +1833,8 @@ printf '{"type":"fixture.completed"}\n'
         })
         .collect();
         let mut c = Config {
+            require_latest: false,
+            skills_manifest: None,
             schema_version: 1,
             workspace: temp.path().into(),
             state_dir: temp.path().join("state"),
@@ -1835,6 +2007,8 @@ printf '{"type":"fixture.completed"}\n'
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path();
         let c = Config {
+            require_latest: false,
+            skills_manifest: None,
             schema_version: 1,
             workspace: root.into(),
             state_dir: root.join("state"),
@@ -1871,6 +2045,7 @@ printf '{"type":"fixture.completed"}\n'
             model: "fixture".into(),
             source_commit: "fixture".into(),
             baseline_commit: None,
+            research_inputs: None,
             superpod_commit: "fixture".into(),
             prompt_digest: "fixture".into(),
             config_digest: "fixture".into(),

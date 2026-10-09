@@ -2,11 +2,13 @@
 //! kept outside agent workspaces; candidate reports never supply approval flags.
 //! These path checks do not replace OS-level filesystem isolation.
 
+use crate::delivery::VerificationArtifact;
 use crate::evolution::{
     AblationStudy, EvaluationContext, EvaluationDecision, ExplorationBudget, ExplorationOutcome,
     HoldoutIsolation, PromptDefinition, PromptRegistry, PromptVersion, QuarantinedRuleProposal,
     StrategyPortfolio, TrialObservation, Variant, evaluate_novel_capability, evaluate_promotion,
 };
+use crate::freshness::{RemoteClient, RemoteSnapshot};
 use crate::storage;
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -33,6 +35,8 @@ pub struct PortfolioValidation {
 pub struct PromotionRequest {
     /// Host-controlled expected versions, separate from observation reports.
     pub context_file: PathBuf,
+    pub upstream: RemoteSnapshot,
+    pub skills_manifest: VerificationArtifact,
     pub holdout_isolation: HoldoutIsolation,
     pub observations: Vec<TrialObservation>,
 }
@@ -41,6 +45,8 @@ pub struct PromotionRequest {
 #[serde(deny_unknown_fields)]
 pub struct NoveltyRequest {
     pub context_file: PathBuf,
+    pub upstream: RemoteSnapshot,
+    pub skills_manifest: VerificationArtifact,
     pub holdout_isolation: HoldoutIsolation,
     pub observations: Vec<TrialObservation>,
     pub ablations: Vec<AblationStudy>,
@@ -59,6 +65,12 @@ pub enum EvaluationKind {
 #[serde(deny_unknown_fields)]
 pub struct EvaluationReceipt {
     pub schema_version: u32,
+    /// Missing only on historical receipts, which remain readable but cannot
+    /// authorize new promotion or exploration-budget increases.
+    #[serde(default)]
+    pub upstream: Option<RemoteSnapshot>,
+    #[serde(default)]
+    pub skills_manifest: Option<VerificationArtifact>,
     pub kind: EvaluationKind,
     pub context: EvaluationContext,
     pub observations: Vec<TrialObservation>,
@@ -69,9 +81,17 @@ pub struct EvaluationReceipt {
 impl EvaluationReceipt {
     pub fn validate(&self) -> Result<()> {
         ensure!(
-            self.schema_version == 1,
+            self.schema_version == 2,
             "unsupported evaluation receipt version"
         );
+        let upstream = self.upstream.as_ref().context(
+            "old evaluation receipt lacks an upstream baseline; re-evaluation is required",
+        )?;
+        validate_evaluation_baseline(&self.context, upstream)?;
+        let skills = self.skills_manifest.as_ref().context(
+            "old evaluation receipt lacks a hashed skills manifest; re-evaluation is required",
+        )?;
+        skills.validate_skills()?;
         let mut canonical = self.observations.clone();
         canonicalize_observations(&mut canonical);
         ensure!(
@@ -84,7 +104,7 @@ impl EvaluationReceipt {
             serde_json::to_value(&ablations)? == serde_json::to_value(&self.ablations)?,
             "ablation evidence is not in canonical order"
         );
-        let recomputed = match self.kind {
+        let mut recomputed = match self.kind {
             EvaluationKind::Promotion => {
                 ensure!(
                     self.ablations.is_empty(),
@@ -96,6 +116,7 @@ impl EvaluationReceipt {
                 evaluate_novel_capability(&self.context, &self.observations, &self.ablations)?
             }
         };
+        bind_upstream_digest(&mut recomputed, upstream, skills)?;
         ensure!(
             serde_json::to_value(&recomputed)? == serde_json::to_value(&self.decision)?,
             "evaluation receipt does not match recomputed evidence"
@@ -259,6 +280,15 @@ pub fn register_prompt_candidate(proposal_file: &Path, registry_file: &Path) -> 
 /// Paths in JSON are interpreted relative to the request file, not the shell's
 /// working directory. Stateful operations require an explicit output path.
 pub fn execute(action: &str, input: &Path, output: Option<&Path>) -> Result<Value> {
+    execute_with_client(action, input, output, &RemoteClient::default())
+}
+
+fn execute_with_client(
+    action: &str,
+    input: &Path,
+    output: Option<&Path>,
+    remote: &RemoteClient,
+) -> Result<Value> {
     let input = input
         .canonicalize()
         .with_context(|| format!("cannot read {}", input.display()))?;
@@ -308,10 +338,19 @@ pub fn execute(action: &str, input: &Path, output: Option<&Path>) -> Result<Valu
                 &request.holdout_isolation,
             )?;
             let context: EvaluationContext = read_strict(&context_path)?;
+            validate_evaluation_baseline(&context, &request.upstream)?;
+            prepare_skills_artifact(
+                base,
+                &mut request.skills_manifest,
+                &request.holdout_isolation,
+            )?;
             canonicalize_observations(&mut request.observations);
-            let decision = evaluate_promotion(&context, &request.observations)?;
+            let mut decision = evaluate_promotion(&context, &request.observations)?;
+            bind_upstream_digest(&mut decision, &request.upstream, &request.skills_manifest)?;
             let receipt = EvaluationReceipt {
-                schema_version: 1,
+                schema_version: 2,
+                upstream: Some(request.upstream),
+                skills_manifest: Some(request.skills_manifest),
                 kind: EvaluationKind::Promotion,
                 context,
                 observations: request.observations,
@@ -331,12 +370,21 @@ pub fn execute(action: &str, input: &Path, output: Option<&Path>) -> Result<Valu
                 &request.holdout_isolation,
             )?;
             let context: EvaluationContext = read_strict(&context_path)?;
+            validate_evaluation_baseline(&context, &request.upstream)?;
+            prepare_skills_artifact(
+                base,
+                &mut request.skills_manifest,
+                &request.holdout_isolation,
+            )?;
             canonicalize_observations(&mut request.observations);
             canonicalize_ablations(&mut request.ablations);
-            let decision =
+            let mut decision =
                 evaluate_novel_capability(&context, &request.observations, &request.ablations)?;
+            bind_upstream_digest(&mut decision, &request.upstream, &request.skills_manifest)?;
             let receipt = EvaluationReceipt {
-                schema_version: 1,
+                schema_version: 2,
+                upstream: Some(request.upstream),
+                skills_manifest: Some(request.skills_manifest),
                 kind: EvaluationKind::Novelty,
                 context,
                 observations: request.observations,
@@ -388,6 +436,18 @@ pub fn execute(action: &str, input: &Path, output: Option<&Path>) -> Result<Valu
                 );
                 let receipt: EvaluationReceipt = read_strict(&receipt_path)?;
                 receipt.validate()?;
+                remote.verify_remote_binding(
+                    receipt
+                        .upstream
+                        .as_ref()
+                        .context("missing evaluation upstream")?,
+                )?;
+                let skills = receipt
+                    .skills_manifest
+                    .as_ref()
+                    .context("missing evaluation skills manifest")?;
+                ensure_host_path(&skills.path, &request.holdout_isolation)?;
+                skills.verify_skills(remote)?;
                 let evidence_id = receipt.decision.evidence_digest.clone();
                 if let Some(share) = budget.record(ExplorationOutcome {
                     experiment_id: evidence_id.clone(),
@@ -493,6 +553,19 @@ pub fn execute(action: &str, input: &Path, output: Option<&Path>) -> Result<Valu
                 StrategySelections::default()
             };
             selections.validate(&registry)?;
+            let upstream = receipt
+                .upstream
+                .as_ref()
+                .context("missing promotion upstream baseline")?;
+            // The paired run stays frozen, but its historical success cannot
+            // authorize selection after the remote default branch advances.
+            remote.verify_remote_binding(upstream)?;
+            let skills = receipt
+                .skills_manifest
+                .as_ref()
+                .context("missing promotion skills manifest")?;
+            ensure_host_path(&skills.path, &request.holdout_isolation)?;
+            skills.verify_skills(remote)?;
             if let Some(current) = selections.roles.get(&request.role) {
                 if current.stable_version == request.candidate_version {
                     ensure!(
@@ -534,6 +607,8 @@ pub fn execute(action: &str, input: &Path, output: Option<&Path>) -> Result<Valu
                 },
             );
             selections.validate(&registry)?;
+            skills.verify_skills(remote)?;
+            remote.verify_remote_binding(upstream)?;
             storage::write(&destination, &selections)?;
             Ok(
                 json!({"selected":true,"already_selected":false,"role":request.role,"version":request.candidate_version,"selections_file":destination}),
@@ -549,6 +624,43 @@ pub fn execute(action: &str, input: &Path, output: Option<&Path>) -> Result<Valu
         }
         _ => bail!("unknown evolution action: {action}"),
     }
+}
+
+fn validate_evaluation_baseline(
+    context: &EvaluationContext,
+    upstream: &RemoteSnapshot,
+) -> Result<()> {
+    upstream.validate()?;
+    ensure!(
+        context.baseline.source_commit == upstream.commit,
+        "evaluation source differs from the captured upstream default baseline"
+    );
+    Ok(())
+}
+
+fn bind_upstream_digest(
+    decision: &mut EvaluationDecision,
+    upstream: &RemoteSnapshot,
+    skills: &VerificationArtifact,
+) -> Result<()> {
+    decision.evidence_digest = storage::digest(&serde_json::to_vec(&(
+        &decision.evidence_digest,
+        &upstream.repository,
+        &upstream.default_branch,
+        &upstream.commit,
+        &skills.sha256,
+    ))?);
+    Ok(())
+}
+
+fn prepare_skills_artifact(
+    base: &Path,
+    artifact: &mut VerificationArtifact,
+    isolation: &HoldoutIsolation,
+) -> Result<()> {
+    artifact.path = relative_to(base, &artifact.path).canonicalize()?;
+    ensure_host_path(&artifact.path, isolation)?;
+    artifact.validate_skills()
 }
 
 fn descends_from(registry: &PromptRegistry, candidate: &str, baseline: &str) -> bool {
@@ -713,6 +825,37 @@ fn write_optional(path: Option<&Path>, value: &impl Serialize) -> Result<()> {
 mod tests {
     use super::*;
 
+    fn mock_remote(root: &Path) -> RemoteClient {
+        use std::os::unix::fs::PermissionsExt;
+        let head = root.join("current-upstream.json");
+        if !head.exists() {
+            storage::write(&head, &json!({"sha":"a".repeat(40)})).unwrap();
+        }
+        let gh = root.join("fake-gh");
+        let quoted = head.to_string_lossy().replace('\'', "'\\''");
+        let release = root.join("current-release.json");
+        if !release.exists() {
+            storage::write(
+                &release,
+                &json!({"id":1,"tag_name":"v1","draft":false,"prerelease":false}),
+            )
+            .unwrap();
+        }
+        let release = release.to_string_lossy().replace('\'', "'\\''");
+        fs::write(&gh, format!("#!/bin/sh\nset -eu\ncase \"$1\" in\nrepo) printf '%s\\n' '{{\"nameWithOwner\":\"coolplayagent/example\",\"defaultBranchRef\":{{\"name\":\"main\"}}}}';;\napi) case \"$2\" in */releases/latest) cat '{release}';; *) cat '{quoted}';; esac;;\n*) exit 92;;\nesac\n")).unwrap();
+        fs::set_permissions(&gh, fs::Permissions::from_mode(0o755)).unwrap();
+        RemoteClient {
+            git: PathBuf::from("git"),
+            gh,
+            timeout: std::time::Duration::from_secs(2),
+        }
+    }
+
+    fn execute_fixture(action: &str, input: &Path, output: Option<&Path>) -> Result<Value> {
+        let host = input.parent().unwrap();
+        execute_with_client(action, input, output, &mock_remote(host))
+    }
+
     fn example(name: &str) -> Value {
         serde_json::from_str(match name {
             "prompt-register" => include_str!("../examples/evolution/prompt-register.json"),
@@ -742,6 +885,17 @@ mod tests {
             "private_root":"../holdout","optimizer_roots":["../optimizer"],
             "shared_knowledge_roots":["../superpod"],"shared_memory_roots":["../memory"]
         });
+        let installed = temp.join("host/verified-skill");
+        fs::create_dir_all(&installed).unwrap();
+        fs::write(
+            installed.join("SKILL.md"),
+            "---\nname: verified-skill\n---\nFixture",
+        )
+        .unwrap();
+        fs::write(installed.join("cli"), "verified runtime").unwrap();
+        let manifest = temp.join("host/skills-manifest.json");
+        storage::write(&manifest, &json!({"schema_version":1,"skills":[{"name":"verified-skill","repository":"coolplayagent/example","installed_path":installed,"runtime_path":installed.join("cli"),"tree_sha256":crate::freshness::skill_tree_digest(&installed).unwrap(),"runtime_sha256":crate::delivery::file_sha256(&installed.join("cli")).unwrap(),"release_tag":"v1","release_id":1,"source_commit":null,"checked_at":"2026-10-09T00:00:00Z"}]})).unwrap();
+        request["skills_manifest"] = json!({"path":"skills-manifest.json","sha256":crate::delivery::file_sha256(&manifest).unwrap()});
         storage::write(&temp.join("host/context.json"), &example("context")).unwrap();
         let path = temp.join(format!("host/{action}.json"));
         storage::write(&path, &request).unwrap();
@@ -826,7 +980,7 @@ mod tests {
         let input = temp.path().join("host/exploration.json");
         let output = temp.path().join("host/budget.json");
         storage::write(&input, &request).unwrap();
-        execute("exploration", &input, Some(&output)).unwrap();
+        execute_fixture("exploration", &input, Some(&output)).unwrap();
         let budget: ExplorationBudget = read_strict(&output).unwrap();
         assert_eq!(budget.pending_count(), 1);
         assert_eq!(budget.share_percent(), 25);
@@ -836,7 +990,7 @@ mod tests {
             {"experiment_id":"first","evaluation_receipt":"evaluation-receipt.json"}
         ]);
         storage::write(&input, &request).unwrap();
-        assert!(execute("exploration", &input, Some(&output)).is_err());
+        assert!(execute_fixture("exploration", &input, Some(&output)).is_err());
         assert_eq!(before, fs::read(&output).unwrap());
     }
 
@@ -893,7 +1047,33 @@ mod tests {
         let mut request = example("promote");
         request["candidate_version"] = candidate.clone().into();
         storage::write(&input, &request).unwrap();
-        let result = execute("promote", &input, Some(&output)).unwrap();
+        // Unchanged host context + a passing receipt are both stale once the
+        // remote default advances; they must not create a selection.
+        storage::write(
+            &temp.path().join("host/current-upstream.json"),
+            &json!({"sha":"e".repeat(40)}),
+        )
+        .unwrap();
+        assert!(execute_fixture("promote", &input, Some(&output)).is_err());
+        assert!(!output.exists());
+        storage::write(
+            &temp.path().join("host/current-upstream.json"),
+            &json!({"sha":"a".repeat(40)}),
+        )
+        .unwrap();
+        storage::write(
+            &temp.path().join("host/current-release.json"),
+            &json!({"id":2,"tag_name":"v2","draft":false,"prerelease":false}),
+        )
+        .unwrap();
+        assert!(execute_fixture("promote", &input, Some(&output)).is_err());
+        assert!(!output.exists());
+        storage::write(
+            &temp.path().join("host/current-release.json"),
+            &json!({"id":1,"tag_name":"v1","draft":false,"prerelease":false}),
+        )
+        .unwrap();
+        let result = execute_fixture("promote", &input, Some(&output)).unwrap();
         assert_eq!(result["already_selected"], false);
         assert_eq!(
             resolve_selection(temp.path(), "research").unwrap(),
@@ -901,7 +1081,7 @@ mod tests {
         );
         let before = fs::read(&output).unwrap();
         assert_eq!(
-            execute("promote", &input, Some(&output)).unwrap()["already_selected"],
+            execute_fixture("promote", &input, Some(&output)).unwrap()["already_selected"],
             true
         );
         assert_eq!(before, fs::read(&output).unwrap());
@@ -926,7 +1106,7 @@ mod tests {
         execute("evaluate", &gate_input, Some(&receipt_path)).unwrap();
         request["candidate_version"] = third.into();
         storage::write(&input, &request).unwrap();
-        assert!(execute("promote", &input, Some(&output)).is_err());
+        assert!(execute_fixture("promote", &input, Some(&output)).is_err());
         assert_eq!(before, fs::read(&output).unwrap());
         assert_eq!(
             resolve_selection(temp.path(), "research").unwrap(),
@@ -949,11 +1129,26 @@ mod tests {
         let input = temp.path().join("host/promote.json");
         storage::write(&input, &example("promote")).unwrap();
         let output = temp.path().join("evolution/selections.json");
-        assert!(execute("promote", &input, Some(&output)).is_err());
+        assert!(execute_fixture("promote", &input, Some(&output)).is_err());
         let mut receipt: Value = storage::read(&receipt_path).unwrap();
         receipt["decision"]["approved"] = false.into();
         storage::write(&receipt_path, &receipt).unwrap();
-        assert!(execute("promote", &input, Some(&output)).is_err());
+        assert!(execute_fixture("promote", &input, Some(&output)).is_err());
         assert!(!output.exists());
+    }
+
+    #[test]
+    fn old_unbound_receipts_stay_readable_but_cannot_authorize_new_gates() {
+        let temp = setup();
+        let input = prepare_gate(temp.path(), "evaluate");
+        let output = temp.path().join("host/receipt.json");
+        execute("evaluate", &input, Some(&output)).unwrap();
+        let mut old: Value = storage::read(&output).unwrap();
+        old["schema_version"] = 1.into();
+        old.as_object_mut().unwrap().remove("upstream");
+        storage::write(&output, &old).unwrap();
+        let old: EvaluationReceipt = read_strict(&output).unwrap();
+        assert!(old.upstream.is_none());
+        assert!(old.validate().is_err());
     }
 }

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "adapter_maintainer": "coolplayagent/agent-research-lab",
+  "adapter_origin": "project-maintained; upstream has no SKILL.md",
+  "runtime_repository": "coolplayagent/computer-use-cli",
+  "runtime_relative_path": "assets/linux-x86_64/relay-computer-use",
+  "runtime_sha256": "6506f42c4ade7c272c8c5ebbac00e0af46db254dff3fe97a425827264cf06148",
+  "checked_at": "2026-10-09T09:50:07.209524+00:00",
+  "upstream_default_head": "b848e4b029507db597167c5736f33a761063ce88",
+  "release_tag": "v0.1.0",
+  "release_id": 330015749,
+  "release_published_at": "2026-05-27T08:14:47Z",
+  "release_source_commit": "7587d5532bbadcc0fe5f9c0713346ed86ed8c7c0",
+  "release_asset_id": 430919907,
+  "release_asset_sha256": "11682c37cb74e3cd3abae3f3c4b067955ef6d2c9a81bae7c2f29541da111527e"
+}

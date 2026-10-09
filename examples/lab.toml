@@ -1,4 +1,6 @@
 schema_version = 1
+require_latest = true
+skills_manifest = "/opt/workspace/agent-research-lab/.lab/latest/skills.json"
 workspace = "/opt/workspace"
 state_dir = "/opt/workspace/agent-research-lab/.lab"
 superpod = "/opt/workspace/superpod"
