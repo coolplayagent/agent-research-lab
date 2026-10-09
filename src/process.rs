@@ -27,6 +27,14 @@ pub fn deadline_scope(duration: Duration) -> DeadlineGuard {
     DeadlineGuard(previous)
 }
 
+/// Whether the enclosing host-operation allowance has expired. Callers may
+/// defer replay-safe work instead of turning an exhausted budget into rejection.
+pub fn deadline_exhausted() -> bool {
+    DEADLINE
+        .get()
+        .is_some_and(|deadline| Instant::now() >= deadline)
+}
+
 pub struct Process {
     child: Child,
     pub stdout: PathBuf,

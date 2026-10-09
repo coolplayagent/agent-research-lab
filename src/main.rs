@@ -132,12 +132,7 @@ fn execute(cli: Cli) -> Result<Value> {
                     continuous,
                     max_seconds,
                     seed,
-                } => {
-                    if seed {
-                        runtime::seed(&c)?;
-                    }
-                    runtime::run(&c, continuous, max_seconds)
-                }
+                } => runtime::run_seeded(&c, continuous, max_seconds, seed),
                 Commands::Status | Commands::Report => runtime::status(&c),
                 Commands::Pause => runtime::pause(&c, true),
                 Commands::Resume => runtime::pause(&c, false),

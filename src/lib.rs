@@ -8,6 +8,7 @@ pub mod freshness;
 pub mod inputs;
 pub mod isolation;
 pub mod knowledge;
+pub mod lease_heartbeat;
 pub mod process;
 pub mod runtime;
 pub mod storage;

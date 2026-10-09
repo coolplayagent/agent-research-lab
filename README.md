@@ -66,7 +66,8 @@ bazel-bin/agent-research-lab --config local.toml refresh
 ```
 
 Each idle admission batch verifies freshness before starting up to three agents of
-one cohort, so remote checks cannot starve active workflow leases. The batch keeps
+one cohort. An independent heartbeat renews each active workflow lease while
+the controller prepares other agents or handles results. The batch keeps
 its source snapshots fixed. Installed skill/runtime bytes are checked again at
 launch and settlement; concurrent installation changes invalidate the result.
 Source, skill, configuration or research-input changes produce
@@ -136,6 +137,12 @@ Read-only failures have bounded retries; `retry TASK_ID` explicitly retries an
 eligible read-only task. Interrupted writes retain their uncertain outcome for
 reconciliation instead of being automatically repeated. Resume does not guarantee
 instruction-level continuation inside a previously terminated model process.
+Retained task starts replay their original timeout and input envelope, even when
+the next controller uses a different timeout default. Successful workflow receipts
+reconstruct durable completion work after a crash. Follow-up admission is replayable;
+interrupted memory writeback remains explicitly unknown until reconciled, avoiding
+an unproven duplicate write. Completion work, freshness checks and seeding share
+the persisted daily budget and the `run --max-seconds` deadline.
 
 The default ceiling is three concurrent agents and 43,200 active wall-clock seconds
 per Asia/Singapore calendar day. Concurrent agents share the wall-clock allowance;
