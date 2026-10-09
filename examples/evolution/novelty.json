@@ -19,7 +19,7 @@
       "partition": "holdout",
       "variant": "baseline",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-baseline-v1",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -36,7 +36,7 @@
       "partition": "holdout",
       "variant": "candidate",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-candidate-v2",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -53,7 +53,7 @@
       "partition": "holdout",
       "variant": "baseline",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-baseline-v1",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -70,7 +70,7 @@
       "partition": "holdout",
       "variant": "candidate",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-candidate-v2",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -87,7 +87,7 @@
       "partition": "holdout",
       "variant": "baseline",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-baseline-v1",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -104,7 +104,7 @@
       "partition": "holdout",
       "variant": "candidate",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-candidate-v2",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -121,7 +121,7 @@
       "partition": "holdout",
       "variant": "baseline",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-baseline-v1",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -138,7 +138,7 @@
       "partition": "holdout",
       "variant": "candidate",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-candidate-v2",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -155,7 +155,7 @@
       "partition": "holdout",
       "variant": "baseline",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-baseline-v1",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -172,7 +172,7 @@
       "partition": "holdout",
       "variant": "candidate",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-candidate-v2",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -189,7 +189,7 @@
       "partition": "holdout",
       "variant": "baseline",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-baseline-v1",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -206,7 +206,7 @@
       "partition": "holdout",
       "variant": "candidate",
       "snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-candidate-v2",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -222,7 +222,7 @@
     {
       "removed_component": "persistent_memory",
       "ablated_snapshot": {
-        "source_commit": "source-fixture-v1",
+        "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "prompt_version": "prompt-candidate-v2",
         "policy_version": "formal-policy-v1",
         "superpod_commit": "superpod-fixture-v1",
@@ -235,7 +235,7 @@
           "partition": "holdout",
           "variant": "baseline",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -252,7 +252,7 @@
           "partition": "holdout",
           "variant": "candidate",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -269,7 +269,7 @@
           "partition": "holdout",
           "variant": "baseline",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -286,7 +286,7 @@
           "partition": "holdout",
           "variant": "candidate",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -303,7 +303,7 @@
           "partition": "holdout",
           "variant": "baseline",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -320,7 +320,7 @@
           "partition": "holdout",
           "variant": "candidate",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -337,7 +337,7 @@
           "partition": "holdout",
           "variant": "baseline",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -354,7 +354,7 @@
           "partition": "holdout",
           "variant": "candidate",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -371,7 +371,7 @@
           "partition": "holdout",
           "variant": "baseline",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -388,7 +388,7 @@
           "partition": "holdout",
           "variant": "candidate",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -405,7 +405,7 @@
           "partition": "holdout",
           "variant": "baseline",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -422,7 +422,7 @@
           "partition": "holdout",
           "variant": "candidate",
           "snapshot": {
-            "source_commit": "source-fixture-v1",
+            "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "prompt_version": "prompt-candidate-v2",
             "policy_version": "formal-policy-v1",
             "superpod_commit": "superpod-fixture-v1",
@@ -435,5 +435,15 @@
         }
       ]
     }
-  ]
+  ],
+  "upstream": {
+    "repository": "coolplayagent/example",
+    "default_branch": "main",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "checked_at": "2026-10-09T00:00:00Z"
+  },
+  "skills_manifest": {
+    "path": "skills-manifest.json",
+    "sha256": "REPLACE_WITH_HOST_MANIFEST_SHA256"
+  }
 }

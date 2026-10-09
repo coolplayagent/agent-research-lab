@@ -32,7 +32,7 @@ rust_test(
 
 pkg_tar(
     name = "package",
-    srcs = [":agent-research-lab"] + glob(["examples/**", "prompts/**", "*.md"]),
+    srcs = [":agent-research-lab"] + glob(["examples/**", "prompts/**", "research/**", "skills/**", "*.md"]),
     package_dir = "agent-research-lab",
     strip_prefix = ".",
     extension = "tar.gz",

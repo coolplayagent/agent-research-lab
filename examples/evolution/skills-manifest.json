@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "skills": [
+    {
+      "name": "example-cli",
+      "repository": "coolplayagent/example",
+      "installed_path": "/absolute/host/skills/example-cli",
+      "runtime_path": "/absolute/host/skills/example-cli/assets/cli",
+      "tree_sha256": "REPLACE_WITH_INSTALLED_TREE_SHA256",
+      "runtime_sha256": "REPLACE_WITH_RUNTIME_SHA256",
+      "release_tag": "v1.0.0",
+      "release_id": 1,
+      "source_commit": null,
+      "checked_at": "2026-10-09T00:00:00Z"
+    }
+  ]
+}

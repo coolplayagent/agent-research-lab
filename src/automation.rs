@@ -86,6 +86,10 @@ fn validate_provenance(root: &Path, operation: &Operation) -> Result<()> {
             &evidence.qualitygate_report,
             &evidence.snapshot_receipt,
             &evidence.evaluation_receipt,
+            evidence
+                .skills_manifest
+                .as_ref()
+                .context("latest skills evidence is required")?,
         ] {
             ensure!(
                 fs::canonicalize(&artifact.path)?.starts_with(&trusted),

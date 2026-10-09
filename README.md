@@ -11,6 +11,12 @@ project does not grant access to SuperPOD. This repository contains the research
 software, prompts and synthetic test fixtures; it does not copy private knowledge,
 credentials or experiment traces into Git.
 
+Reviewed, publicly shareable lessons and hypotheses live in
+[research/insights.md](research/insights.md). New tasks automatically receive that
+file from the project's current remote default-branch commit, with a frozen content
+digest. Each entry retains evidence, version limits, counterexamples and a next
+experiment. Detailed knowledge and source archives continue to live in SuperPOD.
+
 ## Build and configure
 
 Linux is the first supported runtime platform. Install Git, Bazelisk/Bazel,
@@ -32,6 +38,43 @@ Codex executable, published workflow CLI and the seven installed tool bindings.
 Repository paths must refer to existing local Git checkouts. Configure model/API
 authentication through your installed tools; do not put credentials into the
 tracked example configuration.
+
+Production defaults to `require_latest = true`. Set `skills_manifest` to a host-owned
+absolute JSON path recording all seven installed skill directories, runtime paths,
+tree/runtime SHA-256 digests, and latest release tag/ID (or the latest source commit
+when no stable release exists). The Rust types `freshness::SkillsManifest` and
+`SkillSnapshot` define the exact schema; `freshness::skill_tree_digest` defines the
+directory hash. Populate this evidence only after installing and verifying the
+actual package. Five tools provide upstream skills; the two explicitly project-owned
+adapters in `skills/` document Computer Use and Relay Memory where upstream provides
+no skill. Runtime binaries are bundled during local installation, not tracked here.
+
+Use `agent-research-lab skill-digest /absolute/path/to/installed-skill` to calculate
+the canonical directory digest; retain release/download verification separately.
+
+The controller checks GitHub's current stable release identity and installed bytes,
+fetches each remote default branch, and builds separate readonly source worktrees.
+It does not switch or overwrite a developer's branch. Latest release and latest
+source are recorded separately: reproduce a proposed source defect on a build of
+the pinned current source before treating an older released binary's failure as
+evidence. Missing network access, changed skills or an advanced upstream blocks
+admission; there is no fallback to an old local checkout. Install and validate a
+new upstream package and refresh its host manifest when a release changes.
+
+```sh
+bazel-bin/agent-research-lab --config local.toml refresh
+```
+
+Each idle admission batch verifies freshness before starting up to three agents of
+one cohort. An independent heartbeat renews each active workflow lease while
+the controller prepares other agents or handles results. The batch keeps
+its source snapshots fixed. Installed skill/runtime bytes are checked again at
+launch and settlement; concurrent installation changes invalidate the result.
+Source, skill, configuration or research-input changes produce
+new daily task IDs; old experiments remain available as historical evidence.
+When idle, continuous mode checks for a new cohort every 15 minutes. Explicit
+`require_latest = false` is intended only for offline synthetic fixtures and does
+not establish current-version research evidence.
 
 | Binding | Purpose |
 | --- | --- |
@@ -94,6 +137,12 @@ Read-only failures have bounded retries; `retry TASK_ID` explicitly retries an
 eligible read-only task. Interrupted writes retain their uncertain outcome for
 reconciliation instead of being automatically repeated. Resume does not guarantee
 instruction-level continuation inside a previously terminated model process.
+Retained task starts replay their original timeout and input envelope, even when
+the next controller uses a different timeout default. Successful workflow receipts
+reconstruct durable completion work after a crash. Follow-up admission is replayable;
+interrupted memory writeback remains explicitly unknown until reconciled, avoiding
+an unproven duplicate write. Completion work, freshness checks and seeding share
+the persisted daily budget and the `run --max-seconds` deadline.
 
 The default ceiling is three concurrent agents and 43,200 active wall-clock seconds
 per Asia/Singapore calendar day. Concurrent agents share the wall-clock allowance;
@@ -176,7 +225,12 @@ Release operations require hashed files under `outbox/evidence`: the actual full
 Qualitygate report, a host snapshot receipt binding that report to code, prompt,
 policy and SuperPOD, and a distinct evaluator's result receipt. The installation
 snapshot also binds the package and binary hashes. Boolean pass flags alone are
-insufficient. These receipts must come from real checks and recorded invocations;
+insufficient. Current upstream-default bindings and a hashed skill manifest are
+also required, and promotion/release gates recheck them online immediately before
+the effect. Old receipts without these bindings cannot authorize new releases.
+GitHub's expected-head precondition does not atomically freeze the base branch;
+strict up-to-date branch protection or a merge queue is needed for that server-side
+race guarantee. These receipts must come from real checks and recorded invocations;
 do not manufacture them to make a request pass.
 
 An installation packages the binary inside the skill directory and keeps previous

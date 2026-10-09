@@ -1,4 +1,5 @@
 //! Explicit delivery adapters. No network or installation happens merely by loading a request.
+use crate::freshness::{RemoteClient, RemoteSnapshot, SkillsManifest};
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -18,7 +19,7 @@ pub struct VerificationArtifact {
 }
 
 impl VerificationArtifact {
-    fn read(&self) -> Result<Value> {
+    pub(crate) fn read(&self) -> Result<Value> {
         validate_digest(&self.sha256)?;
         ensure!(
             fs::symlink_metadata(&self.path)?.file_type().is_file(),
@@ -31,11 +32,35 @@ impl VerificationArtifact {
         );
         serde_json::from_slice(&bytes).context("verification artifact must be JSON")
     }
+
+    pub(crate) fn validate_skills(&self) -> Result<()> {
+        let manifest: SkillsManifest = serde_json::from_value(self.read()?)?;
+        ensure!(
+            manifest.schema_version == 1 && !manifest.skills.is_empty(),
+            "skills manifest must be a nonempty version-one host artifact"
+        );
+        Ok(())
+    }
+
+    pub(crate) fn verify_skills(&self, remote: &RemoteClient) -> Result<()> {
+        self.validate_skills()?;
+        remote.verify_skills(&self.path)?;
+        // Do not permit a replacement between the bound hash check and the
+        // live verification to silently switch which skills were evaluated.
+        self.validate_skills()?;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ReleaseEvidence {
     pub source_commit: String,
+    /// Optional only for reading historical receipts. Every new delivery gate
+    /// requires a bound, currently fresh remote-default baseline.
+    #[serde(default)]
+    pub upstream: Option<RemoteSnapshot>,
+    #[serde(default)]
+    pub skills_manifest: Option<VerificationArtifact>,
     pub prompt_sha256: String,
     pub policy_sha256: String,
     pub superpod_commit: String,
@@ -52,6 +77,14 @@ pub struct ReleaseEvidence {
 
 impl ReleaseEvidence {
     pub fn validate(&self) -> Result<()> {
+        let upstream = self.upstream.as_ref().context(
+            "old release evidence lacks an upstream baseline; re-evaluation is required",
+        )?;
+        upstream.validate()?;
+        let skills = self.skills_manifest.as_ref().context(
+            "old release evidence lacks a hashed skills manifest; re-evaluation is required",
+        )?;
+        skills.validate_skills()?;
         validate_commit(&self.source_commit)?;
         validate_commit(&self.superpod_commit)?;
         validate_digest(&self.prompt_sha256)?;
@@ -86,6 +119,17 @@ impl ReleaseEvidence {
         let snapshot = self.snapshot_receipt.read()?;
         let evaluation = self.evaluation_receipt.read()?;
         for receipt in [&snapshot, &evaluation] {
+            ensure!(
+                receipt["skills_manifest_sha256"].as_str() == Some(&skills.sha256),
+                "verification receipt has stale skills manifest binding"
+            );
+            let bound: RemoteSnapshot = serde_json::from_value(receipt["upstream"].clone())
+                .context("verification receipt lacks a valid upstream baseline")?;
+            bound.validate()?;
+            ensure!(
+                bound.same_binding(upstream),
+                "verification receipt has stale upstream baseline"
+            );
             for (key, expected) in [
                 ("source_commit", &self.source_commit),
                 ("prompt_sha256", &self.prompt_sha256),
@@ -319,7 +363,26 @@ fn skill_name(path: &Path) -> Result<String> {
 /// Activate a packaged skill and its bundled CLI together, then smoke-test that exact binary.
 /// Installation must be called at a task boundary; active tasks retain their pinned versions.
 pub fn install_candidate(request: &InstallRequest) -> Result<InstallReceipt> {
+    install_candidate_with_client(request, &RemoteClient::default())
+}
+
+fn install_candidate_with_client(
+    request: &InstallRequest,
+    remote: &RemoteClient,
+) -> Result<InstallReceipt> {
     request.evidence.validate()?;
+    let upstream = request
+        .evidence
+        .upstream
+        .as_ref()
+        .context("missing release upstream baseline")?;
+    remote.verify_remote_binding(upstream)?;
+    let skills_manifest = request
+        .evidence
+        .skills_manifest
+        .as_ref()
+        .context("missing release skills manifest")?;
+    skills_manifest.verify_skills(remote)?;
     validate_identifier(&request.skill_directory_name)?;
     relative_path(&request.binary_relative_path)?;
     validate_digest(&request.binary_sha256)?;
@@ -328,6 +391,10 @@ pub fn install_candidate(request: &InstallRequest) -> Result<InstallReceipt> {
         "version and smoke arguments are required"
     );
     let source = fs::canonicalize(&request.skill_source)?;
+    ensure!(
+        !fs::canonicalize(&skills_manifest.path)?.starts_with(&source),
+        "skills manifest must be a host artifact outside the candidate package"
+    );
     let name = skill_name(&source)?;
     let _lock = installation_lock(&request.backup_root, &request.skill_directory_name)?;
     fs::create_dir_all(&request.skills_root)?;
@@ -441,6 +508,10 @@ pub fn install_candidate(request: &InstallRequest) -> Result<InstallReceipt> {
         receipt_path: operation.join("receipt.json"),
     };
     write_receipt(&receipt)?;
+    // Preparation can take time. Do not activate a candidate if its tested
+    // default-branch base advanced while its package was being staged.
+    skills_manifest.verify_skills(remote)?;
+    remote.verify_remote_binding(upstream)?;
     if let Some(backup) = &receipt.backup {
         fs::rename(&target, backup)
             .context("backup and skills directory must be on the same filesystem")?;
@@ -472,6 +543,12 @@ pub fn install_candidate(request: &InstallRequest) -> Result<InstallReceipt> {
     {
         rollback_after_smoke(&mut receipt)?;
         bail!("candidate changed its installed files during smoke testing and was rolled back");
+    }
+    if let Err(error) = remote.verify_remote_binding(upstream) {
+        rollback_after_smoke(&mut receipt)?;
+        bail!(
+            "upstream changed or could not be verified during installation; candidate rolled back: {error}"
+        );
     }
     receipt.phase = "verified".into();
     write_receipt(&receipt)?;
@@ -754,6 +831,10 @@ pub struct ReviewRecord {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MergeSnapshot {
     pub head: String,
+    pub base_ref: String,
+    pub base_commit: String,
+    pub default_branch: String,
+    pub default_commit: String,
     pub state: String,
     pub draft: bool,
     pub author: String,
@@ -769,6 +850,22 @@ pub struct MergeSnapshot {
 /// Missing, stale, queued, skipped, truncated and unknown evidence is never a pass.
 pub fn evaluate_merge_gate(request: &MergeRequest, snapshot: &MergeSnapshot) -> Result<()> {
     request.evidence.validate()?;
+    let upstream = request
+        .evidence
+        .upstream
+        .as_ref()
+        .context("missing release upstream baseline")?;
+    ensure!(
+        request.repository == upstream.repository,
+        "release evidence belongs to a different repository"
+    );
+    ensure!(
+        snapshot.base_ref == upstream.default_branch
+            && snapshot.default_branch == upstream.default_branch
+            && snapshot.base_commit == upstream.commit
+            && snapshot.default_commit == upstream.commit,
+        "upstream default branch advanced or PR targets another base; rebase and re-evaluate before merging"
+    );
     ensure!(
         request.expected_head == request.evidence.source_commit
             && snapshot.head == request.expected_head,
@@ -818,7 +915,7 @@ pub fn evaluate_merge_gate(request: &MergeRequest, snapshot: &MergeSnapshot) -> 
 
 fn github_snapshot(request: &MergeRequest) -> Result<MergeSnapshot> {
     let (owner, name) = validate_repository(&request.repository)?;
-    let query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){headRefOid state isDraft author{login} mergeable mergeStateStatus reviewDecision commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){nodes{__typename ... on CheckRun{status conclusion} ... on StatusContext{state}} pageInfo{hasNextPage}}}}}} reviews(first:100){nodes{author{login} state commit{oid}} pageInfo{hasNextPage}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}}}}";
+    let query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){defaultBranchRef{name target{... on Commit{oid}}} pullRequest(number:$number){headRefOid baseRefName baseRefOid state isDraft author{login} mergeable mergeStateStatus reviewDecision commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){nodes{__typename ... on CheckRun{status conclusion} ... on StatusContext{state}} pageInfo{hasNextPage}}}}}} reviews(first:100){nodes{author{login} state commit{oid}} pageInfo{hasNextPage}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}}}}";
     let value = gh_json(
         vec![
             "api".into(),
@@ -855,6 +952,16 @@ fn github_snapshot(request: &MergeRequest) -> Result<MergeSnapshot> {
     };
     Ok(MergeSnapshot {
         head: read("headRefOid")?,
+        base_ref: read("baseRefName")?,
+        base_commit: read("baseRefOid")?,
+        default_branch: value["data"]["repository"]["defaultBranchRef"]["name"]
+            .as_str()
+            .context("missing repository default branch")?
+            .into(),
+        default_commit: value["data"]["repository"]["defaultBranchRef"]["target"]["oid"]
+            .as_str()
+            .context("missing repository default commit")?
+            .into(),
         state: read("state")?,
         draft: pr["isDraft"].as_bool().context("missing draft state")?,
         author: pr["author"]["login"]
@@ -928,6 +1035,23 @@ pub fn merge_pull_request(request: &MergeRequest) -> Result<PullRequestReceipt> 
         return pr_receipt(&value, true);
     }
     evaluate_merge_gate(request, &snapshot)?;
+    request
+        .evidence
+        .skills_manifest
+        .as_ref()
+        .context("missing release skills manifest")?
+        .verify_skills(&RemoteClient::default())?;
+    // Skill checks can be slow. Refresh PR/base/check state after them, then
+    // perform the latest default-ref check immediately before requesting merge.
+    let final_snapshot = github_snapshot(request)?;
+    evaluate_merge_gate(request, &final_snapshot)?;
+    crate::freshness::verify_remote_binding(
+        request
+            .evidence
+            .upstream
+            .as_ref()
+            .context("missing release upstream baseline")?,
+    )?;
     capture_text(
         "gh",
         &[
@@ -967,6 +1091,52 @@ pub fn merge_pull_request(request: &MergeRequest) -> Result<PullRequestReceipt> 
 mod tests {
     use super::*;
 
+    fn upstream() -> RemoteSnapshot {
+        RemoteSnapshot {
+            repository: "coolplayagent/example".into(),
+            default_branch: "main".into(),
+            commit: "0".repeat(40),
+            checked_at: "2026-10-09T00:00:00Z".into(),
+        }
+    }
+
+    #[cfg(unix)]
+    fn mock_remote(root: &Path) -> RemoteClient {
+        use std::os::unix::fs::PermissionsExt;
+        let head = root.join("current-upstream.json");
+        fs::write(
+            &head,
+            serde_json::to_vec(&json!({"sha":upstream().commit})).unwrap(),
+        )
+        .unwrap();
+        let gh = root.join("fake-gh");
+        let quoted = head.to_string_lossy().replace('\'', "'\\''");
+        let release = root.join("current-release.json");
+        if !release.exists() {
+            fs::write(
+                &release,
+                r#"{"id":1,"tag_name":"v1","draft":false,"prerelease":false}"#,
+            )
+            .unwrap();
+        }
+        let release = release.to_string_lossy().replace('\'', "'\\''");
+        fs::write(&gh, format!("#!/bin/sh\nset -eu\ncase \"$1\" in\nrepo) printf '%s\\n' '{{\"nameWithOwner\":\"coolplayagent/example\",\"defaultBranchRef\":{{\"name\":\"main\"}}}}';;\napi) case \"$2\" in */releases/latest) cat '{release}';; *) cat '{quoted}';; esac;;\n*) exit 92;;\nesac\n")).unwrap();
+        fs::set_permissions(&gh, fs::Permissions::from_mode(0o755)).unwrap();
+        RemoteClient {
+            git: PathBuf::from("git"),
+            gh,
+            timeout: Duration::from_secs(2),
+        }
+    }
+
+    #[cfg(unix)]
+    fn install_fixture(request: &InstallRequest) -> Result<InstallReceipt> {
+        install_candidate_with_client(
+            request,
+            &mock_remote(request.skill_source.parent().unwrap()),
+        )
+    }
+
     fn artifact(root: &Path, name: &str, value: Value) -> VerificationArtifact {
         let path = root.join(name);
         fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
@@ -977,6 +1147,19 @@ mod tests {
     }
 
     fn evidence(root: &Path) -> ReleaseEvidence {
+        let installed = root.join("verified-skill");
+        fs::create_dir_all(&installed).unwrap();
+        fs::write(
+            installed.join("SKILL.md"),
+            "---\nname: verified-skill\n---\nFixture",
+        )
+        .unwrap();
+        fs::write(installed.join("cli"), "verified runtime").unwrap();
+        let skills_manifest = artifact(
+            root,
+            "skills-manifest.json",
+            json!({"schema_version":1,"skills":[{"name":"verified-skill","repository":"coolplayagent/example","installed_path":installed,"runtime_path":installed.join("cli"),"tree_sha256":crate::freshness::skill_tree_digest(&installed).unwrap(),"runtime_sha256":file_sha256(&installed.join("cli")).unwrap(),"release_tag":"v1","release_id":1,"source_commit":null,"checked_at":"2026-10-09T00:00:00Z"}]}),
+        );
         let qualitygate_report = artifact(
             root,
             "qualitygate.json",
@@ -985,15 +1168,17 @@ mod tests {
         let snapshot_receipt = artifact(
             root,
             "snapshot.json",
-            json!({"source_commit":"a".repeat(40),"prompt_sha256":"b".repeat(64),"policy_sha256":"c".repeat(64),"superpod_commit":"d".repeat(40),"qualitygate_report_sha256":qualitygate_report.sha256,"content_digest":"e".repeat(64),"verification_digest":"f".repeat(64)}),
+            json!({"source_commit":"a".repeat(40),"upstream":upstream(),"skills_manifest_sha256":skills_manifest.sha256,"prompt_sha256":"b".repeat(64),"policy_sha256":"c".repeat(64),"superpod_commit":"d".repeat(40),"qualitygate_report_sha256":qualitygate_report.sha256,"content_digest":"e".repeat(64),"verification_digest":"f".repeat(64)}),
         );
         let evaluation_receipt = artifact(
             root,
             "evaluation.json",
-            json!({"role":"independent_evaluator","status":"pass","complete":true,"source_commit":"a".repeat(40),"prompt_sha256":"b".repeat(64),"policy_sha256":"c".repeat(64),"superpod_commit":"d".repeat(40),"evaluator_id":"evaluation","implementer_id":"implementation"}),
+            json!({"role":"independent_evaluator","status":"pass","complete":true,"source_commit":"a".repeat(40),"upstream":upstream(),"skills_manifest_sha256":skills_manifest.sha256,"prompt_sha256":"b".repeat(64),"policy_sha256":"c".repeat(64),"superpod_commit":"d".repeat(40),"evaluator_id":"evaluation","implementer_id":"implementation"}),
         );
         ReleaseEvidence {
             source_commit: "a".repeat(40),
+            upstream: Some(upstream()),
+            skills_manifest: Some(skills_manifest),
             prompt_sha256: "b".repeat(64),
             policy_sha256: "c".repeat(64),
             superpod_commit: "d".repeat(40),
@@ -1019,6 +1204,10 @@ mod tests {
         };
         let valid = MergeSnapshot {
             head: request.expected_head.clone(),
+            base_ref: "main".into(),
+            base_commit: upstream().commit.clone(),
+            default_branch: "main".into(),
+            default_commit: upstream().commit,
             state: "OPEN".into(),
             draft: false,
             author: "author".into(),
@@ -1038,6 +1227,13 @@ mod tests {
         let mut stale = valid.clone();
         stale.head = "e".repeat(40);
         assert!(evaluate_merge_gate(&request, &stale).is_err());
+        let mut advanced = valid.clone();
+        advanced.base_commit = "1".repeat(40);
+        advanced.default_commit = advanced.base_commit.clone();
+        assert!(evaluate_merge_gate(&request, &advanced).is_err());
+        let mut retargeted = valid.clone();
+        retargeted.base_ref = "old-release".into();
+        assert!(evaluate_merge_gate(&request, &retargeted).is_err());
         let mut incomplete = valid.clone();
         incomplete.complete = false;
         assert!(evaluate_merge_gate(&request, &incomplete).is_err());
@@ -1099,10 +1295,10 @@ mod tests {
         let previous = request.skills_root.join("test-skill");
         fs::create_dir_all(&previous).unwrap();
         fs::write(previous.join("SKILL.md"), "---\nname: test-skill\n---\nOld").unwrap();
-        let receipt = install_candidate(&request).unwrap();
+        let receipt = install_fixture(&request).unwrap();
         assert_eq!(receipt.phase, "verified");
         assert_eq!(
-            install_candidate(&request).unwrap().operation_id,
+            install_fixture(&request).unwrap().operation_id,
             receipt.operation_id
         );
         assert!(receipt.target.join("cli").exists());
@@ -1123,10 +1319,10 @@ mod tests {
     #[test]
     fn failed_smoke_rolls_back_and_wrong_hash_never_activates() {
         let (_temp, mut request) = fixture(true);
-        assert!(install_candidate(&request).is_err());
+        assert!(install_fixture(&request).is_err());
         assert!(!request.skills_root.join("test-skill").exists());
         request.binary_sha256 = "0".repeat(64);
-        assert!(install_candidate(&request).is_err());
+        assert!(install_fixture(&request).is_err());
         assert!(!request.skills_root.join("test-skill").exists());
     }
 
@@ -1137,12 +1333,12 @@ mod tests {
         let previous = request.skills_root.join("test-skill");
         fs::create_dir_all(&previous).unwrap();
         fs::write(previous.join("SKILL.md"), "---\nname: test-skill\n---\nOld").unwrap();
-        let mut interrupted = install_candidate(&request).unwrap();
+        let mut interrupted = install_fixture(&request).unwrap();
         let staged = interrupted.receipt_path.parent().unwrap().join("candidate");
         fs::rename(&interrupted.target, staged).unwrap();
         interrupted.phase = "previous_backed_up".into();
         write_receipt(&interrupted).unwrap();
-        let replacement = install_candidate(&request).unwrap();
+        let replacement = install_fixture(&request).unwrap();
         assert_eq!(replacement.phase, "verified");
         assert_eq!(
             fs::read_to_string(replacement.backup.unwrap().join("SKILL.md")).unwrap(),
@@ -1154,7 +1350,7 @@ mod tests {
     #[test]
     fn rollback_refuses_to_overwrite_a_later_modified_installation() {
         let (_temp, request) = fixture(false);
-        let receipt = install_candidate(&request).unwrap();
+        let receipt = install_fixture(&request).unwrap();
         fs::write(receipt.target.join("newer-file"), "later change").unwrap();
         assert!(rollback_install(&receipt.receipt_path).is_err());
         assert!(receipt.target.join("newer-file").exists());
@@ -1170,5 +1366,61 @@ mod tests {
         evidence.qualitygate_report.sha256 =
             file_sha256(&evidence.qualitygate_report.path).unwrap();
         assert!(evidence.validate().is_err());
+    }
+
+    #[test]
+    fn historical_evidence_can_be_read_but_cannot_pass_new_release_gates() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut old = serde_json::to_value(evidence(temp.path())).unwrap();
+        old.as_object_mut().unwrap().remove("upstream");
+        let old: ReleaseEvidence = serde_json::from_value(old).unwrap();
+        assert!(old.upstream.is_none());
+        assert!(old.validate().is_err());
+        let mut without_skills = serde_json::to_value(evidence(temp.path())).unwrap();
+        without_skills
+            .as_object_mut()
+            .unwrap()
+            .remove("skills_manifest");
+        let without_skills: ReleaseEvidence = serde_json::from_value(without_skills).unwrap();
+        assert!(without_skills.validate().is_err());
+        let mut mismatched = evidence(temp.path());
+        mismatched.upstream.as_mut().unwrap().commit = "1".repeat(40);
+        assert!(mismatched.validate().is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn installation_rejects_advanced_or_unverifiable_upstream_before_activation() {
+        let (temp, request) = fixture(false);
+        let client = mock_remote(temp.path());
+        fs::write(
+            temp.path().join("current-upstream.json"),
+            serde_json::to_vec(&json!({"sha":"1".repeat(40)})).unwrap(),
+        )
+        .unwrap();
+        assert!(install_candidate_with_client(&request, &client).is_err());
+        assert!(!request.skills_root.join("test-skill").exists());
+        fs::write(temp.path().join("current-upstream.json"), "{}").unwrap();
+        assert!(install_candidate_with_client(&request, &client).is_err());
+        assert!(!request.skills_root.join("test-skill").exists());
+        fs::write(
+            temp.path().join("current-upstream.json"),
+            serde_json::to_vec(&json!({"sha":upstream().commit})).unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            temp.path().join("current-release.json"),
+            r#"{"id":2,"tag_name":"v2","draft":false,"prerelease":false}"#,
+        )
+        .unwrap();
+        assert!(install_candidate_with_client(&request, &client).is_err());
+        assert!(!request.skills_root.join("test-skill").exists());
+        fs::write(
+            &request.evidence.skills_manifest.as_ref().unwrap().path,
+            "{}",
+        )
+        .unwrap();
+        assert!(install_candidate_with_client(&request, &client).is_err());
+        assert!(!request.skills_root.join("test-skill").exists());
     }
 }

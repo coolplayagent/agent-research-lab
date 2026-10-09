@@ -1,13 +1,13 @@
 {
   "baseline": {
-    "source_commit": "source-fixture-v1",
+    "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "prompt_version": "prompt-baseline-v1",
     "policy_version": "formal-policy-v1",
     "superpod_commit": "superpod-fixture-v1",
     "configuration_digest": "model-tools-memory-fixture-v1"
   },
   "candidate": {
-    "source_commit": "source-fixture-v1",
+    "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "prompt_version": "prompt-candidate-v2",
     "policy_version": "formal-policy-v1",
     "superpod_commit": "superpod-fixture-v1",

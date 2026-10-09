@@ -125,6 +125,52 @@ impl Workflow {
         ])
     }
 
+    /// Restart an already frozen task without applying today's timeout default.
+    /// Absence is distinct from corruption or a different task binding.
+    pub fn replay_task_start(
+        &self,
+        run_id: &str,
+        write: bool,
+        inputs: Value,
+    ) -> Result<Option<Value>> {
+        let path = self
+            .work_dir
+            .join(format!("start-{}.json", hex(run_id.as_bytes())));
+        match fs::symlink_metadata(&path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error.into()),
+            Ok(_) => {}
+        }
+        let retained: Value = crate::storage::read(&path)?;
+        let timeout_ms = retained["bundle"]["capabilities"][0]["timeout_ms"]
+            .as_u64()
+            .context("retained start lacks its original task timeout")?;
+        let started_at = retained["started_at_unix_ms"]
+            .as_u64()
+            .context("retained start lacks its original start time")?;
+        let bundle = task_bundle(
+            &[TaskSpec {
+                id: "task".into(),
+                payload: inputs,
+                write,
+                timeout_ms,
+            }],
+            false,
+        )?;
+        ensure!(
+            retained
+                == json!({"schema_version":1,"bundle":bundle,"run_id":run_id,
+                "inputs":{},"started_at_unix_ms":started_at}),
+            "retained start does not bind the exact frozen task"
+        );
+        self.check_bundle(&bundle)?;
+        Ok(Some(self.run(&[
+            "start".into(),
+            self.db(),
+            path.to_string_lossy().into_owned(),
+        ])?))
+    }
+
     pub fn status(&self, run_id: &str) -> Result<Value> {
         self.run(&["status".into(), self.db(), run_id.into()])
     }
@@ -621,6 +667,26 @@ mod tests {
         w.initialize().unwrap();
         w.start_task("read", false, json!({"command":"/bin/true"}), 60000)
             .unwrap();
+        let retained_path = temp.path().join(format!("start-{}.json", hex(b"read")));
+        let retained_bytes = fs::read(&retained_path).unwrap();
+        assert!(
+            w.start_task("read", false, json!({"command":"/bin/true"}), 90000)
+                .is_err()
+        );
+        assert!(
+            w.replay_task_start("read", false, json!({"command":"/bin/true"}))
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(fs::read(&retained_path).unwrap(), retained_bytes);
+        assert!(
+            w.replay_task_start("read", true, json!({"command":"/bin/true"}))
+                .is_err()
+        );
+        assert!(
+            w.replay_task_start("read", false, json!({"command":"changed"}))
+                .is_err()
+        );
         let state = w.status("read").unwrap();
         w.pause(
             "read",
