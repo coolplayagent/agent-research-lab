@@ -1,4 +1,12 @@
+pub mod automation;
 pub mod budget;
 pub mod config;
+pub mod delivery;
+pub mod evolution;
+pub mod evolution_cli;
+pub mod isolation;
+pub mod knowledge;
 pub mod process;
+pub mod runtime;
 pub mod storage;
+pub mod workflow;

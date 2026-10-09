@@ -1,0 +1,5 @@
+{
+  "parent_policy_version": "formal-policy-v1",
+  "proposed_rule": "Evaluate a different exploration scheduling heuristic in an isolated experiment.",
+  "reason": "Compare scheduling behavior without replacing the formal policy."
+}

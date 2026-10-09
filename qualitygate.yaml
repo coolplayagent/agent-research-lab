@@ -1,17 +1,44 @@
 schema_version: 1
-exclude: []
-languages: []
-rulesets:
-- core
+languages: [rust]
+rulesets: [core]
 rules:
   line-ending:
     enabled: true
     required: true
     severity: error
-    parameters: {}
-    source: null
-    depends_on: []
-checks: []
-profiles: {}
-custom_rules: null
-verification_assets: []
+checks:
+  - id: format
+    kind: command
+    argv: [cargo, fmt, --all, --, --check]
+    timeout_seconds: 120
+  - id: clippy
+    kind: command
+    argv: [cargo, clippy, --locked, --all-targets, --, -D, warnings]
+    timeout_seconds: 600
+  - id: bazel-build
+    kind: command
+    argv: [bazel, build, "--lockfile_mode=error", "//:agent-research-lab", "//:package"]
+    timeout_seconds: 900
+  - id: bazel-test
+    kind: command
+    argv: [bazel, test, "--lockfile_mode=error", "//..."]
+    depends_on: [bazel-build]
+    timeout_seconds: 900
+profiles:
+  quick:
+    include: [line-ending, format]
+  full:
+    include: [line-ending, format, clippy, bazel-build, bazel-test]
+verification_assets:
+  - qualitygate.yaml
+  - Cargo.toml
+  - Cargo.lock
+  - MODULE.bazel
+  - MODULE.bazel.lock
+  - BUILD.bazel
+  - rust-toolchain.toml
+  - .bazelrc
+  - .bazelignore
+  - .bazelversion
+  - .github/workflows/**
+  - prompts/**

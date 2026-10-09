@@ -36,7 +36,7 @@ probe = ["--help"]
 [tools.relay-memory]
 binary = "relay-memory"
 repository = "/opt/workspace/relay-memory"
-probe = ["--version"]
+probe = ["--help"]
 [tools.repo-sandbox]
 binary = "repo-sandbox"
 repository = "/opt/workspace/repo-sandbox"

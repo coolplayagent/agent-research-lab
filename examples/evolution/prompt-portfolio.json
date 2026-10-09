@@ -1,0 +1,9 @@
+{
+  "registry_file": "registry.json",
+  "portfolio": {
+    "task_kind": "long_horizon",
+    "stable": "REPLACE_WITH_REGISTERED_PROMPT_VERSION",
+    "specialized": [],
+    "exploratory": []
+  }
+}
