@@ -1479,6 +1479,79 @@ fn observed_tools(c: &Config, job: &Job) -> Result<Value> {
     }
     Ok(Value::Object(tools))
 }
+
+/// Bound the escaped JSON representation without cutting a Unicode character.
+fn memory_excerpt(text: &str, escaped_bytes: usize) -> Result<(String, bool)> {
+    if serde_json::to_string(text)?.len() <= escaped_bytes + 2 {
+        return Ok((text.to_owned(), false));
+    }
+    let mut excerpt = String::new();
+    let mut used = 0;
+    for character in text.chars() {
+        let cost = serde_json::to_string(&character)?.len() - 2;
+        if used + cost + "…".len() > escaped_bytes {
+            break;
+        }
+        excerpt.push(character);
+        used += cost;
+    }
+    excerpt.push('…');
+    Ok((excerpt, true))
+}
+
+/// Relay Memory stores a compact continuation checkpoint. Full provenance stays
+/// in the immutable workflow receipt and is addressed by its SHA-256 digest.
+fn memory_checkpoint(job: &Job, receipt: &Value) -> Result<String> {
+    let report = &receipt["agent_report"];
+    validate_report(report)?;
+    let (summary, mut truncated) = memory_excerpt(report["summary"].as_str().unwrap(), 512)?;
+    let mut select = |field: &str, count: usize, bytes: usize| -> Result<Vec<String>> {
+        let values = report[field]
+            .as_array()
+            .context("checkpoint field is not an array")?;
+        truncated |= values.len() > count;
+        values
+            .iter()
+            .take(count)
+            .map(|value| {
+                let (text, shortened) = memory_excerpt(
+                    value.as_str().context("checkpoint item is not text")?,
+                    bytes,
+                )?;
+                truncated |= shortened;
+                Ok(text)
+            })
+            .collect()
+    };
+    let findings = select("findings", 3, 256)?;
+    let limitations = select("limitations", 2, 192)?;
+    let checkpoint = serde_json::to_string(&json!({
+        "schema_version":1,
+        "run_id":job.run_id,
+        "receipt_sha256":storage::digest(&serde_json::to_vec(receipt)?),
+        "source_commit":job.source_commit,
+        "superpod_commit":job.superpod_commit,
+        "prompt_digest":job.prompt_digest,
+        "summary":summary,
+        "findings":findings,
+        "limitations":limitations,
+        "truncated":truncated,
+        "omitted_fields":["research_inputs","tools","sources","next_tasks"]
+    }))?;
+    ensure!(checkpoint.len() <= 4096, "memory checkpoint exceeds 4 KiB");
+    Ok(checkpoint)
+}
+
+fn remember_prompt(prompt: &str) -> String {
+    let mut characters = prompt.chars();
+    let mut bounded: String = characters.by_ref().take(512).collect();
+    if characters.next().is_some() {
+        bounded.pop();
+        bounded.push('…');
+    }
+    bounded
+}
+
 fn memory_call(
     c: &Config,
     job: &Job,
@@ -1512,7 +1585,11 @@ fn memory_call(
         "--session".into(),
         job.task.id.clone(),
         "--prompt".into(),
-        job.task.prompt.chars().take(8000).collect(),
+        if operation == "remember" {
+            remember_prompt(&job.task.prompt)
+        } else {
+            job.task.prompt.chars().take(8000).collect()
+        },
     ];
     if let Some(response) = response {
         args.extend(["--response".into(), response.chars().take(32000).collect()]);
@@ -1753,15 +1830,10 @@ fn drain_followups(c: &Config, w: &Workflow) -> Result<bool> {
         memory_gap(c, &job, record.memory_error.as_deref().unwrap())?;
     }
     if record.memory == MemoryWriteback::Pending {
+        let checkpoint = memory_checkpoint(&job, &receipt)?;
         record.memory = MemoryWriteback::Running;
         storage::write(&path, &record)?;
-        match memory_call(
-            c,
-            &job,
-            &dir,
-            "remember",
-            Some(&serde_json::to_string(&receipt)?),
-        ) {
+        match memory_call(c, &job, &dir, "remember", Some(&checkpoint)) {
             Ok(_) => record.memory = MemoryWriteback::Done,
             Err(error) => {
                 record.memory = MemoryWriteback::Unknown;
@@ -2395,6 +2467,111 @@ mod tests {
         let record: PostSuccess = storage::read(&post_success_path(&c, &job)).unwrap();
         assert_eq!(record.memory, MemoryWriteback::Unknown);
         assert!(!temp.path().join("memory-calls").exists());
+    }
+
+    #[test]
+    fn memory_checkpoint_bounds_unicode_and_escaping_without_copying_provenance() {
+        let (_temp, _c, job, _w) = completion_fixture(false, json!([]));
+        let receipt = json!({
+            "agent_report": {
+                "summary":"核验\"最新\"源码\\路径\n\u{0001}".repeat(1000),
+                "findings":vec!["需要补充独立反例。".repeat(200); 8],
+                "limitations":vec!["尚未完成外部评估。".repeat(200); 7],
+                "sources":["source-payload-must-stay-out".repeat(1000)],
+                "next_tasks":[]
+            },
+            "research_inputs":{"repositories":{},"skills":{},"insights":"provenance-must-stay-out".repeat(30000)},
+            "tools":{"payload":"tool-payload-must-stay-out".repeat(1000)}
+        });
+        let encoded = memory_checkpoint(&job, &receipt).unwrap();
+        assert!(encoded.len() <= 4096);
+        let checkpoint: Value = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(
+            checkpoint["receipt_sha256"],
+            storage::digest(&serde_json::to_vec(&receipt).unwrap())
+        );
+        assert_eq!(checkpoint["source_commit"], job.source_commit);
+        assert_eq!(checkpoint["prompt_digest"], job.prompt_digest);
+        assert_eq!(checkpoint["run_id"], job.run_id);
+        assert_eq!(checkpoint["truncated"], true);
+        assert!(checkpoint["summary"].as_str().unwrap().ends_with('…'));
+        assert_eq!(checkpoint["findings"].as_array().unwrap().len(), 3);
+        assert_eq!(checkpoint["limitations"].as_array().unwrap().len(), 2);
+        for field in ["research_inputs", "tools", "sources", "next_tasks"] {
+            assert!(checkpoint.get(field).is_none());
+        }
+        for marker in [
+            "provenance-must-stay-out",
+            "source-payload-must-stay-out",
+            "tool-payload-must-stay-out",
+        ] {
+            assert!(!encoded.contains(marker));
+        }
+        let concise = json!({"agent_report":{"summary":"保留完整中文结论。","findings":["有原始证据。"],"sources":[],"limitations":["仍需独立复核。"]}});
+        let concise: Value =
+            serde_json::from_str(&memory_checkpoint(&job, &concise).unwrap()).unwrap();
+        assert_eq!(concise["summary"], "保留完整中文结论。");
+        assert_eq!(concise["truncated"], false);
+        let prompt = remember_prompt(&"继续研究上下文。".repeat(500));
+        assert!(prompt.chars().count() <= 512);
+        assert!(prompt.ends_with('…'));
+        assert_eq!(remember_prompt("继续研究"), "继续研究");
+    }
+
+    #[test]
+    #[ignore = "set LAB_MEMORY_BIN for actual bounded Chinese checkpoint writeback and retrieval"]
+    fn real_memory_concise_chinese_checkpoint_excludes_provenance() {
+        let binary = std::env::var("LAB_MEMORY_BIN").expect("LAB_MEMORY_BIN");
+        let (temp, mut c, mut job, _w) = completion_fixture(true, json!([]));
+        c.tools.get_mut("relay-memory").unwrap().binary = binary.into();
+        job.task.prompt = "继续 I005 长程研究，核验源码并保留未决问题。".repeat(30);
+        let receipt = json!({
+            "agent_report":{
+                "summary":"续研检查点：已核验最新源码，下一轮检验 I005 的反例。",
+                "findings":["研究结论必须引用冻结源码与原始证据。"],
+                "sources":["full-source-detail-not-copied"],
+                "limitations":["尚未完成独立评估，不代表能力已改进。"],
+                "next_tasks":[]
+            },
+            "research_inputs":{"insights":"large-provenance-not-copied".repeat(30000)},
+            "tools":{"runtime":"large-tool-detail-not-copied".repeat(1000)}
+        });
+        let checkpoint = memory_checkpoint(&job, &receipt).unwrap();
+        assert!(checkpoint.len() <= 4096);
+        assert!(!checkpoint.contains("large-provenance-not-copied"));
+        let started = std::time::Instant::now();
+        let remembered = memory_call(
+            &c,
+            &job,
+            &temp.path().join("writeback"),
+            "remember",
+            Some(&checkpoint),
+        )
+        .unwrap();
+        let elapsed = started.elapsed();
+        assert!(elapsed < Duration::from_secs(20));
+        assert_eq!(remembered["response"], checkpoint);
+        assert!(remembered["prompt"].as_str().unwrap().chars().count() <= 512);
+        assert!(remembered["prompt"].as_str().unwrap().ends_with('…'));
+        job.task.prompt = "继续 I005 长程研究，恢复最新源码检查点与未决反例。".into();
+        let prepared =
+            memory_call(&c, &job, &temp.path().join("retrieval"), "prepare", None).unwrap();
+        // The CLI intentionally returns only bounded response excerpts. Match
+        // the exact committed event and its retained Chinese evidence text.
+        assert!(
+            prepared["recent_events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|event| event["id"] == remembered["id"]
+                    && event["response"]
+                        .as_str()
+                        .is_some_and(|text| text.contains("研究结论必须引用冻结源码与原始证据。")))
+        );
+        eprintln!(
+            "real concise Chinese memory writeback completed in {elapsed:?}; {} bytes",
+            checkpoint.len()
+        );
     }
 
     #[test]

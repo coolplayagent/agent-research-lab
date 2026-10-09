@@ -27,10 +27,13 @@ the Rust dependency source. A working Rust toolchain is also needed for formatti
 and Clippy checks.
 
 ```sh
-bazel build --lockfile_mode=error //:agent-research-lab //:package
-bazel test --lockfile_mode=error //...
+bazel build -c opt --lockfile_mode=error //:agent-research-lab //:package
+bazel test -c opt --lockfile_mode=error //...
 cp examples/lab.toml local.toml
 ```
+
+Use the optimized build for sustained operation: unoptimized hashing of the full
+installed skill trees can consume a substantial part of the host deadline.
 
 Edit `local.toml` before running. Its paths are examples from the development
 machine: set your workspace, private runtime directory, existing SuperPOD checkout,
@@ -119,7 +122,9 @@ bazel-bin/agent-research-lab --config local.toml report
 configuration. Reusing an ID with different inputs is rejected. Each task gets an
 isolated worktree; dependencies receive validated completed reports. `write: false`
 is the default. `required_tools` declares admission prerequisites; `use_memory`
-enables task-local relay-memory. An explicit `prompt_version` selects a registered
+enables task-local relay-memory. Memory retains a bounded result checkpoint and
+immutable receipt references; full source/skill snapshots stay in the private
+receipt. An explicit `prompt_version` selects a registered
 prompt instead of the built-in role prompt.
 
 `seed` adds a daily set of independent research, criticism and synthesis tasks
