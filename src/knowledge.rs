@@ -789,12 +789,27 @@ pub fn refresh_index(request: &IndexRefreshRequest) -> Result<IndexRefreshStatus
     }
     fn ready(value: &Value, expected: &str) -> bool {
         let value = snapshot(value);
-        value["last_indexed_commit"].as_str() == Some(expected) && value["stale"] == false
+        let integrity = &value["content_integrity"];
+        // The installed 1.1.18 contract uses state="complete". Retain explicit
+        // Boolean compatibility without treating a missing integrity report as proof.
+        let complete = match integrity.get("state") {
+            Some(state) => state.as_str() == Some("complete"),
+            None => integrity.get("complete") == Some(&Value::Bool(true)),
+        };
+        value["last_indexed_commit"].as_str() == Some(expected)
+            && value["stale"] == false
+            && complete
     }
-    let active = snapshot(&status)
-        .get("active_task")
-        .is_some_and(|v| !v.is_null());
-    if !ready(&status, &request.expected_commit) && !active {
+    let snapshot_status = snapshot(&status);
+    let active = status.get("active_task").is_some_and(|v| !v.is_null())
+        || snapshot_status
+            .get("active_task")
+            .is_some_and(|v| !v.is_null());
+    let maintenance_pending = status["maintenance_pending"] == true
+        || status["retention"]["maintenance_pending"] == true
+        || snapshot_status["maintenance_pending"] == true
+        || snapshot_status["retention"]["maintenance_pending"] == true;
+    if !ready(&status, &request.expected_commit) && !active && !maintenance_pending {
         relay(
             &request.relay_knowledge_binary,
             &request.superpod_root,
@@ -1042,5 +1057,102 @@ mod tests {
             request.prepared.publication_files
         );
         validate_prepared_publication(&request).unwrap();
+    }
+    #[cfg(unix)]
+    #[test]
+    fn index_refresh_respects_active_work_and_requires_complete_exact_snapshot() {
+        use std::os::unix::fs::PermissionsExt;
+        let temp = tempfile::tempdir().unwrap();
+        let binary = temp.path().join("relay-knowledge-fixture");
+        fs::write(
+            &binary,
+            r#"#!/bin/sh
+set -eu
+case "$1 $2" in
+  'repo status') cat status.json ;;
+  'repo update') printf 'update\n' >> updates.log; cp after.json status.json; printf '{}\n' ;;
+  *) exit 9 ;;
+esac
+"#,
+        )
+        .unwrap();
+        fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+        let expected = "a".repeat(40);
+        let request = IndexRefreshRequest {
+            relay_knowledge_binary: binary,
+            superpod_root: temp.path().into(),
+            repository_alias: "superpod".into(),
+            expected_commit: expected.clone(),
+        };
+        let complete = serde_json::json!({"status":{"last_indexed_commit":expected,"stale":false,"content_integrity":{"state":"complete"}},"retention":{"maintenance_pending":false}});
+        let old = serde_json::json!({"status":{"last_indexed_commit":"b".repeat(40),"stale":true,"content_integrity":{"state":"complete"}}});
+        let mut cases = Vec::new();
+        let mut active = old.clone();
+        active["active_task"] = serde_json::json!({"state":"running"});
+        cases.push(("top-level active task", active, complete.clone(), false, 0));
+        let mut nested = old.clone();
+        nested["status"]["active_task"] = serde_json::json!({"state":"queued"});
+        cases.push(("legacy nested task", nested, complete.clone(), false, 0));
+        let mut maintenance = old.clone();
+        maintenance["retention"] = serde_json::json!({"maintenance_pending":true});
+        cases.push((
+            "maintenance in progress",
+            maintenance,
+            complete.clone(),
+            false,
+            0,
+        ));
+        let mut incomplete = complete.clone();
+        incomplete["status"]["content_integrity"]["state"] = serde_json::json!("incomplete");
+        cases.push(("incomplete bytes", incomplete.clone(), incomplete, false, 1));
+        let missing = serde_json::json!({"status":{"last_indexed_commit":expected,"stale":false}});
+        cases.push((
+            "missing integrity proof",
+            missing.clone(),
+            missing,
+            false,
+            1,
+        ));
+        let mut conflicting = complete.clone();
+        conflicting["status"]["content_integrity"] =
+            serde_json::json!({"state":"degraded","complete":true});
+        cases.push((
+            "contradictory integrity proof",
+            conflicting.clone(),
+            conflicting,
+            false,
+            1,
+        ));
+        cases.push((
+            "already complete",
+            complete.clone(),
+            complete.clone(),
+            true,
+            0,
+        ));
+        cases.push(("one bounded update reaches target", old, complete, true, 1));
+        for (name, before, after, ready, updates) in cases {
+            fs::write(
+                temp.path().join("status.json"),
+                serde_json::to_vec(&before).unwrap(),
+            )
+            .unwrap();
+            fs::write(
+                temp.path().join("after.json"),
+                serde_json::to_vec(&after).unwrap(),
+            )
+            .unwrap();
+            fs::write(temp.path().join("updates.log"), "").unwrap();
+            let result = refresh_index(&request).unwrap();
+            assert_eq!(result.ready, ready, "{name}");
+            assert_eq!(
+                fs::read_to_string(temp.path().join("updates.log"))
+                    .unwrap()
+                    .lines()
+                    .count(),
+                updates,
+                "{name}"
+            );
+        }
     }
 }
