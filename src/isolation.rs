@@ -176,11 +176,6 @@ fn wrap_with_host(
         let tools = checked_directory(&tools)?;
         add_mount(&mut wrapped, "--ro-bind", &tools, &tools)?;
     }
-    // Test providers and explicit executables may live under /tmp, which was
-    // deliberately hidden. Restore only the selected executable read-only.
-    if program.starts_with("/tmp") || program.starts_with("/run") {
-        add_mount(&mut wrapped, "--ro-bind", &program, &program)?;
-    }
     // Model authentication is copied into the private Codex home; the original
     // authentication/configuration trees are unavailable to the child.
     if let Some(host_home) = &host.home {
@@ -214,6 +209,33 @@ fn wrap_with_host(
                 &skills,
                 &codex_home.join("skills"),
             )?;
+        }
+    }
+    // Standalone Codex installations resolve into CODEX_HOME/packages, which
+    // was deliberately masked above. Restore exactly the selected executable
+    // after all masks, including for /tmp-based test providers. Other package
+    // files and original configuration/authentication remain hidden.
+    add_mount(&mut wrapped, "--ro-bind", &program, &program)?;
+    // The standalone distribution launches this exact sibling for tool calls.
+    // Exposing the main executable alone permits model turns but breaks tools.
+    if program.file_name().is_some_and(|name| name == "codex") {
+        let helper = program
+            .parent()
+            .context("executable has no parent")?
+            .join("codex-code-mode-host");
+        if helper.is_file() {
+            let source = helper.canonicalize()?;
+            ensure!(
+                fs::metadata(&source)?.permissions().mode() & 0o111 != 0,
+                "Codex tool host is not executable"
+            );
+            ensure!(
+                !source.starts_with(&state) || source.starts_with(&tools),
+                "Codex tool host cannot alias private controller state"
+            );
+            // Preserve the expected sibling pathname even when an installation
+            // uses a symlink to the actual helper executable.
+            add_mount(&mut wrapped, "--ro-bind", &source, &helper)?;
         }
     }
     for (key, value) in host.environment {
@@ -552,6 +574,82 @@ mod tests {
         assert_eq!(
             fs::metadata(directory).unwrap().permissions().mode() & 0o777,
             0o755
+        );
+    }
+
+    #[test]
+    fn exact_executable_survives_masked_codex_package_directory() {
+        let (_temp, state, worktree, logs) = fixture();
+        let host_home = state.join("tools/host-home");
+        let host_codex = host_home.join(".codex");
+        let package = host_codex.join("packages/release/bin");
+        fs::create_dir_all(&package).unwrap();
+        let executable = package.join("codex");
+        let helper = package.join("codex-code-mode-host");
+        let adjacent = package.join("must-remain-hidden");
+        fs::write(&adjacent, "private fixture").unwrap();
+        fs::write(
+            &executable,
+            "#!/bin/sh\nset -eu\nexec \"${0%/*}/codex-code-mode-host\" \"$1\"\n",
+        )
+        .unwrap();
+        fs::write(
+            &helper,
+            "#!/bin/sh\nset -eu\ntest ! -e \"$1\"\nprintf 'fixture-tool-host\\n'\n",
+        )
+        .unwrap();
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::set_permissions(&helper, fs::Permissions::from_mode(0o755)).unwrap();
+        let access = HostAccess {
+            home: Some(host_home),
+            codex_home: Some(host_codex),
+            environment: vec![("PATH".into(), "/usr/bin:/bin".into())],
+        };
+        let (program, args) = wrap_with_host(
+            executable.to_str().unwrap(),
+            &[utf8(&adjacent).unwrap()],
+            &state,
+            &worktree,
+            &logs,
+            false,
+            access,
+        )
+        .unwrap();
+        let output = Command::new(program).args(args).output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout).trim(),
+            "fixture-tool-host"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires an installed Codex; run explicitly to verify the actual installation layout"]
+    fn actual_installed_codex_version_inside_sandbox() {
+        let (_temp, state, worktree, logs) = fixture();
+        let (program, args) = wrap_agent(
+            "codex",
+            &["--version".into()],
+            &state,
+            &worktree,
+            &logs,
+            false,
+        )
+        .unwrap();
+        let output = Command::new(program).args(args).output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout)
+                .to_lowercase()
+                .contains("codex")
         );
     }
 }

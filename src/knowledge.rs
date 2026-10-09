@@ -7,7 +7,7 @@ use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -316,6 +316,8 @@ pub struct PreparedReport {
     pub report_sha256: String,
     pub experiment_id: String,
     pub relay_knowledge_binary: PathBuf,
+    /// Every reviewed contribution path, including generated navigation/maps and deletions.
+    pub publication_files: BTreeMap<PathBuf, Option<String>>,
 }
 
 fn git(cwd: &Path, args: &[&str]) -> Result<String> {
@@ -493,7 +495,7 @@ pub fn prepare_report(request: &PrepareReportRequest) -> Result<PreparedReport> 
         &request.worktree,
         &["map", "validate", "--format", "json"],
     )?;
-    Ok(PreparedReport {
+    let mut prepared = PreparedReport {
         worktree: fs::canonicalize(&request.worktree)?,
         branch,
         baseline: baseline.clone(),
@@ -501,7 +503,10 @@ pub fn prepare_report(request: &PrepareReportRequest) -> Result<PreparedReport> 
         report_sha256: file_sha256(&report_path)?,
         experiment_id: request.report.bindings.experiment_id.clone(),
         relay_knowledge_binary: request.relay_knowledge_binary.clone(),
-    })
+        publication_files: BTreeMap::new(),
+    };
+    prepared.publication_files = publication_snapshot(&prepared, None)?;
+    Ok(prepared)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -520,17 +525,153 @@ fn allowed_publication_path(path: &Path, report: &PreparedReport) -> bool {
         || path.starts_with("knowledge/topics")
 }
 
-/// Explicit publication commits only report/navigation/map files and opens a PR in stevetdp/superpod.
-pub fn publish_report(request: &PublishReportRequest) -> Result<PullRequestReceipt> {
+fn nul_paths(output: std::process::Output) -> Result<Vec<PathBuf>> {
+    ensure!(output.status.success(), "cannot inspect publication diff");
+    Ok(String::from_utf8(output.stdout)?
+        .split('\0')
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .collect())
+}
+
+fn publication_snapshot(
+    prepared: &PreparedReport,
+    commit: Option<&str>,
+) -> Result<BTreeMap<PathBuf, Option<String>>> {
+    let mut args = vec![
+        "diff".into(),
+        "--name-only".into(),
+        "-z".into(),
+        prepared.baseline.clone(),
+    ];
+    if let Some(commit) = commit {
+        args.push(commit.into());
+    }
+    args.push("--".into());
+    let mut paths: BTreeSet<PathBuf> = nul_paths(crate::process::capture(
+        "git",
+        &args,
+        &prepared.worktree,
+        std::time::Duration::from_secs(30),
+    )?)?
+    .into_iter()
+    .collect();
+    if commit.is_none() {
+        for args in [
+            vec!["ls-files", "--others", "--exclude-standard", "-z"],
+            vec!["diff", "--cached", "--name-only", "-z", "--"],
+        ] {
+            paths.extend(nul_paths(crate::process::capture(
+                "git",
+                &args.into_iter().map(String::from).collect::<Vec<_>>(),
+                &prepared.worktree,
+                std::time::Duration::from_secs(30),
+            )?)?);
+        }
+    }
+    let mut result = BTreeMap::new();
+    for path in paths {
+        relative_path(&path)?;
+        ensure!(
+            allowed_publication_path(&path, prepared),
+            "unexpected publication file: {}",
+            path.display()
+        );
+        let digest = if let Some(commit) = commit {
+            let entry = git(
+                &prepared.worktree,
+                &[
+                    "ls-tree",
+                    commit,
+                    "--",
+                    path.to_str().context("non-UTF-8 publication path")?,
+                ],
+            )?;
+            if entry.is_empty() {
+                None
+            } else {
+                ensure!(
+                    entry.starts_with("100644 blob ") || entry.starts_with("100755 blob "),
+                    "publication tree entry must be a regular file"
+                );
+                let output = crate::process::capture(
+                    "git",
+                    &["show".into(), format!("{commit}:{}", path.display())],
+                    &prepared.worktree,
+                    std::time::Duration::from_secs(30),
+                )?;
+                ensure!(
+                    output.status.success(),
+                    "cannot read committed publication file"
+                );
+                Some(format!("{:x}", Sha256::digest(&output.stdout)))
+            }
+        } else {
+            let file = prepared.worktree.join(&path);
+            match fs::symlink_metadata(&file) {
+                Ok(metadata) => {
+                    ensure!(
+                        metadata.file_type().is_file() && fs::canonicalize(&file)? == file,
+                        "publication path must be a regular file without symlink aliases"
+                    );
+                    Some(file_sha256(&file)?)
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+                Err(error) => return Err(error.into()),
+            }
+        };
+        result.insert(path, digest);
+    }
+    Ok(result)
+}
+
+fn validate_prepared_publication(request: &PublishReportRequest) -> Result<()> {
     let prepared = &request.prepared;
+    validate_identifier(&prepared.experiment_id)?;
+    validate_commit(&prepared.baseline)?;
+    validate_digest(&prepared.report_sha256)?;
+    ensure!(prepared.experiment_id != "index", "reserved experiment ID");
+    let expected_branch = format!("research/{}", prepared.experiment_id);
     ensure!(
-        git(&prepared.worktree, &["branch", "--show-current"])? == prepared.branch,
+        prepared.branch == expected_branch && prepared.branch != request.base_branch,
+        "publication must use its dedicated research branch, distinct from the base"
+    );
+    git(
+        &prepared.worktree,
+        &["check-ref-format", "--branch", &request.base_branch],
+    )?;
+    ensure!(
+        git(&prepared.worktree, &["branch", "--show-current"])? == expected_branch,
         "publication branch changed"
     );
     ensure!(
-        file_sha256(&prepared.worktree.join(&prepared.report_path))? == prepared.report_sha256,
-        "report changed after review"
+        prepared.report_path
+            == PathBuf::from(format!(
+                "knowledge/software/ai-sdlc/{}.md",
+                prepared.experiment_id
+            )),
+        "report path does not match the experiment"
     );
+    git(
+        &prepared.worktree,
+        &["merge-base", "--is-ancestor", &prepared.baseline, "HEAD"],
+    )?;
+    ensure!(
+        prepared.publication_files.get(&prepared.report_path)
+            == Some(&Some(prepared.report_sha256.clone())),
+        "review manifest does not bind the report"
+    );
+    ensure!(
+        publication_snapshot(prepared, None)? == prepared.publication_files,
+        "publication snapshot changed after review"
+    );
+    Ok(())
+}
+
+/// Explicit publication commits only report/navigation/map files and opens a PR in stevetdp/superpod.
+pub fn publish_report(request: &PublishReportRequest) -> Result<PullRequestReceipt> {
+    let prepared = &request.prepared;
+    validate_prepared_publication(request)?;
     let remote = git(&prepared.worktree, &["remote", "get-url", "origin"])?;
     ensure!(
         [
@@ -587,12 +728,16 @@ pub fn publish_report(request: &PublishReportRequest) -> Result<PullRequestRecei
         head != prepared.baseline,
         "publication has no committed contribution"
     );
+    ensure!(
+        publication_snapshot(prepared, Some(&head))? == prepared.publication_files,
+        "committed publication differs from reviewed snapshot"
+    );
     git(
         &prepared.worktree,
         &[
             "push",
             "origin",
-            &format!("HEAD:refs/heads/{}", prepared.branch),
+            &format!("{head}:refs/heads/{}", prepared.branch),
         ],
     )?;
     ensure_pull_request(&PullRequestRequest {
@@ -755,8 +900,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[test]
-    fn preparation_isolated_from_main_checkout_and_retry_safe() {
+    fn preparation_fixture() -> (tempfile::TempDir, PrepareReportRequest) {
         use std::os::unix::fs::PermissionsExt;
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join("superpod");
@@ -783,12 +927,120 @@ mod tests {
             relay_knowledge_binary: binary,
             report,
         };
+        (temp, request)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn preparation_isolated_from_main_checkout_and_retry_safe() {
+        let (_temp, request) = preparation_fixture();
+        let root = &request.superpod_root;
         let prepared = prepare_report(&request).unwrap();
         assert!(!root.join(&prepared.report_path).exists());
-        assert!(git(&root, &["status", "--porcelain"]).unwrap().is_empty());
+        assert!(git(root, &["status", "--porcelain"]).unwrap().is_empty());
         assert_eq!(
             prepare_report(&request).unwrap().report_sha256,
             prepared.report_sha256
         );
+    }
+
+    #[cfg(unix)]
+    fn publication_fixture() -> (tempfile::TempDir, PublishReportRequest) {
+        let (temp, request) = preparation_fixture();
+        let prepared = prepare_report(&request).unwrap();
+        (
+            temp,
+            PublishReportRequest {
+                prepared,
+                base_branch: "main".into(),
+                title: "Publish test report".into(),
+                body: "Test fixture".into(),
+            },
+        )
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn publication_rejects_extra_committed_files() {
+        let (_temp, request) = publication_fixture();
+        validate_prepared_publication(&request).unwrap();
+        fs::write(
+            request.prepared.worktree.join("unreviewed.txt"),
+            "must not publish",
+        )
+        .unwrap();
+        git(&request.prepared.worktree, &["add", "unreviewed.txt"]).unwrap();
+        git(
+            &request.prepared.worktree,
+            &["commit", "-m", "unreviewed file"],
+        )
+        .unwrap();
+        assert!(
+            validate_prepared_publication(&request)
+                .unwrap_err()
+                .to_string()
+                .contains("unexpected publication file")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn publication_rejects_forged_main_and_same_base_before_effects() {
+        let (_temp, mut request) = publication_fixture();
+        request.prepared.branch = "main".into();
+        assert!(
+            publish_report(&request)
+                .unwrap_err()
+                .to_string()
+                .contains("dedicated research branch")
+        );
+        request.prepared.branch = format!("research/{}", request.prepared.experiment_id);
+        request.base_branch = request.prepared.branch.clone();
+        assert!(
+            publish_report(&request)
+                .unwrap_err()
+                .to_string()
+                .contains("dedicated research branch")
+        );
+        assert_eq!(
+            git(&request.prepared.worktree, &["rev-parse", "HEAD"]).unwrap(),
+            request.prepared.baseline
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn publication_binds_index_map_and_committed_snapshot() {
+        let (_temp, mut request) = publication_fixture();
+        let index = request
+            .prepared
+            .worktree
+            .join("knowledge/software/index.md");
+        let original = fs::read(&index).unwrap();
+        fs::write(&index, "changed after review").unwrap();
+        assert!(validate_prepared_publication(&request).is_err());
+        fs::write(&index, original).unwrap();
+        let map = request
+            .prepared
+            .worktree
+            .join("knowledge/knowledge-map.yaml");
+        fs::write(&map, "fixture map").unwrap();
+        request.prepared.publication_files = publication_snapshot(&request.prepared, None).unwrap();
+        fs::write(&map, "map changed after review").unwrap();
+        assert!(validate_prepared_publication(&request).is_err());
+        fs::write(&map, "fixture map").unwrap();
+        validate_prepared_publication(&request).unwrap();
+        git(&request.prepared.worktree, &["add", "."]).unwrap();
+        git(
+            &request.prepared.worktree,
+            &["commit", "-m", "reviewed contribution"],
+        )
+        .unwrap();
+        let head = git(&request.prepared.worktree, &["rev-parse", "HEAD"]).unwrap();
+        assert_eq!(
+            publication_snapshot(&request.prepared, Some(&head)).unwrap(),
+            request.prepared.publication_files
+        );
+        validate_prepared_publication(&request).unwrap();
     }
 }
