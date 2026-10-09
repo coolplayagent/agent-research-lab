@@ -1,0 +1,24 @@
+[workspace]
+members = ["."]
+resolver = "3"
+
+[package]
+name = "agent-research-lab"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Reproducible AI-SDLC and long-horizon agent research with SuperPOD"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+fs2 = "0.4"
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+toml = "0.8"
+
+[dev-dependencies]
+tempfile = "3"

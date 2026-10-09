@@ -1,0 +1,8 @@
+/target/
+/bazel-*
+/.lab/
+/.qualitygate/
+/local.toml
+*.env
+*.sqlite*
+*.log
