@@ -35,6 +35,44 @@ pub fn deadline_exhausted() -> bool {
         .is_some_and(|deadline| Instant::now() >= deadline)
 }
 
+/// Bounded independent host checks. Every child inherits the same absolute
+/// deadline, and all started checks are joined before any error is returned.
+pub fn parallel_map<T: Sync, R: Send>(
+    items: &[T],
+    operation: impl Fn(&T) -> Result<R> + Sync,
+) -> Result<Vec<R>> {
+    let deadline = DEADLINE.get();
+    let mut output = Vec::with_capacity(items.len());
+    for batch in items.chunks(4) {
+        if deadline_exhausted() {
+            bail!("host operation wall-clock budget exhausted");
+        }
+        let results = std::thread::scope(|scope| {
+            let handles: Vec<_> = batch
+                .iter()
+                .map(|item| {
+                    let operation = &operation;
+                    scope.spawn(move || {
+                        DEADLINE.set(deadline);
+                        operation(item)
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|handle| {
+                    handle
+                        .join()
+                        .unwrap_or_else(|_| Err(anyhow::anyhow!("parallel host check panicked")))
+                })
+                .collect::<Vec<_>>()
+        });
+        // Collect only after joining every child, including siblings of failures.
+        output.extend(results.into_iter().collect::<Result<Vec<_>>>()?);
+    }
+    Ok(output)
+}
+
 pub struct Process {
     child: Child,
     pub stdout: PathBuf,
@@ -205,5 +243,75 @@ mod tests {
     fn deadline_terminates_child() {
         let t = tempfile::tempdir().unwrap();
         assert!(capture("sleep", &["5".into()], t.path(), Duration::from_millis(20)).is_err());
+    }
+}
+
+#[cfg(test)]
+mod parallel_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn independent_checks_are_bounded_and_return_in_input_order() {
+        let active = AtomicUsize::new(0);
+        let peak = AtomicUsize::new(0);
+        let items: Vec<_> = (0..11).collect();
+        let result = parallel_map(&items, |item| {
+            let current = active.fetch_add(1, Ordering::SeqCst) + 1;
+            peak.fetch_max(current, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(20 + (3 - item % 4) * 5));
+            active.fetch_sub(1, Ordering::SeqCst);
+            Ok(item * 2)
+        })
+        .unwrap();
+        assert_eq!(
+            result,
+            items.iter().map(|item| item * 2).collect::<Vec<_>>()
+        );
+        assert!((2..=4).contains(&peak.load(Ordering::SeqCst)));
+        assert_eq!(active.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn failures_and_panics_join_started_siblings_without_starting_later_batches() {
+        for panic in [false, true] {
+            let completed = AtomicUsize::new(0);
+            let started = AtomicUsize::new(0);
+            let result = parallel_map(&[0, 1, 2, 3, 4], |item| {
+                started.fetch_add(1, Ordering::SeqCst);
+                if *item == 0 {
+                    assert!(!panic, "fixture worker panic");
+                    bail!("fixture unavailable source");
+                }
+                std::thread::sleep(Duration::from_millis(30));
+                completed.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            });
+            assert!(result.is_err());
+            assert_eq!(started.load(Ordering::SeqCst), 4);
+            assert_eq!(completed.load(Ordering::SeqCst), 3);
+        }
+    }
+
+    #[test]
+    fn later_batches_share_the_original_host_deadline() {
+        let temp = tempfile::tempdir().unwrap();
+        let started = Instant::now();
+        let _deadline = deadline_scope(Duration::from_millis(250));
+        let calls = AtomicUsize::new(0);
+        let result = parallel_map(&[0, 1, 2, 3, 4, 5, 6, 7, 8], |item| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            capture(
+                "/bin/sleep",
+                &[if *item < 4 { "0.10" } else { "5" }.into()],
+                temp.path(),
+                Duration::from_secs(10),
+            )
+        });
+        assert!(result.is_err());
+        assert!(deadline_exhausted());
+        assert!(started.elapsed() < Duration::from_secs(2));
+        assert!(calls.load(Ordering::SeqCst) <= 8);
+        assert!(parallel_map(&[1], |_| -> Result<()> { panic!("expired work started") }).is_err());
     }
 }

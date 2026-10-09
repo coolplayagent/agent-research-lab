@@ -118,17 +118,20 @@ pub fn collect(c: &Config) -> Result<Option<ResearchInputs>> {
         c.workspace.join("agent-research-lab"),
     );
     paths.insert("superpod".into(), c.superpod.clone());
-    let mut repositories = BTreeMap::new();
-    for (name, path) in paths {
-        let upstream = freshness::remote_snapshot(&path)?;
-        if let Some(skill) = skills.skills.iter().find(|skill| skill.name == name) {
+    let paths: Vec<_> = paths.into_iter().collect();
+    let repositories: BTreeMap<_, _> = process::parallel_map(&paths, |(name, path)| {
+        let upstream = freshness::remote_snapshot(path)
+            .with_context(|| format!("refresh latest source {name}"))?;
+        if let Some(skill) = skills.skills.iter().find(|skill| &skill.name == name) {
             ensure!(
                 skill.repository == upstream.repository,
                 "skill and code repositories differ for {name}"
             );
         }
-        repositories.insert(name.clone(), checkout(c, &name, &path, upstream)?);
-    }
+        Ok((name.clone(), checkout(c, name, path, upstream)?))
+    })?
+    .into_iter()
+    .collect();
     let insights_path = repositories["agent-research-lab"]
         .checkout
         .join("research/insights.md");
@@ -180,7 +183,8 @@ pub fn verify(c: &Config, inputs: Option<&ResearchInputs>) -> Result<()> {
         inputs.repositories.keys().cloned().collect::<BTreeSet<_>>() == expected,
         "latest input receipt has missing or unexpected repositories"
     );
-    for (name, repository) in &inputs.repositories {
+    let repositories: Vec<_> = inputs.repositories.iter().collect();
+    process::parallel_map(&repositories, |&(name, repository)| {
         let identity = if name == "superpod" {
             "stevetdp/superpod".into()
         } else {
@@ -208,7 +212,8 @@ pub fn verify(c: &Config, inputs: Option<&ResearchInputs>) -> Result<()> {
             git(&repository.checkout, &["status", "--porcelain"])?.is_empty(),
             "source snapshot dirty: {name}"
         );
-    }
+        Ok(())
+    })?;
     ensure!(
         fs::read_to_string(
             inputs.repositories["agent-research-lab"]

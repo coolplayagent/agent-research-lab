@@ -255,9 +255,12 @@ impl RemoteClient {
             "invalid or empty skills manifest"
         );
         let mut names = std::collections::BTreeSet::new();
-        for skill in &mut manifest.skills {
+        for skill in &manifest.skills {
             crate::config::safe_id(&skill.name)?;
             ensure!(names.insert(skill.name.clone()), "duplicate skill name");
+        }
+        manifest.skills = crate::process::parallel_map(&manifest.skills, |skill| {
+            let mut skill = skill.clone();
             trusted_repository(&skill.repository)?;
             validate_hex(&skill.tree_sha256, 64)?;
             validate_hex(&skill.runtime_sha256, 64)?;
@@ -307,7 +310,8 @@ impl RemoteClient {
                 _ => bail!("skill must bind exactly one release (tag+ID) or source commit"),
             }
             skill.checked_at = Utc::now().to_rfc3339();
-        }
+            Ok(skill)
+        })?;
         Ok(manifest)
     }
 }

@@ -65,6 +65,10 @@ new upstream package and refresh its host manifest when a release changes.
 bazel-bin/agent-research-lab --config local.toml refresh
 ```
 
+Independent skill and repository checks run in groups of at most four under the
+same absolute host deadline. All started checks finish before an error returns;
+a partial collection never replaces the current input manifest.
+
 Each idle admission batch verifies freshness before starting up to three agents of
 one cohort. An independent heartbeat renews each active workflow lease while
 the controller prepares other agents or handles results. The batch keeps
