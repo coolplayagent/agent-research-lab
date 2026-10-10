@@ -9,7 +9,7 @@ use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
     time::Duration,
@@ -397,7 +397,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
         ("computer", "Computer Use 与 sandbox 中的操作恢复"),
     ] {
         let independent = format!(
-            "研究 {title}。只读分析固定的 SuperPOD 提交；给出有来源、可复现实验的假设。识别七个 coolplayagent CLI 的实际使用缺口。不得修改文件、安装、推送、发消息或合并。正文用中文，输出指定 JSON schema。"
+            "研究 {title}。只读分析固定的 SuperPOD 提交；给出有来源、可复现实验的假设。识别七个 coolplayagent CLI 的实际使用缺口。不得修改文件、安装、推送、发消息或合并。本阶段 next_tasks 必须为空数组；把后续实验建议写入 findings，由综合阶段选择。正文用中文，输出指定 JSON schema。"
         );
         let research_id = format!("research-{round}-{topic}");
         let critic_id = format!("critic-{round}-{topic}");
@@ -429,7 +429,11 @@ fn seed_inputs(c: &Config) -> Result<Value> {
                     write: false,
                     exploratory: topic == "collaboration",
                     dependencies: vec![],
-                    required_tools: vec![],
+                    required_tools: if topic == "computer" && c.require_latest {
+                        vec!["computer-use-cli".into(), "repo-sandbox".into()]
+                    } else {
+                        vec![]
+                    },
                 },
                 inputs.clone(),
             )?;
@@ -460,21 +464,81 @@ fn seed_inputs(c: &Config) -> Result<Value> {
 }
 
 fn rendered_task_prompt(c: &Config, task: &Task) -> Result<String> {
-    if let Some(version) = &task.prompt_version {
+    let role = if let Some(version) = &task.prompt_version {
         let prompt = crate::evolution_cli::resolve_registered_prompt(
             &c.state_dir.join("evolution/prompts.json"),
             version,
             &task.role,
         )?;
-        return Ok(format!("{}\n{}", prompt.definition().content, task.prompt));
-    }
-    let role = match task.role.as_str() {
-        "implement" => include_str!("../prompts/implement.md"),
-        "review" => include_str!("../prompts/critic.md"),
-        "evaluate" | "evaluator" => include_str!("../prompts/evaluator.md"),
-        _ => include_str!("../prompts/research.md"),
+        prompt.definition().content.clone()
+    } else {
+        match task.role.as_str() {
+            "implement" => include_str!("../prompts/implement.md"),
+            "review" => include_str!("../prompts/critic.md"),
+            "evaluate" | "evaluator" => include_str!("../prompts/evaluator.md"),
+            _ => include_str!("../prompts/research.md"),
+        }
+        .to_owned()
     };
-    Ok(format!("{role}\n{}", task.prompt))
+    Ok(format!(
+        "{role}\n{}\n\n{}\n{}",
+        task.prompt,
+        followup_instructions(task),
+        if task.required_tools.iter().any(|t| t == "computer-use-cli") {
+            "Owned target experiment: use the installed computer-use CLI against DISPLAY/XAUTHORITY provided by the controller and the unique LAB_DESKTOP_WINDOW. Observe windows and screenshot first, then type a unique harmless token into this dedicated fixture and check LAB_DESKTOP_TARGET/observed.json. Task artifacts may be written under LAB_DESKTOP_TARGET; do not modify the repository. Read targets-host.json beside that directory for the host's real repo-sandbox evidence and retained registry. Do not connect to personal desktops or attempt nested sandbox execution: this host restricts nested user namespaces. Missing target capability is an implementation finding to address, not evidence of success."
+        } else {
+            ""
+        }
+    ))
+}
+
+fn may_propose_followups(task: &Task) -> bool {
+    task.depth < 3 && (task.id.starts_with("synthesis-") || task.role == "implement")
+}
+
+fn followup_instructions(task: &Task) -> &'static str {
+    if !may_propose_followups(task) {
+        "Follow-up authority: next_tasks must be []. Put proposed experiments and unresolved questions in findings; this task cannot enqueue follow-ups."
+    } else if task.role == "implement" {
+        "Follow-up authority: propose at most three independent reviews with role=review and write=false. Do not request more implementation or change any role to obtain write permission. Declare required_tools explicitly: real GUI experiments need computer-use-cli, sandbox experiments need repo-sandbox, and tasks needing neither use []. Missing tool or target bindings are a functional gap, not evidence of success. Return [] when no review is justified."
+    } else {
+        "Follow-up authority: propose at most three bounded tasks. Read-only research/review must set write=false. A justified code or document change must explicitly use role=implement and write=true; never label a writing task as research/review. Keep the actual task description and write flag consistent. The host will not upgrade roles or permissions. Declare required_tools explicitly: real GUI experiments need computer-use-cli, sandbox experiments need repo-sandbox, and tasks needing neither use []. Missing tool or target bindings are a functional gap, not evidence of success. Follow-ups do not authorize installation, publishing or merging. Return [] when evidence does not justify a task."
+    }
+}
+
+fn report_schema(c: &Config, task: &Task) -> Value {
+    let tools: Vec<_> = c.tools.keys().cloned().collect();
+    let repositories: Vec<_> = c
+        .tools
+        .keys()
+        .cloned()
+        .chain(["superpod".into(), "agent-research-lab".into()])
+        .collect();
+    let proposal = |roles: Vec<&str>, write_values: Vec<bool>| {
+        json!({
+            "type":"object","properties":{
+                "repository":{"type":"string","enum":repositories},
+                "role":{"type":"string","enum":roles},
+                "prompt":{"type":"string"},"write":{"type":"boolean","enum":write_values},
+                "exploratory":{"type":"boolean"},
+                "required_tools":{"type":"array","maxItems":7,"items":{"type":"string","enum":tools}}},
+            "required":["repository","role","prompt","write","exploratory","required_tools"],
+            "additionalProperties":false
+        })
+    };
+    let items = if task.role == "implement" {
+        proposal(vec!["review"], vec![false])
+    } else {
+        json!({"anyOf":[
+            proposal(vec!["research", "review"], vec![false]),
+            proposal(vec!["implement"], vec![false, true])
+        ]})
+    };
+    json!({"type":"object","properties":{
+        "summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},
+        "sources":{"type":"array","items":{"type":"string"}},"limitations":{"type":"array","items":{"type":"string"}},
+        "next_tasks":{"type":"array","maxItems":if may_propose_followups(task) {3} else {0},"items":items}
+    },"required":["summary","findings","sources","limitations","next_tasks"],"additionalProperties":false})
 }
 
 fn rendered_experiment_prompt(
@@ -710,16 +774,15 @@ pub fn doctor(c: &Config, probe_models: bool) -> Result<Value> {
     if probe_models {
         let unique: BTreeSet<_> = c.models.values().collect();
         for model in unique {
-            let args = vec![
+            let mut args = vec![
                 "exec".into(),
                 "--ephemeral".into(),
                 "--json".into(),
-                "-s".into(),
-                "read-only".into(),
                 "-m".into(),
                 model.clone(),
-                "Reply with exactly OK. Do not use tools.".into(),
             ];
+            args.extend(crate::agent_policy::arguments());
+            args.push("Reply with exactly OK. Do not use tools.".into());
             let result = process::capture(&c.codex, &args, &c.superpod, Duration::from_secs(90));
             models.push(match result {
                 Ok(out) => json!({"model":model,"available":out.status.success()}),
@@ -728,16 +791,48 @@ pub fn doctor(c: &Config, probe_models: bool) -> Result<Value> {
         }
     }
     Ok(
-        json!({"tools":results,"latest_skills":latest_skills,"superpod":{"path":c.superpod,"commit":knowledge.as_ref().ok(),"error":knowledge.err().map(|e|e.to_string())},"model_probes":models,"daily_seconds":c.daily_seconds,"max_agents":c.max_agents}),
+        json!({"agent_permissions":crate::agent_policy::description(),"tools":results,"latest_skills":latest_skills,"superpod":{"path":c.superpod,"commit":knowledge.as_ref().ok(),"error":knowledge.err().map(|e|e.to_string())},"model_probes":models,"daily_seconds":c.daily_seconds,"max_agents":c.max_agents}),
     )
 }
 
 pub fn status(c: &Config) -> Result<Value> {
     let w = workflow(c);
+    let all_jobs = jobs(c)?;
+    let indexed: BTreeMap<_, _> = all_jobs.iter().map(|j| (j.task.id.clone(), j)).collect();
+    let mut states = BTreeMap::new();
+    let mut errors = BTreeMap::new();
+    for job in &all_jobs {
+        match w.status(&job.run_id) {
+            Ok(state) => {
+                states.insert(job.task.id.clone(), state);
+            }
+            Err(error) => {
+                errors.insert(job.task.id.clone(), error.to_string());
+            }
+        }
+    }
+    let paused = c.state_dir.join("paused").exists();
     let mut result = Vec::new();
-    for job in jobs(c)? {
-        let status = w.status(&job.run_id);
-        result.push(json!({"id":job.task.id,"run_id":job.run_id,"model":job.model,"source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"status":status.as_ref().ok(),"error":status.err().map(|e|e.to_string()),"last_error":job.last_error}));
+    let mut summary = BTreeMap::<&str, usize>::new();
+    for job in &all_jobs {
+        let (state, reason) =
+            controller_state(job, &indexed, &states, paused, &mut BTreeSet::new());
+        *summary.entry(state).or_default() += 1;
+        let postprocessing = if post_success_path(c, job).exists() {
+            match storage::read::<PostSuccess>(&post_success_path(c, job)) {
+                Ok(record) => json!({"memory":record.memory,"memory_error":record.memory_error,
+                    "followups":record.followups,"followup_error":record.followup_error,
+                    "queued":record.followup_queued,"rejected":record.followup_rejections}),
+                Err(error) => json!({"error":error.to_string()}),
+            }
+        } else {
+            Value::Null
+        };
+        result.push(json!({"id":job.task.id,"run_id":job.run_id,"model":job.model,
+            "source_commit":job.source_commit,"superpod_commit":job.superpod_commit,
+            "state":state,"reason":reason,"workflow_state":states.get(&job.task.id).map(|s| &s["status"]),
+            "status":states.get(&job.task.id),"error":errors.get(&job.task.id),
+            "last_error":job.last_error,"postprocessing":postprocessing}));
     }
     let ledger_path = c.state_dir.join("budget.json");
     let ledger: Value = if ledger_path.exists() {
@@ -745,7 +840,101 @@ pub fn status(c: &Config) -> Result<Value> {
     } else {
         json!({})
     };
-    Ok(json!({"paused":c.state_dir.join("paused").exists(),"jobs":result,"budget":ledger}))
+    Ok(json!({"paused":paused,"summary":summary,"jobs":result,"budget":ledger}))
+}
+
+/// Workflow `running` also includes task_ready. Only a matching retained live
+/// process is controller execution; pending work must expose its actual blocker.
+fn controller_state(
+    job: &Job,
+    indexed: &BTreeMap<String, &Job>,
+    states: &BTreeMap<String, Value>,
+    paused: bool,
+    visiting: &mut BTreeSet<String>,
+) -> (&'static str, Option<String>) {
+    if !visiting.insert(job.task.id.clone()) {
+        return (
+            "blocked",
+            Some("dependency cycle requires reconciliation".into()),
+        );
+    }
+    let result = (|| {
+        let Some(workflow) = states.get(&job.task.id) else {
+            return (
+                "unknown",
+                Some("workflow status unavailable; inspect error".into()),
+            );
+        };
+        if workflow["status"] == "succeeded" {
+            return ("succeeded", None);
+        }
+        if let Some(launch) = &job.launch {
+            if launch.pid > 0
+                && process_start(launch.pid).ok().as_ref() == Some(&launch.process_start)
+            {
+                return ("running", None);
+            }
+            return (
+                "needs_reconciliation",
+                Some("retained launch has no matching live process".into()),
+            );
+        }
+        if let Some(due) = job.retry_after {
+            return (
+                "retry_wait",
+                Some(format!("bounded read retry due at {due}")),
+            );
+        }
+        if let Some(error) = &job.last_error {
+            return ("blocked", Some(error.clone()));
+        }
+        if workflow["status"] == "failed" || workflow["status"] == "cancelled" {
+            return (
+                "failed",
+                Some("workflow ended without a successful receipt".into()),
+            );
+        }
+        if workflow.get("pause").is_some_and(|v| !v.is_null()) {
+            return ("paused", Some("workflow is paused".into()));
+        }
+        let mut waiting = vec![];
+        for id in &job.task.dependencies {
+            let Some(dependency) = indexed.get(id) else {
+                return ("blocked", Some(format!("dependency {id} is missing")));
+            };
+            let (state, reason) = controller_state(dependency, indexed, states, paused, visiting);
+            if ["blocked", "failed", "needs_reconciliation", "unknown"].contains(&state) {
+                return (
+                    "blocked",
+                    Some(format!(
+                        "dependency {id} is {state}: {}",
+                        reason.unwrap_or_default()
+                    )),
+                );
+            }
+            if state != "succeeded" {
+                waiting.push(id.as_str());
+            }
+        }
+        if !waiting.is_empty() {
+            return (
+                "waiting_dependencies",
+                Some(format!("awaiting {}", waiting.join(", "))),
+            );
+        }
+        if paused {
+            return ("paused", Some("controller admission is paused".into()));
+        }
+        if workflow["frames"]["1"]["nodes"]["task"]["state"]["state"] == "task_ready" {
+            return ("ready", None);
+        }
+        (
+            "needs_reconciliation",
+            Some("workflow has no ready task or matching retained launch".into()),
+        )
+    })();
+    visiting.remove(&job.task.id);
+    result
 }
 pub fn pause(c: &Config, paused: bool) -> Result<Value> {
     fs::create_dir_all(&c.state_dir)?;
@@ -846,6 +1035,23 @@ fn prepare_host<T>(
     operation().map(Some)
 }
 
+/// Unclaimed prerequisites are safe to defer. A host budget ending during a
+/// probe is not evidence that the installed tool or task is permanently broken.
+fn prepare_prerequisite<T>(
+    c: &Config,
+    ledger: &mut Ledger,
+    window: RunWindow,
+    active: bool,
+    operation: impl FnOnce() -> Result<T>,
+) -> Result<Option<T>> {
+    prepare_host(c, ledger, window, active, || match operation() {
+        Ok(value) => Ok(Some(value)),
+        Err(_) if process::deadline_exhausted() => Ok(None),
+        Err(error) => Err(error),
+    })
+    .map(Option::flatten)
+}
+
 pub fn seed(c: &Config) -> Result<Value> {
     let _lock = storage::lock(&c.state_dir.join("controller.lock"))?;
     let mut ledger = load_ledger(c)?;
@@ -921,6 +1127,8 @@ pub fn run_seeded(
     let mut last = now();
     let mut next_seed_check = 0;
     let mut next_host_tick = 0_i64;
+    let mut desktop_prepared = false;
+    let mut next_desktop_prepare = 0_i64;
     let mut active: Vec<Active> = vec![];
     loop {
         let time = now();
@@ -1150,22 +1358,63 @@ pub fn run_seeded(
                 }
                 checked_cohort = Some(cohort);
             }
-            let availability = prepare_host(c, &mut ledger, window, !active.is_empty(), || {
-                job.task.required_tools.iter().try_for_each(|name| {
-                    let t = c
-                        .tools
-                        .get(name)
-                        .context("required tool no longer configured")?;
-                    let out = process::capture(
-                        t.binary.to_str().context("non-UTF8 tool path")?,
-                        &t.probe,
-                        &c.workspace,
-                        Duration::from_secs(15),
-                    )?;
-                    ensure!(out.status.success(), "required tool {name} unavailable");
-                    Ok::<_, anyhow::Error>(())
-                })
-            });
+            if !desktop_prepared
+                && job
+                    .task
+                    .required_tools
+                    .iter()
+                    .any(|name| name == "computer-use-cli")
+            {
+                // Cold preparation may download dependencies for up to 55 s.
+                // Never run it under the 10 s allowance of an active cohort.
+                if !active.is_empty() || now() < next_desktop_prepare {
+                    continue;
+                }
+                let prepared = prepare_prerequisite(c, &mut ledger, window, false, || {
+                    crate::targets::prepare(c)
+                });
+                last = now();
+                let diagnostic = c.state_dir.join("target-preparation-error.json");
+                match prepared {
+                    Ok(Some(_)) => {
+                        desktop_prepared = true;
+                        if diagnostic.exists() {
+                            fs::remove_file(&diagnostic)?;
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(error) => {
+                        next_desktop_prepare = now() + 30;
+                        storage::write(
+                            &diagnostic,
+                            &json!({"at":now(),"state":"waiting_target",
+                                "retry_after":next_desktop_prepare,"error":format!("{error:#}")}),
+                        )?;
+                        // No workflow attempt has been claimed. The next idle
+                        // interval may safely resume dependency preparation.
+                        continue;
+                    }
+                }
+            }
+            let availability =
+                prepare_prerequisite(c, &mut ledger, window, !active.is_empty(), || {
+                    // DesktopSession verifies the cached dependency manifest in
+                    // each worker. Availability probing never downloads packages.
+                    job.task.required_tools.iter().try_for_each(|name| {
+                        let t = c
+                            .tools
+                            .get(name)
+                            .context("required tool no longer configured")?;
+                        let out = process::capture(
+                            t.binary.to_str().context("non-UTF8 tool path")?,
+                            &t.probe,
+                            &c.workspace,
+                            Duration::from_secs(15),
+                        )?;
+                        ensure!(out.status.success(), "required tool {name} unavailable");
+                        Ok::<_, anyhow::Error>(())
+                    })
+                });
             if active.is_empty() {
                 last = now();
             }
@@ -1326,6 +1575,19 @@ fn launch(
         });
         storage::write(&job_path(c, &job.task.id), job)?;
         storage::write(&dir.join("tool-bindings.json"), &tool_bindings)?;
+        storage::write(
+            &dir.join("agent-permissions.json"),
+            &crate::agent_policy::description(),
+        )?;
+        if job
+            .task
+            .required_tools
+            .iter()
+            .any(|name| name == "repo-sandbox")
+        {
+            let proof = crate::targets::sandbox_verify(c, &dir)?;
+            storage::write(&dir.join("targets-host.json"), &proof)?;
+        }
         let memory = if job.task.use_memory {
             Some(memory_call(c, job, &dir, "prepare", None)?)
         } else {
@@ -1347,44 +1609,26 @@ fn launch(
         );
         fs::write(&prompt_path, prompt)?;
         let schema = dir.join("result-schema.json");
-        let repositories: Vec<_> = c
-            .tools
-            .keys()
-            .cloned()
-            .chain(["superpod".into(), "agent-research-lab".into()])
-            .collect();
-        storage::write(
-            &schema,
-            &json!({"type":"object","properties":{
-        "summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}},
-        "sources":{"type":"array","items":{"type":"string"}},"limitations":{"type":"array","items":{"type":"string"}},
-        "next_tasks":{"type":"array","items":{"type":"object","properties":{
-            "repository":{"type":"string","enum":repositories},"role":{"type":"string","enum":["research","implement","review"]},
-            "prompt":{"type":"string"},"write":{"type":"boolean"},"exploratory":{"type":"boolean"}},
-            "required":["repository","role","prompt","write","exploratory"],"additionalProperties":false}}
-        },"required":["summary","findings","sources","limitations","next_tasks"],"additionalProperties":false}),
-        )?;
+        storage::write(&schema, &report_schema(c, &job.task))?;
 
-        let args = vec![
+        let mut args = vec![
             "exec".into(),
             "--json".into(),
             "--ephemeral".into(),
             "-m".into(),
             job.model.clone(),
-            "-s".into(),
-            "danger-full-access".into(),
-            "-c".into(),
-            "approval_policy=never".into(),
             "-c".into(),
             "model_reasoning_effort=\"medium\"".into(),
-            "-c".into(),
-            "features.multi_agent=false".into(),
             "--output-schema".into(),
             schema.display().to_string(),
             "-o".into(),
             dir.join("result.json").display().to_string(),
             "-".into(),
         ];
+        // Options precede the stdin prompt marker for all Codex versions.
+        args.pop();
+        args.extend(crate::agent_policy::arguments());
+        args.push("-".into());
         let env = vec![
             (
                 "RELAY_MEMORY_HOME".into(),
@@ -1395,14 +1639,23 @@ fn launch(
                 dir.join("knowledge-index").display().to_string(),
             ),
         ];
-        let (program, args) = crate::isolation::wrap_agent(
-            &c.codex,
-            &args,
-            &c.state_dir,
-            &job.worktree,
-            &dir,
-            job.task.write,
-        )?;
+        let (program, args) = if job
+            .task
+            .required_tools
+            .iter()
+            .any(|name| name == "computer-use-cli")
+        {
+            crate::targets::wrap_desktop_agent(c, &job.worktree, &dir, job.task.write, &args)?
+        } else {
+            crate::isolation::wrap_agent(
+                &c.codex,
+                &args,
+                &c.state_dir,
+                &job.worktree,
+                &dir,
+                job.task.write,
+            )?
+        };
         let execution_timeout = Duration::from_secs(remaining)
             .saturating_sub(launch_started.elapsed())
             .min(Duration::from_secs(c.task_timeout_seconds));
@@ -1628,6 +1881,20 @@ struct NextTask {
     prompt: String,
     write: bool,
     exploratory: bool,
+    #[serde(default)]
+    required_tools: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct ProposalRejection {
+    index: usize,
+    reason: String,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct FollowupReport {
+    queued: Vec<String>,
+    rejected: Vec<ProposalRejection>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1657,6 +1924,10 @@ struct PostSuccess {
     followups: FollowupAdmission,
     memory_error: Option<String>,
     followup_error: Option<String>,
+    #[serde(default)]
+    followup_queued: Vec<String>,
+    #[serde(default)]
+    followup_rejections: Vec<ProposalRejection>,
 }
 
 fn post_success_path(c: &Config, job: &Job) -> PathBuf {
@@ -1748,6 +2019,8 @@ fn queue_post_success(c: &Config, w: &Workflow, job: &Job) -> Result<()> {
             followups: FollowupAdmission::Pending,
             memory_error: legacy_memory.then(|| "legacy completion has no durable memory writeback journal; reconcile before retry".into()),
             followup_error: None,
+            followup_queued: vec![],
+            followup_rejections: vec![],
         }
     };
     if record.memory == MemoryWriteback::Running {
@@ -1852,9 +2125,11 @@ fn drain_followups(c: &Config, w: &Workflow) -> Result<bool> {
         record.followups = FollowupAdmission::Running;
         storage::write(&path, &record)?;
         match admit_followups(c, &job, &dir, &receipt) {
-            Ok(()) => {
+            Ok(report) => {
                 record.followups = FollowupAdmission::Done;
                 record.followup_error = None;
+                record.followup_queued = report.queued;
+                record.followup_rejections = report.rejected;
             }
             Err(error) => {
                 record.followup_error = Some(error.to_string());
@@ -1878,54 +2153,85 @@ fn drain_followups(c: &Config, w: &Workflow) -> Result<bool> {
     Ok(true)
 }
 
-fn admit_followups(c: &Config, parent: &Job, dir: &Path, receipt: &Value) -> Result<()> {
-    let proposals: Vec<NextTask> = serde_json::from_value(
-        receipt["agent_report"]
-            .get("next_tasks")
-            .cloned()
-            .unwrap_or(json!([])),
-    )?;
-    if proposals.is_empty() {
-        return Ok(());
-    }
+fn validate_proposal(c: &Config, parent: &Task, index: usize, proposal: &NextTask) -> Result<()> {
     ensure!(
-        parent.task.depth < 3 && proposals.len() <= 3,
+        parent.depth < 3 && index < 3,
         "follow-up limit or maximum depth reached"
     );
     ensure!(
-        parent.task.id.starts_with("synthesis-") || parent.task.role == "implement",
+        may_propose_followups(parent),
         "only synthesis and implementation may propose follow-ups"
     );
-    for proposal in &proposals {
-        ensure!(
-            ["research", "implement", "review"].contains(&proposal.role.as_str()),
-            "unsupported follow-up role"
-        );
-        ensure!(
-            !proposal.prompt.trim().is_empty() && proposal.prompt.len() <= 16000,
-            "invalid follow-up prompt"
-        );
-        ensure!(
-            c.tools.contains_key(&proposal.repository)
-                || ["superpod", "agent-research-lab"].contains(&proposal.repository.as_str()),
-            "follow-up repository not allowlisted"
-        );
-        ensure!(
-            !proposal.write || proposal.role == "implement",
-            "only implementation follow-ups can write"
-        );
-        ensure!(
-            parent.task.role != "implement" || (proposal.role == "review" && !proposal.write),
-            "implementation can only request independent read-only review"
-        );
+    ensure!(
+        ["research", "implement", "review"].contains(&proposal.role.as_str()),
+        "unsupported follow-up role"
+    );
+    ensure!(
+        !proposal.prompt.trim().is_empty() && proposal.prompt.len() <= 16000,
+        "invalid follow-up prompt"
+    );
+    ensure!(
+        c.tools.contains_key(&proposal.repository)
+            || ["superpod", "agent-research-lab"].contains(&proposal.repository.as_str()),
+        "follow-up repository not allowlisted"
+    );
+    ensure!(
+        !proposal.write || proposal.role == "implement",
+        "only implementation follow-ups can write"
+    );
+    ensure!(
+        parent.role != "implement" || (proposal.role == "review" && !proposal.write),
+        "implementation can only request independent read-only review"
+    );
+    ensure!(
+        proposal.required_tools.len() <= 7,
+        "at most seven required tools"
+    );
+    let mut tools = BTreeSet::new();
+    for tool in &proposal.required_tools {
+        ensure!(c.tools.contains_key(tool), "unknown required tool {tool}");
+        ensure!(tools.insert(tool), "duplicate required tool {tool}");
     }
-    let mut queued = vec![];
-    let inputs = if proposals.is_empty() {
+    Ok(())
+}
+
+fn admit_followups(
+    c: &Config,
+    parent: &Job,
+    dir: &Path,
+    receipt: &Value,
+) -> Result<FollowupReport> {
+    let empty = vec![];
+    let proposals = match receipt["agent_report"].get("next_tasks") {
+        Some(value) => value.as_array().context("next_tasks must be an array")?,
+        None => &empty, // Historical receipts may predate follow-up proposals.
+    };
+    let mut report = FollowupReport::default();
+    let mut admissible = Vec::new();
+    for (index, value) in proposals.iter().enumerate() {
+        let parsed = serde_json::from_value::<NextTask>(value.clone())
+            .context("malformed follow-up proposal")
+            .and_then(|proposal| {
+                validate_proposal(c, &parent.task, index, &proposal)?;
+                Ok(proposal)
+            });
+        match parsed {
+            Ok(proposal) => admissible.push((index, proposal)),
+            Err(error) => report.rejected.push(ProposalRejection {
+                index,
+                reason: format!("{error:#}"),
+            }),
+        }
+    }
+    // Persist each proposal's disposition without treating one bad sibling as
+    // authority to discard a valid one. Original indices are stable retry IDs.
+    storage::write(&dir.join("followups.json"), &report)?;
+    let inputs = if admissible.is_empty() {
         None
     } else {
         crate::inputs::collect(c)?
     };
-    for (index, proposal) in proposals.into_iter().enumerate() {
+    for (index, proposal) in admissible {
         let id = format!(
             "followup-{}-{index}",
             &storage::digest(parent.run_id.as_bytes())[..16]
@@ -1943,13 +2249,14 @@ fn admit_followups(c: &Config, parent: &Job, dir: &Path, receipt: &Value) -> Res
                 write: proposal.write,
                 exploratory: proposal.exploratory,
                 dependencies: vec![parent.task.id.clone()],
-                required_tools: vec![],
+                required_tools: proposal.required_tools,
             },
             inputs.clone(),
         )?;
-        queued.push(id);
+        report.queued.push(id);
+        storage::write(&dir.join("followups.json"), &report)?;
     }
-    storage::write(&dir.join("followups.json"), &json!({"queued":queued}))
+    Ok(report)
 }
 
 fn validate_report(value: &Value) -> Result<()> {
@@ -2417,6 +2724,228 @@ mod tests {
     }
 
     #[test]
+    fn mixed_followups_keep_original_indices_and_replay_without_role_escalation() {
+        let (_temp, c, job, w) = completion_fixture(
+            false,
+            json!([
+                {"repository":"superpod","role":"research","prompt":"requires a write","write":true,"exploratory":false},
+                {"repository":"superpod","role":"review","prompt":"inspect evidence","write":false,"exploratory":false},
+                {"repository":"superpod","role":"review","prompt":"malformed missing fields"}
+            ]),
+        );
+        queue_post_success(&c, &w, &job).unwrap();
+        assert!(drain_followups(&c, &w).unwrap());
+        let path = post_success_path(&c, &job);
+        let mut record: PostSuccess = storage::read(&path).unwrap();
+        assert_eq!(record.followups, FollowupAdmission::Done);
+        assert_eq!(
+            record
+                .followup_rejections
+                .iter()
+                .map(|r| r.index)
+                .collect::<Vec<_>>(),
+            vec![0, 2]
+        );
+        let expected = format!(
+            "followup-{}-1",
+            &storage::digest(job.run_id.as_bytes())[..16]
+        );
+        assert_eq!(record.followup_queued, vec![expected.clone()]);
+        let child: Job = storage::read(&job_path(&c, &expected)).unwrap();
+        assert_eq!(child.task.role, "review");
+        assert!(!child.task.write);
+        assert!(
+            child.task.required_tools.is_empty(),
+            "legacy proposals default to no tool requirement"
+        );
+        assert_eq!(jobs(&c).unwrap().len(), 2);
+        // A crash after child creation but before parent-journal settlement
+        // cannot renumber the child or discard the invalid proposal's reason.
+        record.followups = FollowupAdmission::Running;
+        record.followup_queued.clear();
+        record.followup_rejections.clear();
+        storage::write(&path, &record).unwrap();
+        assert!(drain_followups(&c, &w).unwrap());
+        let replayed: PostSuccess = storage::read(&path).unwrap();
+        assert_eq!(replayed.followup_queued, vec![expected]);
+        assert_eq!(replayed.followup_rejections.len(), 2);
+        assert_eq!(jobs(&c).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn gui_followup_binds_explicit_tools_and_rejects_invalid_siblings() {
+        let (_temp, mut c, job, w) = completion_fixture(
+            false,
+            json!([
+                {"repository":"superpod","role":"review","prompt":"unknown tool","write":false,"exploratory":false,"required_tools":["unknown-cli"]},
+                {"repository":"superpod","role":"research","prompt":"observe the owned GUI and sandbox evidence","write":false,"exploratory":true,"required_tools":["computer-use-cli","repo-sandbox"]},
+                {"repository":"superpod","role":"review","prompt":"duplicate binding","write":false,"exploratory":false,"required_tools":["computer-use-cli","computer-use-cli"]}
+            ]),
+        );
+        let binding = c.tools["relay-memory"].clone();
+        c.tools.insert("computer-use-cli".into(), binding.clone());
+        c.tools.insert("repo-sandbox".into(), binding);
+        let receipt = authoritative_success_receipt(&w, &job).unwrap();
+        let dir = c.state_dir.join("runs").join(&job.run_id);
+        let report = admit_followups(&c, &job, &dir, &receipt).unwrap();
+        assert_eq!(report.queued.len(), 1);
+        assert_eq!(
+            report
+                .rejected
+                .iter()
+                .map(|item| item.index)
+                .collect::<Vec<_>>(),
+            vec![0, 2]
+        );
+        assert!(report.rejected[0].reason.contains("unknown required tool"));
+        assert!(
+            report.rejected[1]
+                .reason
+                .contains("duplicate required tool")
+        );
+        let child: Job = storage::read(&job_path(&c, &report.queued[0])).unwrap();
+        assert_eq!(
+            child.task.required_tools,
+            ["computer-use-cli", "repo-sandbox"]
+        );
+        assert!(!child.task.write);
+        assert!(
+            rendered_task_prompt(&c, &child.task)
+                .unwrap()
+                .contains("Owned target experiment")
+        );
+        let schema = report_schema(&c, &job.task);
+        for branch in schema["properties"]["next_tasks"]["items"]["anyOf"]
+            .as_array()
+            .unwrap()
+        {
+            assert!(
+                branch["required"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&json!("required_tools"))
+            );
+            assert_eq!(branch["properties"]["required_tools"]["maxItems"], 7);
+            assert_eq!(
+                branch["properties"]["required_tools"]["items"]["enum"],
+                json!(["computer-use-cli", "relay-memory", "repo-sandbox"])
+            );
+        }
+        let replay = admit_followups(&c, &job, &dir, &receipt).unwrap();
+        assert_eq!(replay.queued, report.queued);
+        assert_eq!(jobs(&c).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn followup_authority_depth_and_schema_are_consistent() {
+        let (_temp, c, mut job, w) = completion_fixture(
+            false,
+            json!([
+                {"repository":"superpod","role":"review","prompt":"independent review","write":false,"exploratory":false},
+                {"repository":"superpod","role":"implement","prompt":"nested implementation","write":true,"exploratory":false}
+            ]),
+        );
+        let receipt = authoritative_success_receipt(&w, &job).unwrap();
+        let dir = c.state_dir.join("runs").join(&job.run_id);
+        job.task.depth = 3;
+        let report = admit_followups(&c, &job, &dir, &receipt).unwrap();
+        assert!(report.queued.is_empty());
+        assert_eq!(report.rejected.len(), 2);
+        assert_eq!(
+            report_schema(&c, &job.task)["properties"]["next_tasks"]["maxItems"],
+            0
+        );
+        job.task.depth = 0;
+        job.task.id = "independent-research".into();
+        let report = admit_followups(&c, &job, &dir, &receipt).unwrap();
+        assert!(report.queued.is_empty());
+        assert_eq!(report.rejected.len(), 2);
+        assert!(followup_instructions(&job.task).contains("next_tasks must be []"));
+        assert_eq!(
+            report_schema(&c, &job.task)["properties"]["next_tasks"]["maxItems"],
+            0
+        );
+        // Implementation receives review authority only, even if its ID happens
+        // to carry the synthesis prefix.
+        job.task.id = "synthesis-recovery".into();
+        job.task.role = "implement".into();
+        let report = admit_followups(&c, &job, &dir, &receipt).unwrap();
+        assert_eq!(report.queued.len(), 1);
+        assert_eq!(report.rejected[0].index, 1);
+        let items = report_schema(&c, &job.task)["properties"]["next_tasks"]["items"].clone();
+        assert_eq!(items["properties"]["role"]["enum"], json!(["review"]));
+        assert_eq!(items["properties"]["write"]["enum"], json!([false]));
+        let proposal: NextTask =
+            serde_json::from_value(receipt["agent_report"]["next_tasks"][0].clone()).unwrap();
+        assert!(validate_proposal(&c, &job.task, 3, &proposal).is_err());
+    }
+
+    #[test]
+    fn legacy_followup_journal_remains_readable_and_blocked_without_automatic_replay() {
+        let (_temp, c, job, w) = completion_fixture(false, json!([]));
+        queue_post_success(&c, &w, &job).unwrap();
+        let path = post_success_path(&c, &job);
+        let mut old: Value = storage::read(&path).unwrap();
+        old.as_object_mut().unwrap().remove("followup_queued");
+        old.as_object_mut().unwrap().remove("followup_rejections");
+        old["followups"] = json!("blocked");
+        old["followup_error"] = json!("historical proposal requires host review");
+        storage::write(&path, &old).unwrap();
+        let record: PostSuccess = storage::read(&path).unwrap();
+        assert!(record.followup_queued.is_empty() && record.followup_rejections.is_empty());
+        assert!(!drain_followups(&c, &w).unwrap());
+    }
+
+    #[test]
+    fn controller_status_distinguishes_ready_blocked_dependencies_and_live_process() {
+        let (_temp, _c, mut parent, _w) = completion_fixture(false, json!([]));
+        let mut child = parent.clone();
+        child.task.id = "waiting-child".into();
+        child.task.dependencies = vec![parent.task.id.clone()];
+        let ready = json!({"status":"running","frames":{"1":{"nodes":{"task":{"state":{"state":"task_ready"}}}}}});
+        let mut states = BTreeMap::from([
+            (parent.task.id.clone(), ready.clone()),
+            (child.task.id.clone(), ready),
+        ]);
+        let classify = |job: &Job, parent: &Job, child: &Job, states: &BTreeMap<String, Value>| {
+            let indexed = BTreeMap::from([
+                (parent.task.id.clone(), parent),
+                (child.task.id.clone(), child),
+            ]);
+            controller_state(job, &indexed, states, false, &mut BTreeSet::new())
+        };
+        assert_eq!(classify(&parent, &parent, &child, &states).0, "ready");
+        assert_eq!(
+            classify(&child, &parent, &child, &states).0,
+            "waiting_dependencies"
+        );
+        parent.last_error = Some("latest baseline changed; enqueue a new experiment".into());
+        assert_eq!(classify(&parent, &parent, &child, &states).0, "blocked");
+        let blocked = classify(&child, &parent, &child, &states);
+        assert_eq!(blocked.0, "blocked");
+        assert!(blocked.1.unwrap().contains("latest baseline changed"));
+        parent.last_error = None;
+        parent.launch = Some(Launch {
+            pid: std::process::id(),
+            process_start: process_start(std::process::id()).unwrap(),
+            lease: json!({}),
+            attempt: json!({}),
+            log_dir: PathBuf::new(),
+            tools: json!({}),
+            git_dir: String::new(),
+        });
+        assert_eq!(classify(&parent, &parent, &child, &states).0, "running");
+        parent.launch.as_mut().unwrap().process_start = "not-the-retained-process".into();
+        assert_eq!(
+            classify(&parent, &parent, &child, &states).0,
+            "needs_reconciliation"
+        );
+        parent.launch = None;
+        states.insert(parent.task.id.clone(), json!({"status":"succeeded"}));
+        assert_eq!(classify(&child, &parent, &child, &states).0, "ready");
+    }
+
+    #[test]
     fn completion_recovery_defers_budget_exhaustion_then_reuses_partial_child() {
         let (_temp, c, job, w) = completion_fixture(
             false,
@@ -2620,6 +3149,45 @@ mod tests {
     fn identifiers_cannot_escape_state() {
         assert!(safe_id("../../secrets").is_err());
         assert!(safe_id("research-123").is_ok());
+    }
+
+    #[test]
+    fn prerequisite_deadline_defers_without_rejecting_or_claiming_the_task() {
+        let (temp, c, job, _) = completion_fixture(false, json!([]));
+        let initial = fs::read(job_path(&c, &job.task.id)).unwrap();
+        let mut ledger = Ledger::default();
+        let window = RunWindow {
+            started: now(),
+            max_seconds: 30,
+        };
+        let started = std::time::Instant::now();
+        let deferred = {
+            let _deadline = process::deadline_scope(Duration::from_millis(80));
+            prepare_prerequisite(&c, &mut ledger, window, true, || {
+                process::capture(
+                    "/bin/sleep",
+                    &["2".into()],
+                    temp.path(),
+                    Duration::from_secs(2),
+                )
+            })
+            .unwrap()
+        };
+        assert!(deferred.is_none());
+        assert!(started.elapsed() < Duration::from_secs(1));
+        assert_eq!(initial, fs::read(job_path(&c, &job.task.id)).unwrap());
+        assert_eq!(
+            prepare_prerequisite(&c, &mut ledger, window, false, || Ok(42)).unwrap(),
+            Some(42),
+            "an unclaimed task remains eligible after the transient deadline"
+        );
+        assert!(
+            prepare_prerequisite::<()>(&c, &mut ledger, window, false, || {
+                bail!("actual tool unavailable")
+            })
+            .is_err(),
+            "a real capability failure must remain visible"
+        );
     }
     #[test]
     fn process_identity_is_stable_for_current_process() {
@@ -2833,13 +3401,15 @@ printf '{"type":"fixture.completed"}\n'
         assert_eq!(w.status(&child.run_id).unwrap()["status"], "succeeded");
         let invalid: Job = storage::read(&job_path(&c, "synthesis-invalid")).unwrap();
         assert_eq!(w.status(&invalid.run_id).unwrap()["status"], "succeeded");
-        assert!(
-            c.state_dir
+        let rejected: FollowupReport = storage::read(
+            &c.state_dir
                 .join("runs")
                 .join(invalid.run_id)
-                .join("blocked-invalid-proposal.json")
-                .exists()
-        );
+                .join("followups.json"),
+        )
+        .unwrap();
+        assert!(rejected.queued.is_empty());
+        assert_eq!(rejected.rejected.len(), 1);
         if std::env::var("LAB_MEMORY_BIN").is_ok() {
             let version =
                 crate::evolution::PromptVersion::new(crate::evolution::PromptDefinition {

@@ -5,7 +5,7 @@ workspace = "/opt/workspace"
 state_dir = "/opt/workspace/agent-research-lab/.lab"
 superpod = "/opt/workspace/superpod"
 codex = "codex"
-workflow = "/home/tdp/.codex/skills/workflow-cli/scripts/workflow.sh"
+workflow = "/home/tdp/.codex/skills/workflow-cli/assets/linux-x86_64/workflow"
 daily_seconds = 43200
 max_agents = 3
 task_timeout_seconds = 1800
@@ -16,11 +16,11 @@ implement = "gpt-6.1-sol"
 review = "gpt-6-sol"
 
 [tools.workflow-cli]
-binary = "/home/tdp/.codex/skills/workflow-cli/scripts/workflow.sh"
+binary = "/home/tdp/.codex/skills/workflow-cli/assets/linux-x86_64/workflow"
 repository = "/opt/workspace/workflow-cli"
 probe = ["version", "--format", "json"]
 [tools.relay-knowledge]
-binary = "/home/tdp/.codex/skills/relay-knowledge-cli-skill-v1.1.18/assets/linux-x86_64/relay-knowledge"
+binary = "/home/tdp/.codex/skills/relay-knowledge-cli/assets/linux-x86_64/relay-knowledge"
 repository = "/opt/workspace/relay-knowledge"
 probe = ["version", "--format", "json"]
 [tools.into-markdown]
@@ -28,18 +28,18 @@ binary = "/home/tdp/.codex/skills/into-markdown/assets/linux-x86_64/into-md"
 repository = "/opt/workspace/into-markdown"
 probe = ["--version"]
 [tools.qualitygate-cli]
-binary = "/home/tdp/.codex/skills/qualitygate-cli-skill-v0.5.7/assets/linux-x86_64/qualitygate"
+binary = "/home/tdp/.codex/skills/qualitygate-cli/assets/linux-x86_64/qualitygate"
 repository = "/opt/workspace/qualitygate-cli"
 probe = ["--version"]
 [tools.computer-use-cli]
-binary = "computer-use"
+binary = "/home/tdp/.codex/skills/computer-use-cli/assets/linux-x86_64/relay-computer-use"
 repository = "/opt/workspace/computer-use-cli"
 probe = ["--help"]
 [tools.relay-memory]
-binary = "relay-memory"
+binary = "/home/tdp/.codex/skills/relay-memory/assets/linux-x86_64/relay-memory"
 repository = "/opt/workspace/relay-memory"
 probe = ["--help"]
 [tools.repo-sandbox]
-binary = "repo-sandbox"
+binary = "/home/tdp/.codex/skills/repo-sandbox-cli/assets/linux-x86_64/repo-sandbox"
 repository = "/opt/workspace/repo-sandbox"
 probe = ["--version"]

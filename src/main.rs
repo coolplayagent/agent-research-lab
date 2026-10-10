@@ -17,6 +17,26 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Commands {
+    /// Prepare and exercise disposable real local CLI targets.
+    Targets {
+        #[arg(value_parser = ["prepare", "status", "verify", "agent-check"])]
+        action: String,
+        #[arg(long, help = "Target selection for verify", default_value = "all", value_parser = ["desktop", "sandbox", "all"])]
+        kind: String,
+    },
+    #[command(hide = true)]
+    TargetWorker {
+        #[arg(long)]
+        dependencies: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long)]
+        computer_cli: PathBuf,
+        #[arg(long)]
+        verify: bool,
+        #[arg(last = true)]
+        command: Vec<String>,
+    },
     /// Check tools and knowledge. Model probes make bounded live calls.
     Doctor {
         #[arg(long)]
@@ -119,6 +139,13 @@ fn execute(cli: Cli) -> Result<Value> {
         command => {
             let c = Config::load(&cli.config)?;
             match command {
+                Commands::Targets { action, kind } => match action.as_str() {
+                    "prepare" => agent_research_lab::targets::prepare(&c),
+                    "status" => agent_research_lab::targets::status(&c),
+                    "verify" => agent_research_lab::targets::verify(&c, &kind),
+                    "agent-check" => agent_research_lab::targets::agent_check(&c),
+                    _ => unreachable!(),
+                },
                 Commands::Doctor { probe_models } => runtime::doctor(&c, probe_models),
                 Commands::Enqueue { input } => Ok(serde_json::to_value(runtime::enqueue(
                     &c,
@@ -170,7 +197,31 @@ fn execute(cli: Cli) -> Result<Value> {
     }
 }
 fn main() {
-    match execute(Cli::parse()) {
+    let cli = Cli::parse();
+    if let Commands::TargetWorker {
+        dependencies,
+        output,
+        computer_cli,
+        verify,
+        command,
+    } = &cli.command
+    {
+        let result = agent_research_lab::targets::worker(
+            dependencies,
+            output,
+            computer_cli,
+            *verify,
+            command,
+        );
+        match result {
+            Ok(code) => std::process::exit(code),
+            Err(e) => {
+                eprintln!("{}", json!({"ok":false,"error":format!("{e:#}")}));
+                std::process::exit(1);
+            }
+        }
+    }
+    match execute(cli) {
         Ok(result) => println!(
             "{}",
             serde_json::to_string_pretty(&json!({"ok":true,"result":result})).unwrap()

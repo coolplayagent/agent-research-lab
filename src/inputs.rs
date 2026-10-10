@@ -226,7 +226,19 @@ pub fn verify(c: &Config, inputs: Option<&ResearchInputs>) -> Result<()> {
 }
 
 fn skill_identity(skills: &SkillsManifest) -> serde_json::Value {
-    let sorted: BTreeMap<_, _> = skills.skills.iter().map(|s| (&s.name, json!({"repository":s.repository,"installed_path":s.installed_path,"runtime_path":s.runtime_path,"tree":s.tree_sha256,"runtime":s.runtime_sha256,"release_tag":s.release_tag,"release_id":s.release_id,"source_commit":s.source_commit}))).collect();
+    let sorted: BTreeMap<_, _> = skills
+        .skills
+        .iter()
+        .map(|s| {
+            let mut identity = json!({"repository":s.repository,"installed_path":s.installed_path,"runtime_path":s.runtime_path,"tree":s.tree_sha256,"runtime":s.runtime_sha256,"release_tag":s.release_tag,"release_id":s.release_id,"source_commit":s.source_commit});
+            // Existing receipts predate this optional proof. Absence must keep
+            // their cohort stable; a real source override changes the binding.
+            if let Some(proof) = &s.source_qualitygate {
+                identity["source_qualitygate"] = json!(proof);
+            }
+            (&s.name, identity)
+        })
+        .collect();
     json!(sorted)
 }
 
@@ -249,6 +261,56 @@ pub fn prompt_context(inputs: &ResearchInputs) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn legacy_skill_receipts_keep_their_cohort_until_a_source_proof_is_added() {
+        let skill = json!({
+            "name":"workflow-cli","repository":"coolplayagent/workflow-cli",
+            "installed_path":"/fixture/skill","runtime_path":"/fixture/skill/workflow",
+            "tree_sha256":"a".repeat(64),"runtime_sha256":"b".repeat(64),
+            "release_tag":"v0.2.0","release_id":42,"source_commit":null,
+            "checked_at":"2026-10-09T00:00:00Z"
+        });
+        let mut inputs: ResearchInputs = serde_json::from_value(json!({
+            "repositories":{},"skills":{"schema_version":1,"skills":[skill]},
+            "insights":"Existing evidence.","insights_sha256":"c".repeat(64)
+        }))
+        .unwrap();
+        let legacy_identity = json!({"workflow-cli":{
+            "repository":"coolplayagent/workflow-cli",
+            "installed_path":"/fixture/skill","runtime_path":"/fixture/skill/workflow",
+            "tree":"a".repeat(64),"runtime":"b".repeat(64),
+            "release_tag":"v0.2.0","release_id":42,"source_commit":null
+        }});
+        let legacy_cohort = storage::digest(
+            json!({
+                "repositories":{},"skills":legacy_identity,"insights":"c".repeat(64)
+            })
+            .to_string()
+            .as_bytes(),
+        )[..12]
+            .to_owned();
+        assert_eq!(skill_identity(&inputs.skills), legacy_identity);
+        assert_eq!(cohort(&inputs), legacy_cohort);
+        assert!(
+            serde_json::to_value(&inputs.skills.skills[0])
+                .unwrap()
+                .get("source_qualitygate")
+                .is_none()
+        );
+        inputs.skills.skills[0].source_qualitygate = Some(freshness::SourceQualitygate {
+            path: "/fixture/source-gate.json".into(),
+            sha256: "d".repeat(64),
+        });
+        let first_proof_cohort = cohort(&inputs);
+        assert_ne!(first_proof_cohort, legacy_cohort);
+        inputs.skills.skills[0]
+            .source_qualitygate
+            .as_mut()
+            .unwrap()
+            .sha256 = "e".repeat(64);
+        assert_ne!(cohort(&inputs), first_proof_cohort);
+    }
+
     #[test]
     fn cohort_changes_with_code_or_research_but_not_check_time() {
         let snapshot = RemoteSnapshot {

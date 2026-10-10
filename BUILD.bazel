@@ -8,7 +8,7 @@ rust_library(
     name = "agent_research_lab",
     srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
     crate_root = "src/lib.rs",
-    compile_data = glob(["prompts/*.md", "examples/evolution/*.json"]),
+    compile_data = glob(["prompts/*.md", "examples/evolution/*.json", "assets/desktop/*"]),
     edition = "2024",
     deps = all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
@@ -32,7 +32,7 @@ rust_test(
 
 pkg_tar(
     name = "package",
-    srcs = [":agent-research-lab"] + glob(["examples/**", "prompts/**", "research/**", "skills/**", "*.md"]),
+    srcs = [":agent-research-lab"] + glob(["examples/**", "prompts/**", "research/**", "skills/**", "assets/**", "*.md"]),
     package_dir = "agent-research-lab",
     strip_prefix = ".",
     extension = "tar.gz",

@@ -48,7 +48,17 @@ pub struct SkillSnapshot {
     pub release_tag: Option<String>,
     pub release_id: Option<u64>,
     pub source_commit: Option<String>,
+    /// A locally built current default-branch skill may supersede a release only
+    /// with a host-retained, passing full gate on that exact source commit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_qualitygate: Option<SourceQualitygate>,
     pub checked_at: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SourceQualitygate {
+    pub path: PathBuf,
+    pub sha256: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -288,6 +298,10 @@ impl RemoteClient {
             match (&skill.release_tag, skill.release_id, &skill.source_commit) {
                 (Some(tag), Some(id), None) if !tag.is_empty() && id > 0 => {
                     ensure!(
+                        skill.source_qualitygate.is_none(),
+                        "release skill cannot carry a source override"
+                    );
+                    ensure!(
                         self.latest_release(&skill.repository)? == Some((id, tag.clone())),
                         "installed skill is not the latest published release: {}",
                         skill.name
@@ -295,11 +309,10 @@ impl RemoteClient {
                 }
                 (None, None, Some(commit)) => {
                     validate_hex(commit, 40)?;
-                    ensure!(
-                        self.latest_release(&skill.repository)?.is_none(),
-                        "a published release exists; source-installed skill requires refresh: {}",
-                        skill.name
-                    );
+                    let release_exists = self.latest_release(&skill.repository)?.is_some();
+                    if release_exists || skill.source_qualitygate.is_some() {
+                        verify_source_qualitygate(&skill)?;
+                    }
                     let latest = self.remote_binding(&skill.repository)?;
                     ensure!(
                         latest.commit == *commit,
@@ -314,6 +327,54 @@ impl RemoteClient {
         })?;
         Ok(manifest)
     }
+}
+
+fn verify_source_qualitygate(skill: &SkillSnapshot) -> Result<()> {
+    let proof = skill.source_qualitygate.as_ref()
+        .context("a published release exists; a source build requires an exact-commit full Qualitygate report")?;
+    ensure!(
+        proof.path.is_absolute(),
+        "source Qualitygate path must be absolute"
+    );
+    validate_hex(&proof.sha256, 64)?;
+    reject_symlink_components(&proof.path)?;
+    use std::os::unix::fs::OpenOptionsExt;
+    let file = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(&proof.path)?;
+    let metadata = file.metadata()?;
+    ensure!(
+        metadata.is_file() && metadata.len() <= 16 * 1024 * 1024,
+        "source Qualitygate report must be regular and at most 16 MiB"
+    );
+    let mut bytes = Vec::new();
+    file.take(16 * 1024 * 1024 + 1).read_to_end(&mut bytes)?;
+    ensure!(
+        bytes.len() as u64 == metadata.len(),
+        "source Qualitygate report changed size while reading"
+    );
+    // Hash and parse the exact same bounded read, even if a concurrent host
+    // publication subsequently replaces the report pathname.
+    ensure!(
+        hex(&Sha256::digest(&bytes)) == proof.sha256,
+        "source Qualitygate report changed"
+    );
+    let report: Value = serde_json::from_slice(&bytes)?;
+    ensure!(
+        report["profile"] == "full"
+            && matches!(report["scope"].as_str(), Some("delivery" | "task"))
+            && report["gate"]["complete"] == true
+            && report["gate"]["decision"] == "pass"
+            && report["plan"]["pending_delivery_checks"]
+                .as_array()
+                .is_some_and(Vec::is_empty)
+            && report["selection"]["empty_delivery"] == false
+            && report["snapshot"]["mode"] == "diff"
+            && report["snapshot"]["head"].as_str() == skill.source_commit.as_deref(),
+        "source skill needs a complete, nonempty full diff gate at its exact source commit"
+    );
+    Ok(())
 }
 
 pub fn remote_snapshot(repository_path: &Path) -> Result<RemoteSnapshot> {
@@ -669,6 +730,7 @@ esac
                 release_tag: Some("v1".into()),
                 release_id: Some(42),
                 source_commit: None,
+                source_qualitygate: None,
                 checked_at: Utc::now().to_rfc3339(),
             }],
         };
@@ -695,8 +757,63 @@ esac
         crate::storage::write(&path, &manifest).unwrap();
         assert!(
             client.verify_skills(&path).is_err(),
-            "source fallback cannot ignore an existing release"
+            "an unverified source fallback cannot ignore an existing release"
         );
+        let proof_path = temp.path().join("source-gate.json");
+        let mut proof = serde_json::json!({
+            "profile":"full","scope":"delivery",
+            "gate":{"complete":true,"decision":"pass"},
+            "plan":{"pending_delivery_checks":[]},
+            "selection":{"empty_delivery":false},
+            "snapshot":{"mode":"diff","head":manifest.skills[0].source_commit}
+        });
+        crate::storage::write(&proof_path, &proof).unwrap();
+        manifest.skills[0].source_qualitygate = Some(SourceQualitygate {
+            path: proof_path.clone(),
+            sha256: crate::storage::digest(&fs::read(&proof_path).unwrap()),
+        });
+        crate::storage::write(&path, &manifest).unwrap();
+        client.verify_skills(&path).unwrap();
+        let retained_proof = fs::read(&proof_path).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&proof_path)
+            .unwrap()
+            .set_len(16 * 1024 * 1024 + 1)
+            .unwrap();
+        assert!(
+            verify_source_qualitygate(&manifest.skills[0])
+                .unwrap_err()
+                .to_string()
+                .contains("16 MiB"),
+            "oversized reports must be rejected before parsing"
+        );
+        fs::write(&proof_path, &retained_proof).unwrap();
+        let replacement = temp.path().join("replacement-source-gate.json");
+        fs::rename(&proof_path, &replacement).unwrap();
+        std::os::unix::fs::symlink(&replacement, &proof_path).unwrap();
+        assert!(verify_source_qualitygate(&manifest.skills[0]).is_err());
+        fs::remove_file(&proof_path).unwrap();
+        fs::rename(&replacement, &proof_path).unwrap();
+        verify_source_qualitygate(&manifest.skills[0]).unwrap();
+        proof["snapshot"]["head"] = "0".repeat(40).into();
+        crate::storage::write(&proof_path, &proof).unwrap();
+        assert!(
+            client.verify_skills(&path).is_err(),
+            "changed proof must fail"
+        );
+        manifest.skills[0]
+            .source_qualitygate
+            .as_mut()
+            .unwrap()
+            .sha256 = crate::storage::digest(&fs::read(&proof_path).unwrap());
+        crate::storage::write(&path, &manifest).unwrap();
+        assert!(
+            client.verify_skills(&path).is_err(),
+            "a passing gate on another source is insufficient"
+        );
+        manifest.skills[0].source_qualitygate = None;
+        crate::storage::write(&path, &manifest).unwrap();
         fs::write(temp.path().join("no-release"), "").unwrap();
         client.verify_skills(&path).unwrap();
         fs::write(author.join("tracked.txt"), "new source skill version").unwrap();
