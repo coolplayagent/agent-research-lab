@@ -117,7 +117,6 @@ pub fn enqueue_with_inputs(
     for t in &task.required_tools {
         ensure!(c.tools.contains_key(t), "unknown tool {t}");
     }
-    let backend = agent_backend::freeze(c, &task)?;
     let _lock = storage::lock(&c.state_dir.join("enqueue.lock"))?;
     let destination = job_path(c, &task.id);
     if destination.exists() {
@@ -126,14 +125,23 @@ pub fn enqueue_with_inputs(
             serde_json::to_value(&prior.task)? == serde_json::to_value(&task)?,
             "task ID already binds different inputs"
         );
-        ensure!(
-            prior.backend == backend,
-            "task ID already binds a different backend"
-        );
+        agent_backend::verify_job(c, &prior)?;
         people::bind(c, &prior)?;
         ensure_started(c, &prior)?;
         return Ok(prior);
     }
+    let persona = people::freeze(c, &task)?;
+    let preference = persona.as_ref().and_then(|p| p.execution.as_ref());
+    let backend =
+        agent_backend::freeze_selected(c, &task, preference.and_then(|p| p.backend.as_deref()))?;
+    let model = preference
+        .and_then(|p| p.model.clone())
+        .unwrap_or_else(|| c.models[&task.role].clone());
+    agent_backend::validate_model(
+        c,
+        backend.as_ref().map_or("codex", |b| b.id.as_str()),
+        &model,
+    )?;
     let repository = if task.repository == "superpod" {
         c.superpod.clone()
     } else if task.repository == "agent-research-lab" {
@@ -161,6 +169,13 @@ pub fn enqueue_with_inputs(
         for id in &task.dependencies {
             let parent: Job = storage::read(&job_path(c, id))?;
             if parent.task.write && parent.task.repository == task.repository {
+                ensure!(
+                    !persona
+                        .as_ref()
+                        .zip(parent.persona.as_ref())
+                        .is_some_and(|(reviewer, author)| reviewer.id == author.id),
+                    "independent review requires a different digital person from the implementation author"
+                );
                 if let Some(inputs) = &inputs {
                     ensure!(
                         parent.source_commit
@@ -215,7 +230,6 @@ pub fn enqueue_with_inputs(
             ],
         )?;
     }
-    let persona = people::freeze(c, &task)?;
     let prompt_digest = storage::digest(
         format!(
             "{}{}",
@@ -226,7 +240,7 @@ pub fn enqueue_with_inputs(
     );
     let job = Job {
         persona,
-        model: c.models[&task.role].clone(),
+        model,
         backend,
         source_commit: commit,
         baseline_commit,
@@ -1774,7 +1788,7 @@ fn launch(
         storage::digest(&serde_json::to_vec(c)?) == job.config_digest,
         "configuration changed after enqueue; enqueue a new experiment instead"
     );
-    agent_backend::verify(c, &job.task, job.backend.as_ref())?;
+    agent_backend::verify_job(c, job)?;
     let dependencies = completed_dependencies(c, w, job)?;
     let tool_bindings = observed_tools(c, job)?;
     let expected_git_dir = git(&job.worktree, &["rev-parse", "--absolute-git-dir"])?;
@@ -1854,7 +1868,10 @@ fn launch(
             None
         };
         let prompt_path = dir.join("prompt.txt");
-        let binding = json!({"source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,"config_digest":job.config_digest});
+        let mut binding = json!({"source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,"config_digest":job.config_digest});
+        if let Some(person) = &job.persona {
+            binding["digital_person"] = json!({"id":person.id,"name":person.name,"revision":person.revision,"session_id":job.task.id,"execution_id":job.run_id});
+        }
         let prompt = format!(
             "{}\n\nFrozen experiment bindings: {}\nUse only this task worktree. Do not create Git commits, change formal gates, access private evaluation holdouts, install tools globally, push or merge. Those operations belong to the host delivery adapters. Evidence missing means unverified.\n",
             rendered_job_prompt(c, job)?,
@@ -1960,7 +1977,7 @@ fn launch(
                 &invocation.access,
             )?
         };
-        agent_backend::verify(c, &job.task, job.backend.as_ref())?;
+        agent_backend::verify_job(c, job)?;
         let execution_timeout = Duration::from_secs(remaining)
             .saturating_sub(launch_started.elapsed())
             .min(Duration::from_secs(c.task_timeout_seconds));
@@ -3914,6 +3931,7 @@ printf '{"type":"fixture.completed"}\n'
             multi_agent: None,
             agent_backends: BTreeMap::new(),
             role_backends: BTreeMap::new(),
+            backend_models: BTreeMap::new(),
             workflow: binary.into(),
             daily_seconds: 3600,
             max_agents: 2,
@@ -4073,6 +4091,167 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
             }
             assert_eq!(job.attempt, 1);
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "real workflow, bwrap and relay-memory; set LAB_WORKFLOW_BIN and LAB_MEMORY_BIN; fake providers only"]
+    fn digital_person_uses_different_executors_without_rebinding_history_or_memory() {
+        use std::os::unix::fs::PermissionsExt;
+        let (temp, mut c) = scheduler_fixture();
+        assert!(std::env::var_os("LAB_MEMORY_BIN").is_some());
+        let bridge = temp.path().join("person-bridge");
+        fs::write(&bridge, r#"#!/usr/bin/python3
+import hashlib, json, pathlib, sys
+raw = sys.stdin.buffer.read()
+r = json.loads(raw)
+assert r['model'] == 'bridge-model'
+assert r['bindings']['digital_person']['id'].startswith('person-')
+assert r['bindings']['digital_person']['session_id'] == 'person-second'
+assert r['bindings']['digital_person']['execution_id'] == r['request_id']
+assert 'PERSON_EXECUTION_CONTINUITY_2741' in r['prompt']
+assert not r['permissions']['worktree_write']
+report = {'summary':'explicit executor continuity fixture','findings':['same person across technical executors'],'sources':[],'limitations':['fake provider, not research quality'],'next_tasks':[]}
+pathlib.Path(r['result_path']).write_text(json.dumps({'schema_version':1,'request_sha256':hashlib.sha256(raw).hexdigest(),'report':report}))
+print(json.dumps({'type':'session.activity','kind':'message','text':'同一个数字人继续研究。'}))
+"#).unwrap();
+        fs::set_permissions(&bridge, fs::Permissions::from_mode(0o700)).unwrap();
+        c.agent_backends.insert(
+            "person-bridge".into(),
+            config::BackendSpec::JsonProcess {
+                program: bridge,
+                args: vec![],
+                env_allowlist: vec![],
+                capabilities: config::Capabilities {
+                    structured_result: true,
+                    read_workspace: true,
+                    ..Default::default()
+                },
+            },
+        );
+        c.backend_models
+            .insert("person-bridge".into(), vec!["bridge-model".into()]);
+        let person = people::change(
+            &c,
+            people::Change::Create {
+                name: "知行".into(),
+                role: "designer".into(),
+                kind: people::Kind::Fixed,
+                soul: "用好奇与审慎回应同伴。".into(),
+                purpose: "研究执行技术之间的连续性".into(),
+            },
+        )
+        .unwrap();
+        people::remember_note(
+            &c,
+            &person.id,
+            "continuity-note",
+            "PERSON_EXECUTION_CONTINUITY_2741：跨执行器保留身份与记忆。",
+        )
+        .unwrap();
+        let task = |id: &str, role: &str| {
+            serde_json::from_value::<Task>(json!({"id":id,"role":role,"repository":"superpod","prompt":"PERSON_EXECUTION_CONTINUITY_2741 继续研究数字人跨技术的记忆连续性。","persona_id":person.id,"max_attempts":1})).unwrap()
+        };
+        let first_task = task("person-first", "research");
+        let first = enqueue(&c, first_task.clone()).unwrap();
+        let original = serde_json::to_value(&first).unwrap();
+        people::change(
+            &c,
+            people::Change::ConfigureExecution {
+                id: person.id.clone(),
+                revision: person.revision,
+                execution: Some(task::ExecutionPreference {
+                    backend: Some("person-bridge".into()),
+                    model: Some("bridge-model".into()),
+                }),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(enqueue(&c, first_task).unwrap()).unwrap(),
+            original
+        );
+        let second = enqueue(&c, task("person-second", "review")).unwrap();
+        assert!(first.backend.is_none());
+        assert_eq!(first.model, "fake-research");
+        assert_eq!(second.backend.as_ref().unwrap().id, "person-bridge");
+        assert_eq!(second.model, "bridge-model");
+        for job in [&first, &second] {
+            assert_eq!(job.persona.as_ref().unwrap().id, person.id);
+            assert!(
+                job.persona
+                    .as_ref()
+                    .unwrap()
+                    .memory
+                    .as_ref()
+                    .unwrap()
+                    .context
+                    .contains("PERSON_EXECUTION_CONTINUITY_2741")
+            );
+            assert!(!job.task.write);
+            agent_backend::verify_job(&c, job).unwrap();
+        }
+        let mut forbidden = second.task.clone();
+        forbidden.write = true;
+        assert!(agent_backend::freeze_selected(&c, &forbidden, Some("person-bridge")).is_err());
+        let mut changed = second.clone();
+        changed.model = "fake-research".into();
+        assert!(agent_backend::verify_job(&c, &changed).is_err());
+        let w = workflow(&c);
+        for mut job in [first, second] {
+            let (mut worker, mut heartbeat) = launch(&c, &w, &mut job, 15).unwrap();
+            let start = std::time::Instant::now();
+            let exit = loop {
+                assert!(start.elapsed() < Duration::from_secs(20));
+                if let Some(exit) = worker.poll().unwrap() {
+                    break exit;
+                }
+                std::thread::sleep(Duration::from_millis(30));
+            };
+            job.launch.as_mut().unwrap().lease = heartbeat.stop().unwrap();
+            assert!(
+                settle_with_heartbeat(
+                    &w,
+                    &job,
+                    &ExitObservation {
+                        success: exit.success(),
+                        code: exit.code(),
+                        reason: None
+                    },
+                    None
+                )
+                .unwrap()
+            );
+            let receipt = authoritative_success_receipt(&w, &job).unwrap();
+            people::writeback(&c, &job, &receipt).unwrap();
+            w.verify(&job.run_id).unwrap();
+        }
+        let directory = people::directory(&c).unwrap();
+        assert_eq!(directory.tasks["person-first"], person.id);
+        assert_eq!(directory.tasks["person-second"], person.id);
+        let memory =
+            people::inspect_memory(&c, &person.id, "PERSON_EXECUTION_CONTINUITY_2741").unwrap();
+        assert_eq!(memory["stats"]["event_count"], 3);
+        people::change(
+            &c,
+            people::Change::ConfigureExecution {
+                id: person.id.clone(),
+                revision: directory.people[&person.id].revision,
+                execution: None,
+            },
+        )
+        .unwrap();
+        let mut author = task("person-author", "implement");
+        author.write = true;
+        enqueue(&c, author).unwrap();
+        let mut self_review = task("person-self-review", "review");
+        self_review.dependencies = vec!["person-author".into()];
+        assert!(
+            enqueue(&c, self_review)
+                .unwrap_err()
+                .to_string()
+                .contains("different digital person")
+        );
     }
 
     #[cfg(unix)]
@@ -4586,6 +4765,7 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
             multi_agent: None,
             agent_backends: BTreeMap::new(),
             role_backends: BTreeMap::new(),
+            backend_models: BTreeMap::new(),
             workflow: root.join("unused"),
             daily_seconds: 3600,
             max_agents: 1,
@@ -4680,6 +4860,7 @@ mod host_budget_tests {
             multi_agent: None,
             agent_backends: BTreeMap::new(),
             role_backends: BTreeMap::new(),
+            backend_models: BTreeMap::new(),
             workflow: root.join("unused"),
             daily_seconds: 43200,
             max_agents: 1,

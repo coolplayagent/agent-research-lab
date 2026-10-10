@@ -16,6 +16,7 @@ let peopleRevision = -1;
 let peopleIndex = new Map(),
   peopleDefaults = {},
   peopleModels = {},
+  executionCatalog = { backends: [], models: [] },
   peopleTotal = 0,
   peopleCursor = null;
 let personFocus = null,
@@ -26,6 +27,7 @@ let editingPerson = null,
   directoryLoading = false,
   peopleKey = "",
   memoryNoteRequest = null;
+let executionEditor = null;
 function digitalPersonId(j) {
   return j?.profile?.person_id || j?.id;
 }
@@ -52,8 +54,8 @@ function personRepresentative(person) {
     currentPersonJob(person.id) || {
       id: person.id,
       role: person.role,
-      model:
-        peopleModels[person.role === "synthesis" ? "research" : person.role],
+      model: person.execution?.model || "按任务选择",
+      backend: person.execution?.backend || "按任务选择",
       state: "offline",
       profile: {
         person_id: person.id,
@@ -70,6 +72,8 @@ function syncPeople(roster) {
   if ((roster.revision || 0) >= peopleRevision) {
     peopleDefaults = roster.defaults || {};
     peopleModels = roster.models || {};
+    executionCatalog = roster.execution_catalog || executionCatalog;
+    renderExecutorDirectory();
     peopleRevision = roster.revision || 0;
   }
   for (const p of roster.people || []) {
@@ -133,7 +137,7 @@ function renderPeopleDirectory() {
       select = el("select");
     select.setAttribute("aria-label", `${personRoles[role] || role}默认成员`);
     for (const p of peopleIndex.values())
-      if (p.role === role && p.kind === "fixed") {
+      if (p.kind === "fixed") {
         const option = el("option", p.name);
         option.value = p.id;
         select.append(option);
@@ -231,10 +235,7 @@ function editPerson(person = null) {
   ]);
   if (person) options.add(person.role);
   for (const role of options) {
-    const option = el(
-      "option",
-      `${personRoles[role] || role} · ${peopleModels[role === "synthesis" ? "research" : role] || "由任务绑定"}`,
-    );
+    const option = el("option", personRoles[role] || role);
     option.value = role;
     roles.append(option);
   }
@@ -295,7 +296,7 @@ async function openPerson(id) {
   $("person-subtitle").textContent =
     `${personKinds[person.kind]} · ${personRoles[person.role] || person.role} · ${{ offline: "离线", online: "在线", busy: "忙碌", chatting: "对话中" }[personPresence(id)]}`;
   $("person-subtitle").textContent +=
-    ` · ${personRepresentative(person).model || "尚未绑定模型"}`;
+    ` · 执行偏好：${person.execution?.backend || "按任务选择"} / ${person.execution?.model || "按任务选择模型"}`;
   $("person-avatar").replaceChildren(avatar(personRepresentative(person)));
   $("person-soul-view").textContent =
     person.soul || "尚未设置独立 Soul；历史任务的角色准则保留在原会话中。";
@@ -352,7 +353,10 @@ async function loadPersonHistory(after = "") {
       const card = el("button", undefined, "person-session"),
         text = el("span", job.topics?.join(" · ") || job.repository);
       text.append(
-        el("small", `${job.model} · 第 ${job.attempt} 轮 · ${job.id}`),
+        el(
+          "small",
+          `${job.backend} · ${job.model} · 第 ${job.attempt} 次执行 · ${job.session_id || job.id}`,
+        ),
       );
       card.append(text, badge(job.state));
       card.addEventListener("click", () => {
@@ -380,7 +384,7 @@ async function loadPersonHistory(after = "") {
   }
 }
 function switchPersonTab(tab) {
-  for (const key of ["history", "memory"]) {
+  for (const key of ["history", "memory", "execution"]) {
     $("person-" + key + "-panel").hidden = key !== tab;
     $("person-tab-" + key).classList.toggle("active", key === tab);
   }
@@ -596,3 +600,121 @@ $("maximize-person").addEventListener("click", () => {
     `${expanded ? "还原" : "放大"}数字人窗口`,
   );
 });
+
+function renderExecutorDirectory() {
+  const root = $("executor-directory");
+  root.replaceChildren();
+  const labels = {
+    structured_result: "结构化结果",
+    read_workspace: "读取工作区",
+    write_workspace: "修改工作区",
+    tool_execution: "工具与协作",
+    desktop: "桌面操作",
+  };
+  for (const backend of executionCatalog.backends) {
+    const card = el("article", undefined, "memory-event");
+    card.append(
+      el("h3", backend.id),
+      el("p", backend.kind === "codex" ? "Codex 执行器" : "stdio JSON 执行器"),
+    );
+    card.append(
+      el(
+        "p",
+        Object.entries(backend.capabilities || {})
+          .filter(([, enabled]) => enabled)
+          .map(([key]) => labels[key] || key)
+          .join(" · "),
+      ),
+    );
+    card.append(el("p", `模型：${(backend.models || []).join(" · ")}`));
+    card.append(
+      el("small", "服务已配置 · 能力为配置声明；任务仍需通过权限检查"),
+    );
+    root.append(card);
+  }
+  root.append(
+    el("p", `可选模型：${executionCatalog.models.join(" · ") || "尚未加载"}`),
+  );
+}
+function editPersonExecution() {
+  const person = peopleIndex.get(personFocus);
+  if (!person) return;
+  executionEditor = person;
+  for (const [field, options, value] of [
+    [
+      "backend",
+      executionCatalog.backends.map((b) => b.id),
+      person.execution?.backend,
+    ],
+    ["model", executionCatalog.models, person.execution?.model],
+  ]) {
+    const select = $("person-" + field);
+    select.replaceChildren();
+    const inherited = el("option", "按任务默认配置");
+    inherited.value = "";
+    select.append(inherited);
+    for (const id of new Set([...options, ...(value ? [value] : [])])) {
+      const option = el(
+        "option",
+        options.includes(id) ? id : `${id}（当前未配置）`,
+      );
+      option.value = id;
+      select.append(option);
+    }
+    select.value = value || "";
+  }
+  $("person-execution-description").textContent =
+    "专长描述思考方式，任务角色决定本次职责与权限。执行技术是可替换的工具；固定成员可以承担不同任务角色。";
+  $("person-execution-status").textContent = "";
+}
+$("person-tab-execution").addEventListener("click", () => {
+  switchPersonTab("execution");
+  editPersonExecution();
+});
+$("person-execution-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const person = executionEditor,
+    request = personRequest;
+  if (!person || person.id !== personFocus) return;
+  const backend = $("person-backend").value || null,
+    model = $("person-model").value || null;
+  $("save-person-execution").disabled = true;
+  try {
+    const result = await peopleApi({
+      operation: "profile",
+      change: {
+        action: "configure_execution",
+        id: person.id,
+        revision: person.revision,
+        execution: backend || model ? { backend, model } : null,
+      },
+    });
+    peopleIndex.set(person.id, result.person);
+    executionEditor = result.person;
+    await loadPeople();
+    await refresh();
+    if (personFocus === person.id && personRequest === request) {
+      $("person-execution-status").textContent =
+        "已保存，新任务将使用此偏好。已有会话、记忆和执行记录保持不变。";
+      $("person-subtitle").textContent =
+        `${personKinds[result.person.kind]} · ${personRoles[result.person.role] || result.person.role} · 执行偏好：${backend || "按任务选择"} / ${model || "按任务选择模型"}`;
+    }
+  } catch (error) {
+    if (personFocus === person.id && personRequest === request)
+      $("person-execution-status").textContent = error.message;
+  } finally {
+    $("save-person-execution").disabled = false;
+  }
+});
+
+$("person-backend").addEventListener("change", updateExecutionModels);
+function updateExecutionModels() {
+  const backend = executionCatalog.backends.find(
+    (b) => b.id === $("person-backend").value,
+  );
+  const models = backend?.models || executionCatalog.models;
+  for (const option of $("person-model").options)
+    option.disabled = Boolean(option.value && !models.includes(option.value));
+  if ($("person-model").selectedOptions[0]?.disabled)
+    $("person-model").value = "";
+}

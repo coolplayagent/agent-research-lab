@@ -17,6 +17,9 @@ pub struct Config {
     pub agent_backends: BTreeMap<String, BackendSpec>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub role_backends: BTreeMap<String, String>,
+    /// Executor model inventory, independent of task roles and digital people.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub backend_models: BTreeMap<String, Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multi_agent: Option<Settings>,
     pub workflow: PathBuf,
@@ -174,6 +177,35 @@ impl BackendSpec {
 }
 /// Validate declarations without spawning adapters or probing model providers.
 pub fn validate_backends(c: &Config) -> Result<()> {
+    for (id, models) in &c.backend_models {
+        ensure!(
+            id == "codex" || c.agent_backends.contains_key(id),
+            "model inventory refers to an unknown backend"
+        );
+        ensure!(
+            !models.is_empty() && models.len() <= 64,
+            "backend model inventory must contain 1..64 models"
+        );
+        let mut unique = std::collections::BTreeSet::new();
+        for model in models {
+            ensure!(
+                !model.trim().is_empty()
+                    && model.len() <= 256
+                    && !model.chars().any(char::is_control)
+                    && unique.insert(model),
+                "invalid or duplicate backend model"
+            );
+        }
+    }
+    for (role, model) in &c.models {
+        let backend = c.role_backends.get(role).map_or("codex", String::as_str);
+        ensure!(
+            c.backend_models
+                .get(backend)
+                .is_none_or(|models| models.contains(model)),
+            "default task model is absent from backend model inventory"
+        );
+    }
     for (id, spec) in &c.agent_backends {
         crate::safe_id(id)?;
         ensure!(id != "codex", "codex is the reserved legacy backend");
@@ -277,6 +309,7 @@ mod tests {
             agent_backends: Default::default(),
             multi_agent: None,
             role_backends: Default::default(),
+            backend_models: Default::default(),
             workflow: "/tools/workflow".into(),
             daily_seconds: 43200,
             max_agents: 8,

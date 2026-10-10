@@ -113,9 +113,36 @@ Alerts and recovery records appear in system messages, with a bounded in-page hi
 Settings control automatic following and motion, and manage the digital-person roster.
 Create fixed, temporary or research people; promote a temporary/research person without
 changing its ID, history or memory; edit its unique name, Soul and purpose; select a
-fixed default for each role. Profile revisions use optimistic concurrency checks.
+fixed default for each task role. A person’s specialty describes their perspective; it
+does not bind them to a model or grant task permissions. One fixed person may fill
+different task roles, while independent review of an implementation must use a
+different person from its author. Profile revisions use optimistic concurrency checks.
 Default/profile changes apply to new research batches. They do not rewrite running
-experiments, grant tools, schedule arbitrary work or modify model bindings.
+experiments, grant tools or schedule arbitrary work.
+The digital person owns identity, Soul, memory and conversation history. A coding agent
+is a replaceable execution technology used by that person. Settings separate the
+**digital-person roster** from the **execution technology catalog**. A person’s execution
+tab can select a configured executor and model, or inherit task defaults. The host stores
+this preference with an optimistic profile revision, freezes it into each new Job, and
+records the actual model, executor specification and executable digest separately.
+Changing preferences never rebinds an existing task, retry, memory home or historical
+session. Unknown models/executors and insufficient task capabilities fail explicitly;
+the host never silently substitutes an executor. Catalog capabilities are configuration
+declarations, not provider compatibility or quality evidence.
+
+`[models]` remains the task-role default map. Optional `[backend_models]` maps executor
+IDs to model lists, so adding a technical model does not create a new role or digital
+person (see `examples/backend.toml`). Without an explicit list, an executor accepts the
+legacy role-default models. The UI exposes IDs, models and declared capabilities only;
+program paths, arguments and credential environment names stay on the host.
+
+A conversation session is identified by `task.id`; each execution attempt has its own
+`run_id`. Both appear in history and JSON bridge requests carry the frozen digital-person
+identity alongside these IDs. Crystal Ball routes through authorized task/session
+endpoints, independently of the coding-agent implementation; replacing execution
+technology does not change message authority or widen a private audience. Native
+coding-agent activity remains folded process detail within the person’s session.
+
 A manually registered task selects an existing person with `"persona_id":"person-…"`.
 Omitting that optional field preserves legacy/formal-experiment behavior and isolation.
 The local HTTP management boundary only accepts bounded same-origin JSON requests with

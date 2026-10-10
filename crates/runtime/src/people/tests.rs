@@ -118,7 +118,7 @@ fn real_memory_cross_group_recall_isolated_people_frozen_inputs_and_promotion() 
     let binary =
         std::env::var_os("LAB_PERSONA_MEMORY_BINARY").expect("exact relay-memory binary required");
     let root = tempfile::tempdir().unwrap();
-    let c = config(root.path(), Path::new(&binary));
+    let mut c = config(root.path(), Path::new(&binary));
     let p = create(&c, Kind::Temporary, "知微");
     let other = create(&c, Kind::Research, "明川");
     let before = freeze(&c, &task("group-before", &p.id)).unwrap().unwrap();
@@ -154,12 +154,55 @@ fn real_memory_cross_group_recall_isolated_people_frozen_inputs_and_promotion() 
             .context
             .contains("PERSONA_CROSS_GROUP_7281")
     );
+    c.agent_backends.insert(
+        "alternate".into(),
+        config::BackendSpec::JsonProcess {
+            program: "/bin/true".into(),
+            args: vec![],
+            env_allowlist: vec![],
+            capabilities: config::Capabilities {
+                structured_result: true,
+                read_workspace: true,
+                ..Default::default()
+            },
+        },
+    );
+    let selected = change(
+        &c,
+        Change::ConfigureExecution {
+            id: p.id.clone(),
+            revision: p.revision,
+            execution: Some(task::ExecutionPreference {
+                backend: Some("alternate".into()),
+                model: Some("critic-model".into()),
+            }),
+        },
+    )
+    .unwrap();
+    let mut review = task("another-backend-and-role", &p.id);
+    review.role = "review".into();
+    let alternate = freeze(&c, &review).unwrap().unwrap();
+    assert_eq!(alternate.id, after.id);
+    assert_eq!(alternate.soul, after.soul);
+    assert!(
+        alternate
+            .memory
+            .as_ref()
+            .unwrap()
+            .context
+            .contains("PERSONA_CROSS_GROUP_7281")
+    );
+    assert_eq!(
+        alternate.execution.as_ref().unwrap().backend.as_deref(),
+        Some("alternate")
+    );
+    assert!(after.execution.is_none());
     let original = prompt(Some(&after)).unwrap();
     let promoted = change(
         &c,
         Change::Promote {
             id: p.id.clone(),
-            revision: p.revision,
+            revision: selected.revision,
         },
     )
     .unwrap();
@@ -189,5 +232,117 @@ fn real_memory_cross_group_recall_isolated_people_frozen_inputs_and_promotion() 
     assert_ne!(
         c.state_dir.join("people/memory").join(&p.id),
         c.state_dir.join("task-memory/group-after")
+    );
+}
+
+#[test]
+fn specialty_and_execution_are_independent_of_identity_and_task_roles() {
+    let root = tempfile::tempdir().unwrap();
+    let mut c = config(root.path(), Path::new("/unused"));
+    c.agent_backends.insert(
+        "bridge".into(),
+        config::BackendSpec::JsonProcess {
+            program: "/bin/true".into(),
+            args: vec![],
+            env_allowlist: vec![],
+            capabilities: config::Capabilities {
+                structured_result: true,
+                read_workspace: true,
+                ..Default::default()
+            },
+        },
+    );
+    c.backend_models
+        .insert("bridge".into(), vec!["independent-model".into()]);
+    let p = change(
+        &c,
+        Change::Create {
+            name: "知桥".into(),
+            role: "designer".into(),
+            kind: Kind::Fixed,
+            soul: "好奇而审慎".into(),
+            purpose: "跨技术研究".into(),
+        },
+    )
+    .unwrap();
+    for role in ["research", "review"] {
+        change(
+            &c,
+            Change::SetDefault {
+                role: role.into(),
+                id: p.id.clone(),
+            },
+        )
+        .unwrap();
+        assert_eq!(default_id(&c, role).unwrap(), p.id);
+    }
+    let choice = task::ExecutionPreference {
+        backend: Some("bridge".into()),
+        model: Some("independent-model".into()),
+    };
+    let updated = change(
+        &c,
+        Change::ConfigureExecution {
+            id: p.id.clone(),
+            revision: p.revision,
+            execution: Some(choice.clone()),
+        },
+    )
+    .unwrap();
+    assert_eq!(updated.id, p.id);
+    assert_eq!(updated.soul, p.soul);
+    assert_eq!(updated.role, "designer");
+    assert_eq!(updated.execution, Some(choice.clone()));
+    assert!(
+        change(
+            &c,
+            Change::ConfigureExecution {
+                id: p.id.clone(),
+                revision: p.revision,
+                execution: None
+            }
+        )
+        .is_err()
+    );
+    for invalid in [
+        task::ExecutionPreference {
+            backend: Some("unknown".into()),
+            model: None,
+        },
+        task::ExecutionPreference {
+            backend: Some("codex".into()),
+            model: Some("independent-model".into()),
+        },
+    ] {
+        assert!(
+            change(
+                &c,
+                Change::ConfigureExecution {
+                    id: p.id.clone(),
+                    revision: updated.revision,
+                    execution: Some(invalid)
+                }
+            )
+            .is_err()
+        );
+    }
+    assert_eq!(directory(&c).unwrap().people[&p.id].execution, Some(choice));
+    let cleared = change(
+        &c,
+        Change::ConfigureExecution {
+            id: p.id.clone(),
+            revision: updated.revision,
+            execution: None,
+        },
+    )
+    .unwrap();
+    assert!(cleared.execution.is_none());
+    assert_eq!(directory(&c).unwrap().defaults["review"], p.id);
+    // Executor model inventories never create identities or business roles.
+    assert!(
+        !directory(&c)
+            .unwrap()
+            .defaults
+            .contains_key("independent-model")
     );
 }

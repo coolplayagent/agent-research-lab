@@ -94,7 +94,21 @@ pub struct PersonaSnapshot {
     pub name: String,
     pub revision: u64,
     pub soul: String,
+    /// Host-approved execution preference at registration; identity survives changes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution: Option<ExecutionPreference>,
     pub memory: Option<PersonaMemory>,
+}
+
+/// A digital person uses an executor and model; neither defines their identity.
+/// Missing fields inherit task defaults. Values must come from host configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ExecutionPreference {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backend: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

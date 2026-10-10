@@ -276,6 +276,12 @@
             数字人<span>成员、角色与记忆</span>
           </button>
           <button
+            id="settings-nav-executors"
+            aria-controls="settings-executors"
+          >
+            执行技术<span>Coding agent 与模型</span>
+          </button>
+          <button
             id="settings-nav-observation"
             aria-controls="settings-observation"
           >
@@ -347,7 +353,7 @@
                   placeholder="留空自动取一个不重复的花名"
               /></label>
               <div class="form-columns">
-                <label>角色<select id="person-role"></select></label
+                <label>专长<select id="person-role"></select></label
                 ><label
                   >成员类型<select id="person-kind">
                     <option value="fixed">固定成员</option>
@@ -377,6 +383,22 @@
               </div>
             </form>
             <div id="person-inline-host" hidden></div>
+          </section>
+          <section
+            id="settings-executors"
+            class="settings-panel settings-card"
+            aria-labelledby="settings-nav-executors"
+            hidden
+          >
+            <h2>执行技术</h2>
+            <p class="system-note">
+              数字人使用 coding agent
+              完成任务。身份、Soul、记忆和会话由水晶球管理；每次执行单独记录所用技术和模型。
+            </p>
+            <div id="executor-directory"></div>
+            <p class="system-note">
+              此处展示服务已配置的技术及其声明能力，不代表模型质量或兼容性验证。进入数字人的「执行技术」页选择使用方式；接入程序由服务配置管理。
+            </p>
           </section>
           <section
             id="settings-service"
@@ -426,6 +448,7 @@
         <div class="person-tabs">
           <button id="person-tab-history" class="active">全部会话</button
           ><button id="person-tab-memory">记忆</button>
+          <button id="person-tab-execution">执行技术</button>
         </div>
         <section id="person-history-panel">
           <p class="system-note">
@@ -433,6 +456,21 @@
           </p>
           <div id="person-history-list"></div>
           <button id="person-history-more" hidden>更早的会话</button>
+        </section>
+        <section id="person-execution-panel" hidden>
+          <p class="system-note">
+            选择这个数字人使用的 coding agent
+            和模型。修改只影响新任务，已有会话和重试继续使用原绑定；身份与记忆保持连续。
+          </p>
+          <form id="person-execution-form" class="person-form">
+            <label>执行技术<select id="person-backend"></select></label>
+            <label>模型<select id="person-model"></select></label>
+            <p id="person-execution-description" class="system-note"></p>
+            <button id="save-person-execution" type="submit">
+              保存执行偏好
+            </button>
+            <p id="person-execution-status" role="status"></p>
+          </form>
         </section>
         <section id="person-memory-panel" hidden>
           <div id="person-memory-stats" class="memory-stats">

@@ -114,7 +114,7 @@ fn project(job: &Job, row: &Value) -> Value {
         .unwrap_or_default();
     json!({
         "id":job.task.id,"role":job.task.role,"repository":job.task.repository,
-        "model":job.model,"run_id":job.run_id,"attempt":job.attempt,
+        "model":job.model,"run_id":job.run_id,"session_id":job.task.id,"execution_id":job.run_id,"attempt":job.attempt,
         "backend":job.backend.as_ref().map(|b| b.id.as_str()).unwrap_or("codex"),
         "profile":{"handle":format!("agent-{}", &storage::digest(job.task.id.as_bytes())[..12]),
             "prompt_version":job.task.prompt_version,"use_memory":job.task.use_memory,
@@ -130,7 +130,7 @@ fn project(job: &Job, row: &Value) -> Value {
         "topics":job.task.communication.as_ref().map(|t| &t.topics),
         "context":context.map(|c| json!({"message_ids":c["context"]["message_ids"],
             "as_of":c["context"]["as_of"],"digest":c["context"]["digest"]})),
-        "persona":job.persona.as_ref().map(|p|json!({"id":p.id,"name":p.name,"revision":p.revision,"soul":p.soul,"memory":p.memory.as_ref().map(|m|json!({"sha256":m.sha256,"pack_sha256":m.pack_sha256,"executable_sha256":m.executable_sha256,"captured_at":m.captured_at}))})),
+        "persona":job.persona.as_ref().map(|p|json!({"id":p.id,"name":p.name,"revision":p.revision,"soul":p.soul,"execution":p.execution,"memory":p.memory.as_ref().map(|m|json!({"sha256":m.sha256,"pack_sha256":m.pack_sha256,"executable_sha256":m.executable_sha256,"captured_at":m.captured_at}))})),
         "postprocessing":row["postprocessing"],
         "candidate_commit":receipt.as_ref().map(|r| &r["candidate"]["candidate_commit"]),
         "communication_gap":job.launch.as_ref().and_then(|l| l.communication_gap.as_ref()),
