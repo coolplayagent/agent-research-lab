@@ -165,6 +165,7 @@ function applySidebarLayout() {
     `${rightOpen && widths.docked ? widths.right : 0}px`,
   );
   shell.style.setProperty("--right-width", `${widths.right}px`);
+  shell.style.setProperty("--right-edge", `${rightOpen ? widths.right : 0}px`);
   for (const side of ["left", "right"]) {
     const open = side === "left" ? leftOpen : rightOpen,
       toggle = $("toggle-" + side + "-sidebar"),
@@ -172,6 +173,7 @@ function applySidebarLayout() {
       handle = $("resize-" + side);
     $(side + "-sidebar").hidden = !open;
     toggle.setAttribute("aria-expanded", String(open));
+    toggle.textContent = (side === "left") === open ? "‹" : "›";
     toggle.title = `${open ? "收起" : "展开"}${label}`;
     toggle.setAttribute("aria-label", toggle.title);
     handle.setAttribute("aria-valuemin", side === "left" ? "180" : "240");
@@ -213,7 +215,9 @@ function setChatCollapsed(collapsed) {
 }
 function initSidebarControls() {
   $("toggle-left-sidebar").addEventListener("click", () => {
-    preferences.leftCollapsed = !preferences.leftCollapsed;
+    const open = $("left-sidebar").hidden;
+    if (focusPanel) maximize(focusPanel);
+    preferences.leftCollapsed = !open;
     savePreferences();
     applySidebarLayout();
   });
@@ -415,9 +419,34 @@ function roomName(id) {
     ? titles[topics[0]] || topics[0]
     : members[0]?.team || short(id);
 }
-function showPage(page, focus = false) {
+let settingsCategory = "people";
+function showSettingsCategory(category) {
+  if (!["people", "observation", "service"].includes(category))
+    category = settingsCategory;
+  if (
+    category !== "people" &&
+    typeof closePerson === "function" &&
+    $("person-window").classList.contains("embedded")
+  )
+    closePerson();
+  settingsCategory = category;
+  for (const id of ["people", "observation", "service"]) {
+    $("settings-" + id).hidden = id !== category;
+    if (id === category)
+      $("settings-nav-" + id).setAttribute("aria-current", "page");
+    else $("settings-nav-" + id).removeAttribute("aria-current");
+  }
+}
+function showPage(route, focus = false) {
+  let [page, category] = route.split("/");
   if (!["collaboration", "messages", "settings"].includes(page))
     page = "collaboration";
+  if (page === "settings") showSettingsCategory(category);
+  else if (
+    typeof closePerson === "function" &&
+    $("person-window").classList.contains("embedded")
+  )
+    closePerson();
   for (const id of ["collaboration", "messages", "settings"]) {
     $(id + "-page").hidden = id !== page;
     if (id === page) $("nav-" + id).setAttribute("aria-current", "page");
@@ -1785,6 +1814,12 @@ for (const page of ["collaboration", "messages", "settings"]) {
   });
 }
 window.addEventListener("hashchange", () => showPage(location.hash.slice(1)));
+for (const category of ["people", "observation", "service"]) {
+  $("settings-nav-" + category).addEventListener("click", () => {
+    location.hash = `settings/${category}`;
+    showPage(`settings/${category}`);
+  });
+}
 for (const id of ["rooms", "private", "people"]) {
   const section = $("section-" + id);
   section.open = !(preferences.collapsed || []).includes(id);

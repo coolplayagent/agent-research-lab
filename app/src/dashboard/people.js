@@ -16,6 +16,7 @@ let peopleRevision = -1;
 let peopleIndex = new Map(),
   peopleDefaults = {},
   peopleModels = {},
+  peopleTotal = 0,
   peopleCursor = null;
 let personFocus = null,
   personHistory = [],
@@ -65,6 +66,7 @@ function personRepresentative(person) {
 }
 function syncPeople(roster) {
   if (!roster) return;
+  peopleTotal = roster.total || peopleTotal;
   if ((roster.revision || 0) >= peopleRevision) {
     peopleDefaults = roster.defaults || {};
     peopleModels = roster.models || {};
@@ -75,6 +77,7 @@ function syncPeople(roster) {
       peopleIndex.set(p.id, p);
   }
   renderPeopleDirectory();
+  $("people-more").hidden = !peopleCursor || peopleIndex.size >= peopleTotal;
 }
 async function peopleApi(body) {
   const response = await fetch("/api/people", {
@@ -110,7 +113,7 @@ async function loadPeople(after = "") {
   } finally {
     directoryLoading = false;
     $("people-more").disabled = false;
-    $("people-more").hidden = !peopleCursor;
+    $("people-more").hidden = !peopleCursor || peopleIndex.size >= peopleTotal;
   }
 }
 function renderPeopleDirectory() {
@@ -191,11 +194,27 @@ function renderPeopleDirectory() {
       el("p", "没有匹配的数字人。可以新增成员，或显示临时成员。", "empty"),
     );
 }
+function settingsPeopleView(view) {
+  $("people-list").hidden = view !== "list";
+  $("person-form").hidden = view !== "form";
+  $("person-inline-host").hidden = view !== "detail";
+}
+function closePerson() {
+  const panel = $("person-window");
+  panel.close();
+  personRequest++;
+  if (panel.classList.contains("embedded")) {
+    settingsPeopleView("list");
+    panel.classList.remove("embedded");
+    document.body.append(panel);
+  }
+}
 function editPerson(person = null) {
-  if ($("person-window").open) $("person-window").close();
-  showPage("settings", true);
+  closePerson();
+  location.hash = "settings/people";
+  showPage("settings/people", true);
   editingPerson = person;
-  $("person-form").hidden = false;
+  settingsPeopleView("form");
   $("person-form-title").textContent = person
     ? `编辑 ${person.name}`
     : "新增数字人";
@@ -288,7 +307,27 @@ async function openPerson(id) {
   $("person-memory-events").replaceChildren();
   $("person-memory-stats").textContent = "记忆由 relay-memory 管理";
   switchPersonTab("history");
-  if (!$("person-window").open) $("person-window").showModal();
+  const panel = $("person-window"),
+    embedded = !$("settings-page").hidden && settingsCategory === "people";
+  if (panel.open && panel.classList.contains("embedded") !== embedded)
+    panel.close();
+  panel.classList.toggle("embedded", embedded);
+  $("maximize-person").hidden = embedded;
+  $("close-person").textContent = embedded ? "← 返回名册" : "×";
+  $("close-person").setAttribute(
+    "aria-label",
+    embedded ? "返回数字人名册" : "关闭数字人窗口",
+  );
+  if (embedded) {
+    settingsPeopleView("detail");
+    if (panel.parentElement !== $("person-inline-host"))
+      $("person-inline-host").append(panel);
+    if (!panel.open) panel.show();
+    $("close-person").focus({ preventScroll: true });
+  } else {
+    if (panel.parentElement !== document.body) document.body.append(panel);
+    if (!panel.open) panel.showModal();
+  }
   await loadPersonHistory();
 }
 async function loadPersonHistory(after = "") {
@@ -317,7 +356,8 @@ async function loadPersonHistory(after = "") {
       );
       card.append(text, badge(job.state));
       card.addEventListener("click", () => {
-        $("person-window").close();
+        if (!$("person-window").classList.contains("embedded"))
+          $("person-window").close();
         openSessionRecord(job);
       });
       root.append(card);
@@ -458,8 +498,14 @@ $("edit-person").addEventListener("click", () =>
   editPerson(peopleIndex.get(personFocus)),
 );
 $("close-person").addEventListener("click", () => {
-  $("person-window").close();
-  personRequest++;
+  const id = personFocus;
+  closePerson();
+  if (!$("settings-page").hidden) {
+    const index = Array.from($("people-directory").children).find((card) =>
+      card.textContent.includes(peopleIndex.get(id)?.name),
+    );
+    (index || $("create-person")).focus({ preventScroll: true });
+  }
 });
 $("person-window").addEventListener("cancel", () => personRequest++);
 $("person-history-more").addEventListener("click", () =>
@@ -467,12 +513,27 @@ $("person-history-more").addEventListener("click", () =>
 );
 $("create-person").addEventListener("click", () => editPerson());
 $("cancel-person").addEventListener("click", () => {
-  $("person-form").hidden = true;
+  if (editingPerson) openPerson(editingPerson.id);
+  else {
+    settingsPeopleView("list");
+    $("create-person").focus();
+  }
 });
 $("people-search").addEventListener("input", renderPeopleDirectory);
 $("people-temporary").addEventListener("change", renderPeopleDirectory);
 $("people-more").addEventListener("click", () => loadPeople(peopleCursor));
 $("nav-settings").addEventListener("click", () => loadPeople());
+document.addEventListener("keydown", (event) => {
+  if (
+    event.key === "Escape" &&
+    $("person-window").open &&
+    $("person-window").classList.contains("embedded") &&
+    !$("session-window").open
+  ) {
+    event.preventDefault();
+    $("close-person").click();
+  }
+});
 function renderPeopleSidebar(list) {
   if (!data?.roster) return;
   const root = $("tasks"),
