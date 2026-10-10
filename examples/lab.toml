@@ -7,7 +7,7 @@ superpod = "/opt/workspace/superpod"
 codex = "codex"
 workflow = "/home/tdp/.codex/skills/workflow-cli/assets/linux-x86_64/workflow"
 daily_seconds = 43200
-max_agents = 3
+max_agents = 8
 task_timeout_seconds = 1800
 
 [models]
