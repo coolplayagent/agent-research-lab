@@ -33,7 +33,9 @@ agent-research-lab --config /ABS/pilot.toml collaboration collect /ABS/STATE/pri
 
 ## 观察与独立核验
 
-`findings` 的每个字符串承载一个 JSON claim card，格式见 [claim-card 示例](../examples/collaboration/claim-card.json)。引用使用 `task-id#claim-id`；只能引用本轮已提供的依赖，修订只能指向自己的初稿。`change`、反例关系和知识建议都只是模型提案。
+新计划使用 `collaboration-pilot-v2`。`findings` 的每个字符串承载一个 JSON claim card，格式见 [claim-card 示例](../examples/collaboration/claim-card.json)。卡片的 `id` 是 **1..100 个 ASCII 字母、数字、下划线或连字符**组成的本地值，例如 `c1`；不包含 task ID 或 `#`。宿主自动生成 `task-id#c1`，只有跨卡字段 `counterexample_to`、`revises` 使用这种完整引用；只能引用本轮已提供的依赖，修订只能指向自己的初稿。`change`、反例关系和知识建议都只是模型提案。
+
+已冻结的 `collaboration-pilot-v1` 计划仍按原始任务文本、DAG 和摘要验证、收集，结果保留 v1 标识。v2 不改写旧计划或报告，不接受旧报告中的不安全 ID，也不为旧实例增加尝试。协议变更后的验证使用新实验 ID；未知协议继续拒绝。
 
 结果中 `scheduled_calls` 等 `*_calls` 指计划的 agent 调用次数，不是 provider API 请求计数。收集器分开记录：
 
