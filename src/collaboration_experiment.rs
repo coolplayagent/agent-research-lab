@@ -19,7 +19,8 @@ use std::{
 };
 
 const SLOTS: usize = 8;
-const PROTOCOL: &str = "collaboration-pilot-v1";
+const LEGACY_PROTOCOL: &str = "collaboration-pilot-v1";
+const PROTOCOL: &str = "collaboration-pilot-v2";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -252,7 +253,21 @@ fn specialist_prompt(slot: &Slot) -> String {
         slot.perspective
     )
 }
-fn build_tasks(r: &PlanRequest, prompts: &[PromptVersion]) -> Vec<PlannedTask> {
+fn card_id_contract(protocol: &str, task_id: &str) -> Result<String> {
+    match protocol {
+        // Historical plans must retain this exact text for digest-bound replay.
+        LEGACY_PROTOCOL => Ok(format!("Your card prefix is {task_id}#.")),
+        PROTOCOL => Ok(format!(
+            "The id field must be a LOCAL value of 1..100 ASCII letters, digits, underscores or hyphens ([A-Za-z0-9_-]), for example c1. Never put a task ID, prefix or # in id. For id=c1, the host automatically creates the qualified identifier {task_id}#c1; do not emit that qualified identifier in id. Only counterexample_to and revises contain qualified task-id#local-id references to supplied dependency cards."
+        )),
+        _ => bail!("unsupported collaboration protocol"),
+    }
+}
+fn build_tasks(
+    r: &PlanRequest,
+    prompts: &[PromptVersion],
+    protocol: &str,
+) -> Result<Vec<PlannedTask>> {
     let other = if r.first_arm == Arm::Baseline {
         Arm::Candidate
     } else {
@@ -276,8 +291,9 @@ fn build_tasks(r: &PlanRequest, prompts: &[PromptVersion]) -> Vec<PlannedTask> {
                 } else {
                     "Challenge the claims in the supplied dependency receipts, checking their sources and alternative explanations, then revise your own initial claims. Critique only supplied evidence. Retain unresolved disagreement; do not converge for consensus."
                 };
+                let id_contract = card_id_contract(protocol, &id)?;
                 let prompt = format!(
-                    "Objective: {}\nScope: {}\nStage {round}: {stage}\nUse at most {} claim cards and the same {}-second task ceiling as every matched slot. Stop when these bounded findings are complete; a missing source or unresolved claim belongs in limitations. All sources must be pinned repository files; no new knowledge store. Each findings element must be a JSON-encoded object with exactly these fields: id (local safe ID), text, evidence (array of {{repository,commit,path,start_line,end_line,sha256,quote}}; SHA-256 is whole file, quote is a short exact excerpt within the cited lines), counterexample_to (array of task-id#claim-id), revises (array of your OWN initial task-id#claim-id), change (new/keep/narrow/retract), rationale, knowledge_update (null or {{target_path,proposal}} pointing to an existing SuperPOD knowledge file). Every reference must identify a card in a supplied dependency. New cards have revises=[]; keep/narrow/retract must refer to your own initial card. In round 1 use change=new and no cross-card references. Your card prefix is {id}#. Read the common SuperPOD sources {:?} at the pinned commit before analysis; at least one claim must cite their actual content with file digest and exact short quote. Source path/line existence is not proof it supports the claim. Put readable references in sources too. Return the runtime's summary/findings/sources/limitations/next_tasks schema; next_tasks MUST be []. Do not self-grade or request more calls.",
+                    "Objective: {}\nScope: {}\nStage {round}: {stage}\nUse at most {} claim cards and the same {}-second task ceiling as every matched slot. Stop when these bounded findings are complete; a missing source or unresolved claim belongs in limitations. All sources must be pinned repository files; no new knowledge store. Each findings element must be a JSON-encoded object with exactly these fields: id (local safe ID), text, evidence (array of {{repository,commit,path,start_line,end_line,sha256,quote}}; SHA-256 is whole file, quote is a short exact excerpt within the cited lines), counterexample_to (array of task-id#claim-id), revises (array of your OWN initial task-id#claim-id), change (new/keep/narrow/retract), rationale, knowledge_update (null or {{target_path,proposal}} pointing to an existing SuperPOD knowledge file). Every reference must identify a card in a supplied dependency. New cards have revises=[]; keep/narrow/retract must refer to your own initial card. In round 1 use change=new and no cross-card references. {id_contract} Read the common SuperPOD sources {:?} at the pinned commit before analysis; at least one claim must cite their actual content with file digest and exact short quote. Source path/line existence is not proof it supports the claim. Put readable references in sources too. Return the runtime's summary/findings/sources/limitations/next_tasks schema; next_tasks MUST be []. Do not self-grade or request more calls.",
                     r.question,
                     slot.perspective,
                     r.max_claims,
@@ -307,7 +323,7 @@ fn build_tasks(r: &PlanRequest, prompts: &[PromptVersion]) -> Vec<PlannedTask> {
             }
         }
     }
-    tasks
+    Ok(tasks)
 }
 fn plan_digest(plan: &Plan) -> Result<String> {
     digest(
@@ -322,7 +338,7 @@ fn validate_plan(c: &Config, plan: &Plan) -> Result<()> {
         "plan lacks SuperPOD binding"
     );
     ensure!(
-        plan.schema_version == 1 && plan.protocol == PROTOCOL,
+        plan.schema_version == 1 && matches!(plan.protocol.as_str(), LEGACY_PROTOCOL | PROTOCOL),
         "unsupported collaboration protocol"
     );
     ensure!(
@@ -344,7 +360,7 @@ fn validate_plan(c: &Config, plan: &Plan) -> Result<()> {
     }
     ensure!(
         serde_json::to_value(&plan.tasks)?
-            == serde_json::to_value(build_tasks(&plan.request, &plan.prompts))?,
+            == serde_json::to_value(build_tasks(&plan.request, &plan.prompts, &plan.protocol)?)?,
         "plan DAG or task contract changed"
     );
     ensure!(plan.digest == plan_digest(plan)?, "plan digest mismatch");
@@ -466,7 +482,7 @@ pub fn execute(
                 current.register(prompt.clone())?;
             }
             storage::write(&registry_path, &current)?;
-            let tasks = build_tasks(&request, &prompts);
+            let tasks = build_tasks(&request, &prompts, PROTOCOL)?;
             let mut plan = Plan {
                 schema_version: 1,
                 protocol: PROTOCOL.into(),
@@ -1144,7 +1160,7 @@ fn collect(
     let complete = metrics.values().all(|m| m.incomplete_calls == 0);
     let knowledge_proposals:Vec<_>=claims.iter().filter_map(|claim|claim.card.knowledge_update.as_ref().map(|update|json!({"status":"pending_host_review","superpod_commit":plan.inputs.repositories["superpod"].upstream.commit,"claim_id":claim.id,"claim_digest":claim.digest,"target_path":update.target_path,"proposal":update.proposal}))).collect();
     Ok(
-        json!({"schema_version":1,"protocol":PROTOCOL,"plan_digest":plan.digest,"team_pairs":1,"promotion_eligible":false,"call_unit":"planned_codex_exec_attempt",
+        json!({"schema_version":1,"protocol":plan.protocol,"plan_digest":plan.digest,"team_pairs":1,"promotion_eligible":false,"call_unit":"planned_codex_exec_attempt",
         "complete":complete,"fully_adjudicated":complete && !claims.is_empty() && metrics.values().all(|m|m.invalid_reports==0) && claims.iter().all(|c|c.adjudication.is_some()),
         "metrics":metrics,"tasks":tasks,"claims":claims,"knowledge_proposals":knowledge_proposals,
         "limitations":["One team-level pilot; coupled slots are not independent trials.","Equal call/time ceilings do not imply equal actual tokens or cost.","Resolvable citations do not prove semantic support; host adjudications are separate.","Literal repeated claims are not measured duplicate work; semantic duplication requires host adjudication.","Worker-writable trace usage is diagnostic, not independent billing or promotion evidence.","Failures remain in the planned denominator. No automatic TrialObservation, promotion, policy change or knowledge publication."]}),
@@ -1155,6 +1171,9 @@ fn collect(
 mod tests {
     use super::*;
     fn fixture() -> (tempfile::TempDir, Config, Plan, Citation) {
+        fixture_protocol(PROTOCOL)
+    }
+    fn fixture_protocol(protocol: &str) -> (tempfile::TempDir, Config, Plan, Citation) {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path();
         let state = root.join("state");
@@ -1226,7 +1245,7 @@ mod tests {
                 PromptVersion::new(PromptDefinition {
                     parent_versions: vec![],
                     role: slot.role.clone(),
-                    task_kind: PROTOCOL.into(),
+                    task_kind: protocol.into(),
                     content: specialist_prompt(slot),
                     change_reason: "fixture".into(),
                     failure_conditions: vec!["unsupported evidence".into()],
@@ -1240,10 +1259,10 @@ mod tests {
         }
         storage::write(&state.join("evolution/prompts.json"), &registry).unwrap();
         let inputs:ResearchInputs=serde_json::from_value(json!({"repositories":{"superpod":{"upstream":{"repository":"stevetdp/superpod","default_branch":"main","commit":commit,"checked_at":"2026-10-10T00:00:00Z"},"checkout":repo}},"skills":{"schema_version":1,"skills":[]},"insights":"frozen insights","insights_sha256":storage::digest(b"frozen insights")})).unwrap();
-        let tasks = build_tasks(&r, &prompts);
+        let tasks = build_tasks(&r, &prompts, protocol).unwrap();
         let mut plan = Plan {
             schema_version: 1,
-            protocol: PROTOCOL.into(),
+            protocol: protocol.into(),
             request: r,
             config_digest: digest(&c).unwrap(),
             input_digest: input_digest(&inputs).unwrap(),
@@ -1481,6 +1500,70 @@ mod tests {
             assert_eq!(w.status(&run).unwrap()["status"], "running");
             w.verify(&run).unwrap();
         }
+    }
+    #[test]
+    fn frozen_v1_plan_remains_collectible_without_relabeling_or_relaxing_ids() {
+        let (_temp, c, original, citation) = fixture_protocol(LEGACY_PROTOCOL);
+        // Captured from the complete 32-task fixture at main 55c83f5, before v2.
+        assert_eq!(
+            digest(&original.tasks).unwrap(),
+            "68b54f464bcd7f5280fd9c2dfc4d94090b78b8b54b6579904b617c8e374e75fe"
+        );
+        let plan: Plan = serde_json::from_slice(&serde_json::to_vec(&original).unwrap()).unwrap();
+        validate_plan(&c, &plan).unwrap();
+        let entry = &plan.tasks[0];
+        let (job, receipt, state) = job_and_receipt(&c, &plan, entry, &card(&citation));
+        storage::write(
+            &c.state_dir
+                .join("jobs")
+                .join(format!("{}.json", entry.task.id)),
+            &job,
+        )
+        .unwrap();
+        storage::write(
+            &c.state_dir
+                .join("runs")
+                .join(&job.run_id)
+                .join("receipt.json"),
+            &receipt,
+        )
+        .unwrap();
+        let collected = collect(&c, &plan, None, |_| Ok(state.clone())).unwrap();
+        assert_eq!(collected["protocol"], LEGACY_PROTOCOL);
+        assert_eq!(collected["metrics"]["baseline"]["succeeded_calls"], 1);
+        assert_eq!(
+            collected["claims"][0]["id"],
+            format!("{}#claim-one", entry.task.id)
+        );
+        let mut qualified = card(&citation);
+        qualified.id = format!("{}#claim-one", entry.task.id);
+        let (_, invalid, _) = job_and_receipt(&c, &plan, entry, &qualified);
+        assert!(report_cards(entry, &invalid, 3, &BTreeSet::new()).is_err());
+
+        let mut changed = plan.clone();
+        changed.protocol = PROTOCOL.into();
+        changed.digest = plan_digest(&changed).unwrap();
+        assert!(
+            validate_plan(&c, &changed).is_err(),
+            "v1 tasks cannot be relabeled v2"
+        );
+        changed = plan.clone();
+        changed.tasks[24]
+            .task
+            .dependencies
+            .push(plan.tasks[0].task.id.clone());
+        changed.digest = plan_digest(&changed).unwrap();
+        assert!(
+            validate_plan(&c, &changed).is_err(),
+            "legacy replay still validates its DAG"
+        );
+        changed = plan;
+        changed.protocol = "collaboration-pilot-v999".into();
+        changed.digest = plan_digest(&changed).unwrap();
+        assert!(
+            validate_plan(&c, &changed).is_err(),
+            "unknown protocols remain closed"
+        );
     }
     #[test]
     fn two_arms_have_matched_specialists_and_only_the_planned_peer_edges() {
