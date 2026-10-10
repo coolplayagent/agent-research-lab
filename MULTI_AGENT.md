@@ -68,6 +68,9 @@ messages and 4 KiB, with a digest retained in launch and completion evidence.
 Empty subscriptions/query produce no automatic context. Direct worker reads of
 the bounded view are possible: the 4 KiB selection limit is **not** a measured
 limit on all tokens the model may read or generate.
+The launch digest binds the initial selection, not proof that a model understood
+it or a transcript of every later direct read. Later board views are mutable
+caches of retained host authority; actual tool/read evidence remains separate.
 
 ```sh
 agent-research-lab --config local.toml agents backends
@@ -95,6 +98,9 @@ Each shard has its own lock and bounded index; each poll touches a bounded cell
 and a fixed number of slots. A noisy cell cannot grow a global queue or force
 delivery to all subscribers. Capacity exhaustion is explicit and never discards
 active records or silently resets quotas.
+The quotas bound accepted host state and ingestion work; they do not impose a
+filesystem quota on arbitrary worker-created log files. A larger executor pool
+also needs independently tested CPU, memory, PID and disk limits.
 
 The run ownership shard still reads and rewrites a bounded map (at most 4,096
 records / 4 MiB); it is not an unbounded constant-time key-value database. Cohort

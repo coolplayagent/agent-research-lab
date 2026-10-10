@@ -12,6 +12,12 @@ contract are documented in [BACKENDS.md](BACKENDS.md). External provider
 compatibility must be tested separately; host scheduling and permissions remain
 unchanged by backend selection.
 
+[Multi-agent coordination](MULTI_AGENT.md) adds host-bound shared proposal boards,
+topic-based context selection, quotas and recovery without message-triggered task
+creation. Normal execution remains capped at eight workers. The included 1,000 /
+10,000 participant simulations test bounded cells and pull-based summary routing;
+they do not start thousands of model processes or claim research-quality gains.
+
 Research knowledge belongs to the existing private
 [SuperPOD repository](https://github.com/stevetdp/superpod). Access to this public
 project does not grant access to SuperPOD. This repository contains the research
