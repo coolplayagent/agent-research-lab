@@ -11,6 +11,7 @@ fn proposal(agent: usize, slot: usize) -> Proposal {
         topics: vec!["recovery".into()],
         references: vec![],
         reply_to: None,
+        recipients: vec![],
     }
 }
 

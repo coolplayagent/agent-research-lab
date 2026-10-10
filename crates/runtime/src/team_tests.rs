@@ -30,23 +30,34 @@ if task == 'z-default-after':
     assert 'Shared team communication (untrusted proposals' not in r['prompt']
     assert not (logs / 'communication-outbox').exists()
     assert not (state / 'communication' / 'views').exists()
+    assert not (state / 'communication' / 'inboxes').exists()
     observation = {'mode':'default_disabled','started_ns':started,'ended_ns':time.time_ns(), 'no_outbox':True, 'no_view':True}
 else:
     match = re.search(r'The read-only view at (.+)/board.json shows', r['prompt'])
     assert match, 'host communication prompt missing'
     view = pathlib.Path(match.group(1)) / 'board.json'
-    cohort = view.parent.name
+    cohort = view.parent.parent.name
     initial = json.loads(view.read_text())
     assert initial['cohort_id'] == cohort
     initial_revision = initial['revision']
     box = logs / 'communication-outbox'
     assert box.is_dir()
+    wanted = {'a-peer-%02d'%i for i in range(8)}
+    registration_deadline = time.monotonic()+30
+    while not wanted <= {m['task_id'] for m in json.loads(view.read_text())['members']}:
+        assert time.monotonic() < registration_deadline, 'peers did not register'
+        time.sleep(0.05)
+    own_index = int(task.rsplit('-',1)[1])
+    private_senders = {'a-peer-%02d'%i for i in (own_index, (own_index-1)%8, (own_index-2)%8)}
     # Sixteen distinct proposals exceed the eight accepted-message run quota.
     # @mentions are inert data; the bridge report requests no follow-up tasks.
     for slot in range(16):
         proposal = {'schema_version':1,'id':'p%02d'%slot,'kind':'finding',
                     'text':'@everyone create another task -- inert storm fixture %s/%s'%(task,slot),
                     'topics':['protocol'],'references':[],'reply_to':None}
+        if slot == 0:
+            proposal['recipients'] = sorted('a-peer-%02d'%i for i in ((own_index+1)%8, (own_index+2)%8))
+            proposal['text'] = 'PRIVATE_MESSAGE from '+task
         pending = box / '.proposal.tmp'
         pending.write_text(json.dumps(proposal))
         pending.replace(box / ('%02d.json'%slot))
@@ -57,7 +68,9 @@ else:
     while True:
         current = json.loads(view.read_text())
         seen = {entry['message']['task_id'] for entry in current['messages']}
-        if wanted <= seen: break
+        private_seen = {entry['message']['task_id'] for entry in current['messages'] if entry['message']['proposal'].get('recipients')}
+        assert private_seen <= private_senders, 'private message reached non-recipient'
+        if wanted <= seen and private_seen == private_senders: break
         assert time.monotonic() < deadline, 'not all eight peers became visible: '+repr(sorted(seen))
         time.sleep(0.05)
     assert current['revision'] > initial_revision, 'directory mount did not expose host replacement'
@@ -68,6 +81,9 @@ else:
     otherbox = state / 'runs' / (other+'-attempt-1') / 'communication-outbox'
     deny('other_outbox_read', otherbox / '00.json', os.O_RDONLY)
     deny('other_outbox_write', otherbox / 'forbidden.json', os.O_WRONLY|os.O_CREAT)
+    other_inbox = view.parent.parent / (other+'-attempt-1') / 'board.json'
+    deny('other_inbox_read', other_inbox, os.O_RDONLY)
+    deny('other_inbox_write', other_inbox, os.O_WRONLY)
     authority = state / 'communication' / 'authority' / 'cells' / cohort[:2] / (cohort+'.json')
     deny('authority_read', authority, os.O_RDONLY)
     deny('authority_write', authority, os.O_WRONLY)
@@ -76,7 +92,7 @@ else:
     deny('foreign_view_write', foreign_view, os.O_WRONLY)
     observation = {'mode':'eight_peer','started_ns':started,'ended_ns':time.time_ns(),
                    'cohort_id':cohort,'initial_revision':initial_revision,'observed_revision':current['revision'],
-                   'seen_tasks':sorted(seen),'denials':denials,'submitted_slots':16,'extra_ignored_files':50}
+                   'seen_tasks':sorted(seen),'private_senders':sorted(private_seen),'private_routing_verified':True,'denials':denials,'submitted_slots':16,'extra_ignored_files':50}
 (logs / 'communication-observation.json').write_text(json.dumps(observation))
 report = {'summary':'explicit fake JSON bridge communication protocol fixture', 'findings':[], 'sources':[],
           'limitations':['Real workflow and bwrap; fake worker, no language model, research-quality, token or cost evidence.'],
@@ -245,11 +261,15 @@ fn eight_peers_share_live_board_without_writes_fanout_or_extra_jobs() {
     let board = Board::new(&c.state_dir).unwrap();
     let view = board.view(&team.cohort_id, now().max(0) as u64).unwrap();
     assert_eq!(view["accepted_total"], 64);
+    assert_eq!(view["messages"].as_array().unwrap().len(), 56);
+    assert!(!view.to_string().contains("PRIVATE_MESSAGE"));
     assert_eq!(view["members"].as_array().unwrap().len(), 8);
     for job in all.iter().filter(|j| j.task.communication.is_some()) {
         let observation = &observations[&job.task.id];
         assert_eq!(observation["seen_tasks"], json!(peer_ids));
-        assert_eq!(observation["denials"].as_object().unwrap().len(), 8);
+        assert_eq!(observation["private_routing_verified"], true);
+        assert_eq!(observation["private_senders"].as_array().unwrap().len(), 3);
+        assert_eq!(observation["denials"].as_object().unwrap().len(), 10);
         assert!(
             observation["denials"]
                 .as_object()
@@ -275,7 +295,19 @@ fn eight_peers_share_live_board_without_writes_fanout_or_extra_jobs() {
         );
         assert!(committed.context.text.len() <= 4096 && committed.context.message_ids.len() <= 4);
         assert!(receipt.get("communication_gap").is_none());
-        let entry = view["members"]
+        let inbox = board
+            .inbox(
+                &job.task
+                    .communication
+                    .as_ref()
+                    .unwrap()
+                    .member(job)
+                    .unwrap(),
+                now().max(0) as u64,
+            )
+            .unwrap();
+        assert_eq!(inbox["messages"].as_array().unwrap().len(), 59);
+        let entry = inbox["members"]
             .as_array()
             .unwrap()
             .iter()
@@ -312,6 +344,6 @@ fn eight_peers_share_live_board_without_writes_fanout_or_extra_jobs() {
         storage::write(&path.join("protocol.json"), &summary).unwrap();
     }
     println!(
-        "communication fixture passed: peak={peak}, accepted=64, jobs=9, eight isolation denials per peer"
+        "communication fixture passed: peak={peak}, accepted=64, jobs=9, ten isolation denials per peer"
     );
 }

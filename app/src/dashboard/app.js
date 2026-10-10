@@ -35,6 +35,7 @@ let data = null,
   fetching = false,
   chatKey = "",
   chatView = "",
+  chatRoute = "",
   detailKey = "",
   inspected = "",
   focusPanel = "",
@@ -431,7 +432,12 @@ function graph(list) {
       canvas.append(
         svg("path", { d: path, class: "publish", "marker-end": "url(#pub)" }),
       );
-    if (j.context?.message_ids?.length)
+    if (
+      j.context?.message_ids?.length ||
+      allMessages.some((m) =>
+        (m.message.proposal.recipients || []).includes(j.id),
+      )
+    )
       canvas.append(
         svg("path", {
           d: `M${x2 + 4},${y2 + 4} L${x1 + 4},${y1 + 4}`,
@@ -467,15 +473,16 @@ function graph(list) {
       transform: "rotate(-25 382 205)",
     }),
     svg("text", { x: 400, y: 225 }, "水晶球"),
-    svg("text", { x: 400, y: 247 }, "公共板"),
+    svg("text", { x: 400, y: 247 }, "消息中心"),
     svg(
       "text",
       { x: 400, y: 269, class: "board-sub" },
-      `${board?.active_messages || 0} 条可用提议 / ${board?.accepted_total || 0} 条留存`,
+      `${allMessages.filter((m) => !(m.message.proposal.recipients || []).length).length} 条公共 / ${allMessages.filter((m) => (m.message.proposal.recipients || []).length).length} 条定向`,
     ),
   );
   const open = () => {
     if (focusPanel === "graph") maximize("chat");
+    chatRoute = "";
     chatKey = "";
     render();
     $("timeline").scrollTop = $("timeline").scrollHeight;
@@ -805,22 +812,100 @@ function processBlock(j, s) {
   block.append(body);
   return block;
 }
+function channelKey(record) {
+  const recipients = record.message.proposal.recipients || [];
+  if (!recipients.length) return "";
+  return JSON.stringify([
+    record.cohort_id,
+    [...new Set([record.message.task_id, ...recipients])].sort(),
+  ]);
+}
+function conversationRecords() {
+  return data.boards
+    .filter((b) => !room || b.cohort_id === room)
+    .flatMap((b) =>
+      (b.retained_messages || []).map((r) => ({
+        ...r,
+        cohort_id: b.cohort_id,
+      })),
+    );
+}
+function privateChats() {
+  const byId = new Map(data.jobs.map((j) => [j.id, j])),
+    channels = new Map();
+  for (const record of conversationRecords()) {
+    const key = channelKey(record);
+    if (!key) continue;
+    if (!channels.has(key)) {
+      const ids = [
+        ...new Set([
+          record.message.task_id,
+          ...record.message.proposal.recipients,
+        ]),
+      ].sort();
+      channels.set(key, {
+        label: ids
+          .map((id) => (byId.has(id) ? name(byId.get(id)) : id))
+          .join("、"),
+        count: 0,
+      });
+    }
+    channels.get(key).count++;
+  }
+  if (chatRoute && !channels.has(chatRoute)) chatRoute = "";
+  const root = $("private-chats"),
+    scroll = root.scrollTop;
+  root.replaceChildren();
+  $("private-count").textContent = channels.size || "";
+  for (const [key, channel] of channels) {
+    const button = el(
+      "button",
+      undefined,
+      `private-chat ${chatRoute === key ? "selected" : ""}`,
+    );
+    button.append(
+      el("span", "◈", "private-icon"),
+      el("span", channel.label, "private-name"),
+      el("small", channel.count),
+    );
+    button.title = channel.label;
+    button.addEventListener("click", () => {
+      chatRoute = key;
+      following = false;
+      render();
+    });
+    root.append(button);
+  }
+  if (!channels.size)
+    root.append(el("p", "私聊与多人会话会显示在这里", "private-empty"));
+  root.scrollTop = scroll;
+  $("chat-title").textContent = chatRoute
+    ? `◈ ${channels.get(chatRoute).label}`
+    : "# 协作群聊";
+  $("chat-title").title = chatRoute
+    ? "水晶球定向分发 · 点击返回公共群聊"
+    : "水晶球公共群聊";
+}
 function timeline(list) {
   const root = $("timeline"),
     ids = new Set(list.map((j) => j.id)),
     byId = new Map(data.jobs.map((j) => [j.id, j]));
-  const allRecords = data.boards
-    .filter((b) => !room || b.cohort_id === room)
-    .flatMap((b) => b.retained_messages || []);
+  const allRecords = conversationRecords();
   const records = allRecords
-    .filter((m) => ids.has(m.message.task_id))
+    .filter((m) => channelKey(m) === chatRoute && ids.has(m.message.task_id))
     .sort((a, b) => a.message.created_at - b.message.created_at);
   const sources = new Map(allRecords.map((m) => [m.message.id, m]));
-  const key = JSON.stringify([room, records, list.map((j) => [j.id, name(j)])]);
+  const key = JSON.stringify([
+    room,
+    chatRoute,
+    records,
+    list.map((j) => [j.id, name(j)]),
+  ]);
   if (key === chatKey) return;
   chatKey = key;
-  const changedView = room !== chatView;
-  chatView = room;
+  const view = `${room}:${chatRoute}`;
+  const changedView = view !== chatView;
+  chatView = view;
   const bottom = root.scrollHeight - root.clientHeight - root.scrollTop < 80,
     scroll = root.scrollTop;
   root.replaceChildren();
@@ -847,7 +932,16 @@ function timeline(list) {
       bubble.append(el("p", "这条消息已撤销。", "withdrawn-message"));
       bubble.title = record.origin.reason || "";
     } else {
-      if (p.reply_to) {
+      if (p.recipients?.length) {
+        for (const id of p.recipients) {
+          const recipient = byId.get(id);
+          bubble.append(
+            recipient
+              ? mention(recipient)
+              : el("span", `@${id}`, "mention unavailable"),
+          );
+        }
+      } else if (p.reply_to) {
         const parent = sources.get(p.reply_to),
           recipient = byId.get(parent?.message.task_id);
         if (recipient) bubble.append(mention(recipient));
@@ -902,6 +996,7 @@ function rooms() {
       room = id;
       inspected = "";
       following = false;
+      chatRoute = "";
       chatKey = "";
       render();
     });
@@ -917,6 +1012,7 @@ function render() {
     all = cohortJobs();
   if (!list.some((j) => j.id === selected)) selected = list[0]?.id || "";
   rooms();
+  privateChats();
   const group = data.jobs.find((j) => j.cohort_id === room);
   $("room-title").textContent = room
     ? "# " + (group?.team || short(room))
@@ -1113,6 +1209,7 @@ $("search").addEventListener("input", render);
 $("state").addEventListener("change", render);
 $("refresh").addEventListener("click", refresh);
 $("latest-room").addEventListener("click", () => {
+  chatRoute = "";
   following = true;
   if (data) accept(data);
 });
@@ -1125,6 +1222,10 @@ $("view-chat").addEventListener("click", () => {
   document.body.classList.add("chat-only");
   $("view-chat").classList.add("active");
   $("view-map").classList.remove("active");
+});
+$("chat-title").addEventListener("click", () => {
+  chatRoute = "";
+  render();
 });
 $("close-session").addEventListener("click", closeSession);
 $("session-window").addEventListener("cancel", (e) => {

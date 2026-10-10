@@ -36,7 +36,8 @@ pub fn wrap_agent(
 }
 
 /// Host-selected access, never supplied by a backend result. Views must be exact
-/// exported cohort directories; controller authority is not mountable here.
+/// public cohort directories or this run's inbox; controller authority and other
+/// runs' inboxes are not mountable here.
 #[derive(Debug, Clone)]
 pub struct AgentAccess {
     pub codex_credentials: bool,
@@ -382,17 +383,27 @@ fn wrap_with_host(
     }
     for view in &host.access.read_only_views {
         let view = checked_directory(view)?;
-        let name = view
-            .file_name()
-            .and_then(|v| v.to_str())
-            .context("invalid cohort view")?;
+        let public_root = state.join("communication/views");
+        let inbox_root = state.join("communication/inboxes");
+        let cohort = if view.parent() == Some(public_root.as_path()) {
+            Some(view.as_path())
+        } else if logs.parent() == Some(runs.as_path())
+            && view.file_name() == logs.file_name()
+            && view.parent().and_then(Path::parent) == Some(inbox_root.as_path())
+        {
+            view.parent()
+        } else {
+            None
+        };
         ensure!(
-            view.parent() == Some(state.join("communication/views").as_path())
-                && name.len() == 64
-                && name
-                    .bytes()
-                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
-            "read-only view must be an exact exported cohort directory"
+            cohort
+                .and_then(Path::file_name)
+                .and_then(|v| v.to_str())
+                .is_some_and(|name| name.len() == 64
+                    && name
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))),
+            "read-only view must be an exported public cohort or this run's exact inbox"
         );
         add_mount(&mut wrapped, "--ro-bind", &view, &view)?;
     }
@@ -786,6 +797,60 @@ test ! -e "$3/authority/private.json"
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn private_inbox_mount_is_limited_to_the_current_run() {
+        let (_temp, state, worktree, logs) = fixture();
+        let cohort = state.join("communication/inboxes").join("b".repeat(64));
+        let own = cohort.join("task-one");
+        let peer = cohort.join("task-two");
+        for directory in [&own, &peer] {
+            fs::create_dir_all(directory).unwrap();
+            fs::write(directory.join("board.json"), "private-proposal").unwrap();
+        }
+        let access = |view| AgentAccess {
+            codex_credentials: false,
+            env_allowlist: vec![],
+            read_only_views: vec![view],
+        };
+        let (program, args) = wrap_agent_with_access(
+            "/bin/sh",
+            &[
+                "-c".into(),
+                "set -eu; test \"$(cat \"$1/board.json\")\" = private-proposal; ! touch \"$1/forbidden\" 2>/dev/null; test ! -e \"$2/board.json\"".into(),
+                "inbox-test".into(),
+                utf8(&own).unwrap(),
+                utf8(&peer).unwrap(),
+            ],
+            &state,
+            &worktree,
+            &logs,
+            false,
+            &access(own.clone()),
+        ).unwrap();
+        let output = Command::new(program).args(args).output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let alias = cohort.join("alias");
+        std::os::unix::fs::symlink(&own, &alias).unwrap();
+        for invalid in [peer, cohort.clone(), cohort.parent().unwrap().into(), alias] {
+            assert!(
+                wrap_agent_with_access(
+                    "/bin/true",
+                    &[],
+                    &state,
+                    &worktree,
+                    &logs,
+                    false,
+                    &access(invalid)
+                )
+                .is_err()
+            );
+        }
     }
 
     #[test]
