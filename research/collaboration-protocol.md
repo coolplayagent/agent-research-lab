@@ -4,11 +4,11 @@
 
 ## 契约与对照
 
-一个实例包含两臂，每臂八个固定参与者、两轮，共 32 次有界真实模型调用。每个 slot 在两臂中的模型、视角、角色提示词版本、任务时间上限和最大 claim 数一致。第一轮全部独立分析；第二轮 baseline 只读取自己的初稿，candidate 读取自己及环上后两位参与者的已提交初稿，先寻找反例再修订。保留少数观点，不要求共识。运行器仍是调度与效果权限的唯一所有者。
+一个实例包含两臂，每臂八个固定参与者、两轮，共 32 次有界 agent 调用（Codex exec task attempts），并不等于底层模型 API 请求数；一次 agent 调用可能包含多次模型轮次、工具调用或 provider 内部重试。每个 slot 在两臂中的模型、视角、角色提示词版本、任务时间上限和最大 claim 数一致。第一轮全部独立分析；第二轮 baseline 只读取自己的初稿，candidate 读取自己及环上后两位参与者的已提交初稿，先寻找反例再修订。保留少数观点，不要求共识。运行器仍是调度与效果权限的唯一所有者。
 
 两臂均使用既有 `Task.dependencies`；运行器将工作流已确认且版本绑定正确的回执作为不可信研究证据传入。agent 不直接互相写文件或消息，不共享可变记忆。所有任务只读、`use_memory=false`、`next_tasks=[]`。不使用具备续作提案权限的 `implement` 角色。需要第三模型时由宿主在私有配置增加只读 `evaluate` 角色；harness 不改配置，不启动任务。
 
-八个 slot 存在互相依赖，**不是八个独立统计样本**。32 次调用只构成一个团队层面的 A/B pilot；也不能证明八个进程曾同时运行。并发容量应通过独立运行区间验收。相同调用数与时间上限不等于实际 token 或费用相同；轮次顺序可能影响延迟，后续独立实例应预先交替 `first_arm`。
+八个 slot 存在互相依赖，**不是八个独立统计样本**。32 次 agent 调用只构成一个团队层面的 A/B pilot；也不能证明八个进程曾同时运行。并发容量应通过独立运行区间验收。相同 agent 调用数与时间上限不等于实际 token 或费用相同；轮次顺序可能影响延迟，后续独立实例应预先交替 `first_arm`。
 
 ## 本地命令
 
@@ -20,7 +20,7 @@ agent-research-lab --config /ABS/pilot.toml collaboration plan examples/collabor
 
 `plan` 联网检查当前来源与已安装技能，冻结全部绑定、视角、问题、主假设和 DAG；注册带父版本的不可变提示词，不选择或晋级它们。重放同一计划是幂等的；来源、配置或请求变化必须使用新实验 ID。每个 task 必须实际读取声明的共同 SuperPOD 文件，引用固定 commit、路径、文件 SHA-256、行段及短原文。缺少可解析的共同知识内容引用属于协议无效，不能当成功结果。
 
-按 manifest 顺序用现有 `enqueue TASK.json` 注册 32 个任务，再由现有控制器执行。第一轮任务必须先注册，依赖才可引用；不使用自动 seed 或额外研究调用污染本次预算。任务超时、失败与无效输出保留在计划分母中；不得只挑成功任务，也不得悄悄重试增加某一臂预算。需要重试时建立新实例并说明原因。任务时间上限由控制器真实 watchdog 执行。
+按 manifest 顺序用现有 `enqueue TASK.json` 注册 32 个任务，再由现有控制器执行。第一轮任务必须先注册，依赖才可引用；使用非 continuous 的 `run --max-seconds 3600`，不传 `--seed`，执行完即退出。当前 continuous 模式即使未传 `--seed` 仍会在空闲时补充研究任务，因此不能用于此固定预算 pilot。不得用额外研究调用污染本次预算。任务超时、失败与无效输出保留在计划分母中；不得只挑成功任务，也不得悄悄重试增加某一臂预算。每个计划任务固定 `max_attempts=1`，控制器的自动、恢复及手动重试都遵守此上限；历史未指定任务保留原有三次上限。需要重试时建立新实例并说明原因。任务时间上限由控制器真实 watchdog 执行。
 
 ```sh
 agent-research-lab --config /ABS/pilot.toml collaboration collect /ABS/STATE/private/collaboration/pilot-001/manifest.json --output /ABS/STATE/private/collaboration/pilot-001/collection-001.json
@@ -33,7 +33,7 @@ agent-research-lab --config /ABS/pilot.toml collaboration collect /ABS/STATE/pri
 
 `findings` 的每个字符串承载一个 JSON claim card，格式见 [claim-card 示例](../examples/collaboration/claim-card.json)。引用使用 `task-id#claim-id`；只能引用本轮已提供的依赖，修订只能指向自己的初稿。`change`、反例关系和知识建议都只是模型提案。
 
-收集器分开记录：
+结果中 `scheduled_calls` 等 `*_calls` 指计划的 agent 调用次数，不是 provider API 请求计数。收集器分开记录：
 
 - 引用可解析性：固定 Git 对象的文件摘要、行段和短原文是否匹配。存在原文不等于支持论断。
 - 字面重复：最终 claim 经空白和大小写归一后的重复数。引用同一来源不直接算重复工作；语义重复与实际无效工作需要宿主另行核验。

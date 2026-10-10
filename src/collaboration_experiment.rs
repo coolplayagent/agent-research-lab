@@ -295,6 +295,7 @@ fn build_tasks(r: &PlanRequest, prompts: &[PromptVersion]) -> Vec<PlannedTask> {
                         repository: "superpod".into(),
                         prompt,
                         prompt_version: Some(prompts[i].version().into()),
+                        max_attempts: Some(1),
                         use_memory: false,
                         depth: 0,
                         write: false,
@@ -1063,7 +1064,7 @@ fn collect(
     let complete = metrics.values().all(|m| m.incomplete_calls == 0);
     let knowledge_proposals:Vec<_>=claims.iter().filter_map(|claim|claim.card.knowledge_update.as_ref().map(|update|json!({"status":"pending_host_review","superpod_commit":plan.inputs.repositories["superpod"].upstream.commit,"claim_id":claim.id,"claim_digest":claim.digest,"target_path":update.target_path,"proposal":update.proposal}))).collect();
     Ok(
-        json!({"schema_version":1,"protocol":PROTOCOL,"plan_digest":plan.digest,"team_pairs":1,"promotion_eligible":false,
+        json!({"schema_version":1,"protocol":PROTOCOL,"plan_digest":plan.digest,"team_pairs":1,"promotion_eligible":false,"call_unit":"planned_codex_exec_attempt",
         "complete":complete,"fully_adjudicated":complete && !claims.is_empty() && metrics.values().all(|m|m.invalid_reports==0) && claims.iter().all(|c|c.adjudication.is_some()),
         "metrics":metrics,"tasks":tasks,"claims":claims,"knowledge_proposals":knowledge_proposals,
         "limitations":["One team-level pilot; coupled slots are not independent trials.","Equal call/time ceilings do not imply equal actual tokens or cost.","Resolvable citations do not prove semantic support; host adjudications are separate.","Literal repeated claims are not measured duplicate work; semantic duplication requires host adjudication.","Worker-writable trace usage is diagnostic, not independent billing or promotion evidence.","Failures remain in the planned denominator. No automatic TrialObservation, promotion, policy change or knowledge publication."]}),
@@ -1244,6 +1245,8 @@ mod tests {
             );
             assert_eq!(a.model, b.model);
             assert_eq!(a.task.prompt_version, b.task.prompt_version);
+            assert_eq!(a.task.max_attempts, Some(1));
+            assert_eq!(b.task.max_attempts, Some(1));
             assert!(!a.task.write && !a.task.use_memory && !b.task.write && !b.task.use_memory);
         }
         let mut tampered = plan.clone();
