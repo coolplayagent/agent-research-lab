@@ -56,6 +56,34 @@ pub fn wrap_agent(
     wrap_with_host(program, args, state_dir, worktree, log_dir, write, host)
 }
 
+/// Start task-owned target services in the same namespace as Codex. Build the
+/// mounts using the actual Codex executable so its distribution/helper survives
+/// masking, then insert the trusted controller launcher before that executable.
+pub fn wrap_agent_with_launcher(
+    program: &str,
+    args: &[String],
+    state_dir: &Path,
+    worktree: &Path,
+    log_dir: &Path,
+    write: bool,
+    launcher: (&Path, &[String]),
+) -> Result<(String, Vec<String>)> {
+    let launcher_path = executable(launcher.0.to_str().context("launcher path is not UTF-8")?)?;
+    let logs = checked_directory(log_dir)?;
+    ensure!(
+        launcher_path.starts_with(&logs),
+        "target launcher must belong to this task"
+    );
+    let (bwrap, mut wrapped) = wrap_agent(program, args, state_dir, worktree, log_dir, write)?;
+    let command_start = wrapped.len() - args.len() - 1;
+    let command = wrapped.split_off(command_start);
+    wrapped.push(utf8(&launcher_path)?);
+    wrapped.extend_from_slice(launcher.1);
+    wrapped.push("--".into());
+    wrapped.extend(command);
+    Ok((bwrap, wrapped))
+}
+
 struct HostAccess {
     home: Option<PathBuf>,
     codex_home: Option<PathBuf>,
@@ -160,6 +188,10 @@ fn wrap_with_host(
         "/dev".into(),
         "--tmpfs".into(),
         "/tmp".into(),
+        "--perms".into(),
+        "1777".into(),
+        "--dir".into(),
+        "/tmp/.X11-unix".into(),
         "--tmpfs".into(),
         "/run".into(),
         "--tmpfs".into(),
@@ -193,6 +225,8 @@ fn wrap_with_host(
             ".git-credentials",
             ".gitconfig",
             ".netrc",
+            ".Xauthority",
+            ".ICEauthority",
         ] {
             mask_credentials(&mut wrapped, &host_home.join(relative))?;
         }
@@ -244,6 +278,15 @@ fn wrap_with_host(
             // uses a symlink to the actual helper executable.
             add_mount(&mut wrapped, "--ro-bind", &source, &helper)?;
         }
+    }
+    // Codex desktop distributions may put ripgrep under the masked package
+    // tree. Preserve that exact utility, just like the selected tool host.
+    if let Ok(rg) = executable("rg") {
+        ensure!(
+            !rg.starts_with(&state) || rg.starts_with(&tools),
+            "search utility cannot alias private controller state"
+        );
+        add_mount(&mut wrapped, "--ro-bind", &rg, &rg)?;
     }
     for (key, value) in host.environment {
         wrapped.extend(["--setenv".into(), key, value]);
@@ -312,6 +355,14 @@ fn sanitize_codex_config(contents: &str) -> Result<String> {
         .as_table()
         .context("Codex configuration must be a table")?;
     let mut sanitized = toml::map::Map::new();
+    sanitized.insert(
+        "approval_policy".into(),
+        crate::agent_policy::APPROVAL_POLICY.into(),
+    );
+    sanitized.insert(
+        "sandbox_mode".into(),
+        crate::agent_policy::SANDBOX_MODE.into(),
+    );
     for key in [
         "model",
         "model_provider",
@@ -560,6 +611,8 @@ mod tests {
             toml::from_str(&fs::read_to_string(logs.join("codex-home/config.toml")).unwrap())
                 .unwrap();
         assert_eq!(config["model"].as_str(), Some("test-model"));
+        assert_eq!(config["approval_policy"].as_str(), Some("never"));
+        assert_eq!(config["sandbox_mode"].as_str(), Some("danger-full-access"));
         assert!(config.get("mcp_servers").is_none());
         assert!(config.get("hooks").is_none());
         assert_eq!(

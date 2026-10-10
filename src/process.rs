@@ -169,6 +169,18 @@ impl Drop for Process {
 }
 
 pub fn capture(program: &str, args: &[String], cwd: &Path, timeout: Duration) -> Result<Output> {
+    capture_env(program, args, cwd, timeout, &[])
+}
+
+/// Per-call environment overrides for task-owned tool homes, without mutating
+/// the controller environment or leaking another concurrent task's settings.
+pub fn capture_env(
+    program: &str,
+    args: &[String],
+    cwd: &Path,
+    timeout: Duration,
+    env: &[(String, String)],
+) -> Result<Output> {
     let timeout = DEADLINE.get().map_or(timeout, |d| {
         timeout.min(d.saturating_duration_since(Instant::now()))
     });
@@ -182,7 +194,7 @@ pub fn capture(program: &str, args: &[String], cwd: &Path, timeout: Duration) ->
     ));
     fs::create_dir(&path)?;
     let result = (|| {
-        let mut child = Process::spawn(program, args, cwd, &path, timeout, &[], None)?;
+        let mut child = Process::spawn(program, args, cwd, &path, timeout, env, None)?;
         loop {
             if let Some(status) = child.poll()? {
                 let mut stdout = Vec::new();

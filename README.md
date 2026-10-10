@@ -44,8 +44,13 @@ tracked example configuration.
 
 Production defaults to `require_latest = true`. Set `skills_manifest` to a host-owned
 absolute JSON path recording all seven installed skill directories, runtime paths,
-tree/runtime SHA-256 digests, and latest release tag/ID (or the latest source commit
-when no stable release exists). The Rust types `freshness::SkillsManifest` and
+tree/runtime SHA-256 digests, and latest release tag/ID (or the latest default-branch
+source commit). If a stable release exists, installing a newer local source build
+also requires `source_qualitygate: {path, sha256}`: an immutable full, nonempty
+passing diff report at that exact source commit. Retain build provenance and label
+the installation as a development build; it is not a published release. Without
+this evidence the existing release requirement remains in force.
+The Rust types `freshness::SkillsManifest` and
 `SkillSnapshot` define the exact schema; `freshness::skill_tree_digest` defines the
 directory hash. Populate this evidence only after installing and verifying the
 actual package. Five tools provide upstream skills; the two explicitly project-owned
@@ -93,10 +98,45 @@ not establish current-version research evidence.
 | `relay-memory` | Isolated task memory, with explicit local storage |
 | `repo-sandbox` | Tasks against configured execution environments |
 
-Computer Use and repo-sandbox need their own configured, working targets. A
-successful `--help` or version probe does not prove a browser, desktop or remote
-sandbox is ready. Missing declared tools block the affected task. This controller
-does not create personal desktop sessions or provision remote infrastructure.
+The controller can prepare disposable local targets without personal desktop or
+remote-machine configuration. On Ubuntu, `targets prepare` downloads authenticated
+APT packages into `.lab/tools/desktop`; it needs no sudo and does not install system
+packages. The real desktop uses Xvfb, Openbox and an owned GTK input application.
+Every computer research task gets a separate display, authority cookie and output
+directory. The controller first observes its unique window; agents can then use
+the installed computer-use CLI and compare inputs with actual GTK event receipts.
+
+The repo-sandbox local provider uses host tools and creates a real Bubblewrap
+namespace for each execution. Its durable session records a workspace and reports
+`ready`; it does not represent a running Docker container or persistent service.
+The controller runs `target install`, `dev up/exec/status/down` with a private
+registry and verifies an actual workspace write. This happens on the host because
+some AppArmor policies forbid nested user namespaces inside an agent. Models get
+the retained evidence and can inspect the private registry. WSL/VM targets remain
+available through repo-sandbox for experiments needing those semantics.
+
+```sh
+bazel-bin/agent-research-lab --config local.toml targets prepare
+bazel-bin/agent-research-lab --config local.toml targets verify --kind all
+bazel-bin/agent-research-lab --config local.toml targets status
+bazel-bin/agent-research-lab --config local.toml targets agent-check
+```
+
+`targets verify` requires the local-provider repo-sandbox build; an older runtime
+fails visibly instead of treating help output as readiness. Preparation is bounded
+and resumable. Missing prerequisites produce actionable errors while unrelated
+research continues. Real verification logs and screenshots stay under `.lab/runs`.
+`targets agent-check` makes a bounded live call with the configured review model
+through the production target launcher and checks actual tool events and a PNG.
+It consumes provider usage and verifies transport, not independent model quality.
+
+All controller-owned Codex workers and model probes explicitly use
+`approval_policy = "never"` and `sandbox_mode = "danger-full-access"` (all approved).
+Each attempt records these arguments in `agent-permissions.json`. The controller
+owns the three-agent limit and disables nested Codex agents. The outer mount/PID
+boundary still keeps host credentials, other attempts and evaluation holdouts
+private. OS permission errors need target or namespace diagnosis; an approval flag
+cannot grant missing kernel privileges.
 
 ```sh
 bazel-bin/agent-research-lab --config local.toml doctor
@@ -121,7 +161,7 @@ bazel-bin/agent-research-lab --config local.toml report
 `enqueue` binds a task ID to its inputs, source commit, SuperPOD commit, prompt and
 configuration. Reusing an ID with different inputs is rejected. Each task gets an
 isolated worktree; dependencies receive validated completed reports. `write: false`
-is the default. `required_tools` declares admission prerequisites; `use_memory`
+is the default. `required_tools` declares admission prerequisites (also supported on follow-up proposals); `use_memory`
 enables task-local relay-memory. Memory retains a bounded result checkpoint and
 immutable receipt references; full source/skill snapshots stay in the private
 receipt. An explicit `prompt_version` selects a registered

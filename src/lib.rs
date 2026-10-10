@@ -1,3 +1,4 @@
+pub mod agent_policy;
 pub mod automation;
 pub mod budget;
 pub mod config;
@@ -12,4 +13,5 @@ pub mod lease_heartbeat;
 pub mod process;
 pub mod runtime;
 pub mod storage;
+pub mod targets;
 pub mod workflow;
