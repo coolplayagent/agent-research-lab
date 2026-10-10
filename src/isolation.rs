@@ -293,6 +293,8 @@ fn wrap_with_host(
     }
     for (key, value) in [
         ("HOME", home),
+        ("CARGO_HOME", logs.join("home/.cargo")),
+        ("CARGO_TARGET_DIR", logs.join("cache/cargo-target")),
         ("CODEX_HOME", codex_home),
         ("RELAY_MEMORY_HOME", logs.join("memory")),
         ("RELAY_KNOWLEDGE_HOME", logs.join("knowledge-index")),
@@ -305,6 +307,13 @@ fn wrap_with_host(
     for key in ["TMPDIR", "TMP", "TEMP"] {
         wrapped.extend(["--setenv".into(), key.into(), "/tmp".into()]);
     }
+    // A different download URL must not invalidate an identical, checksum-
+    // verified archive. The task still owns every mutable cache/lock file.
+    wrapped.extend([
+        "--setenv".into(),
+        "BAZEL_HTTP_RULES_URLS_AS_DEFAULT_CANONICAL_ID".into(),
+        "0".into(),
+    ]);
     wrapped.extend([
         "--chdir".into(),
         utf8(&worktree)?,

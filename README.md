@@ -334,3 +334,26 @@ Live workflow protocol tests are separately opt-in via `LAB_WORKFLOW_BIN`; their
 ignored status is not evidence that a remote service or model has passed. Formal
 delivery additionally requires a complete full Qualitygate check of the final
 snapshot. GitHub Actions runs the Bazel build/tests and Rust formatting/lint checks.
+
+Build tasks (write tasks or tasks explicitly requiring `qualitygate-cli`) seed
+private dependency caches before claiming an attempt, in an idle host budget
+window. Cargo imports only locked crates.io archives and their public sparse
+index entries. Bazel imports hashes reachable from the frozen lockfiles and
+checksum-verified registry and Rust/Python rule metadata. Each archive is verified again;
+no credentials, host lockfiles, extracted repositories or writable hardlinks are
+shared. Missing cache entries remain explicit in `build-cache-seed.json` and may
+still require working network access. The marker records preparation, not a
+passing build or gate. Limits apply to both copied and reused files (4096 files,
+2 GiB total, 512 MiB per file); deadline exhaustion resumes without a claim.
+
+Task build caches accumulate independently. Once an attempt is terminal and no
+worker or reconciliation uses it, its `runs/<run-id>/cache` and
+`runs/<run-id>/home/.cargo` directories may be removed. Retain the seed report,
+process logs, receipts, target evidence and worktree until their retention policy
+allows removal. The controller does not automatically delete these artifacts.
+
+The real cache integration probe keeps the production namespace boundary and
+requires offline Clippy plus Bazel build/package with repository downloads
+disabled. Full controller tests run in the trusted host gate: their isolation
+regressions create new namespaces, which the agent's outer `--disable-userns`
+boundary intentionally denies. An inner test failure is not a passing host gate.
