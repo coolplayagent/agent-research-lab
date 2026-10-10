@@ -63,8 +63,10 @@ fn desktop_arguments(c: &Config, output: &Path) -> Vec<String> {
     ]
 }
 
-/// Codex and its owned display share one task namespace. No host desktop socket
-/// or session bus is exposed, and the worker lifetime bounds every target child.
+/// Codex and its owned display share one task namespace. Desktop environment
+/// variables refer only to the owned target; no host display socket is mounted.
+/// API networking remains shared, so this is not network-level X11 isolation.
+/// The worker lifetime bounds every target child.
 pub fn wrap_desktop_agent(
     c: &Config,
     worktree: &Path,
