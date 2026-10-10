@@ -6,6 +6,7 @@ version = 4
 name = "agent-research-lab"
 version = "0.1.0"
 dependencies = [
+ "ai-im",
  "anyhow",
  "async-stream",
  "axum",
@@ -41,6 +42,22 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
+]
+
+[[package]]
+name = "ai-im"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "axum",
+ "clap",
+ "lab-crystal",
+ "lab-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -742,7 +759,6 @@ name = "lab-crystal"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "lab-config",
  "lab-storage",
  "rusqlite",
  "serde",

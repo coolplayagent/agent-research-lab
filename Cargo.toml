@@ -31,6 +31,7 @@ automation = { package = "lab-automation", path = "crates/automation" }
 budget = { package = "lab-budget", path = "crates/budget" }
 build_cache = { package = "lab-build-cache", path = "crates/build-cache" }
 collaboration_experiment = { package = "lab-collaboration-experiment", path = "crates/collaboration-experiment" }
+im_service = { package = "ai-im", path = "crates/im-service" }
 crystal = { package = "lab-crystal", path = "crates/crystal" }
 communication = { package = "lab-communication", path = "crates/communication" }
 config = { package = "lab-config", path = "crates/config" }

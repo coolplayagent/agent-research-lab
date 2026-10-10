@@ -1,6 +1,6 @@
 //! Operator control surface; stable people are registered by the authoritative directory.
 use super::transport::{Web, body, boundary, error, intent, json_response};
-use super::*;
+use crate::*;
 use axum::{
     extract::{Query, Request, State},
     http::HeaderMap,
@@ -14,6 +14,22 @@ use std::convert::Infallible;
 #[derive(Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 enum Change {
+    Person {
+        person: crystal::Person,
+    },
+    Send {
+        message: crystal::Publish,
+    },
+    Convert {
+        group_id: String,
+        revision: u64,
+        title: String,
+    },
+    Fork {
+        source: String,
+        group: crystal::NewGroup,
+        history_from: Option<u64>,
+    },
     Create {
         group: crystal::NewGroup,
     },
@@ -34,25 +50,22 @@ enum Change {
         lifetime_seconds: u64,
     },
 }
-async fn register(web: &Web) -> Result<()> {
-    let config = web
-        .config
-        .clone()
-        .context("identity directory unavailable")?;
-    let people = tokio::task::spawn_blocking(move || runtime::people::directory(&config)).await??;
-    web.hub
-        .register(people.people.keys().cloned().collect())
-        .await
-}
-pub(super) async fn manage(State(web): State<Web>, request: Request) -> Response {
+pub async fn manage(State(web): State<Web>, request: Request) -> Response {
     let result=async{
         intent(request.headers(),web.addr,"manage-crystal")?;
         let _permit=web.reads.clone().try_acquire_owned().context("management backpressure")?;
         let change:Change=serde_json::from_slice(&body(request,512*1024).await?)?;
         // This is a host control boundary, never accepted from a coding-agent grant.
-        register(&web).await?;
+
         match change {
-            Change::Create{group}=>Ok(json!(web.hub.create_group(group).await?)),
+            Change::Person { person } => { ensure!(person.id != "operator", "operator identity is reserved"); web.hub.save_person(person).await?; Ok(json!({"saved":true})) },
+            Change::Send { message } => Ok(json!(web.hub.publish_as("operator", message).await?)),
+            Change::Convert { group_id, revision, title } => Ok(json!(web.hub.convert(&group_id, revision, title).await?)),
+            Change::Fork { source, group, history_from } => Ok(json!(web.hub.fork(&source, group, history_from).await?)),
+            Change::Create{mut group}=>{
+                if !group.members.iter().any(|m| m == "operator") { group.members.push("operator".into()); }
+                Ok(json!(web.hub.create_group(group).await?))
+            },
             Change::Update{change}=>{web.hub.update_group(change).await?;Ok(json!({"updated":true}))},
             Change::Membership{group_id,person_id,add}=>{web.hub.membership(&group_id,&person_id,add).await?;Ok(json!({"updated":true}))},
             Change::Presence{person_id,state}=>{web.hub.set_presence(&person_id,state).await?;Ok(json!(web.hub.presence(&person_id)?))},
@@ -62,7 +75,7 @@ pub(super) async fn manage(State(web): State<Web>, request: Request) -> Response
     json_response(result)
 }
 #[derive(Deserialize, Default)]
-pub(super) struct View {
+pub struct View {
     #[serde(default)]
     group_id: String,
     #[serde(default)]
@@ -73,48 +86,18 @@ pub(super) struct View {
     sequence: u64,
     before: Option<u64>,
 }
-// Existing evidence-bound run boards remain behind the same observation API.
-// Their bounded protocol is immutable; it is never replayed into a new agent inbox.
-fn frozen_catalog(web: &Web) -> Value {
-    let snapshot = web.snapshot.read().unwrap();
-    let mut groups = BTreeMap::<String, Value>::new();
-    for job in snapshot["jobs"].as_array().into_iter().flatten() {
-        if let Some(id) = job["cohort_id"].as_str() {
-            groups.entry(id.into()).or_insert_with(||json!({"id":format!("run_{id}"),"cohort_id":id,"title":job["team"],"topics":job["topics"],"kind":"frozen_run","managed_by":"research_controller"}));
-        }
-    }
-    json!(groups.into_values().collect::<Vec<_>>())
-}
-fn frozen_view(web: &Web, id: &str) -> Result<Value> {
-    ensure!(
-        id.len() == 64 && id.bytes().all(|b| b.is_ascii_hexdigit()),
-        "invalid frozen run channel"
-    );
-    let snapshot = web.snapshot.read().unwrap();
-    let board = snapshot["boards"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|board| board["cohort_id"] == id)
-        .context("frozen channel unavailable in current observer window")?;
-    Ok(
-        json!({"kind":"frozen_run","id":format!("run_{id}"),"board":board,"authority":"host_frozen_experiment_protocol","replay_to_new_conversation":false}),
-    )
-}
-
-pub(super) async fn view(
+pub async fn view(
     State(web): State<Web>,
     headers: HeaderMap,
     Query(query): Query<View>,
 ) -> Response {
     let result=async{boundary(&headers,web.addr)?;
-        if let Some(id)=query.group_id.strip_prefix("run_"){return frozen_view(&web,id);}
-        if query.group_id.is_empty(){return Ok(json!({"metrics":web.hub.metrics(),"directory":web.hub.groups(&query.after,&query.query,100)?,"frozen_groups":frozen_catalog(&web)}));}
+        if query.group_id.is_empty(){return Ok(json!({"metrics":web.hub.metrics(),"directory":web.hub.groups(&query.after,&query.query,100)?}));}
         Ok(json!({"group":web.hub.group(&query.group_id)?,"members":web.hub.members(&query.group_id,&query.after,100)?,"messages":if query.before.is_some() || query.sequence==0 { web.hub.history_before(&query.group_id, query.before.unwrap_or(i64::MAX as u64),128).await? } else { web.hub.history(&query.group_id,query.sequence,128).await? }}))
     }.await;
     json_response(result)
 }
-pub(super) async fn events(
+pub async fn events(
     State(web): State<Web>,
     headers: HeaderMap,
     Query(query): Query<View>,

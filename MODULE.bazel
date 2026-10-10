@@ -16,3 +16,20 @@ crate.from_cargo(
     manifests = ["//:Cargo.toml"],
 )
 use_repo(crate, "crates")
+
+# Pinned frontend toolchain; release packages embed precompiled ES modules.
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "im_node",
+    urls = ["https://nodejs.org/dist/v22.22.1/node-v22.22.1-linux-x64.tar.xz"],
+    sha256 = "9a6bc82f9b491279147219f6a18add1e18424dce90d41d2a5fcd69d4924ba3aa",
+    strip_prefix = "node-v22.22.1-linux-x64",
+    build_file_content = 'exports_files(["bin/node"], visibility = ["//visibility:public"])',
+)
+http_archive(
+    name = "im_typescript",
+    urls = ["https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz"],
+    sha256 = "10e108c9cf7d5f2879053dff18515fb405abf2ccef63eaaf017d9c571687a1d3",
+    strip_prefix = "package",
+    build_file_content = 'exports_files(["bin/tsc"], visibility = ["//visibility:public"])\nfilegroup(name="compiler", srcs=glob(["lib/**", "bin/**"]), visibility=["//visibility:public"])',
+)

@@ -82,7 +82,7 @@ fn publish_batch(store: &mut Store, shared: &Shared, batch: Vec<Command>) {
                         "communication credential revoked or expired before commit"
                     );
                 }
-                store::append(&tx, actor, input, &mut remaining)
+                store::append(&tx, actor, input, &mut remaining, credential.is_none())
             })();
             if result.as_ref().err().is_some_and(storage_fault) {
                 return Err(result.unwrap_err());
@@ -158,6 +158,31 @@ fn publish_batch(store: &mut Store, shared: &Shared, batch: Vec<Command>) {
 }
 fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
     let result = match op {
+        Control::Goal(command) => {
+            let read = matches!(&command, crate::goals::GoalCommand::List { .. });
+            let result = store.goal_command(command)?;
+            if read {
+                return Ok(result);
+            }
+            let group = result["input"]["group_id"]
+                .as_str()
+                .context("goal group missing")?;
+            let after = shared
+                .catalog
+                .read()
+                .unwrap()
+                .groups
+                .get(group)
+                .map_or(0, |g| g.last_sequence);
+            let messages = store.history(group, after, 2)?;
+            *shared.catalog.write().unwrap() = store.catalog()?;
+            for message in messages {
+                if let Some(feed) = shared.feeds.lock().unwrap().get(group) {
+                    let _ = feed.send(Arc::new(message));
+                }
+            }
+            result
+        }
         #[cfg(test)]
         Control::ReadOnlyFault => {
             store.connection.execute_batch("PRAGMA query_only=ON")?;
@@ -167,9 +192,47 @@ fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
             store.register(&actors)?;
             let mut catalog = shared.catalog.write().unwrap();
             for actor in actors {
+                catalog.people.entry(actor.clone()).or_insert(Person {
+                    id: actor.clone(),
+                    name: actor.clone(),
+                    application_id: None,
+                });
                 catalog.actors.entry(actor).or_insert(Presence::Online);
             }
             json!({"registered":true})
+        }
+        Control::Person(person) => {
+            store.save_person(&person)?;
+            let mut catalog = shared.catalog.write().unwrap();
+            catalog
+                .actors
+                .entry(person.id.clone())
+                .or_insert(Presence::Online);
+            catalog.people.insert(person.id.clone(), person);
+            json!({"saved":true})
+        }
+        Control::Convert {
+            group,
+            revision,
+            title,
+        } => {
+            store.convert(&group, revision, &title)?;
+            let mut catalog = shared.catalog.write().unwrap();
+            let result = catalog.groups.get_mut(&group).context("unknown group")?;
+            result.kind = GroupKind::Conversation;
+            result.private = false;
+            result.title = title;
+            result.revision += 1;
+            json!(result)
+        }
+        Control::Fork {
+            source,
+            group,
+            history_from,
+        } => {
+            store.fork(&source, &group, history_from)?;
+            *shared.catalog.write().unwrap() = store.catalog()?;
+            json!(shared.catalog.read().unwrap().groups[&group.id])
         }
         Control::Create(group) => {
             let result = store.create_group(&group)?;

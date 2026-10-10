@@ -19,7 +19,15 @@ pub fn now_ms() -> u64 {
         .as_millis() as u64
 }
 pub fn id(value: &str) -> Result<()> {
-    config::safe_id(value)
+    ensure!(
+        !value.is_empty()
+            && value.len() <= 100
+            && value
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_'),
+        "identifier must be 1..100 ASCII letters, digits, underscores or hyphens"
+    );
+    Ok(())
 }
 pub fn text(value: &str, max: usize) -> Result<()> {
     ensure!(
@@ -56,6 +64,41 @@ impl Presence {
         Ok(serde_json::from_value(serde_json::Value::String(s.into()))?)
     }
 }
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GroupKind {
+    #[default]
+    Conversation,
+    Temporary,
+    Board,
+}
+impl GroupKind {
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            Self::Conversation => "conversation",
+            Self::Temporary => "temporary",
+            Self::Board => "board",
+        }
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Person {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub application_id: Option<String>,
+}
+impl Person {
+    pub fn validate(&self) -> Result<()> {
+        id(&self.id)?;
+        text(&self.name, 256)?;
+        if let Some(application) = &self.application_id {
+            id(application)?;
+        }
+        Ok(())
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Group {
@@ -63,6 +106,8 @@ pub struct Group {
     pub title: String,
     pub topic: String,
     pub private: bool,
+    #[serde(default)]
+    pub kind: GroupKind,
     pub archived: bool,
     pub pinned: bool,
     pub revision: u64,
@@ -78,6 +123,8 @@ pub struct NewGroup {
     pub topic: String,
     #[serde(default)]
     pub private: bool,
+    #[serde(default)]
+    pub kind: GroupKind,
     pub members: Vec<String>,
 }
 impl NewGroup {
@@ -85,6 +132,14 @@ impl NewGroup {
         id(&self.id)?;
         text(&self.title, 256)?;
         text(&self.topic, 2048)?;
+        ensure!(
+            self.kind != GroupKind::Temporary || self.private,
+            "temporary conversations must have a private audience"
+        );
+        ensure!(
+            self.kind != GroupKind::Board || !self.private,
+            "boards use managed group membership"
+        );
         ensure!(
             !self.members.is_empty() && self.members.len() <= MAX_MEMBERS,
             "group requires 1..20000 digital people"

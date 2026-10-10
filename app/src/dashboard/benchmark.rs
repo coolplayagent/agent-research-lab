@@ -214,6 +214,7 @@ async fn exercise(
             title: format!("研究群 {i}"),
             topic: "性能实验：真实网络与持久日志".into(),
             private: false,
+            kind: Default::default(),
             members: if mode == "mixed" {
                 vec![actors[i].clone(), actors[(i + 1) % people].clone()]
             } else {

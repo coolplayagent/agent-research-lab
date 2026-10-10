@@ -16,6 +16,7 @@ async fn setup(hub: &Hub) -> String {
         title: "共同研究".into(),
         topic: "检验协作是否产生新假设".into(),
         private: true,
+        kind: Default::default(),
         members: vec!["lumen".into(), "cedar".into()],
     })
     .await
@@ -134,6 +135,7 @@ async fn control_transactions_roll_back_and_archives_keep_readable_history() {
             title: "t".into(),
             topic: "t".into(),
             private: false,
+            kind: Default::default(),
             members: vec!["missing".into()]
         })
         .await
@@ -211,6 +213,7 @@ async fn pinning_orders_all_pages_and_revision_conflicts_cannot_overwrite() {
             title: id.into(),
             topic: "t".into(),
             private: false,
+            kind: Default::default(),
             members: vec!["lumen".into()],
         })
         .await

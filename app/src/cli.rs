@@ -4,11 +4,11 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(
     version,
-    about = "Evidence-driven AI-SDLC research; knowledge in SuperPOD"
+    about = "AI-IM multi-agent collaboration; research is a group task scenario"
 )]
 pub(crate) struct Cli {
-    #[arg(long, global = true, default_value = "local.toml")]
-    pub(crate) config: PathBuf,
+    #[arg(long, global = true)]
+    pub(crate) config: Option<PathBuf>,
     #[command(subcommand)]
     pub(crate) command: Commands,
 }
@@ -28,9 +28,14 @@ pub(crate) enum Commands {
         rate: usize,
     },
     /// Print the host-only browser bootstrap link from masked controller state.
-    ServeLink,
-    /// Serve the local research dashboard and digital-person settings alongside the controller.
+    ServeLink {
+        #[arg(long)]
+        state_dir: Option<PathBuf>,
+    },
+    /// Serve AI-IM groups and goals. --config enables the optional research scenario.
     Serve {
+        #[arg(long)]
+        state_dir: Option<PathBuf>,
         #[arg(long, default_value = "127.0.0.1:8090")]
         listen: std::net::SocketAddr,
         /// Bound this observer's lifetime independently from the research controller.

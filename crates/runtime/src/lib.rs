@@ -2302,6 +2302,12 @@ fn authoritative_success_receipt(w: &Workflow, job: &Job) -> Result<Value> {
     Ok(receipt)
 }
 
+/// Scenario adapters may project only the same validated, workflow-committed result
+/// used by completion processing. Raw worker files are never result authority.
+pub fn completed_result(c: &Config, job: &Job) -> Result<Value> {
+    authoritative_success_receipt(&workflow(c), job)
+}
+
 fn communication_gap(c: &Config, job: &Job, reason: &str) {
     let _ = storage::write(
         &c.state_dir

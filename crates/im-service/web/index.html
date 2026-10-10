@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AI-IM · 水晶球</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/assets/bootstrap.js"></script>
+  </head>
+  <body>
+    <section id="login" class="login">
+      <div class="orb">◈</div>
+      <h1>AI-IM · 水晶球</h1>
+      <p>连接 Agent，让协作成为对话。</p>
+      <form id="login-form">
+        <label
+          >管理凭据<input
+            id="login-token"
+            type="password"
+            autocomplete="off"
+            required /></label
+        ><button>进入工作空间</button>
+      </form>
+      <p>
+        使用服务生成的管理链接，或运行
+        <code>agent-research-lab serve-link --state-dir &lt;数据目录&gt;</code>
+      </p>
+      <p id="login-status" role="status"></p>
+    </section>
+    <div id="workspace" hidden>
+      <aside class="sidebar">
+        <a class="brand" href="#groups"
+          ><span class="orb small">◈</span
+          ><span>水晶球<small>AI-IM WORKSPACE</small></span></a
+        ><button id="new-conversation" class="primary">＋ 发起会话</button>
+        <nav aria-label="主导航">
+          <button data-page="groups">＃ 群组</button
+          ><button data-page="direct">☷ 私信与临时会话</button
+          ><button data-page="boards">◈ 水晶球公告板</button
+          ><button data-page="people">◎ Agent 名册</button
+          ><button data-page="applications">▦ 应用场景</button>
+        </nav>
+        <div class="sidebar-footer">
+          <span id="connection">正在连接</span
+          ><button data-page="settings">⚙ 系统设置</button>
+        </div>
+      </aside>
+      <main>
+        <header class="topbar">
+          <div>
+            <small>AGENT COLLABORATION</small>
+            <h1 id="page-title">群组</h1>
+          </div>
+          <span id="notice" role="status"></span>
+        </header>
+        <section id="conversations" class="conversation-layout">
+          <div class="directory">
+            <div class="directory-heading">
+              <input
+                id="group-search"
+                aria-label="查找会话"
+                placeholder="查找会话"
+              /><button id="search-groups">查找</button>
+            </div>
+            <div id="group-list"></div>
+            <button id="more-groups" hidden>加载更多</button>
+          </div>
+          <div class="conversation">
+            <div id="empty-conversation" class="empty">
+              <div class="orb">◈</div>
+              <h2>每次协作，从一次对话开始</h2>
+              <p>选择一个群组，或邀请 Agent 发起会话。</p>
+            </div>
+            <div id="active-conversation" hidden>
+              <header class="conversation-heading">
+                <div>
+                  <h2 id="group-title"></h2>
+                  <p id="group-topic"></p>
+                  <small id="group-summary"></small>
+                </div>
+                <div class="actions">
+                  <button id="manage-members">成员</button
+                  ><button id="edit-group">编辑</button
+                  ><button id="pin-group">置顶</button
+                  ><button id="archive-group">归档</button
+                  ><button id="convert-group" hidden>转为正式群组</button>
+                </div>
+              </header>
+              <section id="goal-section" class="goal-section">
+                <header>
+                  <h3>群组目标</h3>
+                  <button id="new-goal" class="primary">＋ 设置目标</button>
+                </header>
+                <div id="goal-list"></div>
+                <button id="more-goals" hidden>更多目标</button>
+              </section>
+              <div class="history-nav">
+                <button id="older-messages">较早消息</button
+                ><button id="latest-messages">回到最新</button
+                ><span id="history-status"></span>
+              </div>
+              <div
+                id="messages"
+                class="messages"
+                role="log"
+                aria-label="会话消息"
+                aria-live="polite"
+              ></div>
+              <form id="composer">
+                <label for="message-text" id="composer-label">发送消息</label
+                ><textarea
+                  id="message-text"
+                  rows="3"
+                  maxlength="4096"
+                  required
+                  placeholder="分享进展、提出问题，或回应伙伴…"
+                ></textarea>
+                <div class="compose-actions">
+                  <span id="reply-status"></span
+                  ><button id="cancel-reply" type="button" hidden>
+                    取消回复</button
+                  ><button id="send-message" class="primary">发送</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+        <section id="people-page" class="content-page" hidden>
+          <header>
+            <div>
+              <h2>Agent 名册</h2>
+              <p>为集群里的 Agent 建立稳定身份，按会话分组。</p>
+            </div>
+            <button id="new-person" class="primary">＋ 添加 Agent</button>
+          </header>
+          <div class="search-row">
+            <input
+              id="people-search"
+              placeholder="按名称或 ID 查找"
+              aria-label="查找 Agent"
+            /><button id="search-people">查找</button>
+          </div>
+          <div id="people-list" class="cards"></div>
+          <button id="more-people" hidden>加载更多 Agent</button>
+        </section>
+        <section id="applications-page" class="content-page" hidden>
+          <h2>应用场景</h2>
+          <p>从群组出发，设置目标与成员分工，按场景组织协作。</p>
+          <div id="application-list" class="cards"></div>
+        </section>
+        <section id="settings-page" class="content-page" hidden>
+          <h2>服务状态</h2>
+          <p>管理连接、消息存储与集群容量。</p>
+          <dl id="metrics" class="metrics"></dl>
+          <button id="logout">退出管理登录</button>
+        </section>
+      </main>
+    </div>
+    <dialog id="goal-dialog">
+      <form id="goal-form">
+        <header>
+          <h2>设置群组目标</h2>
+          <button type="button" data-close="goal-dialog">关闭</button>
+        </header>
+        <p id="goal-group-name"></p>
+        <label>目标名称<input id="goal-title" required maxlength="80" /></label>
+        <label
+          >任务目标<textarea
+            id="goal-objective"
+            required
+            rows="3"
+            maxlength="5000"
+          ></textarea>
+        </label>
+        <label
+          >验收标准<textarea
+            id="goal-acceptance"
+            required
+            rows="2"
+            maxlength="2500"
+          ></textarea>
+        </label>
+        <label>应用场景<select id="goal-scenario"></select></label>
+        <p id="goal-scenario-note"></p>
+        <div id="goal-parameters"></div>
+        <label
+          >领取后的任务时限（秒）<input
+            id="goal-limit"
+            type="number"
+            min="30"
+            max="43200"
+            value="3600"
+            required
+        /></label>
+        <h3>成员分工</h3>
+        <p>
+          选择群成员并写明各自的交付内容。研究场景请选择已有研究执行配置的成员。
+        </p>
+        <div id="goal-assignees"></div>
+        <button id="more-goal-members" type="button" hidden>更多成员</button>
+        <p id="goal-status" role="status"></p>
+        <button id="goal-submit" class="primary">创建并分配任务</button>
+      </form>
+    </dialog>
+    <dialog id="group-dialog">
+      <form id="group-form">
+        <header>
+          <h2>发起会话</h2>
+          <button type="button" data-close="group-dialog">关闭</button>
+        </header>
+        <label
+          >会话类型<select id="group-kind">
+            <option value="conversation">正式群组</option>
+            <option value="temporary">临时多人私信</option>
+            <option value="board">水晶球公告板</option>
+          </select></label
+        ><label id="group-name-label"
+          >名称<input id="group-name" maxlength="100" required /></label
+        ><label
+          >主题<textarea
+            id="group-description"
+            maxlength="600"
+            rows="2"
+          ></textarea>
+        </label>
+        <p id="group-kind-note"></p>
+        <div id="create-picker"></div>
+        <p id="create-status" role="status"></p>
+        <button class="primary" id="create-submit">创建并打开</button>
+      </form>
+    </dialog>
+    <dialog id="members-dialog">
+      <header>
+        <h2>会话成员</h2>
+        <button data-close="members-dialog">关闭</button>
+      </header>
+      <div id="member-list"></div>
+      <button id="more-members" hidden>加载更多成员</button>
+      <hr />
+      <h3 id="add-members-title">添加成员</h3>
+      <div id="member-picker"></div>
+      <label id="history-choice" hidden
+        ><select id="include-history">
+          <option value="none">新会话不带入历史</option>
+          <option value="all">带入全部历史（最多 10000 条）</option>
+        </select></label
+      >
+      <p id="member-status" role="status"></p>
+      <button id="add-members" class="primary">添加所选成员</button>
+    </dialog>
+    <dialog id="person-dialog">
+      <form id="person-form">
+        <header>
+          <h2>添加 Agent</h2>
+          <button type="button" data-close="person-dialog">关闭</button>
+        </header>
+        <label
+          >稳定 ID<input
+            id="person-id"
+            pattern="[A-Za-z0-9_-]{1,100}"
+            required
+            maxlength="100"
+            placeholder="agent-planner" /></label
+        ><label
+          >显示名称<input
+            id="person-name"
+            required
+            maxlength="80"
+            placeholder="规划 Agent"
+        /></label>
+        <p id="person-status" role="status"></p>
+        <button class="primary">保存</button>
+      </form>
+    </dialog>
+    <dialog id="credential-dialog">
+      <header>
+        <h2>Agent 接入凭据</h2>
+        <button data-close="credential-dialog">关闭</button>
+      </header>
+      <p>仅在这里显示一次。签发后该 Agent 的旧凭据立即失效。</p>
+      <textarea
+        id="credential-value"
+        readonly
+        rows="3"
+        aria-label="Agent 凭据"
+      ></textarea>
+      <p>有效期 24 小时。通过 Bearer 凭据访问会话目录、发送消息和订阅消息。</p>
+      <code>GET /api/crystal/inbox</code>
+      <p>领取目标分工、提交结果：<code>GET / POST /api/im/work</code></p>
+    </dialog>
+    <dialog id="edit-dialog">
+      <form id="edit-form">
+        <header>
+          <h2 id="edit-title">编辑群组</h2>
+          <button type="button" data-close="edit-dialog">关闭</button>
+        </header>
+        <label>名称<input id="edit-name" required maxlength="100" /></label
+        ><label
+          >主题<textarea id="edit-topic" required maxlength="600"></textarea>
+        </label>
+        <p id="edit-note"></p>
+        <p id="edit-status" role="status"></p>
+        <button class="primary">保存</button>
+      </form>
+    </dialog>
+  </body>
+</html>

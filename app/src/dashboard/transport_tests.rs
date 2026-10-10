@@ -183,6 +183,7 @@ async fn network_busy_queue_reconnect_ack_and_revocation_preserve_private_delive
             title: "私聊".into(),
             topic: "共同验证".into(),
             private: true,
+            kind: Default::default(),
             members: vec!["a".into(), "b".into()],
         })
         .await

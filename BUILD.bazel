@@ -46,6 +46,7 @@ test_suite(
     tests = [
         "//app:serde_compatibility_tests",
         "//app:tests",
+        "//crates/im-service:tests",
         "//crates/agent-backend:tests",
         "//crates/agent-policy:tests",
         "//crates/automation:tests",
@@ -87,3 +88,7 @@ pkg_tar(
     mode = "0755",
     visibility = ["//visibility:public"],
 )
+
+# Minimal AI-IM core package; the main system also supports optional research scenarios.
+alias(name = "ai-im", actual = "//crates/im-service:ai-im", visibility = ["//visibility:public"])
+alias(name = "im-package", actual = "//crates/im-service:package", visibility = ["//visibility:public"])

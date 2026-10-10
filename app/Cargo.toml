@@ -3,9 +3,10 @@ name = "agent-research-lab"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Reproducible AI-SDLC and long-horizon agent research with SuperPOD"
+description = "AI-IM multi-agent collaboration with optional evidence-bound research scenarios"
 
 [dependencies]
+im_service.workspace = true
 async-stream.workspace = true
 axum.workspace = true
 crystal.workspace = true

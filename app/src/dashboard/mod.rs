@@ -24,8 +24,8 @@ mod observe;
 mod operator;
 mod personas;
 mod profiles;
+mod research_scenario;
 mod resources;
-mod rooms;
 mod sessions;
 mod transport;
 
@@ -211,6 +211,7 @@ fn snapshot(c: &Config) -> Result<Value> {
 
 type Shared = Arc<RwLock<Value>>;
 
+#[cfg(test)]
 fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
     ensure!(request.ends_with("\r\n\r\n"), "incomplete headers");
     let mut lines = request.split("\r\n");
@@ -283,6 +284,10 @@ pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<
         .worker_threads(4)
         .enable_all()
         .build()?;
+    runtime.block_on(async {
+        web.hub.register_operator().await?;
+        research_scenario::sync_people(&web.hub, Arc::new(c.clone())).await
+    })?;
     thread::scope(|scope| -> Result<()> {
         scope.spawn(|| {
             if observe::run(c, &shared, &stop, &updates).is_err() {
@@ -293,18 +298,26 @@ pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<
             }
         });
         let result = runtime.block_on(async {
+            let scenario = tokio::spawn(research_scenario::run(
+                web.hub.clone(),
+                Arc::new(c.clone()),
+                max_seconds,
+                shutdown.subscribe(),
+            ));
             let listener = tokio::net::TcpListener::from_std(listener)?;
             let halt = async move {
                 tokio::time::sleep(Duration::from_secs(max_seconds)).await;
                 shutdown.send_replace(true);
             };
-            tokio::time::timeout(
+            let served = tokio::time::timeout(
                 Duration::from_secs(max_seconds + 5),
                 axum::serve(listener, transport::router(web))
                     .with_graceful_shutdown(halt)
                     .into_future(),
             )
-            .await??;
+            .await;
+            let _ = scenario.await;
+            served??;
             Ok::<_, anyhow::Error>(())
         });
         stop.store(true, Ordering::Relaxed);
@@ -320,3 +333,6 @@ mod tests;
 
 #[cfg(test)]
 mod transport_tests;
+
+#[cfg(test)]
+mod research_scenario_tests;
