@@ -26,10 +26,44 @@ const badge = (state) =>
 const short = (s, n = 10) => (s || "").slice(0, n),
   time = (t) =>
     t ? new Date(t * 1000).toLocaleTimeString("zh-CN", { hour12: false }) : "—";
+function messageTimestamp(seconds) {
+  const date = new Date(seconds * 1000);
+  if (typeof seconds !== "number" || !Number.isFinite(date.getTime()))
+    return el("span", "时间未知", "message-time");
+  const options = {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  };
+  const stamp = el(
+    "time",
+    date.toDateString() === new Date().toDateString()
+      ? date.toLocaleTimeString("zh-CN", options)
+      : date.toLocaleString("zh-CN", {
+          ...options,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }),
+    "message-time",
+  );
+  stamp.dateTime = date.toISOString();
+  stamp.title = date.toLocaleString("zh-CN", {
+    ...options,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZoneName: "short",
+  });
+  stamp.setAttribute("aria-label", stamp.title);
+  return stamp;
+}
+const preferences = readPreferences();
 let data = null,
   room = "",
   selected = "",
-  following = true,
+  following = preferences.follow !== false,
   connected = false,
   stream,
   fetching = false,
@@ -43,14 +77,170 @@ let data = null,
   extraSession = null,
   sessionAgent = "",
   historyState = null,
-  sessionReturnFocus = null;
+  sessionReturnFocus = null,
+  snapshotError = "",
+  systemKey = "";
+const systemEntries = new Map();
 const opened = new Set(),
   profiles = new Map(),
   pulses = new Map(),
   publishPulses = new Map(),
   lastBytes = new Map();
+function readPreferences() {
+  try {
+    const value = JSON.parse(
+      localStorage.getItem("crystal-observer-preferences") || "{}",
+    );
+    return {
+      follow: value.follow !== false,
+      motion: value.motion !== false,
+      pinnedRooms: Array.isArray(value.pinnedRooms)
+        ? value.pinnedRooms.filter((x) => typeof x === "string").slice(-1000)
+        : [],
+      collapsed: Array.isArray(value.collapsed)
+        ? value.collapsed.filter((x) =>
+            ["rooms", "private", "people"].includes(x),
+          )
+        : [],
+    };
+  } catch (_) {
+    return {};
+  }
+}
+function savePreferences() {
+  try {
+    localStorage.setItem(
+      "crystal-observer-preferences",
+      JSON.stringify(preferences),
+    );
+  } catch (_) {}
+}
+function setFollowing(value) {
+  following = value;
+  preferences.follow = value;
+  savePreferences();
+}
+function roomName(id) {
+  const members = data.jobs.filter((j) => j.cohort_id === id),
+    topics = [...new Set(members.flatMap((j) => j.topics || []))],
+    titles = {
+      sdlc: "可验证自动交付",
+      memory: "跨会话记忆与恢复",
+      collaboration: "多 agent 协作边界",
+      computer: "操作与沙箱恢复",
+    };
+  return topics.length === 1
+    ? titles[topics[0]] || topics[0]
+    : members[0]?.team || short(id);
+}
+function showPage(page, focus = false) {
+  if (!["collaboration", "messages", "settings"].includes(page))
+    page = "collaboration";
+  for (const id of ["collaboration", "messages", "settings"]) {
+    $(id + "-page").hidden = id !== page;
+    if (id === page) $("nav-" + id).setAttribute("aria-current", "page");
+    else $("nav-" + id).removeAttribute("aria-current");
+  }
+  if (page !== "collaboration") {
+    if ($("session-window").open) closeSession();
+    document.body.classList.remove("profile-open");
+    if (focus) $(page + "-title").focus({ preventScroll: true });
+  }
+}
+function renderSystemMessages() {
+  const current = new Map(),
+    control = data?.controller || {};
+  if (snapshotError) current.set("snapshot-request", snapshotError);
+  if (data?.error) current.set("snapshot", String(data.error));
+  if (data && !connected)
+    current.set(
+      "connection",
+      "实时连接暂时中断，正在自动重连。页面会继续尝试获取最新快照。",
+    );
+  if (data && !control.live)
+    current.set("controller", "研究控制器离线或尚未上报状态。");
+  else if (control.stale)
+    current.set(
+      "heartbeat",
+      `控制器心跳已延迟 ${control.heartbeat_age_seconds} 秒，正在持续观察。`,
+    );
+  if (control.seed?.error)
+    current.set(
+      "seed",
+      `新研究准入受阻：${control.seed.error}${control.seed.next_attempt_at ? " · 下次检查 " + time(control.seed.next_attempt_at) : ""}`,
+    );
+  for (const warning of data?.warnings || [])
+    current.set("warning:" + warning, warning);
+  const visibleCurrent = new Map([...current].slice(0, 100));
+  const now = Date.now();
+  for (const [key, entry] of systemEntries) {
+    if (current.has(key) && !visibleCurrent.has(key)) {
+      systemEntries.delete(key);
+      continue;
+    }
+    if (entry.active && !current.has(key)) {
+      entry.active = false;
+      entry.changedAt = now;
+    }
+  }
+  for (const [key, text] of visibleCurrent) {
+    const old = systemEntries.get(key);
+    if (!old || !old.active)
+      systemEntries.set(key, { text, active: true, changedAt: now });
+    else old.text = text;
+  }
+  const entries = [...systemEntries].sort(
+    ([, a], [, b]) =>
+      Number(b.active) - Number(a.active) || b.changedAt - a.changedAt,
+  );
+  for (const [key] of entries.slice(100)) systemEntries.delete(key);
+  const active = current.size;
+  $("system-unread").hidden = !active;
+  $("system-unread").textContent = active;
+  $("system-message-count").textContent = active
+    ? `${active} 条待关注${active > 100 ? " · 显示前 100 条" : ""}`
+    : "当前无告警";
+  const key = JSON.stringify(entries.slice(0, 100));
+  if (systemKey === key) return;
+  systemKey = key;
+  const root = $("system-messages");
+  root.replaceChildren();
+  for (const [, entry] of entries.slice(0, 100)) {
+    const card = el(
+        "article",
+        undefined,
+        `system-message ${entry.active ? "active" : "resolved"}`,
+      ),
+      heading = el("div", undefined, "system-message-heading");
+    heading.append(
+      el("strong", entry.active ? "需要关注" : "已恢复"),
+      el("time", new Date(entry.changedAt).toLocaleString("zh-CN")),
+    );
+    card.append(heading, el("p", entry.text));
+    root.append(card);
+  }
+  if (!entries.length) root.append(el("div", "当前没有系统告警。", "empty"));
+}
 function role(j) {
   return j.id.startsWith("synthesis-") ? "synthesis" : j.role;
+}
+function agentPresence(j) {
+  const member = data?.boards
+    .flatMap((b) => b.members || [])
+    .find((m) => m.run_id === j.run_id);
+  const offline =
+    j.state !== "running" || !data?.controller?.live || data?.controller?.stale;
+  return {
+    state: offline ? "offline" : member?.presence?.state || "online",
+    pending: member?.presence?.pending || 0,
+  };
+}
+function presenceLabel(j) {
+  return (
+    { offline: "离线", online: "在线", chatting: "对话中", busy: "忙碌" }[
+      agentPresence(j).state
+    ] || "离线"
+  );
 }
 function name(j) {
   return j.profile?.display_name || j.id;
@@ -280,7 +470,7 @@ function renderSession(resetScroll = false) {
   }
   $("session-title").textContent = name(j);
   $("session-subtitle").textContent =
-    `${j.model} · ${labels[j.state] || j.state} · 第 ${j.attempt} 轮`;
+    `${j.model} · ${presenceLabel(j)} · 第 ${j.attempt} 轮`;
   $("session-avatar").replaceChildren(avatar(j));
   const s = state.page;
   $("session-status").textContent =
@@ -504,7 +694,7 @@ function graph(list) {
       transform: `translate(${x - 78},${y - 32})`,
       tabindex: 0,
       role: "button",
-      "aria-label": `${j.id} ${labels[j.state]}`,
+      "aria-label": `${name(j)} ${presenceLabel(j)}`,
     });
     group.append(
       svg("title", {}, j.id),
@@ -513,18 +703,18 @@ function graph(list) {
         cx: 13,
         cy: 16,
         r: 3,
-        fill:
-          j.state === "running"
-            ? "#199377"
-            : j.state === "blocked"
-              ? "#c79b56"
-              : "#b4c6c8",
+        fill: {
+          online: "#199377",
+          chatting: "#159aa4",
+          busy: "#c68a3e",
+          offline: "#a7b3b7",
+        }[agentPresence(j).state],
       }),
       svg("text", { x: 23, y: 20 }, name(j)),
       svg(
         "text",
         { x: 12, y: 37, class: "node-sub" },
-        `${roleLabel(j)} · ${j.model} · ${labels[j.state] || j.state}`,
+        `${roleLabel(j)} · ${j.model} · ${presenceLabel(j)}`,
       ),
       svg(
         "text",
@@ -551,7 +741,7 @@ function details(j) {
   const root = $("detail"),
     s = j && session(j),
     profile = j && profiles.get(j.run_id);
-  const key = JSON.stringify([j, s?.bytes, profile]);
+  const key = JSON.stringify([j, s?.bytes, profile, j && agentPresence(j)]);
   if (key === detailKey) return;
   detailKey = key;
   const scroll = root.parentElement.scrollTop;
@@ -565,14 +755,25 @@ function details(j) {
   const hero = el("div", undefined, "persona-hero"),
     title = el("div");
   title.append(el("h2", name(j)), el("code", "@" + handle(j)), badge(j.state));
+  title.append(
+    el("span", presenceLabel(j), `im-status ${agentPresence(j).state}`),
+  );
   hero.append(avatar(j), title);
   root.append(hero, el("p", `${j.model} · ${j.backend}`, "persona-model"));
+  if (agentPresence(j).pending)
+    root.append(
+      el(
+        "p",
+        `${agentPresence(j).pending} 条消息待投递；在线后继续接收。`,
+        "process-meta",
+      ),
+    );
   const inspect = el("button", "打开会话历史", "inspect-process");
   inspect.addEventListener("click", () => {
     document.body.classList.remove("profile-open");
     if (j.cohort_id !== room) {
       room = j.cohort_id || "";
-      following = false;
+      setFollowing(false);
     }
     $("search").value = "";
     $("state").value = "";
@@ -871,7 +1072,7 @@ function privateChats() {
     button.title = channel.label;
     button.addEventListener("click", () => {
       chatRoute = key;
-      following = false;
+      setFollowing(false);
       render();
     });
     root.append(button);
@@ -898,6 +1099,7 @@ function timeline(list) {
   const key = JSON.stringify([
     room,
     chatRoute,
+    new Date().toDateString(),
     records,
     list.map((j) => [j.id, name(j)]),
   ]);
@@ -955,9 +1157,30 @@ function timeline(list) {
           );
       }
       bubble.append(readable(p.text, `board-message:${m.id}`));
+      if (record.delivery?.length) {
+        const pending = record.delivery.filter((d) => d.state === "pending"),
+          expired = record.delivery.filter((d) => d.state === "expired"),
+          marker = el(
+            "span",
+            pending.length ? "◷" : expired.length ? "◌" : "✓",
+            "delivery-marker",
+          ),
+          summary = record.delivery
+            .map(
+              (d) =>
+                `${byId.has(d.task_id) ? name(byId.get(d.task_id)) : d.task_id}：${{ pending: "待投递", delivered: "已投递", expired: "已过期" }[d.state] || d.state}`,
+            )
+            .join("；");
+        marker.title = `${summary}。已投递不代表已读。`;
+        marker.setAttribute("aria-label", marker.title);
+        marker.tabIndex = 0;
+        bubble.append(marker);
+      }
       if (record.expired) bubble.title = "历史消息，已过期";
     }
-    body.append(sender, bubble);
+    const header = el("div", undefined, "message-header");
+    header.append(sender, messageTimestamp(m.created_at));
+    body.append(header, bubble);
     row.append(face, body);
     root.append(row);
   }
@@ -969,7 +1192,7 @@ function rooms() {
   const groups = new Map();
   data.jobs.forEach((j) => {
     if (j.cohort_id && !groups.has(j.cohort_id))
-      groups.set(j.cohort_id, j.team || short(j.cohort_id));
+      groups.set(j.cohort_id, roomName(j.cohort_id));
   });
   $("room-count").textContent = groups.size;
   const add = (id, label) => {
@@ -995,14 +1218,44 @@ function rooms() {
     button.addEventListener("click", () => {
       room = id;
       inspected = "";
-      following = false;
+      setFollowing(false);
       chatRoute = "";
       chatKey = "";
       render();
     });
-    container.append(button);
+    const entry = el("div", undefined, "room-entry");
+    entry.append(button);
+    if (id) {
+      const pinned = (preferences.pinnedRooms || []).includes(id),
+        pin = el(
+          "button",
+          pinned ? "★" : "☆",
+          `room-pin ${pinned ? "pinned" : ""}`,
+        );
+      pin.title = `${pinned ? "取消置顶" : "置顶"} ${label}`;
+      pin.dataset.cohort = id;
+      pin.setAttribute("aria-label", pin.title);
+      pin.setAttribute("aria-pressed", String(pinned));
+      pin.addEventListener("click", () => {
+        const pins = new Set(preferences.pinnedRooms || []);
+        if (pins.has(id)) pins.delete(id);
+        else pins.add(id);
+        preferences.pinnedRooms = [...pins].slice(-1000);
+        savePreferences();
+        rooms();
+        const buttons = container.querySelectorAll(".room-pin");
+        [...buttons]
+          .find((b) => b.dataset.cohort === id)
+          ?.focus({ preventScroll: true });
+      });
+      entry.append(pin);
+    }
+    container.append(entry);
   };
-  groups.forEach((label, id) => add(id, label));
+  const pinned = new Set(preferences.pinnedRooms || []);
+  [...groups]
+    .sort(([a], [b]) => Number(pinned.has(b)) - Number(pinned.has(a)))
+    .forEach(([id, label]) => add(id, label));
   add("", "全部历史任务");
   $("latest-room").classList.toggle("following", following);
 }
@@ -1013,10 +1266,7 @@ function render() {
   if (!list.some((j) => j.id === selected)) selected = list[0]?.id || "";
   rooms();
   privateChats();
-  const group = data.jobs.find((j) => j.cohort_id === room);
-  $("room-title").textContent = room
-    ? "# " + (group?.team || short(room))
-    : "# 全部研究记录";
+  $("room-title").textContent = room ? "# " + roomName(room) : "# 全部研究记录";
   $("room-subtitle").textContent =
     `${all.length} 个任务 · ${data.max_agents || 8} 个并发上限 · SuperPOD 公共知识库`;
   const count = (states) => all.filter((j) => states.includes(j.state)).length;
@@ -1045,32 +1295,20 @@ function render() {
       stopped: "已停止",
       unknown: "状态未上报",
     };
-  const failed = !!control.seed?.error;
-  const problems = [
-    data.error,
-    control.stale
-      ? `控制器心跳已延迟 ${control.heartbeat_age_seconds} 秒，正在持续观察。`
-      : null,
-    ...new Set(
-      (data.warnings || []).filter(
-        (w) => !room || !w.startsWith("协作组 ") || w.includes(short(room, 12)),
-      ),
-    ),
-    failed
-      ? `新研究准入受阻：${control.seed.error}${control.seed.next_attempt_at ? " · 下次检查 " + time(control.seed.next_attempt_at) : ""}`
-      : null,
-  ].filter(Boolean);
-  $("notice").hidden = !problems.length;
-  $("notice").textContent = problems.join("\n");
   $("controller-status").textContent = control.live
-    ? failed
-      ? "版本检查待恢复"
-      : phases[control.phase] || control.phase
-    : "控制器离线 / 未上报";
-  $("controller-status").classList.toggle(
-    "problem",
-    failed || !control.live || control.stale,
-  );
+    ? phases[control.phase] || control.phase
+    : "控制器离线";
+  $("setting-follow").checked = following;
+  $("setting-motion").checked = preferences.motion !== false;
+  const info = $("service-settings-info");
+  info.replaceChildren();
+  for (const [label, value] of [
+    ["服务状态", $("controller-status").textContent],
+    ["并发上限", `${data.max_agents || 8} 个数字人`],
+    ["当前任务", `${data.jobs.length} 个`],
+    ["知识库", "SuperPOD"],
+  ])
+    info.append(el("dt", label), el("dd", value));
   const rows = $("tasks");
   const scroll = rows.scrollTop;
   rows.replaceChildren();
@@ -1082,12 +1320,11 @@ function render() {
       ),
       text = el("span", name(j), "task-name");
     text.append(
-      el(
-        "small",
-        `${roleLabel(j)} · ${j.model} · ${labels[j.state] || j.state}`,
-      ),
+      el("small", `${roleLabel(j)} · ${j.model} · ${presenceLabel(j)}`),
     );
-    b.append(avatar(j), text, el("span", undefined, `presence ${j.state}`));
+    const dot = el("span", undefined, `presence ${agentPresence(j).state}`);
+    dot.title = presenceLabel(j);
+    b.append(avatar(j), text, dot);
     b.title = j.id;
     b.addEventListener("click", () => choose(j.id, true));
     rows.append(b);
@@ -1140,6 +1377,7 @@ function accept(value) {
   render();
 }
 function connection() {
+  renderSystemMessages();
   const age = data?.sampled_at
     ? Math.max(0, Math.floor(Date.now() / 1000 - data.sampled_at))
     : null;
@@ -1163,8 +1401,10 @@ async function refresh() {
       signal: AbortSignal.timeout(8000),
     });
     if (!r.ok) throw new Error("snapshot");
+    snapshotError = "";
     accept(await r.json());
   } catch (_) {
+    snapshotError = "无法获取运行快照，正在自动重试。";
     connected = false;
     connection();
   } finally {
@@ -1206,11 +1446,43 @@ document.addEventListener("keydown", (e) => {
 $("maximize-graph").addEventListener("click", () => maximize("graph"));
 $("maximize-chat").addEventListener("click", () => maximize("chat"));
 $("search").addEventListener("input", render);
+for (const page of ["collaboration", "messages", "settings"]) {
+  $("nav-" + page).addEventListener("click", () => {
+    location.hash = page;
+    showPage(page, true);
+  });
+}
+window.addEventListener("hashchange", () => showPage(location.hash.slice(1)));
+for (const id of ["rooms", "private", "people"]) {
+  const section = $("section-" + id);
+  section.open = !(preferences.collapsed || []).includes(id);
+  section.addEventListener("toggle", () => {
+    const collapsed = new Set(preferences.collapsed || []);
+    if (section.open) collapsed.delete(id);
+    else collapsed.add(id);
+    preferences.collapsed = [...collapsed];
+    savePreferences();
+  });
+}
+$("setting-follow").checked = following;
+$("setting-follow").addEventListener("change", (e) => {
+  setFollowing(e.target.checked);
+  if (following) chatRoute = "";
+  if (data) accept(data);
+});
+$("setting-motion").checked = preferences.motion !== false;
+document.body.classList.toggle("reduced-motion", preferences.motion === false);
+$("setting-motion").addEventListener("change", (e) => {
+  preferences.motion = e.target.checked;
+  document.body.classList.toggle("reduced-motion", !preferences.motion);
+  savePreferences();
+});
+showPage(location.hash.slice(1));
 $("state").addEventListener("change", render);
 $("refresh").addEventListener("click", refresh);
 $("latest-room").addEventListener("click", () => {
   chatRoute = "";
-  following = true;
+  setFollowing(true);
   if (data) accept(data);
 });
 $("view-map").addEventListener("click", () => {

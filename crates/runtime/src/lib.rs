@@ -367,12 +367,12 @@ fn seed_inputs(c: &Config) -> Result<Value> {
     ] {
         let communication = shared.then(|| multi_agent::TeamBinding {
             id: format!("research-{round}"),
-            cell: None,
+            cell: Some(topic.into()),
             topics: vec![topic.into()],
             query: String::new(),
         });
         let independent_phase = if shared {
-            "先形成独立论证，再按团队通信协议发布简短发现、质疑或反例；仅在有助于本任务时读取相关提案，保留分歧。"
+            "群聊围绕本研究议题展开。先形成独立论证，再读同伴的相关消息；有可回应的观点时，先指出对方的具体主张并接话，再给出补充、质疑、反例或追问，用 reply_to 关联原消息。不要各自重复报告而忽略同伴。尚无人发言时，以一个有依据的观察和开放问题开启讨论；独立工作后最多再读一次并回应有价值的新观点，不等待、不自动循环回复。允许发散，但说明新角度与本议题的联系，最后回到待验证的问题。保留分歧，不为达成共识而附和。"
         } else {
             "此阶段不读取其他 agent 的结论。"
         };
@@ -436,7 +436,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
                 role: "research".into(),
                 repository: "superpod".into(),
                 prompt: format!(
-                    "综合两份关于 {title} 的独立研究和质疑结果。保留少数观点、反例和未解决分歧，检查引用，提出可区分竞争假设的有界实验。未实测的能力只能登记为假设。不得以共识代替证据。基于原始分歧证据，在 next_tasks 提出最多三个有界实验或 CLI 修复任务；无充分证据时返回空数组，不制造工作。不修改文件、安装、推送或合并。正文用中文。"
+                    "综合两份关于 {title} 的独立研究和质疑结果。保留少数观点、反例和未解决分歧，检查引用，提出可区分竞争假设的有界实验。未实测的能力只能登记为假设。不得以共识代替证据。若有团队通信，先回应群里一个具体分歧或未答问题，再连接不同观点，说明哪些发散值得带回本主题；使用 reply_to 指向可回复的原消息，不另起一份与对话脱节的独白，不编造他人的回应。基于原始分歧证据，在 next_tasks 提出最多三个有界实验或 CLI 修复任务；无充分证据时返回空数组，不制造工作。不修改文件、安装、推送或合并。正文用中文。"
                 ),
                 prompt_version: None,
                 communication: communication.clone(),

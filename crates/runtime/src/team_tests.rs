@@ -102,6 +102,46 @@ print(json.dumps({'type':'communication.fixture','task':task,**observation}), fl
 "#;
 
 #[test]
+#[ignore = "real workflow; set LAB_WORKFLOW_BIN; verifies host-seeded topic membership"]
+fn seeded_research_keeps_topic_peers_in_separate_conversation_cells() {
+    let (_temp, mut c) = super::tests::scheduler_fixture();
+    c.multi_agent = Some(multi_agent::Settings {
+        shared_research: true,
+    });
+    seed_inputs(&c).unwrap();
+    let all = jobs(&c).unwrap();
+    assert_eq!(all.len(), 12);
+    let mut groups = BTreeMap::<String, Vec<&Job>>::new();
+    for job in &all {
+        let team = job.task.communication.as_ref().unwrap();
+        assert_eq!(team.topics.len(), 1);
+        assert_eq!(team.cell.as_ref(), team.topics.first());
+        groups
+            .entry(team.member(job).unwrap().cohort_id)
+            .or_default()
+            .push(job);
+    }
+    assert_eq!(groups.len(), 4);
+    for peers in groups.values() {
+        assert_eq!(peers.len(), 3);
+        let ids: BTreeSet<_> = peers.iter().map(|j| &j.task.id).collect();
+        assert_eq!(peers.iter().filter(|j| j.task.role == "review").count(), 1);
+        let synthesis = peers
+            .iter()
+            .find(|j| !j.task.dependencies.is_empty())
+            .unwrap();
+        assert_eq!(synthesis.task.dependencies.len(), 2);
+        assert!(
+            synthesis
+                .task
+                .dependencies
+                .iter()
+                .all(|id| ids.contains(id))
+        );
+    }
+}
+
+#[test]
 #[ignore = "real workflow/bwrap, explicit fake JSON bridge; set LAB_WORKFLOW_BIN; optional LAB_TEAM_EVIDENCE_DIR retains private fixture"]
 fn eight_peers_share_live_board_without_writes_fanout_or_extra_jobs() {
     let (temp, mut c) = super::tests::scheduler_fixture();
