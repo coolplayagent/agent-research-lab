@@ -14,6 +14,7 @@ rust_library(
     aliases = aliases(),
     compile_data = ["//:prompt_assets"],
     deps = [
+        "//crates/contracts:contracts",
         "//crates/agent-backend:agent_backend",
         "//crates/agent-policy:agent_policy",
         "//crates/automation:automation",
@@ -46,3 +47,5 @@ rust_test(
     proc_macro_deps = all_crate_deps(proc_macro_dev = True),
     visibility = ["//visibility:public"],
 )
+
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])

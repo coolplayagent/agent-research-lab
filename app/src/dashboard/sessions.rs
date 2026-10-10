@@ -25,11 +25,11 @@ pub(super) fn text_field(value: &Value, limit: usize) -> Value {
     .iter()
     .any(|key| lowered.contains(key))
     {
-        return json!("[包含认证字段，内容已隐藏]");
+        return json!("[redacted: authentication fields]");
     }
     let mut out: String = text.chars().take(limit).collect();
     if text.chars().count() > limit {
-        out.push_str("\n…[摘要已截断]");
+        out.push_str("\n...[truncated]");
     }
     json!(out)
 }
@@ -39,23 +39,27 @@ fn event(value: &Value, offset: u64) -> Option<Value> {
     let item = &value["item"];
     let item_type = item["type"].as_str().unwrap_or("");
     let title = match (kind, item_type) {
-        ("thread.started", _) => "Session 已建立",
-        ("turn.started", _) => "开始处理任务",
-        ("turn.completed", _) => "本轮执行结束",
-        ("turn.failed" | "error", _) => "执行报告错误",
-        ("item.started", "command_execution" | "mcp_tool_call" | "web_search") => "正在调用工具",
-        ("item.completed", "command_execution" | "mcp_tool_call" | "web_search") => "工具执行结束",
-        ("item.completed", "agent_message") => "Agent 公开消息",
-        ("item.completed", "file_change") => "文件变更记录",
+        ("thread.started", _) => contracts::SessionEventKind::SessionStarted,
+        ("turn.started", _) => contracts::SessionEventKind::TurnStarted,
+        ("turn.completed", _) => contracts::SessionEventKind::TurnCompleted,
+        ("turn.failed" | "error", _) => contracts::SessionEventKind::ExecutionError,
+        ("item.started", "command_execution" | "mcp_tool_call" | "web_search") => {
+            contracts::SessionEventKind::ToolStarted
+        }
+        ("item.completed", "command_execution" | "mcp_tool_call" | "web_search") => {
+            contracts::SessionEventKind::ToolCompleted
+        }
+        ("item.completed", "agent_message") => contracts::SessionEventKind::AgentMessage,
+        ("item.completed", "file_change") => contracts::SessionEventKind::FileChange,
         // JSON bridge adapters may emit this optional, non-authoritative telemetry.
-        ("session.activity", _) => "Agent 活动",
+        ("session.activity", _) => contracts::SessionEventKind::Activity,
         _ => return None,
     };
     Some(
         json!({"id":offset,"type":kind,"title":title,"item_type":item_type,
         "item_id":item["id"].as_str().map(|s|s.chars().take(100).collect::<String>()),
         "session_id":value["thread_id"].as_str().map(|s|s.chars().take(100).collect::<String>()),
-        "status":text_field(&item["status"],80),"exit_code":item["exit_code"].as_i64(),
+        "status":contracts::SessionItemStatus::from_value(&item["status"]).unwrap_or(contracts::SessionItemStatus::Unknown),"exit_code":item["exit_code"].as_i64(),
         "text":if item_type=="agent_message" {text_field(&item["text"],4000)} else if value["message"].is_string() {text_field(&value["message"],1000)} else {text_field(&value["error"]["message"],1000)},
         "command":text_field(&item["command"],1200),
         "output":text_field(&item["aggregated_output"],2000),
@@ -140,7 +144,7 @@ pub(super) fn page(state: &Path, run: &str, before: Option<u64>) -> Result<Value
         "modified_at":metadata.modified()?.duration_since(UNIX_EPOCH)?.as_secs(),
         "events":events,"truncated":truncated,"invalid_lines":invalid,
         "page_end":end,"next_before":(older_end > 0).then_some(older_end),
-        "notice":"stdio-json 公开事件摘要；时间为日志更新时间，原始事件未提供时间戳。"}))
+        "notice":contracts::ApiNotice::PublicEventScope.notice(json!({}))}))
 }
 
 pub(super) fn controller(state: &Path) -> Value {
@@ -152,8 +156,8 @@ pub(super) fn controller(state: &Path) -> Value {
         ensure!(bytes.len() <= 65536, "oversize status");
         Ok(serde_json::from_slice(&bytes)?)
     };
-    let mut current =
-        read_small("controller-status.json").unwrap_or_else(|_| json!({"phase":"unknown"}));
+    let mut current = read_small("controller-status.json")
+        .unwrap_or_else(|_| json!({"phase":contracts::ControllerPhase::Unknown}));
     let pid = current["pid"].as_u64().unwrap_or(0);
     let live = fs::read_to_string(format!("/proc/{pid}/stat"))
         .ok()
@@ -182,7 +186,10 @@ pub(super) fn update(c: &Config, shared: &Shared) -> bool {
         .cloned()
         .unwrap_or_default();
     let mut chosen = jobs.iter().collect::<Vec<_>>();
-    chosen.sort_by_key(|j| j["state"] != "running");
+    chosen.sort_by_key(|j| {
+        contracts::ExecutionState::from_value(&j["state"])
+            != Some(contracts::ExecutionState::Running)
+    });
     let sessions: Vec<_> = chosen
         .into_iter()
         .take(16)
@@ -234,7 +241,7 @@ mod tests {
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             let mut log = File::create(&path).unwrap();
             for index in 0..125 {
-                writeln!(log, "{}", json!({"type":"item.completed","item":{"type":"agent_message","text":format!("消息-{index}:{}", "文".repeat(padding))}})).unwrap();
+                writeln!(log, "{}", json!({"type":"item.completed","item":{"type":"agent_message","text":format!("message-{index}:{}", include_str!("fixtures/character.txt").repeat(padding))}})).unwrap();
                 writeln!(log, "{}", json!({"type":"item.completed","item":{"type":"reasoning","text":"PRIVATE_REASONING"}})).unwrap();
             }
             write!(log, "{{\"type\":\"item.completed\"").unwrap();
@@ -268,7 +275,7 @@ mod tests {
             assert!(pages > 1);
             assert_eq!(seen.len(), 125);
             for (index, text) in seen.values().enumerate() {
-                assert!(text.starts_with(&format!("消息-{index}:")));
+                assert!(text.starts_with(&format!("message-{index}:")));
             }
             let empty = page(&root, "history", Some(0)).unwrap();
             assert!(empty["events"].as_array().unwrap().is_empty());
@@ -342,11 +349,11 @@ mod tests {
         assert!(!projected.to_string().contains("PRIVATE_LEASE"));
         assert_eq!(
             event(
-                &json!({"type":"item.completed","item":{"type":"agent_message","text":"公开进度"}}),
+                &json!({"type":"item.completed","item":{"type":"agent_message","text":"Public progress"}}),
                 0
             )
             .unwrap()["text"],
-            "公开进度"
+            "Public progress"
         );
     }
 }

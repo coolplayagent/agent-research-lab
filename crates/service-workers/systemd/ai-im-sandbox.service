@@ -1,0 +1,19 @@
+[Unit]
+Description=AI-IM independent sandbox service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/ai-im-services --kind sandbox --state-dir %t/ai-im/sandbox --socket %t/ai-im/sandbox.sock --max-seconds 43200 --capacity 4
+RuntimeDirectory=ai-im
+RuntimeDirectoryPreserve=yes
+RuntimeDirectoryMode=0700
+Restart=always
+RestartSec=3
+KillMode=control-group
+TimeoutStopSec=15
+UMask=0077
+MemoryMax=8G
+TasksMax=512
+
+[Install]
+WantedBy=default.target

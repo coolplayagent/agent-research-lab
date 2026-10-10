@@ -12,6 +12,7 @@ pub(crate) struct Catalog {
     pub groups: BTreeMap<String, Group>,
     pub members: BTreeMap<String, BTreeSet<String>>,
     pub actors: BTreeMap<String, Presence>,
+    pub people: BTreeMap<String, Person>,
     pub grants: BTreeMap<String, (String, u64)>,
     pub messages: u64,
 }
@@ -41,14 +42,7 @@ impl Store {
           CREATE INDEX IF NOT EXISTS grants_expiry ON grants(expires_ms);
           CREATE TABLE IF NOT EXISTS messages(sequence INTEGER PRIMARY KEY AUTOINCREMENT,group_id TEXT NOT NULL REFERENCES groups(id),sender_id TEXT NOT NULL REFERENCES actors(id),request_id TEXT NOT NULL,text TEXT NOT NULL,reply_to INTEGER,accepted_ms INTEGER NOT NULL,UNIQUE(group_id,sender_id,request_id));
           CREATE INDEX IF NOT EXISTS room_history ON messages(group_id,sequence);")?;
-        ensure!(
-            connection.query_row(
-                "SELECT value FROM crystal_meta WHERE key='schema'",
-                [],
-                |r| r.get::<_, u64>(0)
-            )? == 1,
-            "unsupported crystal schema"
-        );
+        super::schema::migrate(&connection)?;
         ensure!(
             connection.query_row("PRAGMA synchronous", [], |r| r.get::<_, u64>(0))? == 2,
             "durable mode must remain FULL"
@@ -74,6 +68,20 @@ impl Store {
             actors.insert(id, Presence::parse(&state)?);
         }
         ensure!(actors.len() <= MAX_ACTORS, "actor capacity exceeded");
+        let mut people = BTreeMap::new();
+        let mut query = self
+            .connection
+            .prepare("SELECT id,name,application_id FROM actors ORDER BY id")?;
+        for row in query.query_map([], |r| {
+            Ok(Person {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                application_id: r.get(2)?,
+            })
+        })? {
+            let person = row?;
+            people.insert(person.id.clone(), person);
+        }
         let mut members: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         let mut query = self
             .connection
@@ -87,7 +95,7 @@ impl Store {
             "membership capacity exceeded"
         );
         let mut groups = BTreeMap::new();
-        let mut query=self.connection.prepare("SELECT id,title,topic,private,archived,pinned,revision,created_ms,last_sequence FROM groups ORDER BY id")?;
+        let mut query=self.connection.prepare("SELECT id,title,topic,private,archived,pinned,revision,created_ms,last_sequence,kind FROM groups ORDER BY id")?;
         for group in query.query_map([], |r| {
             Ok(Group {
                 id: r.get(0)?,
@@ -100,6 +108,12 @@ impl Store {
                 created_ms: r.get(7)?,
                 last_sequence: r.get(8)?,
                 member_count: 0,
+                kind: match r.get::<_, String>(9)?.as_str() {
+                    "temporary" => GroupKind::Temporary,
+                    "board" => GroupKind::Board,
+                    "conversation" => GroupKind::Conversation,
+                    _ => return Err(rusqlite::Error::InvalidQuery),
+                },
             })
         })? {
             let mut group = group?;
@@ -108,6 +122,7 @@ impl Store {
                 group.member_count <= MAX_MEMBERS,
                 "member capacity exceeded"
             );
+            members.entry(group.id.clone()).or_default();
             groups.insert(group.id.clone(), group);
         }
         ensure!(groups.len() <= MAX_GROUPS, "group capacity exceeded");
@@ -129,6 +144,7 @@ impl Store {
             .query_row("SELECT COUNT(*) FROM messages", [], |r| r.get(0))?;
         Ok(Catalog {
             actors,
+            people,
             groups,
             members,
             grants,
@@ -142,107 +158,16 @@ impl Store {
         }
         let tx = self.connection.transaction()?;
         for actor in actors {
-            tx.execute("INSERT OR IGNORE INTO actors(id) VALUES(?1)", [actor])?;
+            tx.execute(
+                "INSERT OR IGNORE INTO actors(id,name) VALUES(?1,?1)",
+                [actor],
+            )?;
         }
         ensure!(
             tx.query_row("SELECT COUNT(*) FROM actors", [], |r| r.get::<_, usize>(0))?
                 <= MAX_ACTORS,
             "actor capacity exhausted"
         );
-        tx.commit()?;
-        Ok(())
-    }
-    pub fn create_group(&mut self, group: &NewGroup) -> Result<Group> {
-        group.validate()?;
-        let tx = self.connection.transaction()?;
-        ensure!(
-            tx.query_row("SELECT COUNT(*) FROM groups", [], |r| r.get::<_, usize>(0))? < MAX_GROUPS,
-            "group capacity exhausted"
-        );
-        ensure!(
-            tx.query_row("SELECT COUNT(*) FROM members", [], |r| r.get::<_, usize>(0))?
-                + group.members.len()
-                <= MAX_MEMBERSHIPS,
-            "membership capacity exhausted"
-        );
-        let created = now_ms();
-        tx.execute(
-            "INSERT INTO groups(id,title,topic,private,created_ms) VALUES(?1,?2,?3,?4,?5)",
-            params![group.id, group.title, group.topic, group.private, created],
-        )?;
-        for actor in &group.members {
-            tx.execute(
-                "INSERT INTO members(group_id,actor_id) VALUES(?1,?2)",
-                params![group.id, actor],
-            )?;
-        }
-        tx.commit()?;
-        Ok(Group {
-            id: group.id.clone(),
-            title: group.title.clone(),
-            topic: group.topic.clone(),
-            private: group.private,
-            archived: false,
-            pinned: false,
-            revision: 1,
-            created_ms: created,
-            last_sequence: 0,
-            member_count: group.members.len(),
-        })
-    }
-    pub fn update_group(&mut self, change: &GroupChange) -> Result<()> {
-        id(&change.id)?;
-        text(&change.title, 256)?;
-        text(&change.topic, 2048)?;
-        let updated=self.connection.execute("UPDATE groups SET title=?1,topic=?2,archived=?3,pinned=?4,revision=revision+1 WHERE id=?5 AND revision=?6",params![change.title,change.topic,change.archived,change.pinned,change.id,change.revision])?;
-        ensure!(updated == 1, "group changed; refresh before editing");
-        Ok(())
-    }
-    pub fn membership(&mut self, group: &str, actor: &str, add: bool) -> Result<()> {
-        id(group)?;
-        id(actor)?;
-        let tx = self.connection.transaction()?;
-        let private: bool =
-            tx.query_row("SELECT private FROM groups WHERE id=?1", [group], |r| {
-                r.get(0)
-            })?;
-        if add {
-            let exists: bool = tx.query_row(
-                "SELECT EXISTS(SELECT 1 FROM members WHERE group_id=?1 AND actor_id=?2)",
-                params![group, actor],
-                |r| r.get(0),
-            )?;
-            ensure!(
-                !private || exists,
-                "private conversation audience is immutable; create a new conversation"
-            );
-            ensure!(
-                exists
-                    || tx.query_row(
-                        "SELECT COUNT(*) FROM members WHERE group_id=?1",
-                        [group],
-                        |r| r.get::<_, usize>(0)
-                    )? < MAX_MEMBERS,
-                "group member capacity exhausted"
-            );
-            ensure!(
-                exists
-                    || tx
-                        .query_row("SELECT COUNT(*) FROM members", [], |r| r.get::<_, usize>(0))?
-                        < MAX_MEMBERSHIPS,
-                "membership capacity exhausted"
-            );
-            tx.execute(
-                "INSERT OR IGNORE INTO members(group_id,actor_id) VALUES(?1,?2)",
-                params![group, actor],
-            )?;
-        } else {
-            tx.execute(
-                "DELETE FROM members WHERE group_id=?1 AND actor_id=?2",
-                params![group, actor],
-            )?;
-        }
-        tx.execute("UPDATE groups SET revision=revision+1 WHERE id=?1", [group])?;
         tx.commit()?;
         Ok(())
     }
@@ -274,7 +199,7 @@ impl Store {
             limit > 0 && limit <= PAGE_SIZE,
             "history page exceeds bound"
         );
-        let mut q=self.connection.prepare_cached("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms FROM messages WHERE group_id=?1 AND sequence>?2 ORDER BY sequence LIMIT ?3")?;
+        let mut q=self.connection.prepare_cached("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms,event FROM messages WHERE group_id=?1 AND sequence>?2 ORDER BY sequence LIMIT ?3")?;
         let rows = q.query_map(params![group, after, limit], message_row)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
@@ -284,7 +209,7 @@ impl Store {
             "history page exceeds bound"
         );
         let before = before.min(i64::MAX as u64);
-        let mut q=self.connection.prepare_cached("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms FROM messages WHERE group_id=?1 AND sequence<?2 ORDER BY sequence DESC LIMIT ?3")?;
+        let mut q=self.connection.prepare_cached("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms,event FROM messages WHERE group_id=?1 AND sequence<?2 ORDER BY sequence DESC LIMIT ?3")?;
         let mut rows = q
             .query_map(params![group, before, limit], message_row)?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -324,6 +249,18 @@ fn message_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
         text: row.get(4)?,
         reply_to: row.get(5)?,
         accepted_ms: row.get(6)?,
+        event: row
+            .get::<_, Option<String>>(7)?
+            .map(|s| {
+                serde_json::from_str(&s).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        7,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })
+            })
+            .transpose()?,
     })
 }
 /// Only the writer calls this within its bounded commit batch.
@@ -332,6 +269,7 @@ pub(crate) fn append(
     actor: &str,
     input: &Publish,
     remaining: &mut u64,
+    host: bool,
 ) -> Result<Receipt> {
     input.validate()?;
     let member: bool = tx.query_row(
@@ -343,7 +281,7 @@ pub(crate) fn append(
         member,
         "digital person is not a member of this conversation"
     );
-    let prior=tx.query_row("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms FROM messages WHERE group_id=?1 AND sender_id=?2 AND request_id=?3",params![input.group_id,actor,input.request_id],message_row).optional()?;
+    let prior=tx.query_row("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms,event FROM messages WHERE group_id=?1 AND sender_id=?2 AND request_id=?3",params![input.group_id,actor,input.request_id],message_row).optional()?;
     if let Some(prior) = prior {
         ensure!(
             prior.text == input.text && prior.reply_to == input.reply_to,
@@ -365,6 +303,15 @@ pub(crate) fn append(
         |r| r.get(0),
     )?;
     ensure!(!archived, "conversation is archived");
+    let kind: String = tx.query_row(
+        "SELECT kind FROM groups WHERE id=?1",
+        [&input.group_id],
+        |r| r.get(0),
+    )?;
+    ensure!(
+        host || kind != "board",
+        "only the operator can publish announcements"
+    );
     if let Some(parent) = input.reply_to {
         ensure!(
             tx.query_row(
@@ -385,6 +332,7 @@ pub(crate) fn append(
     *remaining -= 1;
     Ok(Receipt {
         message: Message {
+            event: None,
             sequence,
             group_id: input.group_id.clone(),
             sender_id: actor.into(),

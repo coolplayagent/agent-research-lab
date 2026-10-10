@@ -2,14 +2,7 @@
 use super::*;
 use std::io::{Seek, SeekFrom};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Presence {
-    Offline,
-    Online,
-    Chatting,
-    Busy,
-}
+pub use contracts::Presence;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -192,11 +185,11 @@ pub(super) fn dispatch(c: &Cohort, index: usize, now: u64) -> Vec<serde_json::Va
                 .iter()
                 .any(|m| &m.identity.task_id == id && delivered(c, index, &m.identity))
             {
-                "delivered"
+                contracts::DeliveryState::Delivered
             } else if message.expires_at <= now {
-                "expired"
+                contracts::DeliveryState::Expired
             } else {
-                "pending"
+                contracts::DeliveryState::Pending
             };
             serde_json::json!({"task_id":id,"state":status})
         })

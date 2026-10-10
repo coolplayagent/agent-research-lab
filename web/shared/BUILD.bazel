@@ -1,0 +1,10 @@
+load("//web:defs.bzl", "typescript")
+typescript(name = "compiled", srcs = glob(["src/**/*.ts"]), config = "tsconfig.json", visibility = ["//visibility:public"])
+filegroup(name = "types", srcs = glob(["dist/**/*.d.ts"]), visibility = ["//visibility:public"])
+filegroup(name = "assets", srcs = glob(["dist/**/*.js"]), visibility = ["//visibility:public"])
+genrule(name = "checked", srcs = [":compiled", "src/contracts.ts"] + glob(["dist/**"]), outs = ["shared.checked"], tools = ["//crates/contracts:generate"], cmd = "diff -r $(location :compiled) web/shared/dist && $(location //crates/contracts:generate) > $(@D)/contracts.generated.ts && diff $(@D)/contracts.generated.ts web/shared/src/contracts.ts && touch $@", visibility = ["//visibility:public"])
+
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])
+load("@rules_rust//rust:defs.bzl", "rust_library")
+exports_files(["Cargo.toml"], visibility = ["//visibility:public"])
+rust_library(name = "web_assets", crate_name = "web_assets", srcs = ["src/lib.rs"], edition = "2024", compile_data = [":assets", ":checked"], visibility = ["//visibility:public"])

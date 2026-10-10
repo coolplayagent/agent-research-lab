@@ -1,5 +1,6 @@
 [Unit]
-Description=Agent Research Lab local research dashboard
+Conflicts=agent-research-lab.service
+Description=AI-IM service (legacy unit name; use only one system service)
 
 [Service]
 Type=simple

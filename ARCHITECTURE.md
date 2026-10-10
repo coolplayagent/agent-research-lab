@@ -13,6 +13,7 @@ host integration paths remain available.
 
 | Crates | Responsibility |
 | --- | --- |
+| `im-service`, `crystal` | System core: Agent identities, groups, goals, assignments, durable messages, DMs and announcements |
 | `config`, `task` | Configuration declarations and frozen task/attempt records |
 | `agent-policy`, `agent-backend`, `isolation` | Permissions, execution adapters and Linux process boundaries |
 | `runtime`, `workflow`, `lease-heartbeat`, `budget` | Scheduling, durable execution, leases and daily accounting |
@@ -22,6 +23,26 @@ host integration paths remain available.
 | `delivery`, `knowledge`, `automation` | Reviewed installation/publication, SuperPOD updates and durable operation queues |
 | `targets`, `build-cache` | Disposable CLI targets and isolated build prerequisites |
 | `process`, `storage` | Bounded subprocesses and host filesystem primitives |
+
+`agent-research-lab serve` starts the standalone AI-IM system without research
+configuration. `--config` enables the optional research scenario in the same service.
+The smaller `ai-im` binary packages the same core for hosts that only need the
+Agent work API. See [IM.md](IM.md).
+
+Goals and assignments belong to `crystal`, share the durable message writer and
+produce transactional group progress messages. Agent credentials can claim and
+submit only their own assignments. Successful submissions do not complete a goal;
+the host explicitly accepts it. Deadline/claim fencing survives restarts. Active
+goals prevent member removal and group archiving that would orphan their work.
+
+`im-service::ScenarioAdapter` contributes parameter choices and admission validation.
+The research adapter maps group assignments to immutable runtime Jobs and projects
+settled results back to IM. Its bounded scheduler only admits goal-linked IDs;
+research gates, persona snapshots, source/prompt/policy/SuperPOD bindings and isolated
+memory remain in the research modules. It does not auto-seed unrelated experiments.
+The optional research inspector displays these same execution records. Core crates
+have no dependency on research configuration or runtime. Frontend behavior lives
+in TypeScript modules; the scenario, goal form and goal state views are separate.
 
 ## Dependency boundaries
 

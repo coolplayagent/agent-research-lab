@@ -3,7 +3,7 @@ fn config(root: &Path, memory: &Path) -> Config {
     serde_json::from_value(json!({"schema_version":1,"workspace":root,"state_dir":root.join("state"),"superpod":root.join("superpod"),"codex":"unused","workflow":root.join("workflow"),"daily_seconds":600,"max_agents":2,"task_timeout_seconds":60,"require_latest":false,"models":{"research":"test-model","review":"critic-model","implement":"writer-model"},"tools":{"relay-memory":{"binary":memory,"repository":root,"probe":[]}}})).unwrap()
 }
 fn task(id: &str, person: &str) -> Task {
-    serde_json::from_value(json!({"id":id,"role":"research","repository":"superpod","prompt":"继续研究数字人跨群的连续记忆","persona_id":person})).unwrap()
+    serde_json::from_value(json!({"id":id,"role":"research","repository":"superpod","prompt":"Research continuous persona memory across groups","persona_id":person})).unwrap()
 }
 fn create(c: &Config, kind: Kind, name: &str) -> Person {
     change(
@@ -12,8 +12,8 @@ fn create(c: &Config, kind: Kind, name: &str) -> Person {
             name: name.into(),
             role: "research".into(),
             kind,
-            soul: "带着好奇思考，面对反例修正判断。".into(),
-            purpose: "研究记忆恢复".into(),
+            soul: "Think curiously and revise with counterexamples.".into(),
+            purpose: "Research memory recovery".into(),
         },
     )
     .unwrap()
@@ -23,10 +23,10 @@ fn all_creation_modes_unique_names_promotion_and_legacy_history_survive() {
     let root = tempfile::tempdir().unwrap();
     let c = config(root.path(), Path::new("/unused"));
     let legacy = c.state_dir.join("dashboard/personas.json");
-    storage::write(&legacy, &json!({"old-a":"云舟","old-b":"星河"})).unwrap();
+    storage::write(&legacy, &json!({"old-a":"CloudBoat","old-b":"StarRiver"})).unwrap();
     let directory = directory(&c).unwrap();
     let legacy_id = directory.tasks["old-a"].clone();
-    assert_eq!(directory.people[&legacy_id].name, "云舟");
+    assert_eq!(directory.people[&legacy_id].name, "CloudBoat");
     for kind in [Kind::Fixed, Kind::Temporary, Kind::Research] {
         create(&c, kind, "");
     }
@@ -34,7 +34,7 @@ fn all_creation_modes_unique_names_promotion_and_legacy_history_survive() {
         change(
             &c,
             Change::Create {
-                name: "云舟".into(),
+                name: "CloudBoat".into(),
                 role: "research".into(),
                 kind: Kind::Fixed,
                 soul: "".into(),
@@ -61,7 +61,7 @@ fn all_creation_modes_unique_names_promotion_and_legacy_history_survive() {
             Change::Update {
                 id: legacy_id.clone(),
                 revision: prior.revision,
-                name: "改名".into(),
+                name: "Renamed".into(),
                 soul: "".into(),
                 purpose: "".into()
             }
@@ -81,7 +81,7 @@ fn all_creation_modes_unique_names_promotion_and_legacy_history_survive() {
     assert_eq!(default_id(&c, "research").unwrap(), legacy_id);
     assert_eq!(
         storage::read::<Value>(&legacy).unwrap(),
-        json!({"old-a":"云舟","old-b":"星河"})
+        json!({"old-a":"CloudBoat","old-b":"StarRiver"})
     );
     let names: BTreeSet<_> = after.people.values().map(|p| &p.name).collect();
     assert_eq!(names.len(), after.people.len());
@@ -91,7 +91,7 @@ fn invalid_or_duplicate_legacy_directory_is_not_overwritten() {
     let root = tempfile::tempdir().unwrap();
     let c = config(root.path(), Path::new("/unused"));
     let legacy = c.state_dir.join("dashboard/personas.json");
-    let value = json!({"old-a":"云舟","old-b":"云舟"});
+    let value = json!({"old-a":"CloudBoat","old-b":"CloudBoat"});
     storage::write(&legacy, &value).unwrap();
     assert!(directory(&c).is_err());
     assert!(!path(&c).exists());
@@ -101,13 +101,13 @@ fn invalid_or_duplicate_legacy_directory_is_not_overwritten() {
 fn ambiguous_memory_write_is_never_blindly_replayed() {
     let root = tempfile::tempdir().unwrap();
     let c = config(root.path(), Path::new("/bin/false"));
-    let p = create(&c, Kind::Temporary, "待核对");
-    assert!(remember_note(&c, &p.id, "note-1", "研究线索").is_err());
-    let error = remember_note(&c, &p.id, "note-1", "研究线索")
+    let p = create(&c, Kind::Temporary, "Reconcile");
+    assert!(remember_note(&c, &p.id, "note-1", "Research lead").is_err());
+    let error = remember_note(&c, &p.id, "note-1", "Research lead")
         .unwrap_err()
         .to_string();
     assert!(error.contains("reconciliation"));
-    let error = remember_note(&c, &p.id, "note-1", "不同内容")
+    let error = remember_note(&c, &p.id, "note-1", "Different content")
         .unwrap_err()
         .to_string();
     assert!(error.contains("different input"));
@@ -119,11 +119,10 @@ fn real_memory_cross_group_recall_isolated_people_frozen_inputs_and_promotion() 
         std::env::var_os("LAB_PERSONA_MEMORY_BINARY").expect("exact relay-memory binary required");
     let root = tempfile::tempdir().unwrap();
     let mut c = config(root.path(), Path::new(&binary));
-    let p = create(&c, Kind::Temporary, "知微");
-    let other = create(&c, Kind::Research, "明川");
+    let p = create(&c, Kind::Temporary, "Insight");
+    let other = create(&c, Kind::Research, "BrightRiver");
     let before = freeze(&c, &task("group-before", &p.id)).unwrap().unwrap();
-    let note =
-        "PERSONA_CROSS_GROUP_7281：记忆恢复实验发现并发写回需要独立证据，下一步研究失败后的恢复。";
+    let note = "PERSONA_CROSS_GROUP_7281: Memory recovery experiments require independent evidence for concurrent writeback. Next investigate recovery after failure.";
     let first = remember_note(&c, &p.id, "note-1", note).unwrap();
     let repeated = remember_note(&c, &p.id, "note-1", note).unwrap();
     assert_eq!(first, repeated);
@@ -211,14 +210,14 @@ fn real_memory_cross_group_recall_isolated_people_frozen_inputs_and_promotion() 
         Change::Update {
             id: p.id.clone(),
             revision: promoted.revision,
-            name: "知微".into(),
-            soul: "新的表达方式".into(),
+            name: "Insight".into(),
+            soul: "New expression".into(),
             purpose: p.purpose.clone(),
         },
     )
     .unwrap();
     assert_eq!(original, prompt(Some(&after)).unwrap());
-    let recalled = inspect_memory(&c, &p.id, "记忆恢复实验").unwrap();
+    let recalled = inspect_memory(&c, &p.id, "Memory recovery experiments").unwrap();
     assert_eq!(recalled["stats"]["event_count"], 1);
     assert!(recalled.to_string().contains("PERSONA_CROSS_GROUP_7281"));
     let mut tampered = after;
@@ -257,11 +256,11 @@ fn specialty_and_execution_are_independent_of_identity_and_task_roles() {
     let p = change(
         &c,
         Change::Create {
-            name: "知桥".into(),
+            name: "KnowledgeBridge".into(),
             role: "designer".into(),
             kind: Kind::Fixed,
-            soul: "好奇而审慎".into(),
-            purpose: "跨技术研究".into(),
+            soul: "Curious and cautious".into(),
+            purpose: "Research across technologies".into(),
         },
     )
     .unwrap();

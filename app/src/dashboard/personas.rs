@@ -135,7 +135,9 @@ pub(super) fn history(c: &Config, id: &str, after: &str, shared: &Shared) -> Res
                 .as_array()
                 .and_then(|jobs| jobs.iter().find(|j| j["run_id"] == job.run_id))
                 .cloned()
-                .unwrap_or_else(|| project(job, &json!({"state":"historical"})));
+                .unwrap_or_else(|| {
+                    project(job, &json!({"state":contracts::ExecutionState::Historical}))
+                });
             value["profile"]["person_id"] = json!(id);
             value["profile"]["display_name"] = json!(p.name);
             value["profile"]["handle"] = json!(id);

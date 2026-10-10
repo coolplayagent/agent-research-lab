@@ -793,7 +793,10 @@ pub fn refresh_index(request: &IndexRefreshRequest) -> Result<IndexRefreshStatus
         // The installed 1.1.18 contract uses state="complete". Retain explicit
         // Boolean compatibility without treating a missing integrity report as proof.
         let complete = match integrity.get("state") {
-            Some(state) => state.as_str() == Some("complete"),
+            Some(state) => {
+                contracts::ContentIntegrityState::from_value(state)
+                    == Some(contracts::ContentIntegrityState::Complete)
+            }
             None => integrity.get("complete") == Some(&Value::Bool(true)),
         };
         value["last_indexed_commit"].as_str() == Some(expected)

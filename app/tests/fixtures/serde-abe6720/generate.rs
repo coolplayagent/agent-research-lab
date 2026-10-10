@@ -67,7 +67,7 @@ fn main() {
     );
     legacy_config.validate().unwrap();
     let bridge = json!({"kind":"json_process","program":"/synthetic/tools/bridge",
-        "args":["--fixture","中文"],"env_allowlist":["OPENAI_API_KEY"],
+        "args":["--fixture",include_str!("unicode-language.txt")],"env_allowlist":["OPENAI_API_KEY"],
         "capabilities":{"structured_result":true,"read_workspace":true,"write_workspace":true,"tool_execution":true,"desktop":true}});
     let mut full_config_input = legacy_config_input;
     full_config_input["agent_backends"] = json!({"synthetic-bridge":bridge,"synthetic-codex":{"kind":"codex","program":"synthetic-codex"}});
@@ -79,9 +79,9 @@ fn main() {
 
     let legacy_task_input = json!({"id":"legacy-task","role":"research","repository":"superpod","prompt":"Independent synthetic task.\nNo runtime invocation."});
     let legacy_task: Task = capture(out, "legacy-task", legacy_task_input.clone(), &mut digests);
-    let full_team_input = json!({"id":"compat-team","cell":"cell-01","topics":["research","protocol"],"query":"证据 & counterexample"});
+    let full_team_input = json!({"id":"compat-team","cell":"cell-01","topics":["research","protocol"],"query":include_str!("unicode-query.txt")});
     let full_task_input = json!({"id":"full-task","role":"implement","repository":"agent-research-lab",
-        "prompt":"Synthetic multilingual contract: 证据, quote \"x\", newline\nsecond line.",
+        "prompt":include_str!("unicode-prompt.txt"),
         "prompt_version":"implement-v3","communication":full_team_input,"max_attempts":2,
         "use_memory":true,"depth":2,"write":true,"exploratory":true,
         "dependencies":["previous-task"],"required_tools":["workflow-cli","relay-memory"]});

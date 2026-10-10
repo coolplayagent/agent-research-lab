@@ -165,7 +165,7 @@ impl Watcher {
         Ok((full, session, overflow))
     }
 }
-fn warn(shared: &Shared, updates: &watch::Sender<u64>, message: &str) {
+fn warn(shared: &Shared, updates: &watch::Sender<u64>, message: contracts::Notice) {
     let mut value = shared.write().unwrap();
     value["error"] = json!(message);
     value["revision"] = json!(value["revision"].as_u64().unwrap_or(0).saturating_add(1));
@@ -216,7 +216,11 @@ pub(super) fn run(
                         updates.send_modify(|v| *v = v.wrapping_add(1));
                         let _ = full_session_send.try_send(());
                     }
-                    Err(_) => warn(shared, updates, "读取运行状态失败；保留上次记录。"),
+                    Err(_) => warn(
+                        shared,
+                        updates,
+                        contracts::ApiNotice::SnapshotReadFailed.notice(json!({})),
+                    ),
                 }
             }
         });
@@ -239,7 +243,7 @@ pub(super) fn run(
                         warn(
                             shared,
                             updates,
-                            "文件事件队列溢出，正在重建快照；消息日志可按游标重放。",
+                            contracts::ApiNotice::ObserverOverflow.notice(json!({})),
                         );
                     }
                     if full {
@@ -253,7 +257,7 @@ pub(super) fn run(
                     warn(
                         shared,
                         updates,
-                        "文件事件观察中断，请重启观察服务；实时消息服务独立运行。",
+                        contracts::ApiNotice::ObserverInterrupted.notice(json!({})),
                     );
                     break;
                 }

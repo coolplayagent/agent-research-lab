@@ -1,0 +1,12 @@
+[package]
+name = "lab-contracts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "contracts"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true

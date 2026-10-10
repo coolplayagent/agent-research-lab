@@ -15,13 +15,13 @@ impl Controller {
             process_start: process_start(std::process::id())?,
             last: Value::Null,
         };
-        value.record("starting", &[])?;
+        value.record(ControllerPhase::Starting, &[])?;
         Ok(value)
     }
-    pub(super) fn record(&mut self, phase: &str, active: &[String]) -> Result<()> {
+    pub(super) fn record(&mut self, phase: ControllerPhase, active: &[String]) -> Result<()> {
         let time = now();
         if self.last["at"] == time
-            && self.last["phase"] == phase
+            && self.last["phase"] == phase.as_str()
             && self.last["active"] == json!(active)
         {
             return Ok(());
@@ -33,7 +33,7 @@ impl Controller {
 }
 impl Drop for Controller {
     fn drop(&mut self) {
-        let _ = self.record("stopped", &[]);
+        let _ = self.record(ControllerPhase::Stopped, &[]);
     }
 }
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=AI-SDLC research lab (requires completed bootstrap acceptance)
+Description=AI-IM multi-agent system with optional CLI research scenario
 After=network-online.target
 
 [Service]
@@ -7,12 +7,13 @@ Type=simple
 Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
 Environment=RUSTUP_HOME=%h/.rustup
 WorkingDirectory=/opt/workspace/agent-research-lab
-ExecStart=/opt/workspace/agent-research-lab/bazel-bin/agent-research-lab --config /opt/workspace/agent-research-lab/local.toml run --continuous --seed --max-seconds 43200
+ExecStart=/opt/workspace/agent-research-lab/bazel-bin/agent-research-lab --config /opt/workspace/agent-research-lab/local.toml serve --listen 127.0.0.1:8090 --max-seconds 43200
 Restart=always
-RestartSec=60
+RestartSec=5
 KillMode=control-group
 TimeoutStopSec=30
 UMask=0077
+LimitNOFILE=65536
 
 [Install]
 WantedBy=default.target

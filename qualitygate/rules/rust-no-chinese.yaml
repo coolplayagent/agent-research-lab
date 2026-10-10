@@ -1,0 +1,28 @@
+schema_version: 1
+id: rust-no-chinese
+version: 1
+source:
+  document: AGENTS.md
+  section: API and presentation boundaries
+  content_hash: sha256:542c1a2ad26f46b8977ff0f8528221f2020af523c35f5fd29670a752ed58bde6
+language:
+- rust
+required: true
+severity: error
+applies_to:
+  paths:
+  - '**/*.rs'
+  provenance_scope: null
+requires_capabilities:
+- files
+binding: null
+when:
+  entity: file
+  change: all
+then:
+  require_marker: false
+  require_dependency: null
+  name_pattern: null
+  forbid_pattern: \p{Han}
+  max_count: null
+fix: Keep Rust code, comments and server-owned strings in English. Move presentation text into frontend locale resources and multilingual compatibility data into external fixtures.

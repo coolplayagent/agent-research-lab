@@ -92,10 +92,42 @@ impl Process {
         env: &[(String, String)],
         stdin: Option<&Path>,
     ) -> Result<Self> {
+        Self::spawn_command(
+            Command::new(program),
+            args,
+            cwd,
+            directory,
+            timeout,
+            env,
+            stdin,
+        )
+    }
+    /// Start with an empty inherited environment; only explicitly selected variables are passed.
+    pub fn spawn_clean(
+        program: &str,
+        args: &[String],
+        cwd: &Path,
+        directory: &Path,
+        timeout: Duration,
+        env: &[(String, String)],
+        stdin: Option<&Path>,
+    ) -> Result<Self> {
+        let mut command = Command::new(program);
+        command.env_clear();
+        Self::spawn_command(command, args, cwd, directory, timeout, env, stdin)
+    }
+    fn spawn_command(
+        mut cmd: Command,
+        args: &[String],
+        cwd: &Path,
+        directory: &Path,
+        timeout: Duration,
+        env: &[(String, String)],
+        stdin: Option<&Path>,
+    ) -> Result<Self> {
         fs::create_dir_all(directory)?;
         let stdout = directory.join("stdout.jsonl");
         let stderr = directory.join("stderr.log");
-        let mut cmd = Command::new(program);
         cmd.args(args)
             .current_dir(cwd)
             .envs(env.iter().cloned())
@@ -116,7 +148,7 @@ impl Process {
             Some(path) => Stdio::from(File::open(path)?),
             None => Stdio::null(),
         });
-        let child = cmd.spawn().with_context(|| format!("launch {program}"))?;
+        let child = cmd.spawn().context("launch bounded process")?;
         Ok(Self {
             child,
             stdout,

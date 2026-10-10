@@ -1,0 +1,22 @@
+load("//web:defs.bzl", "typescript")
+
+typescript(
+    name = "compiled",
+    srcs = glob(["src/**/*.ts"]) + ["//web/shared:types"],
+    config = "tsconfig.json",
+    visibility = ["//visibility:public"],
+)
+filegroup(
+    name = "assets",
+    srcs = glob(["dist/**/*.js"]),
+    visibility = ["//visibility:public"],
+)
+genrule(
+    name = "checked",
+    srcs = [":compiled"] + glob(["dist/**/*.js"]),
+    outs = ["typescript.checked"],
+    cmd = "diff -r $(location :compiled) app/src/dashboard/web/dist && touch $@",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])

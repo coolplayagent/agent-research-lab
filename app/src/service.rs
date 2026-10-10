@@ -10,6 +10,36 @@ use serde_json::{Value, json};
 
 fn execute(cli: Cli) -> Result<Value> {
     match cli.command {
+        Commands::Serve {
+            listen,
+            max_seconds,
+            state_dir,
+        } => {
+            if let Some(path) = &cli.config {
+                let c = Config::load(path)?;
+                anyhow::ensure!(
+                    state_dir.is_none(),
+                    "--config uses its configured state_dir; do not also pass --state-dir"
+                );
+                crate::dashboard::serve(&c, listen, max_seconds)
+            } else {
+                let state = state_dir.unwrap_or_else(|| ".ai-im".into());
+                tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(4)
+                    .enable_all()
+                    .build()?
+                    .block_on(im_service::serve(&state, listen, max_seconds))?;
+                Ok(json!({"stopped":true,"mode":"ai-im"}))
+            }
+        }
+        Commands::ServeLink { state_dir } => {
+            let state = if let Some(path) = &cli.config {
+                Config::load(path)?.state_dir
+            } else {
+                state_dir.unwrap_or_else(|| ".ai-im".into())
+            };
+            storage::read(&state.join("dashboard/access.json"))
+        }
         Commands::CrystalBench {
             state,
             mode,
@@ -52,13 +82,8 @@ fn execute(cli: Cli) -> Result<Value> {
             knowledge::refresh_index(&storage::read(&input)?)?,
         )?),
         command => {
-            let c = Config::load(&cli.config)?;
+            let c = Config::load(&cli.config.unwrap_or_else(|| "local.toml".into()))?;
             match command {
-                Commands::ServeLink => storage::read(&c.state_dir.join("dashboard/access.json")),
-                Commands::Serve {
-                    listen,
-                    max_seconds,
-                } => crate::dashboard::serve(&c, listen, max_seconds),
                 Commands::Agents {
                     action,
                     cohort,

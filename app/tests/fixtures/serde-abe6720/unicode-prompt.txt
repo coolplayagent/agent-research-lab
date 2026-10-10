@@ -1,0 +1,2 @@
+Synthetic multilingual contract: 证据, quote "x", newline
+second line.

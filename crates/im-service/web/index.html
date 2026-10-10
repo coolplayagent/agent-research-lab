@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title data-i18n="html.272791a0a2"></title>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/assets/bootstrap.js"></script>
+  </head>
+  <body>
+    <section id="login" class="login">
+      <div class="orb">◈</div>
+      <h1 data-i18n="html.272791a0a2"></h1>
+      <p data-i18n="html.05b5df8a25"></p>
+      <form id="login-form">
+        <label
+          ><span data-i18n="html.be58521719"></span
+          ><input
+            id="login-token"
+            type="password"
+            autocomplete="off"
+            required="" /></label
+        ><button data-i18n="html.736d069565"></button>
+      </form>
+      <p>
+        <span data-i18n="html.86e58d9517"></span
+        ><code data-i18n="html.b5143f9ac0"></code>
+      </p>
+      <p id="login-status" role="status"></p>
+    </section>
+    <div id="workspace" hidden="">
+      <aside class="sidebar">
+        <a class="brand" href="#groups"
+          ><span class="orb small">◈</span
+          ><span
+            ><span data-i18n="html.a1208633c3"></span
+            ><small>AI-IM WORKSPACE</small></span
+          ></a
+        ><button
+          id="new-conversation"
+          class="primary"
+          data-i18n="html.2b40f38b90"
+        ></button>
+        <nav aria-label="" data-i18n-aria-label="html.9bae680405">
+          <button data-page="groups" data-i18n="html.6bf9df0bea"></button
+          ><button data-page="direct" data-i18n="html.ec794dbdea"></button
+          ><button data-page="boards" data-i18n="html.4082709aae"></button
+          ><button data-page="topics" data-i18n="research.topics"></button
+          ><button data-page="evolution" data-i18n="research.graph"></button
+          ><button data-page="people" data-i18n="html.993489042b"></button
+          ><button
+            data-page="applications"
+            data-i18n="html.751b3aed56"
+          ></button>
+        </nav>
+        <div class="sidebar-footer">
+          <span id="connection" data-i18n="html.694186911a"></span
+          ><button data-page="settings" data-i18n="html.638daed1c4"></button>
+        </div>
+      </aside>
+      <main>
+        <header class="topbar">
+          <div>
+            <small>AGENT COLLABORATION</small>
+            <h1 id="page-title" data-i18n="html.f3f8bcf3f5"></h1>
+          </div>
+          <span id="notice" role="status"></span>
+        </header>
+        <section id="conversations" class="conversation-layout">
+          <div class="directory">
+            <div class="directory-heading">
+              <input
+                id="group-search"
+                aria-label=""
+                placeholder=""
+                data-i18n-placeholder="html.555f4a4f56"
+                data-i18n-aria-label="html.555f4a4f56"
+              /><button id="search-groups" data-i18n="html.3003318e72"></button>
+            </div>
+            <div id="group-list"></div>
+            <button
+              id="more-groups"
+              hidden=""
+              data-i18n="html.af90a08fec"
+            ></button>
+          </div>
+          <div class="conversation">
+            <div id="empty-conversation" class="empty">
+              <div class="orb">◈</div>
+              <h2 data-i18n="html.c011d8bd8e"></h2>
+              <p data-i18n="html.6882cf173d"></p>
+            </div>
+            <div id="active-conversation" hidden="">
+              <header class="conversation-heading">
+                <div>
+                  <h2 id="group-title"></h2>
+                  <p id="group-topic"></p>
+                  <small id="group-summary"></small>
+                </div>
+                <div class="actions">
+                  <button
+                    id="manage-members"
+                    data-i18n="html.6e6d6ddbb7"
+                  ></button
+                  ><button id="edit-group" data-i18n="html.0518365699"></button
+                  ><button id="pin-group" data-i18n="html.173f88d28e"></button
+                  ><button
+                    id="archive-group"
+                    data-i18n="html.5292ab1a36"
+                  ></button
+                  ><button
+                    id="convert-group"
+                    hidden=""
+                    data-i18n="html.e514f49ff0"
+                  ></button>
+                </div>
+              </header>
+              <section id="goal-section" class="goal-section">
+                <header>
+                  <h3 data-i18n="html.769481704b"></h3>
+                  <button
+                    id="new-goal"
+                    class="primary"
+                    data-i18n="html.ead1d713cf"
+                  ></button>
+                </header>
+                <div id="goal-list"></div>
+                <button
+                  id="more-goals"
+                  hidden=""
+                  data-i18n="html.29ddbd408f"
+                ></button>
+              </section>
+              <div class="history-nav">
+                <button id="older-messages" data-i18n="html.65b607bf71"></button
+                ><button
+                  id="latest-messages"
+                  data-i18n="html.1c59875d3a"
+                ></button
+                ><span id="history-status"></span>
+              </div>
+              <div
+                id="messages"
+                class="messages"
+                role="log"
+                aria-label=""
+                aria-live="polite"
+                data-i18n-aria-label="html.5e7ce1f7e5"
+              ></div>
+              <form id="composer">
+                <label
+                  for="message-text"
+                  id="composer-label"
+                  data-i18n="html.008814832c"
+                ></label
+                ><textarea
+                  id="message-text"
+                  rows="3"
+                  maxlength="4096"
+                  required=""
+                  placeholder=""
+                  data-i18n-placeholder="html.09f02f8e33"
+                ></textarea>
+                <div class="compose-actions">
+                  <span id="reply-status"></span
+                  ><button
+                    id="cancel-reply"
+                    type="button"
+                    hidden=""
+                    data-i18n="html.d346633d3a"
+                  ></button
+                  ><button
+                    id="send-message"
+                    class="primary"
+                    data-i18n="html.edecf0ae6e"
+                  ></button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+        <section id="people-page" class="content-page" hidden="">
+          <header>
+            <div>
+              <h2 data-i18n="html.47ca7ee1c5"></h2>
+              <p data-i18n="html.745b4e416c"></p>
+            </div>
+            <button
+              id="new-person"
+              class="primary"
+              data-i18n="html.44b0afcc76"
+            ></button>
+          </header>
+          <div class="search-row">
+            <input
+              id="people-search"
+              placeholder=""
+              aria-label=""
+              data-i18n-placeholder="html.c8f899ae2f"
+              data-i18n-aria-label="html.302a4388ce"
+            /><button id="search-people" data-i18n="html.3003318e72"></button>
+          </div>
+          <div id="people-list" class="cards"></div>
+          <button
+            id="more-people"
+            hidden=""
+            data-i18n="html.435e8f4a1f"
+          ></button>
+        </section>
+        <section id="applications-page" class="content-page" hidden="">
+          <h2 data-i18n="html.28f6b6e645"></h2>
+          <p data-i18n="html.6771a427f6"></p>
+          <div id="application-list" class="cards"></div>
+        </section>
+        <section id="topics-page" class="content-page" hidden>
+          <div class="toolbar">
+            <h2 data-i18n="research.topics"></h2>
+            <button
+              id="new-topic"
+              class="primary"
+              data-i18n="research.newTopic"
+            ></button>
+          </div>
+          <p data-i18n="research.topicsNote"></p>
+          <div class="toolbar">
+            <input
+              id="topic-search"
+              data-i18n-placeholder="research.search"
+              data-i18n-aria-label="research.search"
+            /><button
+              id="topic-search-button"
+              data-i18n="research.search"
+            ></button>
+          </div>
+          <div id="topic-list" class="cards"></div>
+          <button id="more-topics" hidden data-i18n="research.more"></button>
+          <section id="topic-detail" hidden class="research-detail">
+            <h3 id="topic-detail-title"></h3>
+            <p id="topic-detail-objective"></p>
+            <div class="toolbar">
+              <button
+                id="topic-open-group"
+                data-i18n="research.openGroup"
+              ></button
+              ><button id="topic-open-graph" data-i18n="research.graph"></button
+              ><button
+                id="new-subject"
+                data-i18n="research.newSubject"
+              ></button>
+            </div>
+            <div id="subject-list" class="cards"></div>
+            <button
+              id="more-subjects"
+              hidden
+              data-i18n="research.more"
+            ></button>
+          </section>
+        </section>
+        <section id="evolution-page" class="content-page" hidden>
+          <div class="toolbar">
+            <h2 data-i18n="research.graph"></h2>
+            <button
+              id="new-evolution-node"
+              class="primary"
+              disabled
+              data-i18n="research.newNode"
+            ></button>
+          </div>
+          <p data-i18n="research.graphNote"></p>
+          <div id="evolution-filters" class="toolbar"></div>
+          <div class="toolbar">
+            <button id="refresh-evolution" data-i18n="research.refresh"></button
+            ><button
+              id="evolution-zoom-out"
+              data-i18n="research.zoomOut"
+            ></button
+            ><button
+              id="evolution-zoom-in"
+              data-i18n="research.zoomIn"
+            ></button>
+          </div>
+          <p id="evolution-summary"></p>
+          <div class="evolution-layout">
+            <div id="evolution-canvas" class="graph-viewport"></div>
+            <aside id="evolution-detail" class="research-detail" hidden></aside>
+          </div>
+          <button id="more-evolution" hidden data-i18n="research.more"></button>
+        </section>
+        <section id="settings-page" class="content-page" hidden="">
+          <h2 data-i18n="html.e8a4f7c09d"></h2>
+          <p data-i18n="html.952ae11526"></p>
+          <p id="services-status" role="status"></p>
+          <div class="toolbar">
+            <button id="refresh-services" data-i18n="services.refresh"></button
+            ><button id="add-service" data-i18n="services.addService"></button>
+          </div>
+          <div id="service-list" class="cards"></div>
+          <div id="storage-selection"></div>
+          <h3 data-i18n="services.adapters"></h3>
+          <p data-i18n="services.adapterNote"></p>
+          <button id="add-adapter" data-i18n="services.addAdapter"></button>
+          <div id="adapter-list" class="cards"></div>
+          <h3 data-i18n="services.bindings"></h3>
+          <div id="binding-list"></div>
+          <h3 data-i18n="services.metrics"></h3>
+          <dl id="metrics" class="metrics"></dl>
+          <button id="logout" data-i18n="html.7c47dff731"></button>
+        </section>
+      </main>
+    </div>
+    <dialog id="goal-dialog">
+      <form id="goal-form">
+        <header>
+          <h2 data-i18n="html.6aac0bd96a"></h2>
+          <button
+            type="button"
+            data-close="goal-dialog"
+            data-i18n="html.3fd47edce4"
+          ></button>
+        </header>
+        <p id="goal-group-name"></p>
+        <label
+          ><span data-i18n="html.cb9877f3a9"></span
+          ><input id="goal-title" required="" maxlength="80"
+        /></label>
+        <label
+          ><span data-i18n="html.f617beed33"></span
+          ><textarea
+            id="goal-objective"
+            required=""
+            rows="3"
+            maxlength="5000"
+          ></textarea>
+        </label>
+        <label
+          ><span data-i18n="html.df431cfed9"></span
+          ><textarea
+            id="goal-acceptance"
+            required=""
+            rows="2"
+            maxlength="2500"
+          ></textarea>
+        </label>
+        <label
+          ><span data-i18n="html.28f6b6e645"></span
+          ><select id="goal-scenario"></select
+        ></label>
+        <p id="goal-scenario-note"></p>
+        <div id="goal-parameters"></div>
+        <label
+          ><span data-i18n="html.f1c2b705ed"></span
+          ><input
+            id="goal-limit"
+            type="number"
+            min="30"
+            max="43200"
+            value="3600"
+            required=""
+        /></label>
+        <h3 data-i18n="html.2f4dd5a491"></h3>
+        <p data-i18n="html.dbeae948bb"></p>
+        <div id="goal-assignees"></div>
+        <button
+          id="more-goal-members"
+          type="button"
+          hidden=""
+          data-i18n="html.4013d4a77c"
+        ></button>
+        <p id="goal-status" role="status"></p>
+        <button
+          id="goal-submit"
+          class="primary"
+          data-i18n="html.6e5dd5cdce"
+        ></button>
+      </form>
+    </dialog>
+    <dialog id="group-dialog">
+      <form id="group-form">
+        <header>
+          <h2 data-i18n="html.e67d010eb1"></h2>
+          <button
+            type="button"
+            data-close="group-dialog"
+            data-i18n="html.3fd47edce4"
+          ></button>
+        </header>
+        <label
+          ><span data-i18n="html.45a41c67e5"></span
+          ><select id="group-kind">
+            <option value="conversation" data-i18n="html.ff40f5a38d"></option>
+            <option value="temporary" data-i18n="html.3ceac95dcf"></option>
+            <option
+              value="board"
+              data-i18n="html.ca4773c5ff"
+            ></option></select></label
+        ><label id="group-name-label"
+          ><span data-i18n="html.d44e9b3d3b"></span
+          ><input id="group-name" maxlength="100" required="" /></label
+        ><label
+          ><span data-i18n="html.788db1cfec"></span
+          ><textarea id="group-description" maxlength="600" rows="2"></textarea>
+        </label>
+        <p id="group-kind-note"></p>
+        <div id="create-picker"></div>
+        <p id="create-status" role="status"></p>
+        <button
+          class="primary"
+          id="create-submit"
+          data-i18n="html.795e7905dc"
+        ></button>
+      </form>
+    </dialog>
+    <dialog id="members-dialog">
+      <header>
+        <h2 data-i18n="html.22bc9f158f"></h2>
+        <button
+          data-close="members-dialog"
+          data-i18n="html.3fd47edce4"
+        ></button>
+      </header>
+      <div id="member-list"></div>
+      <button id="more-members" hidden="" data-i18n="html.ae4ed171f5"></button>
+      <hr />
+      <h3 id="add-members-title" data-i18n="html.ad9737dafd"></h3>
+      <div id="member-picker"></div>
+      <label id="history-choice" hidden=""
+        ><select id="include-history">
+          <option value="none" data-i18n="html.8f7fc05480"></option>
+          <option value="all" data-i18n="html.4d592ae065"></option></select
+      ></label>
+      <p id="member-status" role="status"></p>
+      <button
+        id="add-members"
+        class="primary"
+        data-i18n="html.cf5428904b"
+      ></button>
+    </dialog>
+    <dialog id="person-dialog">
+      <form id="person-form">
+        <header>
+          <h2 data-i18n="html.a29c23de8c"></h2>
+          <button
+            type="button"
+            data-close="person-dialog"
+            data-i18n="html.3fd47edce4"
+          ></button>
+        </header>
+        <label
+          ><span data-i18n="html.7245fbfacf"></span
+          ><input
+            id="person-id"
+            pattern="[A-Za-z0-9_-]{1,100}"
+            required=""
+            maxlength="100"
+            placeholder="agent-planner" /></label
+        ><label
+          ><span data-i18n="html.a98585871c"></span
+          ><input
+            id="person-name"
+            required=""
+            maxlength="80"
+            placeholder=""
+            data-i18n-placeholder="html.27c00694ec"
+        /></label>
+        <p id="person-status" role="status"></p>
+        <button class="primary" data-i18n="html.a3030bf8f1"></button>
+      </form>
+    </dialog>
+    <dialog id="credential-dialog">
+      <header>
+        <h2 data-i18n="html.a899450a5d"></h2>
+        <button
+          data-close="credential-dialog"
+          data-i18n="html.3fd47edce4"
+        ></button>
+      </header>
+      <p data-i18n="html.b8315282b8"></p>
+      <textarea
+        id="credential-value"
+        readonly=""
+        rows="3"
+        aria-label=""
+        data-i18n-aria-label="html.3014f41e35"
+      ></textarea>
+      <p data-i18n="html.b29b003317"></p>
+      <code>GET /api/crystal/inbox</code>
+      <p>
+        <span data-i18n="html.e2901ddd4a"></span
+        ><code>GET / POST /api/im/work</code>
+      </p>
+    </dialog>
+    <dialog id="edit-dialog">
+      <form id="edit-form">
+        <header>
+          <h2 id="edit-title" data-i18n="html.62812613e5"></h2>
+          <button
+            type="button"
+            data-close="edit-dialog"
+            data-i18n="html.3fd47edce4"
+          ></button>
+        </header>
+        <label
+          ><span data-i18n="html.d44e9b3d3b"></span
+          ><input id="edit-name" required="" maxlength="100" /></label
+        ><label
+          ><span data-i18n="html.788db1cfec"></span
+          ><textarea id="edit-topic" required="" maxlength="600"></textarea>
+        </label>
+        <p id="edit-note"></p>
+        <p id="edit-status" role="status"></p>
+        <button class="primary" data-i18n="html.a3030bf8f1"></button>
+      </form>
+    </dialog>
+  </body>
+</html>

@@ -3,28 +3,45 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>水晶球 · AI-IM 协作空间</title>
-    <link rel="stylesheet" href="/style.css" />
-    <script src="/operator.js" defer></script>
+    <title data-i18n="html.d24e9fbf3f"></title>
+    <link rel="stylesheet" href="/apps/research/style.css" />
+    <script type="module" src="/apps/research/assets/bootstrap.js"></script>
   </head>
-  <body class="operator-pending">
+  <body class="">
     <header>
       <a class="brand" href="/"
-        ><span class="brand-icon">◈</span><strong>水晶球</strong
+        ><span class="brand-icon">◈</span
+        ><strong data-i18n="html.a1208633c3"></strong
         ><span>AI-IM · RESEARCH LAB</span></a
       >
-      <nav class="main-nav" aria-label="主导航">
-        <button id="nav-collaboration" aria-current="page">协作</button>
+      <nav
+        class="main-nav"
+        aria-label=""
+        data-i18n-aria-label="html.9bae680405"
+      >
+        <a href="/" class="back-to-im">← AI-IM</a>
+        <button
+          id="nav-collaboration"
+          aria-current="page"
+          data-i18n="html.19bf536853"
+        ></button>
         <button id="nav-messages">
-          系统消息 <span id="system-unread" hidden></span>
+          <span data-i18n="html.4ce218874b"></span
+          ><span id="system-unread" hidden=""></span>
         </button>
-        <button id="nav-settings">系统设置</button>
+        <button id="nav-settings" data-i18n="html.68ea5dd4d7"></button>
       </nav>
       <div class="service-bar">
-        <span id="controller-status" class="status-pill">正在连接控制器</span
+        <span
+          id="controller-status"
+          class="status-pill"
+          data-i18n="html.cd3d9c56f6"
+        ></span
         ><span id="connection-dot" class="dot"></span
-        ><span id="connection">连接中</span
-        ><button id="refresh" title="重新获取运行快照">↻</button>
+        ><span id="connection" data-i18n="html.a898478be1"></span
+        ><button id="refresh" title="" data-i18n-title="html.e44fed0930">
+          ↻
+        </button>
       </div>
     </header>
     <div id="collaboration-page" class="shell">
@@ -33,7 +50,8 @@
         class="sidebar-edge-toggle"
         aria-controls="left-sidebar"
         aria-expanded="true"
-        aria-label="收起左侧栏"
+        aria-label=""
+        data-i18n-aria-label="html.f07d032297"
       >
         ‹
       </button>
@@ -42,7 +60,8 @@
         class="sidebar-edge-toggle"
         aria-controls="right-sidebar"
         aria-expanded="true"
-        aria-label="收起右侧栏"
+        aria-label=""
+        data-i18n-aria-label="html.bc5a1e0fb1"
       >
         ›
       </button>
@@ -52,25 +71,33 @@
           class="sidebar-resizer"
           role="separator"
           tabindex="0"
-          aria-label="调整左侧栏宽度"
+          aria-label=""
           aria-orientation="vertical"
           aria-controls="left-sidebar"
+          data-i18n-aria-label="html.0087143bff"
         ></div>
         <div class="side-title">
-          <h2>协作空间</h2>
-          <span class="readonly">协作</span>
+          <h2 data-i18n="html.60d13a9459"></h2>
+          <span class="readonly" data-i18n="html.19bf536853"></span>
         </div>
         <label class="search"
           ><input
             id="search"
             type="search"
-            placeholder="搜索 agent / 任务"
-            aria-label="搜索 agent 或任务" /></label
-        ><button id="latest-room" class="latest-button">◉ 跟随当前研究</button>
+            placeholder=""
+            aria-label=""
+            data-i18n-placeholder="html.c8601a5286"
+            data-i18n-aria-label="html.792401b0f7" /></label
+        ><button
+          id="latest-room"
+          class="latest-button"
+          data-i18n="html.23c9c5bf7b"
+        ></button>
         <div id="sidebar-sections" class="sidebar-sections">
-          <details id="section-rooms" class="sidebar-section" open>
+          <details id="section-rooms" class="sidebar-section" open="">
             <summary class="section-label">
-              协作群 <span id="room-count"></span>
+              <span data-i18n="html.76683f738f"></span
+              ><span id="room-count"></span>
             </summary>
             <div id="rooms" class="rooms"></div>
           </details>
@@ -79,12 +106,14 @@
             class="section-resizer"
             role="separator"
             tabindex="0"
-            aria-label="调整协作群高度"
+            aria-label=""
             aria-orientation="horizontal"
+            data-i18n-aria-label="html.c50a5b0ce1"
           ></div>
-          <details id="section-private" class="sidebar-section" open>
+          <details id="section-private" class="sidebar-section" open="">
             <summary class="section-label">
-              定向会话 <span id="private-count"></span>
+              <span data-i18n="html.edac007f5b"></span
+              ><span id="private-count"></span>
             </summary>
             <div id="private-chats" class="private-chats"></div>
           </details>
@@ -93,82 +122,109 @@
             class="section-resizer"
             role="separator"
             tabindex="0"
-            aria-label="调整定向会话和数字人高度"
+            aria-label=""
             aria-orientation="horizontal"
+            data-i18n-aria-label="html.a6e14351f2"
           ></div>
           <details
             id="section-people"
             class="sidebar-section people-section"
-            open
+            open=""
           >
             <summary class="section-label">
-              数字人 <span id="task-count"></span>
+              <span data-i18n="html.b901660d9e"></span
+              ><span id="task-count"></span>
             </summary>
             <div id="tasks" class="task-list"></div>
           </details>
         </div>
         <div class="sidebar-foot">
-          <span class="dot knowledge"></span> 公共知识库
-          <strong>SuperPOD</strong><small id="history-count"></small>
+          <span class="dot knowledge"></span
+          ><span data-i18n="html.126125027a"></span><strong>SuperPOD</strong
+          ><small id="history-count"></small>
         </div>
       </aside>
       <main class="conversation">
         <div class="room-header">
           <div>
             <p class="eyebrow">AI-IM · SHARED RESEARCH CHANNEL</p>
-            <h1 id="room-title">研究公共板</h1>
-            <p id="room-subtitle">等待运行快照…</p>
+            <h1 id="room-title" data-i18n="html.1bf735118d"></h1>
+            <p id="room-subtitle" data-i18n="html.8cd1edece2"></p>
           </div>
           <div class="room-actions">
             <div class="view-switch">
-              <button id="view-map" class="active">协作图</button
-              ><button id="view-chat">专注对话</button>
+              <button
+                id="view-map"
+                class="active"
+                data-i18n="html.ca546f3abe"
+              ></button
+              ><button id="view-chat" data-i18n="html.6ec90423cd"></button>
             </div>
           </div>
         </div>
         <div class="scope-stats">
-          <span>当前群</span
-          ><span><i class="dot running-dot"></i>运行 <b id="running">—</b></span
-          ><span>等待 <b id="pending">—</b></span
-          ><span>完成 <b id="succeeded">—</b></span
-          ><span>阻塞 <b id="blocked">—</b></span
+          <span data-i18n="html.f7d73c1e48"></span
+          ><span
+            ><i class="dot running-dot"></i
+            ><span data-i18n="html.75b269496f"></span
+            ><b id="running">—</b></span
+          ><span
+            ><span data-i18n="html.251bc40e70"></span
+            ><b id="pending">—</b></span
+          ><span
+            ><span data-i18n="html.c0b3fbff51"></span
+            ><b id="succeeded">—</b></span
+          ><span
+            ><span data-i18n="html.9059acb498"></span
+            ><b id="blocked">—</b></span
           ><label
-            >状态
-            <select id="state">
-              <option value="">全部</option>
-              <option value="running">运行中</option>
-              <option value="ready">就绪</option>
-              <option value="waiting_dependencies">等待依赖</option>
-              <option value="succeeded">已完成</option>
-              <option value="blocked">阻塞</option>
-              <option value="failed">失败</option>
-              <option value="needs_reconciliation">待核对</option>
-              <option value="unknown">未知</option>
-              <option value="paused">暂停</option>
-              <option value="retry_wait">重试等待</option>
-            </select></label
-          >
+            ><span data-i18n="html.6320b4a872"></span
+            ><select id="state">
+              <option value="" data-i18n="html.5c55a67935"></option>
+              <option value="running" data-i18n="html.1f0eb99b7e"></option>
+              <option value="ready" data-i18n="html.b073db9c0b"></option>
+              <option
+                value="waiting_dependencies"
+                data-i18n="html.74dfc51e13"
+              ></option>
+              <option value="succeeded" data-i18n="html.f28461bb49"></option>
+              <option value="blocked" data-i18n="html.9059acb498"></option>
+              <option value="failed" data-i18n="html.28384d7afd"></option>
+              <option
+                value="needs_reconciliation"
+                data-i18n="html.33df16b4af"
+              ></option>
+              <option value="unknown" data-i18n="html.4d8c1c5b42"></option>
+              <option value="paused" data-i18n="html.8d12fc0d4e"></option>
+              <option
+                value="retry_wait"
+                data-i18n="html.9203b8b6f3"
+              ></option></select
+          ></label>
         </div>
         <section id="map-panel" class="map-panel">
           <div class="map-heading">
-            <span>多 AGENT 实时协作</span
+            <span data-i18n="html.6a0065a31c"></span
             ><span class="legend"
-              ><i class="publish-line"></i>发送消息
-              <i class="context-line"></i>定向投递 / 上下文</span
-            >
+              ><i class="publish-line"></i
+              ><span data-i18n="html.008814832c"></span
+              ><i class="context-line"></i
+              ><span data-i18n="html.907366ef5d"></span
+            ></span>
             <button
               id="maximize-graph"
               class="maximize"
-              aria-label="放大协作图"
+              aria-label=""
               aria-pressed="false"
-            >
-              ↗ 放大
-            </button>
+              data-i18n="html.5a2a22c0d8"
+              data-i18n-aria-label="html.3ea5b60711"
+            ></button>
           </div>
           <div
             id="graph"
             class="graph"
-            aria-label="水晶球公共板与多 agent 实时协作图"
+            aria-label=""
+            data-i18n-aria-label="html.4133b52696"
           ></div>
           <div class="map-foot">
             <span id="graph-limit"></span><span id="sample-time"></span>
@@ -176,28 +232,35 @@
         </section>
         <div class="chat-heading">
           <div>
-            <button id="chat-title" class="chat-title" title="返回公共群聊">
-              # 协作群聊
-            </button>
+            <button
+              id="chat-title"
+              class="chat-title"
+              title=""
+              data-i18n="html.063ab25cde"
+              data-i18n-title="html.1db8648ff1"
+            ></button>
           </div>
           <span id="message-count"></span
-          ><button id="open-profile" class="profile-toggle">数字人看板</button>
+          ><button
+            id="open-profile"
+            class="profile-toggle"
+            data-i18n="html.d805b8194e"
+          ></button>
           <button
             id="collapse-chat"
             class="panel-toggle"
             aria-controls="timeline"
             aria-expanded="true"
-          >
-            ⌄ 收起
-          </button>
+            data-i18n="html.8b82c245e6"
+          ></button>
           <button
             id="maximize-chat"
             class="maximize"
-            aria-label="放大对话窗口"
+            aria-label=""
             aria-pressed="false"
-          >
-            ↗ 放大
-          </button>
+            data-i18n="html.5a2a22c0d8"
+            data-i18n-aria-label="html.f4dfbc2ea2"
+          ></button>
         </div>
         <div
           id="timeline"
@@ -207,8 +270,8 @@
         ></div>
         <div class="composer">
           <span>◈</span>
-          <p>实时同步协作消息</p>
-          <span class="readonly">点击数字人查看会话</span>
+          <p data-i18n="html.11e1b1c135"></p>
+          <span class="readonly" data-i18n="html.daaa4d148b"></span>
         </div>
       </main>
       <aside id="right-sidebar" class="inspector">
@@ -217,17 +280,24 @@
           class="sidebar-resizer"
           role="separator"
           tabindex="0"
-          aria-label="调整右侧栏宽度"
+          aria-label=""
           aria-orientation="vertical"
           aria-controls="right-sidebar"
+          data-i18n-aria-label="html.5b4ad1f893"
         ></div>
         <div class="inspector-heading">
           <p class="eyebrow">DIGITAL PERSONA</p>
-          <h2>数字人看板</h2>
-          <button id="close-profile" aria-label="关闭数字人看板">×</button>
+          <h2 data-i18n="html.d805b8194e"></h2>
+          <button
+            id="close-profile"
+            aria-label=""
+            data-i18n-aria-label="html.639ade44a5"
+          >
+            ×
+          </button>
         </div>
         <div id="detail" class="detail">
-          <div class="empty">点击头像、@名字或协作图节点查看数字人。</div>
+          <div class="empty" data-i18n="html.07ea6c3d6a"></div>
         </div>
       </aside>
     </div>
@@ -235,13 +305,17 @@
       id="messages-page"
       class="system-page"
       aria-labelledby="messages-title"
-      hidden
+      hidden=""
     >
       <div class="system-page-heading">
         <div>
           <p class="eyebrow">SYSTEM MESSAGES</p>
-          <h1 id="messages-title" tabindex="-1">系统消息</h1>
-          <p>查看服务告警、连接状态与恢复记录。</p>
+          <h1
+            id="messages-title"
+            tabindex="-1"
+            data-i18n="html.4ce218874b"
+          ></h1>
+          <p data-i18n="html.af7be96126"></p>
         </div>
         <span id="system-message-count" class="status-pill"></span>
       </div>
@@ -250,174 +324,106 @@
         class="system-messages"
         aria-live="polite"
       ></div>
-      <p class="system-note">保留本次打开页面期间最近 100 条状态记录。</p>
+      <p class="system-note" data-i18n="html.c026327733"></p>
     </main>
     <main
       id="settings-page"
       class="system-page"
       aria-labelledby="settings-title"
-      hidden
+      hidden=""
     >
       <div class="system-page-heading">
         <div>
           <p class="eyebrow">SYSTEM SETTINGS</p>
-          <h1 id="settings-title" tabindex="-1">系统设置</h1>
-          <p>管理数字人，调整观察体验，了解服务运行情况。</p>
+          <h1
+            id="settings-title"
+            tabindex="-1"
+            data-i18n="html.68ea5dd4d7"
+          ></h1>
+          <p data-i18n="html.4f52977b45"></p>
         </div>
       </div>
       <div class="settings-layout">
-        <nav class="settings-nav" aria-label="设置分类">
+        <nav
+          class="settings-nav"
+          aria-label=""
+          data-i18n-aria-label="html.dfb699c543"
+        >
           <button
             id="settings-nav-people"
             aria-controls="settings-people"
             aria-current="page"
           >
-            数字人<span>成员、角色与记忆</span>
+            <span data-i18n="html.b901660d9e"></span
+            ><span data-i18n="html.9850e5979c"></span>
           </button>
           <button
             id="settings-nav-executors"
             aria-controls="settings-executors"
           >
-            执行技术<span>Coding agent 与模型</span>
+            <span data-i18n="html.d43d31419b"></span
+            ><span data-i18n="html.444c067ef8"></span>
           </button>
           <button
             id="settings-nav-observation"
             aria-controls="settings-observation"
           >
-            观察体验<span>跟随与动态图效</span>
+            <span data-i18n="html.89c9159183"></span
+            ><span data-i18n="html.4c4860c062"></span>
           </button>
           <button
             id="settings-nav-evolution"
             aria-controls="settings-evolution"
           >
-            群体演化<span>策略谱系与开发集证据</span>
-          </button>
-          <button
-            id="settings-nav-communication"
-            aria-controls="settings-communication"
-          >
-            协作通信<span>群、成员与投递状态</span>
+            <span data-i18n="html.eb6ff3e82b"></span
+            ><span data-i18n="html.de0fca0af2"></span>
           </button>
           <button id="settings-nav-service" aria-controls="settings-service">
-            运行信息<span>服务与公共知识库</span>
+            <span data-i18n="html.0020a68469"></span
+            ><span data-i18n="html.36226ac061"></span>
           </button>
         </nav>
         <div class="settings-content">
           <section
             id="settings-evolution"
             class="settings-panel settings-card"
-            hidden
+            hidden=""
           >
-            <h2>群体演化</h2>
-            <p class="system-note">
-              数字人的身份与记忆保持连续；策略版本通过分支、评估和证据积累演化。后代的贡献与当前版本的表现分别观察。
-            </p>
+            <h2 data-i18n="html.eb6ff3e82b"></h2>
+            <p class="system-note" data-i18n="html.0cb566fbee"></p>
             <div class="crystal-controls">
-              <button id="lineage-refresh">读取谱系证据</button
-              ><button id="lineage-next" hidden>下一页</button>
+              <button id="lineage-refresh" data-i18n="html.016c5ace55"></button
+              ><button
+                id="lineage-next"
+                hidden=""
+                data-i18n="html.8a8542f696"
+              ></button>
             </div>
             <p id="lineage-status" role="status"></p>
             <dl id="lineage-budget" class="crystal-metrics"></dl>
             <div id="lineage-nodes"></div>
-            <p class="system-note">
-              谱系统计仅使用开发集。候选策略的启用仍须通过既有评估与发布门禁。
-            </p>
-          </section>
-          <section
-            id="settings-communication"
-            class="settings-panel settings-card"
-            hidden
-          >
-            <h2>协作通信</h2>
-            <p class="system-note">
-              同一个数字人可加入多个主题群。私聊的参与范围创建后保持固定。
-            </p>
-            <dl id="crystal-metrics" class="crystal-metrics"></dl>
-            <div class="crystal-controls">
-              <input
-                id="crystal-search"
-                type="search"
-                aria-label="搜索协作群"
-                placeholder="搜索群名或主题"
-              /><button id="crystal-search-button">查找</button
-              ><button id="crystal-next" hidden>下一页</button>
-            </div>
-            <div id="crystal-directory" class="crystal-directory"></div>
-            <form id="crystal-create" class="crystal-form">
-              <h3>创建会话</h3>
-              <label
-                >名称<input
-                  id="crystal-title"
-                  required
-                  maxlength="80"
-                  placeholder="例如：长期记忆的边界"
-              /></label>
-              <label
-                >讨论主题<textarea
-                  id="crystal-topic"
-                  required
-                  maxlength="600"
-                  placeholder="共同探讨的问题、已有观察或待验证假设"
-                ></textarea>
-              </label>
-              <label
-                >会话类型<select id="crystal-private">
-                  <option value="false">协作群</option>
-                  <option value="true">私聊 / 多人私聊</option>
-                </select></label
-              >
-              <fieldset>
-                <legend>选择数字人</legend>
-                <input
-                  id="crystal-member-search"
-                  type="search"
-                  aria-label="筛选成员花名"
-                  placeholder="按花名筛选"
-                />
-                <div id="crystal-member-picker"></div>
-                <button id="crystal-more-people" type="button">
-                  加载更多数字人
-                </button>
-              </fieldset>
-              <button type="submit">创建会话</button>
-              <p id="crystal-form-status" role="status"></p>
-            </form>
-            <section id="crystal-room-settings" hidden>
-              <h3 id="crystal-selected-title"></h3>
-              <div class="crystal-controls">
-                <button id="crystal-pin">置顶</button
-                ><button id="crystal-archive">归档</button
-                ><button id="crystal-open">打开聊天</button>
-              </div>
-              <button id="crystal-add-members" type="button">
-                将上方所选数字人加入此群
-              </button>
-              <div id="crystal-members"></div>
-              <button id="crystal-more-members" hidden>更多成员</button>
-            </section>
+            <p class="system-note" data-i18n="html.77eda903d5"></p>
           </section>
           <section
             id="settings-observation"
             class="settings-panel settings-card"
             aria-labelledby="observation-settings"
-            hidden
+            hidden=""
           >
-            <h2 id="observation-settings">观察设置</h2>
+            <h2 id="observation-settings" data-i18n="html.77fa8f3f54"></h2>
             <label class="setting-row"
               ><span
-                ><strong>跟随当前研究</strong
-                ><small
-                  >新研究开始时自动切换协作群；手动选择会话会暂停跟随。</small
-                ></span
+                ><strong data-i18n="html.a42a7c721d"></strong
+                ><small data-i18n="html.77523398d2"></small></span
               ><input id="setting-follow" type="checkbox"
             /></label>
             <label class="setting-row"
               ><span
-                ><strong>动态图效</strong
-                ><small>显示数字人活动和协作图中的动态连线。</small></span
+                ><strong data-i18n="html.572331f30d"></strong
+                ><small data-i18n="html.0ca90b2089"></small></span
               ><input id="setting-motion" type="checkbox"
             /></label>
-            <p class="system-note">这些偏好保存在当前浏览器中。</p>
+            <p class="system-note" data-i18n="html.b4ec8877ed"></p>
           </section>
           <section
             id="settings-people"
@@ -426,95 +432,114 @@
           >
             <div id="people-list" class="settings-card">
               <div class="people-heading">
-                <h2 id="people-settings">数字人名册</h2>
-                <button id="create-person">＋ 新增数字人</button>
+                <h2 id="people-settings" data-i18n="html.7438a400ae"></h2>
+                <button id="create-person" data-i18n="html.cbb0a36288"></button>
               </div>
-              <p class="system-note">
-                固定成员跨群复用；临时成员可以转为固定；研究成员保留独立身份与记忆。
-              </p>
+              <p class="system-note" data-i18n="html.2e0702fa29"></p>
               <div id="people-defaults" class="people-defaults"></div>
 
               <div class="people-filters">
                 <input
                   id="people-search"
-                  placeholder="搜索花名、角色、研究方向"
-                  aria-label="搜索数字人"
+                  placeholder=""
+                  aria-label=""
+                  data-i18n-placeholder="html.9741b84958"
+                  data-i18n-aria-label="html.4518c8c8ab"
                 /><label
-                  ><input id="people-temporary" type="checkbox" />
-                  显示临时成员</label
-                >
+                  ><input id="people-temporary" type="checkbox" /><span
+                    data-i18n="html.b880d1840d"
+                  ></span
+                ></label>
               </div>
               <div id="people-directory" class="people-directory"></div>
-              <button id="people-more" hidden>加载更多数字人</button>
+              <button
+                id="people-more"
+                hidden=""
+                data-i18n="html.4a17ebde4e"
+              ></button>
               <p id="people-settings-status" role="status"></p>
             </div>
-            <form id="person-form" class="person-form" hidden>
-              <h3 id="person-form-title">新增数字人</h3>
+            <form id="person-form" class="person-form" hidden="">
+              <h3 id="person-form-title" data-i18n="html.e47aec6e4e"></h3>
               <label
-                >花名<input
+                ><span data-i18n="html.6ec7d273ff"></span
+                ><input
                   id="person-name"
                   maxlength="32"
-                  placeholder="留空自动取一个不重复的花名"
+                  placeholder=""
+                  data-i18n-placeholder="html.b7e7f344fe"
               /></label>
               <div class="form-columns">
-                <label>专长<select id="person-role"></select></label
+                <label
+                  ><span data-i18n="html.9f5e8b5c9b"></span
+                  ><select id="person-role"></select></label
                 ><label
-                  >成员类型<select id="person-kind">
-                    <option value="fixed">固定成员</option>
-                    <option value="temporary">临时成员</option>
-                    <option value="research">研究成员</option>
-                  </select></label
-                >
+                  ><span data-i18n="html.dedd0eb74d"></span
+                  ><select id="person-kind">
+                    <option value="fixed" data-i18n="html.386ac4789d"></option>
+                    <option
+                      value="temporary"
+                      data-i18n="html.e3423f6204"
+                    ></option>
+                    <option
+                      value="research"
+                      data-i18n="html.470ee88c16"
+                    ></option></select
+                ></label>
               </div>
               <label
-                >研究方向 / 用途<input
+                ><span data-i18n="html.ce64a0a4d0"></span
+                ><input
                   id="person-purpose"
                   maxlength="300"
-                  placeholder="例如：研究跨会话记忆的可靠性"
+                  placeholder=""
+                  data-i18n-placeholder="html.004fe961a2"
               /></label>
               <label
                 >Soul<textarea
                   id="person-soul"
                   rows="4"
                   maxlength="1200"
-                  placeholder="描述它如何倾听、思考和表达；权限由任务决定。"
+                  placeholder=""
+                  data-i18n-placeholder="html.47cc257ff2"
                 ></textarea>
               </label>
               <div class="form-actions">
-                <button type="submit" id="save-person">保存数字人</button
-                ><button type="button" id="cancel-person">取消</button
+                <button
+                  type="submit"
+                  id="save-person"
+                  data-i18n="html.06e8bea502"
+                ></button
+                ><button
+                  type="button"
+                  id="cancel-person"
+                  data-i18n="html.2cd0f3be87"
+                ></button
                 ><span id="person-form-status" role="status"></span>
               </div>
             </form>
-            <div id="person-inline-host" hidden></div>
+            <div id="person-inline-host" hidden=""></div>
           </section>
           <section
             id="settings-executors"
             class="settings-panel settings-card"
             aria-labelledby="settings-nav-executors"
-            hidden
+            hidden=""
           >
-            <h2>执行技术</h2>
-            <p class="system-note">
-              数字人使用 coding agent
-              完成任务。身份、Soul、记忆和会话由水晶球管理；每次执行单独记录所用技术和模型。
-            </p>
+            <h2 data-i18n="html.d43d31419b"></h2>
+            <p class="system-note" data-i18n="html.5b0744a01b"></p>
             <div id="executor-directory"></div>
-            <p class="system-note">
-              此处展示服务已配置的技术及其声明能力，不代表模型质量或兼容性验证。进入数字人的「执行技术」页选择使用方式；接入程序由服务配置管理。
-            </p>
+            <p class="system-note" data-i18n="html.95df6fbff5"></p>
           </section>
           <section
             id="settings-service"
             class="settings-panel settings-card"
             aria-labelledby="service-settings"
-            hidden
+            hidden=""
           >
-            <h2 id="service-settings">服务运行信息</h2>
+            <h2 id="service-settings" data-i18n="html.af38cee97b"></h2>
             <dl id="service-settings-info"></dl>
-            <p class="system-note">
-              运行参数由服务配置管理，此处展示当前状态。
-            </p>
+            <p class="system-note" data-i18n="html.9e6e0cc106"></p>
           </section>
         </div>
       </div>
@@ -523,22 +548,23 @@
       <div class="session-heading">
         <div id="person-avatar"></div>
         <div class="session-heading-text">
-          <h2 id="person-title">数字人</h2>
+          <h2 id="person-title" data-i18n="html.b901660d9e"></h2>
           <p id="person-subtitle"></p>
         </div>
         <button
           id="maximize-person"
-          aria-label="放大数字人窗口"
+          aria-label=""
           aria-pressed="false"
-        >
-          ↗ 放大
-        </button>
-        <button id="edit-person">编辑资料</button
-        ><button id="promote-person">转为固定成员</button
+          data-i18n="html.5a2a22c0d8"
+          data-i18n-aria-label="html.fc135ef1ff"
+        ></button>
+        <button id="edit-person" data-i18n="html.6e7ecbfdeb"></button
+        ><button id="promote-person" data-i18n="html.c6d37f9664"></button
         ><button
           id="close-person"
           class="window-close"
-          aria-label="关闭数字人窗口"
+          aria-label=""
+          data-i18n-aria-label="html.693a4aec52"
         >
           ×
         </button>
@@ -550,58 +576,80 @@
           <p id="person-purpose-view"></p>
         </section>
         <div class="person-tabs">
-          <button id="person-tab-history" class="active">全部会话</button
-          ><button id="person-tab-memory">记忆</button>
-          <button id="person-tab-execution">执行技术</button>
+          <button
+            id="person-tab-history"
+            class="active"
+            data-i18n="html.19c6c208f9"
+          ></button
+          ><button id="person-tab-memory" data-i18n="html.7a6335b379"></button>
+          <button
+            id="person-tab-execution"
+            data-i18n="html.d43d31419b"
+          ></button>
         </div>
         <section id="person-history-panel">
-          <p class="system-note">
-            按数字人汇总各群、各任务和执行轮次，切换群不会丢失会话。
-          </p>
+          <p class="system-note" data-i18n="html.a6ad9f354c"></p>
           <div id="person-history-list"></div>
-          <button id="person-history-more" hidden>更早的会话</button>
+          <button
+            id="person-history-more"
+            hidden=""
+            data-i18n="html.5001a53994"
+          ></button>
         </section>
-        <section id="person-execution-panel" hidden>
-          <p class="system-note">
-            选择这个数字人使用的 coding agent
-            和模型。修改只影响新任务，已有会话和重试继续使用原绑定；身份与记忆保持连续。
-          </p>
+        <section id="person-execution-panel" hidden="">
+          <p class="system-note" data-i18n="html.a55eb62254"></p>
           <form id="person-execution-form" class="person-form">
-            <label>执行技术<select id="person-backend"></select></label>
-            <label>模型<select id="person-model"></select></label>
+            <label
+              ><span data-i18n="html.d43d31419b"></span
+              ><select id="person-backend"></select
+            ></label>
+            <label
+              ><span data-i18n="html.c98e118e0a"></span
+              ><select id="person-model"></select
+            ></label>
             <p id="person-execution-description" class="system-note"></p>
-            <button id="save-person-execution" type="submit">
-              保存执行偏好
-            </button>
+            <button
+              id="save-person-execution"
+              type="submit"
+              data-i18n="html.7aeeab94b4"
+            ></button>
             <p id="person-execution-status" role="status"></p>
           </form>
         </section>
-        <section id="person-memory-panel" hidden>
-          <div id="person-memory-stats" class="memory-stats">
-            记忆由 relay-memory 管理
-          </div>
+        <section id="person-memory-panel" hidden="">
+          <div
+            id="person-memory-stats"
+            class="memory-stats"
+            data-i18n="html.3a1aa40c43"
+          ></div>
           <form id="person-recall-form" class="memory-query">
             <input
               id="person-memory-query"
               maxlength="1000"
-              placeholder="想起哪些研究线索？"
-              aria-label="记忆查询"
-            /><button type="submit">召回记忆</button>
+              placeholder=""
+              aria-label=""
+              data-i18n-placeholder="html.4ea2f51d29"
+              data-i18n-aria-label="html.9859181adc"
+            /><button type="submit" data-i18n="html.1a31fbbea4"></button>
           </form>
           <div id="person-memory-events"></div>
           <form id="person-note-form">
             <label
-              >为这个数字人记下一件事<textarea
+              ><span data-i18n="html.1bdfe84975"></span
+              ><textarea
                 id="person-memory-note"
                 rows="3"
                 maxlength="1000"
-                placeholder="偏好、研究线索、尚未解决的问题或证据位置"
+                placeholder=""
+                data-i18n-placeholder="html.671d60e758"
               ></textarea></label
-            ><button id="person-remember" type="submit">保存到记忆</button>
+            ><button
+              id="person-remember"
+              type="submit"
+              data-i18n="html.342aa3d4c1"
+            ></button>
           </form>
-          <p class="system-note">
-            后续任务使用已固定的记忆上下文；运行中的实验保持原有输入。不要记录凭证或私有评测答案。
-          </p>
+          <p class="system-note" data-i18n="html.64ead7562a"></p>
         </section>
         <p id="person-status" role="status"></p>
       </div>
@@ -610,22 +658,27 @@
       <div class="session-heading">
         <div id="session-avatar"></div>
         <div class="session-heading-text">
-          <h2 id="session-title">数字人会话</h2>
+          <h2 id="session-title" data-i18n="html.55e9a59ab8"></h2>
           <p id="session-subtitle"></p>
         </div>
-        <button id="session-profile" class="profile-toggle">数字人看板</button>
+        <button
+          id="session-profile"
+          class="profile-toggle"
+          data-i18n="html.d805b8194e"
+        ></button>
         <button
           id="maximize-session"
           class="maximize"
-          aria-label="放大会话窗口"
+          aria-label=""
           aria-pressed="false"
-        >
-          ↗ 放大
-        </button>
+          data-i18n="html.5a2a22c0d8"
+          data-i18n-aria-label="html.ab0e65157f"
+        ></button>
         <button
           id="close-session"
           class="window-close"
-          aria-label="关闭会话窗口"
+          aria-label=""
+          data-i18n-aria-label="html.34f762cba0"
         >
           ×
         </button>
@@ -633,11 +686,16 @@
       <div
         id="session-history"
         class="session-history"
-        aria-label="会话历史"
+        aria-label=""
+        data-i18n-aria-label="html.9ec4b72399"
       ></div>
       <div class="session-footer">
-        <span id="session-status" role="status">正在读取会话…</span>
-        <button id="session-latest">回到最新 ↓</button>
+        <span
+          id="session-status"
+          role="status"
+          data-i18n="html.c4de4ad42c"
+        ></span>
+        <button id="session-latest" data-i18n="html.2539e70292"></button>
       </div>
     </dialog>
   </body>

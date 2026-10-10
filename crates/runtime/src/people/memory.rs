@@ -120,7 +120,7 @@ pub fn inspect_memory(c: &Config, id: &str, query: &str) -> Result<Value> {
             {
                 let record: Value = storage::read(&entry.path())?;
                 checked += 1;
-                if record["state"] != "done" {
+                if MemoryWriteback::from_value(&record["state"]) != Some(MemoryWriteback::Done) {
                     unknown += 1;
                 }
             }
@@ -128,7 +128,7 @@ pub fn inspect_memory(c: &Config, id: &str, query: &str) -> Result<Value> {
     }
     Ok(
         json!({"person_id":id,"provider":"relay-memory","stats":stats,"events":events,"checked_writebacks":checked,"unconfirmed_writebacks":unknown,
-        "notice":"记忆是历史线索。每次实验使用已固定的上下文；研究结论仍以 SuperPOD 和证据为准。"}),
+        "notice":contracts::ApiNotice::MemoryScope.notice(json!({}))}),
     )
 }
 /// Host receipt journal prevents replay after success or an ambiguous process exit.
@@ -159,12 +159,12 @@ fn remember(
             "memory request key already binds different input"
         );
         ensure!(
-            prior["state"] == "done",
+            MemoryWriteback::from_value(&prior["state"]) == Some(MemoryWriteback::Done),
             "memory write outcome unknown; reconciliation required"
         );
         return Ok(prior);
     }
-    let mut record = json!({"state":"running","input_sha256":digest,"session":session,"at":now()});
+    let mut record = json!({"state":MemoryWriteback::Running,"input_sha256":digest,"session":session,"at":now()});
     storage::write(&path, &record)?;
     let result = call(
         c,
@@ -183,13 +183,13 @@ fn remember(
     );
     match result {
         Ok(event) => {
-            record["state"] = json!("done");
+            record["state"] = json!(MemoryWriteback::Done);
             record["event_id"] = event["id"].clone();
             storage::write(&path, &record)?;
             Ok(record)
         }
         Err(error) => {
-            record["state"] = json!("unknown");
+            record["state"] = json!(MemoryWriteback::Unknown);
             record["error"] = json!(error.to_string());
             storage::write(&path, &record)?;
             Err(error)
@@ -208,14 +208,14 @@ pub fn remember_note(c: &Config, id: &str, request_id: &str, note: &str) -> Resu
         id,
         &format!("note:{request_id}"),
         "profile-notes",
-        "用户为数字人记录的偏好、研究线索与待解问题",
+        "User-recorded persona preferences, research leads and open questions",
         note,
         json!({"origin":"user_note","request_id":request_id}),
     )
 }
 pub(in crate::people) fn writeback(c: &Config, job: &Job, receipt: &Value) -> Result<Value> {
     let Some(person) = &job.persona else {
-        return Ok(json!({"state":"not_enabled"}));
+        return Ok(json!({"state":MemoryWriteback::NotEnabled}));
     };
     // Persist a concise public result and immutable evidence references, not prompts,
     // private conversations, raw runs, holdouts, credentials or another person's store.
@@ -224,7 +224,10 @@ pub(in crate::people) fn writeback(c: &Config, job: &Job, receipt: &Value) -> Re
         .as_str()
         .unwrap_or_default()
         .to_owned();
-    for (field, label) in [("findings", "发现"), ("limitations", "局限 / 待解问题")] {
+    for (field, label) in [
+        ("findings", "Findings"),
+        ("limitations", "Limitations / open questions"),
+    ] {
         for line in checkpoint[field]
             .as_array()
             .into_iter()

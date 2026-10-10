@@ -1,0 +1,43 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_binary", "rust_test")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+exports_files(["Cargo.toml"])
+rust_library(
+    name = "im_service",
+    crate_name = "im_service",
+    srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
+    crate_root = "src/lib.rs",
+    compile_data = ["//crates/im-service/web:assets", "//crates/im-service/web:checked"],
+    edition = "2024",
+    aliases = aliases(),
+    deps = ["//web/shared:web_assets", "//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/crystal:crystal", "//crates/service-api:service_api", "//crates/im-storage:im_storage", "//crates/storage:storage"] + all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+)
+rust_binary(
+    name = "ai-im",
+    srcs = ["src/main.rs"],
+    edition = "2024",
+    aliases = aliases(),
+    deps = [":im_service", "//crates/storage:storage"] + all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+)
+rust_test(
+    name = "tests",
+    crate = ":im_service",
+    aliases = aliases(normal_dev = True, proc_macro_dev = True),
+    deps = all_crate_deps(normal_dev = True),
+    proc_macro_deps = all_crate_deps(proc_macro_dev = True),
+    visibility = ["//visibility:public"],
+)
+pkg_tar(
+    name = "package",
+    srcs = [":ai-im", "//crates/im-storage:ai-im-storage", "//crates/im-storage:units", "//crates/service-workers:ai-im-services", "//crates/service-workers:units", "systemd/ai-im.service"],
+    package_dir = "ai-im",
+    extension = "tar.gz",
+    mode = "0755",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])

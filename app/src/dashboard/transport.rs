@@ -2,22 +2,21 @@
 use super::*;
 use axum::{
     Router,
-    body::{Body, to_bytes},
-    extract::{Query, Request, State},
+    extract::{Request, State},
     http::{HeaderMap, StatusCode},
     response::{
         IntoResponse, Response, Sse,
         sse::{Event, KeepAlive},
     },
-    routing::{get, post},
+    routing::get,
 };
-use crystal::{Hub, Publish};
-use serde::Deserialize;
+use im_storage::Client as Hub;
 use std::convert::Infallible;
 use tokio::sync::{Semaphore, watch};
 
 #[derive(Clone)]
 pub(super) struct Web {
+    pub services: Option<Arc<service_api::Registry>>,
     pub hub: Hub,
     pub operator: Option<Arc<super::operator::Operator>>,
     pub addr: SocketAddr,
@@ -30,7 +29,7 @@ pub(super) struct Web {
 }
 impl Web {
     pub fn new(
-        hub: Hub,
+        hub: impl Into<Hub>,
         addr: SocketAddr,
         config: Option<Arc<Config>>,
         snapshot: Shared,
@@ -38,7 +37,8 @@ impl Web {
         shutdown: watch::Sender<bool>,
     ) -> Self {
         Self {
-            hub,
+            services: None,
+            hub: hub.into(),
             operator: None,
             addr,
             config,
@@ -51,225 +51,29 @@ impl Web {
     }
 }
 pub(super) fn router(web: Web) -> Router {
-    Router::new()
-        .merge(super::operator::routes())
-        .route("/api/crystal/send", post(send))
-        .route("/api/crystal/stream", get(stream))
-        .route("/api/crystal/ack", post(ack))
-        .route("/api/crystal/presence", post(presence))
-        .route("/api/crystal/manage", post(super::rooms::manage))
-        .route("/api/crystal/view", get(super::rooms::view))
-        .route("/api/crystal/events", get(super::rooms::events))
+    let mut core = im_service::transport::Web::new(web.hub.clone(), web.addr, web.shutdown.clone());
+    core.services = web.services.clone();
+    core.operator = web.operator.clone();
+    if let Some(config) = &web.config {
+        core.scenarios = Arc::new(vec![
+            Arc::new(im_service::Collaboration),
+            Arc::new(super::research_scenario::Research(config.clone())),
+        ]);
+    }
+    let application = Router::new()
         .route("/api/events", get(snapshots))
-        .fallback(resource)
-        .layer(axum::middleware::from_fn_with_state(
-            web.clone(),
-            super::operator::protect,
-        ))
-        .with_state(web)
+        .route("/api/snapshot", get(resource))
+        .route("/api/people", get(resource).post(resource))
+        .route("/api/people/{id}", get(resource))
+        .route("/api/profile/{id}", get(resource))
+        .route("/api/session/{id}", get(resource))
+        .route("/api/evolution/lineage", get(resource))
+        .route("/apps/research/", get(resource))
+        .route("/apps/research/{*asset}", get(resource))
+        .with_state(web);
+    im_service::transport::router(core, application)
 }
-pub(super) fn boundary(headers: &HeaderMap, addr: SocketAddr) -> Result<()> {
-    let mut request = "GET / HTTP/1.1\r\n".to_owned();
-    for (key, value) in headers {
-        request.push_str(key.as_str());
-        request.push_str(": ");
-        request.push_str(value.to_str()?);
-        request.push_str("\r\n");
-    }
-    request.push_str("\r\n");
-    ensure!(request.len() <= 8192, "headers exceed bound");
-    allowed_request(&request, addr)?;
-    Ok(())
-}
-pub(super) fn intent(headers: &HeaderMap, addr: SocketAddr, value: &str) -> Result<()> {
-    boundary(headers, addr)?;
-    ensure!(
-        headers.get_all("origin").iter().count() == 1
-            && headers
-                .get("content-type")
-                .is_some_and(|v| v == "application/json")
-            && headers.get("x-crystal-intent").is_some_and(|v| v == value),
-        "same-origin JSON intent required"
-    );
-    Ok(())
-}
-fn token(headers: &HeaderMap) -> Result<&str> {
-    ensure!(
-        headers.get_all("authorization").iter().count() == 1,
-        "credential required"
-    );
-    headers
-        .get("authorization")
-        .context("credential required")?
-        .to_str()?
-        .strip_prefix("Bearer ")
-        .context("bearer credential required")
-}
-pub(super) fn error(error: impl std::fmt::Display) -> Response {
-    let text = error.to_string();
-    let code = if text.contains("backpressure") {
-        StatusCode::TOO_MANY_REQUESTS
-    } else if text.contains("writer fault") {
-        StatusCode::SERVICE_UNAVAILABLE
-    } else {
-        StatusCode::BAD_REQUEST
-    };
-    response(
-        code,
-        "application/json",
-        serde_json::to_vec(&json!({"error":sessions::text_field(&json!(text),1000)})).unwrap(),
-    )
-}
-pub(super) fn response(status: StatusCode, mime: &str, body: impl Into<Body>) -> Response {
-    Response::builder().status(status).header("content-type",mime).header("cache-control","no-store")
-        .header("x-content-type-options","nosniff").header("referrer-policy","no-referrer")
-        .header("content-security-policy","default-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
-        .body(body.into()).unwrap()
-}
-pub(super) fn json_response(result: Result<Value>) -> Response {
-    match result {
-        Ok(value) => response(
-            StatusCode::OK,
-            "application/json",
-            serde_json::to_vec(&value).unwrap(),
-        ),
-        Err(e) => error(e),
-    }
-}
-pub(super) async fn body(request: Request, max: usize) -> Result<Vec<u8>> {
-    let body =
-        tokio::time::timeout(Duration::from_secs(2), to_bytes(request.into_body(), max)).await??;
-    Ok(body.to_vec())
-}
-async fn send(State(web): State<Web>, request: Request) -> Response {
-    let result = async {
-        boundary(request.headers(), web.addr)?;
-        let token = token(request.headers())?.to_owned();
-        let input: Publish = serde_json::from_slice(&body(request, 16 * 1024).await?)?;
-        Ok(json!(web.hub.publish(&token, input).await?))
-    }
-    .await;
-    json_response(result)
-}
-#[derive(Deserialize)]
-struct Ack {
-    group_id: String,
-    sequence: u64,
-}
-async fn ack(State(web): State<Web>, request: Request) -> Response {
-    let result = async {
-        boundary(request.headers(), web.addr)?;
-        let token = token(request.headers())?.to_owned();
-        let input: Ack = serde_json::from_slice(&body(request, 2048).await?)?;
-        web.hub
-            .acknowledge(&token, &input.group_id, input.sequence)
-            .await?;
-        Ok(json!({"acknowledged":input.sequence}))
-    }
-    .await;
-    json_response(result)
-}
-#[derive(Deserialize)]
-struct StateChange {
-    state: crystal::Presence,
-}
-async fn presence(State(web): State<Web>, request: Request) -> Response {
-    let result = async {
-        boundary(request.headers(), web.addr)?;
-        let actor = web.hub.authenticate(token(request.headers())?)?;
-        let input: StateChange = serde_json::from_slice(&body(request, 1024).await?)?;
-        web.hub.set_presence(&actor, input.state).await?;
-        Ok(json!(web.hub.presence(&actor)?))
-    }
-    .await;
-    json_response(result)
-}
-#[derive(Deserialize)]
-struct StreamQuery {
-    group_id: String,
-    after: Option<u64>,
-}
-async fn stream(
-    State(web): State<Web>,
-    headers: HeaderMap,
-    Query(query): Query<StreamQuery>,
-) -> Response {
-    let setup = async {
-        boundary(&headers, web.addr)?;
-        let token = token(&headers)?.to_owned();
-        let actor = web.hub.authenticate(&token)?;
-        let expiry = web.hub.grant_expiry(&token)?;
-        let subscription = web.hub.subscribe(&actor, &query.group_id)?;
-        let after = if let Some(after) = query.after {
-            after
-        } else if let Some(after) = headers.get("last-event-id") {
-            after.to_str()?.parse()?
-        } else {
-            web.hub.cursor(&actor, &query.group_id).await?
-        };
-        ensure!(
-            after <= web.hub.group(&query.group_id)?.last_sequence,
-            "cursor exceeds conversation history"
-        );
-        let permit = web
-            .streams
-            .clone()
-            .try_acquire_owned()
-            .context("stream backpressure")?;
-        Ok::<_, anyhow::Error>((token, expiry, subscription, after, permit))
-    }
-    .await;
-    let (token, expiry, mut subscription, mut cursor, permit) = match setup {
-        Ok(v) => v,
-        Err(e) => return error(e),
-    };
-    let mut shutdown = web.shutdown.subscribe();
-    let source = async_stream::stream! {
-        let _permit=permit;
-        yield Ok::<_,Infallible>(Event::default().event("ready").data("{}"));
-        let expires=tokio::time::sleep(Duration::from_millis(expiry.saturating_sub(crystal::now_ms())));tokio::pin!(expires);
-        let mut replay=true;
-        'delivery: loop {
-            if *shutdown.borrow() {break;}
-            if web.hub.authenticate(&token).is_err(){yield Ok(Event::default().event("revoked").data("{}"));break;}
-            match subscription.receives() {
-                Err(error)=>{let kind=if error.to_string().contains("writer fault"){"fault"}else{"revoked"};yield Ok(Event::default().event(kind).data("{}"));break;}
-                Ok(false)=>{
-                    tokio::select!{_ = shutdown.changed()=>break,_=&mut expires=>break,_=subscription.wait_control()=>{}}
-                    replay=true;continue;
-                }
-                Ok(true)=>{}
-            }
-            if replay {
-                let page=match web.hub.history(&query.group_id,cursor,crystal::PAGE_SIZE).await{Ok(p)=>p,Err(e)=>{yield Ok(Event::default().event("fault").data(e.to_string()));break;}};
-                // A control operation can run while the disk read is in flight.
-                if !subscription.receives().unwrap_or(false)||web.hub.authenticate(&token).is_err(){continue;}
-                subscription.replayed(page.len());
-                for message in &page {
-                    if !subscription.receives().unwrap_or(false)||web.hub.authenticate(&token).is_err(){replay=true;continue 'delivery;}
-                    cursor=message.sequence;yield Ok(Event::default().event("message").id(cursor.to_string()).json_data(message).unwrap());}
-                if page.len()==crystal::PAGE_SIZE {continue;}
-                replay=false;
-            }
-            tokio::select!{
-                _=shutdown.changed()=>break,
-                _=&mut expires=>break,
-                next=subscription.recv()=>match next {
-                    Ok(Some(message)) if message.sequence>cursor=>{
-                        if !subscription.receives().unwrap_or(false)||web.hub.authenticate(&token).is_err(){replay=true;continue;}
-                        cursor=message.sequence;yield Ok(Event::default().event("message").id(cursor.to_string()).json_data(&*message).unwrap());
-                    }
-                    Ok(Some(_))=>{},
-                    Ok(None)=>replay=true,
-                    Err(_)=>break,
-                }
-            }
-        }
-    };
-    Sse::new(source)
-        .keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
-        .into_response()
-}
+pub(super) use im_service::transport::{body, boundary, error, intent, json_response, response};
 async fn snapshots(State(web): State<Web>, headers: HeaderMap) -> Response {
     if let Err(e) = boundary(&headers, web.addr) {
         return error(e);
