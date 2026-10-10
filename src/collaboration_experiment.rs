@@ -400,8 +400,8 @@ fn immutable_write(c: &Config, path: &Path, value: &impl Serialize) -> Result<()
     Ok(())
 }
 
-/// `plan` creates immutable task JSONs; enqueue/run remain the existing bounded
-/// controller interfaces. `collect` is read-only against workflow authority.
+/// `plan` freezes tasks; `enqueue` reuses one verified cohort through the existing
+/// durable registration path. `collect` reads workflow authority. None starts workers.
 pub fn execute(
     c: &Config,
     action: &str,
@@ -484,6 +484,26 @@ pub fn execute(
                 json!({"manifest":output.join("manifest.json"),"plan_digest":plan.digest,"tasks":32,"team_pairs":1,"promotion_eligible":false}),
             )
         }
+        "enqueue" => {
+            ensure!(grades.is_none(), "enqueue does not accept adjudications");
+            private_path(c, input, false)?;
+            private_path(c, output, true)?;
+            let plan: Plan = storage::read(input)?;
+            let _lock = storage::lock(&c.state_dir.join("collaboration-enqueue.lock"))?;
+            let expected = enqueue_summary(&plan);
+            if output.exists() {
+                ensure!(
+                    storage::read::<Value>(output)? == expected,
+                    "batch output already binds a different plan"
+                );
+            }
+            let result = enqueue_plan(c, &plan, || {
+                crate::inputs::collect(c)?
+                    .context("batch registration requires current upstream and skill bindings")
+            })?;
+            immutable_write(c, output, &result)?;
+            Ok(result)
+        }
         "collect" => {
             private_path(c, input, false)?;
             let plan: Plan = storage::read(input)?;
@@ -503,8 +523,68 @@ pub fn execute(
             immutable_write(c, output, &result)?;
             Ok(result)
         }
-        _ => bail!("unknown collaboration action; use plan or collect"),
+        _ => bail!("unknown collaboration action; use plan, enqueue or collect"),
     }
+}
+fn enqueue_summary(plan: &Plan) -> Value {
+    json!({"schema_version":1,"plan_digest":plan.digest,"input_digest":plan.input_digest,
+        "task_ids":plan.tasks.iter().map(|entry| &entry.task.id).collect::<Vec<_>>(),
+        "registered_tasks":plan.tasks.len(),"worker_launch_requested":false})
+}
+fn check_registered_job(c: &Config, plan: &Plan, entry: &PlannedTask, job: &Job) -> Result<()> {
+    check_job(c, plan, entry, job)?;
+    ensure!(
+        job.baseline_commit.is_none() && job.run_id == format!("{}-attempt-1", entry.task.id),
+        "existing batch job has a different frozen run or candidate baseline"
+    );
+    // Re-render the job's original checked_at values, never the new refresh.
+    let prompt =
+        crate::runtime::rendered_experiment_prompt(c, &job.task, job.research_inputs.as_ref())?;
+    ensure!(
+        storage::digest(prompt.as_bytes()) == job.prompt_digest,
+        "existing job prompt binding differs from its frozen inputs"
+    );
+    Ok(())
+}
+fn enqueue_plan(
+    c: &Config,
+    plan: &Plan,
+    refresh: impl FnOnce() -> Result<ResearchInputs>,
+) -> Result<Value> {
+    validate_plan(c, plan)?;
+    for prompt in &plan.prompts {
+        let registered = crate::evolution_cli::resolve_registered_prompt(
+            &c.state_dir.join("evolution/prompts.json"),
+            prompt.version(),
+            &prompt.definition().role,
+        )?;
+        ensure!(
+            registered.version() == prompt.version(),
+            "registered prompt differs from plan"
+        );
+    }
+    // Reject every existing mismatch before creating any new job or worktree.
+    for entry in &plan.tasks {
+        let path = c
+            .state_dir
+            .join("jobs")
+            .join(format!("{}.json", entry.task.id));
+        if path.exists() {
+            let job: Job = storage::read(&path)?;
+            check_registered_job(c, plan, entry, &job)?;
+        }
+    }
+    let inputs = refresh()?;
+    ensure!(
+        input_digest(&inputs)? == plan.input_digest,
+        "manifest source, skill or knowledge baseline is stale; create a new experiment"
+    );
+    for entry in &plan.tasks {
+        let job = crate::runtime::enqueue_with_inputs(c, entry.task.clone(), Some(inputs.clone()))?;
+        // Also detects a conflicting ordinary enqueue racing with preflight.
+        check_registered_job(c, plan, entry, &job)?;
+    }
+    Ok(enqueue_summary(plan))
 }
 fn materialize(c: &Config, root: &Path, plan: &Plan) -> Result<()> {
     immutable_write(c, &root.join("manifest.json"), plan)?;
@@ -1225,6 +1305,182 @@ mod tests {
         let receipt = json!({"agent_report":{"summary":"A bounded fixture finding","findings":[serde_json::to_string(card).unwrap()],"sources":["superpod:knowledge/index.md"],"limitations":["protocol fixture"],"next_tasks":[]},"source_commit":commit,"superpod_commit":commit,"prompt_digest":job.prompt_digest,"model":job.model});
         let state = json!({"status":"succeeded","frames":{"1":{"nodes":{"task":{"outputs":{"result":serde_json::to_string(&receipt).unwrap()}}}}}});
         (job, receipt, state)
+    }
+    fn batch_fixture(real_workflow: Option<PathBuf>) -> (tempfile::TempDir, Config, Plan) {
+        use std::os::unix::fs::PermissionsExt;
+        let (temp, mut c, mut plan, _) = fixture();
+        c.workflow = if let Some(binary) = real_workflow {
+            binary
+        } else {
+            let binary = temp.path().join("explicit-fake-workflow");
+            fs::write(
+                &binary,
+                "#!/bin/sh\nprintf '%s\n' '{\"ok\":true,\"result\":{}}'\n",
+            )
+            .unwrap();
+            fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+            binary
+        };
+        plan.config_digest = digest(&c).unwrap();
+        plan.digest = plan_digest(&plan).unwrap();
+        (temp, c, plan)
+    }
+    fn verify_partial_batch_replay(c: &Config, plan: &Plan) {
+        let first = &plan.tasks[0];
+        crate::runtime::enqueue_with_inputs(c, first.task.clone(), Some(plan.inputs.clone()))
+            .unwrap();
+        let first_path = c
+            .state_dir
+            .join("jobs")
+            .join(format!("{}.json", first.task.id));
+        let preserved = fs::read(&first_path).unwrap();
+        let mut refreshed = plan.inputs.clone();
+        refreshed
+            .repositories
+            .get_mut("superpod")
+            .unwrap()
+            .upstream
+            .checked_at = "2026-10-11T00:00:00Z".into();
+        let mut collections = 0;
+        let result = enqueue_plan(c, plan, || {
+            collections += 1;
+            Ok(refreshed.clone())
+        })
+        .unwrap();
+        assert_eq!(collections, 1);
+        assert_eq!(result["registered_tasks"], 32);
+        assert_eq!(result["worker_launch_requested"], false);
+        assert_eq!(
+            fs::read(&first_path).unwrap(),
+            preserved,
+            "existing original timestamps and prompt digest must remain frozen"
+        );
+        assert_eq!(fs::read_dir(c.state_dir.join("jobs")).unwrap().count(), 32);
+        let second: Job = storage::read(
+            &c.state_dir
+                .join("jobs")
+                .join(format!("{}.json", plan.tasks[1].task.id)),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(second.research_inputs).unwrap(),
+            serde_json::to_value(Some(refreshed.clone())).unwrap()
+        );
+        let before: Vec<_> = plan
+            .tasks
+            .iter()
+            .map(|entry| {
+                fs::read(
+                    c.state_dir
+                        .join("jobs")
+                        .join(format!("{}.json", entry.task.id)),
+                )
+                .unwrap()
+            })
+            .collect();
+        refreshed
+            .repositories
+            .get_mut("superpod")
+            .unwrap()
+            .upstream
+            .checked_at = "2026-10-12T00:00:00Z".into();
+        assert_eq!(enqueue_plan(c, plan, || Ok(refreshed)).unwrap(), result);
+        for (entry, bytes) in plan.tasks.iter().zip(before) {
+            assert_eq!(
+                fs::read(
+                    c.state_dir
+                        .join("jobs")
+                        .join(format!("{}.json", entry.task.id))
+                )
+                .unwrap(),
+                bytes
+            );
+        }
+        assert!(
+            !c.state_dir.join("runs").exists(),
+            "registration never starts a model process"
+        );
+    }
+    #[test]
+    fn batch_enqueue_refreshes_once_and_preserves_partial_replay_bindings() {
+        let (_temp, c, plan) = batch_fixture(None);
+        verify_partial_batch_replay(&c, &plan);
+    }
+    #[test]
+    fn batch_enqueue_rejects_drift_before_registering_any_missing_task() {
+        let (_temp, c, plan) = batch_fixture(None);
+        let first = &plan.tasks[0];
+        crate::runtime::enqueue_with_inputs(&c, first.task.clone(), Some(plan.inputs.clone()))
+            .unwrap();
+        let mut stale = plan.inputs.clone();
+        stale
+            .repositories
+            .get_mut("superpod")
+            .unwrap()
+            .upstream
+            .commit = "b".repeat(40);
+        assert!(enqueue_plan(&c, &plan, || Ok(stale)).is_err());
+        assert_eq!(fs::read_dir(c.state_dir.join("jobs")).unwrap().count(), 1);
+        let last = plan.tasks.last().unwrap();
+        let mut bad: Job = storage::read(
+            &c.state_dir
+                .join("jobs")
+                .join(format!("{}.json", first.task.id)),
+        )
+        .unwrap();
+        bad.task = last.task.clone();
+        bad.model = "different".into();
+        storage::write(
+            &c.state_dir
+                .join("jobs")
+                .join(format!("{}.json", last.task.id)),
+            &bad,
+        )
+        .unwrap();
+        assert!(
+            enqueue_plan(&c, &plan, || panic!(
+                "mismatched existing job must fail preflight"
+            ))
+            .is_err()
+        );
+        assert_eq!(
+            fs::read_dir(c.state_dir.join("jobs")).unwrap().count(),
+            2,
+            "preflight must not fill earlier missing tasks before finding a late mismatch"
+        );
+        assert!(
+            !c.state_dir
+                .join("worktrees")
+                .join(&plan.tasks[1].task.id)
+                .exists()
+        );
+    }
+    #[test]
+    fn batch_enqueue_rejects_changed_plan_and_missing_registered_prompt() {
+        let (_temp, c, mut plan) = batch_fixture(None);
+        plan.tasks[0].task.prompt.push_str("changed");
+        assert!(enqueue_plan(&c, &plan, || panic!("invalid plan must not refresh")).is_err());
+        let (_temp, c, plan) = batch_fixture(None);
+        fs::remove_file(c.state_dir.join("evolution/prompts.json")).unwrap();
+        assert!(enqueue_plan(&c, &plan, || panic!("missing prompt must not refresh")).is_err());
+        assert!(!c.state_dir.join("jobs").exists());
+    }
+    #[test]
+    #[ignore = "set LAB_WORKFLOW_BIN for actual durable 32-task batch registration; no model launched"]
+    fn actual_workflow_batch_enqueue_is_idempotent_without_worker_launch() {
+        let (_temp, c, plan) =
+            batch_fixture(Some(std::env::var("LAB_WORKFLOW_BIN").unwrap().into()));
+        verify_partial_batch_replay(&c, &plan);
+        let w = Workflow::new(
+            &c.workflow,
+            c.state_dir.join("workflow.sqlite"),
+            c.state_dir.join("workflow"),
+        );
+        for entry in &plan.tasks {
+            let run = format!("{}-attempt-1", entry.task.id);
+            assert_eq!(w.status(&run).unwrap()["status"], "running");
+            w.verify(&run).unwrap();
+        }
     }
     #[test]
     fn two_arms_have_matched_specialists_and_only_the_planned_peer_edges() {

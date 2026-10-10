@@ -17,9 +17,9 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Commands {
-    /// Plan or collect one bounded, evidence-bound collaboration pilot.
+    /// Plan, enqueue or collect one bounded, evidence-bound collaboration pilot.
     Collaboration {
-        #[arg(value_parser = ["plan", "collect"])]
+        #[arg(value_parser = ["plan", "enqueue", "collect"])]
         action: String,
         input: PathBuf,
         #[arg(long)]

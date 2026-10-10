@@ -139,7 +139,7 @@ pub fn enqueue(c: &Config, task: Task) -> Result<Job> {
     enqueue_with_inputs(c, task, inputs)
 }
 
-fn enqueue_with_inputs(
+pub(crate) fn enqueue_with_inputs(
     c: &Config,
     mut task: Task,
     inputs: Option<crate::inputs::ResearchInputs>,
@@ -557,7 +557,7 @@ fn report_schema(c: &Config, task: &Task) -> Value {
     },"required":["summary","findings","sources","limitations","next_tasks"],"additionalProperties":false})
 }
 
-fn rendered_experiment_prompt(
+pub(crate) fn rendered_experiment_prompt(
     c: &Config,
     task: &Task,
     inputs: Option<&crate::inputs::ResearchInputs>,
