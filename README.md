@@ -297,6 +297,24 @@ into release authority.
 
 ## SuperPOD publication and evidence boundaries
 
+With `require_latest = true`, every role receives the same bounded SuperPOD
+entrypoint pack: `knowledge/index.md`, the AI-SDLC index, and the evidence-method
+document. The host reads committed regular Git blobs and records the SuperPOD
+commit, path, complete source digest, excerpt digest and truncation status. Each
+excerpt is at most 16 KiB; full source files must be nonempty UTF-8 and at most
+1 MiB. Admission checks the pack against the pinned commit. Agents follow
+task-relevant links in that read-only snapshot. Context delivery alone does not
+prove that a model read the linked material or that its conclusion is correct.
+
+All roles propose useful additions, corrections, counterexamples and next tests
+in their durable result receipts, with an existing SuperPOD destination and
+baseline. The host reviews evidence, prepares an isolated contribution, merges
+reviewed updates serially and refreshes the exact merged index for later cohorts.
+These explicit host adapters remain necessary; a model proposal or successful
+task does not itself publish knowledge. `relay-memory` retains isolated task
+continuity; SuperPOD remains the shared, versioned knowledge base. Historical
+receipts without the pack keep their original prompt and cohort identities.
+
 `knowledge-prepare` renders a typed, reviewed research report under
 `knowledge/software/ai-sdlc/` in a dedicated SuperPOD worktree. It keeps source IDs,
 citations, retrieval status, available checksums and immutable experiment bindings
