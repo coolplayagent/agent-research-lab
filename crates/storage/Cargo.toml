@@ -1,0 +1,20 @@
+[package]
+name = "lab-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "storage"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+fs2.workspace = true
+libc.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

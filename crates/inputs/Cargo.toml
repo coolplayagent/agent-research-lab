@@ -1,0 +1,21 @@
+[package]
+name = "lab-inputs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "inputs"
+
+[dependencies]
+anyhow.workspace = true
+config.workspace = true
+delivery.workspace = true
+freshness.workspace = true
+process.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+storage.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

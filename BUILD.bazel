@@ -1,38 +1,84 @@
-load("@crates//:defs.bzl", "all_crate_deps")
-load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+load("@rules_rust//rust:defs.bzl", "rust_binary")
 
 exports_files(["Cargo.toml", "Cargo.lock"])
 
-rust_library(
-    name = "agent_research_lab",
-    srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
-    crate_root = "src/lib.rs",
-    compile_data = glob(["prompts/*.md", "examples/evolution/*.json", "assets/desktop/*"]),
-    edition = "2024",
-    deps = all_crate_deps(normal = True),
-    proc_macro_deps = all_crate_deps(proc_macro = True),
+filegroup(
+    name = "prompt_assets",
+    srcs = glob(["prompts/*.md"]),
     visibility = ["//visibility:public"],
 )
 
+filegroup(
+    name = "evolution_examples",
+    srcs = glob(["examples/evolution/*.json"]),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "desktop_assets",
+    srcs = glob(["assets/desktop/*"]),
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "agent_research_lab",
+    actual = "//app:app_service",
+    visibility = ["//visibility:public"],
+)
+
+# Keep the executable at bazel-bin/agent-research-lab for service and package users.
 rust_binary(
     name = "agent-research-lab",
-    srcs = ["src/main.rs"],
+    version = "0.1.0",
+    srcs = ["//app:src/main.rs"],
+    crate_root = "//app:src/main.rs",
     edition = "2024",
-    deps = [":agent_research_lab"] + all_crate_deps(normal = True),
-    proc_macro_deps = all_crate_deps(proc_macro = True),
+    aliases = aliases(package_name = "app"),
+    deps = ["//app:app_service"] + all_crate_deps(normal = True, package_name = "app"),
+    proc_macro_deps = all_crate_deps(proc_macro = True, package_name = "app"),
     visibility = ["//visibility:public"],
 )
 
-rust_test(
+test_suite(
     name = "tests",
-    crate = ":agent_research_lab",
-    deps = all_crate_deps(normal_dev = True),
+    tests = [
+        "//app:serde_compatibility_tests",
+        "//app:tests",
+        "//crates/agent-backend:tests",
+        "//crates/agent-policy:tests",
+        "//crates/automation:tests",
+        "//crates/budget:tests",
+        "//crates/build-cache:tests",
+        "//crates/collaboration-experiment:tests",
+        "//crates/communication:tests",
+        "//crates/config:tests",
+        "//crates/delivery:tests",
+        "//crates/evolution:tests",
+        "//crates/evolution-cli:tests",
+        "//crates/freshness:tests",
+        "//crates/inputs:tests",
+        "//crates/isolation:tests",
+        "//crates/knowledge:tests",
+        "//crates/lease-heartbeat:tests",
+        "//crates/multi-agent:tests",
+        "//crates/process:tests",
+        "//crates/runtime:tests",
+        "//crates/storage:tests",
+        "//crates/targets:tests",
+        "//crates/task:tests",
+        "//crates/workflow:tests",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 pkg_tar(
     name = "package",
-    srcs = [":agent-research-lab"] + glob(["examples/**", "prompts/**", "research/**", "skills/**", "assets/**", "*.md"]),
+    srcs = [
+        ":agent-research-lab",
+        "//app:systemd/agent-research-lab.service",
+    ] + glob(["examples/**", "prompts/**", "research/**", "skills/**", "assets/**", "*.md"]),
     package_dir = "agent-research-lab",
     strip_prefix = ".",
     extension = "tar.gz",

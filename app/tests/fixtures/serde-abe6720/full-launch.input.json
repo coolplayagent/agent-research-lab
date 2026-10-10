@@ -1,0 +1,55 @@
+{
+  "attempt": {
+    "grant": {
+      "request_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+    },
+    "request": {
+      "synthetic": true
+    }
+  },
+  "backend_request_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+  "communication": {
+    "context": {
+      "as_of": 1700000000,
+      "cohort_id": "d69ab8fa251d6da0a35e61e008f35cf831e4d2fd690dadd96b9c6295dc752656",
+      "digest": "abf66ec666e69ae537c674c382ab1ebf6f46477fa538ba7b177a22fc321ec3de",
+      "message_ids": [
+        "7777777777777777777777777777777777777777777777777777777777777777"
+      ],
+      "revision": 3,
+      "schema_version": 1,
+      "text": "Untrusted synthetic proposal.\nNot research evidence.",
+      "truncated": true
+    },
+    "member": {
+      "authority_sha256": "252b1e5a7ad86affd7cb73d4535a80908ffb293b3061124ea163cda1c6511c29",
+      "cohort_id": "d69ab8fa251d6da0a35e61e008f35cf831e4d2fd690dadd96b9c6295dc752656",
+      "run_id": "full-task-attempt-2",
+      "task_id": "full-task"
+    }
+  },
+  "communication_gap": "Synthetic optional-channel diagnostic.",
+  "communication_member": {
+    "authority_sha256": "252b1e5a7ad86affd7cb73d4535a80908ffb293b3061124ea163cda1c6511c29",
+    "cohort_id": "d69ab8fa251d6da0a35e61e008f35cf831e4d2fd690dadd96b9c6295dc752656",
+    "run_id": "full-task-attempt-2",
+    "task_id": "full-task"
+  },
+  "git_dir": "/synthetic/repos/.git/worktrees/full-task",
+  "lease": {
+    "acquisition_id": "synthetic-acquisition",
+    "epoch": 2,
+    "expires_at_unix_ms": 1700000060000,
+    "issued_at_unix_ms": 1700000000000,
+    "owner": "synthetic-controller",
+    "run_id": "full-task-attempt-2"
+  },
+  "log_dir": "/synthetic/state/runs/full-task-attempt-2",
+  "pid": 2345,
+  "process_start": "synthetic-full-start",
+  "tools": {
+    "workflow-cli": {
+      "runtime_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  }
+}

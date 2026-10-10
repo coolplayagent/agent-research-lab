@@ -1,0 +1,24 @@
+[package]
+name = "lab-targets"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "targets"
+
+[dependencies]
+agent_backend.workspace = true
+agent_policy.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+config.workspace = true
+isolation.workspace = true
+libc.workspace = true
+process.workspace = true
+serde_json.workspace = true
+storage.workspace = true
+
+[dev-dependencies]
+workflow.workspace = true
+tempfile.workspace = true

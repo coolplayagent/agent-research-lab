@@ -1,0 +1,308 @@
+{
+  "attempt": 2,
+  "backend": {
+    "executable": "/synthetic/tools/bridge",
+    "executable_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "id": "synthetic-bridge",
+    "spec": {
+      "args": [
+        "--fixture",
+        "中文"
+      ],
+      "capabilities": {
+        "desktop": true,
+        "read_workspace": true,
+        "structured_result": true,
+        "tool_execution": true,
+        "write_workspace": true
+      },
+      "env_allowlist": [
+        "OPENAI_API_KEY"
+      ],
+      "kind": "json_process",
+      "program": "/synthetic/tools/bridge"
+    }
+  },
+  "baseline_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "config_digest": "3055debc62865468ed27c899659fc3cd1a5d9efe7d870edb306531749be20be3",
+  "last_error": "Synthetic previous attempt diagnostic.",
+  "launch": {
+    "attempt": {
+      "grant": {
+        "request_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "request": {
+        "synthetic": true
+      }
+    },
+    "backend_request_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "communication": {
+      "context": {
+        "as_of": 1700000000,
+        "cohort_id": "d69ab8fa251d6da0a35e61e008f35cf831e4d2fd690dadd96b9c6295dc752656",
+        "digest": "abf66ec666e69ae537c674c382ab1ebf6f46477fa538ba7b177a22fc321ec3de",
+        "message_ids": [
+          "7777777777777777777777777777777777777777777777777777777777777777"
+        ],
+        "revision": 3,
+        "schema_version": 1,
+        "text": "Untrusted synthetic proposal.\nNot research evidence.",
+        "truncated": true
+      },
+      "member": {
+        "authority_sha256": "252b1e5a7ad86affd7cb73d4535a80908ffb293b3061124ea163cda1c6511c29",
+        "cohort_id": "d69ab8fa251d6da0a35e61e008f35cf831e4d2fd690dadd96b9c6295dc752656",
+        "run_id": "full-task-attempt-2",
+        "task_id": "full-task"
+      }
+    },
+    "communication_gap": "Synthetic optional-channel diagnostic.",
+    "communication_member": {
+      "authority_sha256": "252b1e5a7ad86affd7cb73d4535a80908ffb293b3061124ea163cda1c6511c29",
+      "cohort_id": "d69ab8fa251d6da0a35e61e008f35cf831e4d2fd690dadd96b9c6295dc752656",
+      "run_id": "full-task-attempt-2",
+      "task_id": "full-task"
+    },
+    "git_dir": "/synthetic/repos/.git/worktrees/full-task",
+    "lease": {
+      "acquisition_id": "synthetic-acquisition",
+      "epoch": 2,
+      "expires_at_unix_ms": 1700000060000,
+      "issued_at_unix_ms": 1700000000000,
+      "owner": "synthetic-controller",
+      "run_id": "full-task-attempt-2"
+    },
+    "log_dir": "/synthetic/state/runs/full-task-attempt-2",
+    "pid": 2345,
+    "process_start": "synthetic-full-start",
+    "tools": {
+      "workflow-cli": {
+        "runtime_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    }
+  },
+  "model": "synthetic-implement",
+  "prompt_digest": "b2a452c4157863907f0ec055e9a81e7fb45b0fcacdd7259b5a6c226aea4385d4",
+  "research_inputs": {
+    "insights": "Synthetic local evidence reference.",
+    "insights_sha256": "ad3f4c9448610dabe32832e68e241348ff22f4575bf266c0257afe4593ce9e81",
+    "repositories": {
+      "agent-research-lab": {
+        "checkout": "/synthetic/state/sources/agent-research-lab/cccccccccccccccccccccccccccccccccccccccc",
+        "upstream": {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "commit": "cccccccccccccccccccccccccccccccccccccccc",
+          "default_branch": "main",
+          "repository": "coolplayagent/agent-research-lab"
+        }
+      },
+      "computer-use-cli": {
+        "checkout": "/synthetic/state/sources/computer-use-cli/cccccccccccccccccccccccccccccccccccccccc",
+        "upstream": {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "commit": "cccccccccccccccccccccccccccccccccccccccc",
+          "default_branch": "main",
+          "repository": "coolplayagent/computer-use-cli"
+        }
+      },
+      "into-markdown": {
+        "checkout": "/synthetic/state/sources/into-markdown/cccccccccccccccccccccccccccccccccccccccc",
+        "upstream": {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "commit": "cccccccccccccccccccccccccccccccccccccccc",
+          "default_branch": "main",
+          "repository": "coolplayagent/into-markdown"
+        }
+      },
+      "qualitygate-cli": {
+        "checkout": "/synthetic/state/sources/qualitygate-cli/cccccccccccccccccccccccccccccccccccccccc",
+        "upstream": {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "commit": "cccccccccccccccccccccccccccccccccccccccc",
+          "default_branch": "main",
+          "repository": "coolplayagent/qualitygate-cli"
+        }
+      },
+      "relay-knowledge": {
+        "checkout": "/synthetic/state/sources/relay-knowledge/cccccccccccccccccccccccccccccccccccccccc",
+        "upstream": {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "commit": "cccccccccccccccccccccccccccccccccccccccc",
+          "default_branch": "main",
+          "repository": "coolplayagent/relay-knowledge"
+        }
+      },
+      "relay-memory": {
+        "checkout": "/synthetic/state/sources/relay-memory/cccccccccccccccccccccccccccccccccccccccc",
+        "upstream": {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "commit": "cccccccccccccccccccccccccccccccccccccccc",
+          "default_branch": "main",
+          "repository": "coolplayagent/relay-memory"
+        }
+      },
+      "repo-sandbox": {
+        "checkout": "/synthetic/state/sources/repo-sandbox/cccccccccccccccccccccccccccccccccccccccc",
+        "upstream": {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "commit": "cccccccccccccccccccccccccccccccccccccccc",
+          "default_branch": "main",
+          "repository": "coolplayagent/repo-sandbox"
+        }
+      },
+      "superpod": {
+        "checkout": "/synthetic/state/sources/superpod/cccccccccccccccccccccccccccccccccccccccc",
+        "upstream": {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "commit": "cccccccccccccccccccccccccccccccccccccccc",
+          "default_branch": "main",
+          "repository": "coolplayagent/superpod"
+        }
+      },
+      "workflow-cli": {
+        "checkout": "/synthetic/state/sources/workflow-cli/cccccccccccccccccccccccccccccccccccccccc",
+        "upstream": {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "commit": "cccccccccccccccccccccccccccccccccccccccc",
+          "default_branch": "main",
+          "repository": "coolplayagent/workflow-cli"
+        }
+      }
+    },
+    "shared_knowledge": {
+      "documents": [
+        {
+          "excerpt": "Synthetic SuperPOD excerpt, never copied from production.",
+          "excerpt_sha256": "2430f15325152a48b81b308fd6a406911b6b411637a14027965953e3be47f69d",
+          "path": "knowledge/index.md",
+          "source_bytes": 57,
+          "source_sha256": "2430f15325152a48b81b308fd6a406911b6b411637a14027965953e3be47f69d",
+          "truncated": false
+        }
+      ],
+      "superpod_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "skills": {
+      "schema_version": 1,
+      "skills": [
+        {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "installed_path": "/synthetic/skills/workflow-cli",
+          "name": "workflow-cli",
+          "release_id": 7,
+          "release_tag": "v0.0.0-synthetic",
+          "repository": "coolplayagent/workflow-cli",
+          "runtime_path": "/synthetic/skills/workflow-cli/cli",
+          "runtime_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "source_commit": null,
+          "tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "installed_path": "/synthetic/skills/relay-knowledge",
+          "name": "relay-knowledge",
+          "release_id": 7,
+          "release_tag": "v0.0.0-synthetic",
+          "repository": "coolplayagent/relay-knowledge",
+          "runtime_path": "/synthetic/skills/relay-knowledge/cli",
+          "runtime_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "source_commit": null,
+          "tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "installed_path": "/synthetic/skills/into-markdown",
+          "name": "into-markdown",
+          "release_id": 7,
+          "release_tag": "v0.0.0-synthetic",
+          "repository": "coolplayagent/into-markdown",
+          "runtime_path": "/synthetic/skills/into-markdown/cli",
+          "runtime_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "source_commit": null,
+          "tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "installed_path": "/synthetic/skills/qualitygate-cli",
+          "name": "qualitygate-cli",
+          "release_id": 7,
+          "release_tag": "v0.0.0-synthetic",
+          "repository": "coolplayagent/qualitygate-cli",
+          "runtime_path": "/synthetic/skills/qualitygate-cli/cli",
+          "runtime_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "source_commit": null,
+          "tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "installed_path": "/synthetic/skills/computer-use-cli",
+          "name": "computer-use-cli",
+          "release_id": 7,
+          "release_tag": "v0.0.0-synthetic",
+          "repository": "coolplayagent/computer-use-cli",
+          "runtime_path": "/synthetic/skills/computer-use-cli/cli",
+          "runtime_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "source_commit": null,
+          "tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "installed_path": "/synthetic/skills/relay-memory",
+          "name": "relay-memory",
+          "release_id": 7,
+          "release_tag": "v0.0.0-synthetic",
+          "repository": "coolplayagent/relay-memory",
+          "runtime_path": "/synthetic/skills/relay-memory/cli",
+          "runtime_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "source_commit": null,
+          "tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        {
+          "checked_at": "2026-10-10T00:00:00Z",
+          "installed_path": "/synthetic/skills/repo-sandbox",
+          "name": "repo-sandbox",
+          "release_id": 7,
+          "release_tag": "v0.0.0-synthetic",
+          "repository": "coolplayagent/repo-sandbox",
+          "runtime_path": "/synthetic/skills/repo-sandbox/cli",
+          "runtime_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "source_commit": null,
+          "tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      ]
+    }
+  },
+  "retry_after": 1700000100,
+  "run_id": "full-task-attempt-2",
+  "source_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "superpod_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "task": {
+    "communication": {
+      "cell": "cell-01",
+      "id": "compat-team",
+      "query": "证据 & counterexample",
+      "topics": [
+        "research",
+        "protocol"
+      ]
+    },
+    "dependencies": [
+      "previous-task"
+    ],
+    "depth": 2,
+    "exploratory": true,
+    "id": "full-task",
+    "max_attempts": 2,
+    "prompt": "Synthetic multilingual contract: 证据, quote \"x\", newline\nsecond line.",
+    "prompt_version": "implement-v3",
+    "repository": "agent-research-lab",
+    "required_tools": [
+      "workflow-cli",
+      "relay-memory"
+    ],
+    "role": "implement",
+    "use_memory": true,
+    "write": true
+  },
+  "worktree": "/synthetic/state/worktrees/full-task"
+}

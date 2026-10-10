@@ -1,0 +1,101 @@
+{
+  "agent_backends": {
+    "synthetic-bridge": {
+      "args": [
+        "--fixture",
+        "中文"
+      ],
+      "capabilities": {
+        "desktop": true,
+        "read_workspace": true,
+        "structured_result": true,
+        "tool_execution": true,
+        "write_workspace": true
+      },
+      "env_allowlist": [
+        "OPENAI_API_KEY"
+      ],
+      "kind": "json_process",
+      "program": "/synthetic/tools/bridge"
+    },
+    "synthetic-codex": {
+      "kind": "codex",
+      "program": "synthetic-codex"
+    }
+  },
+  "codex": "codex",
+  "daily_seconds": 43200,
+  "max_agents": 8,
+  "models": {
+    "implement": "synthetic-implement",
+    "research": "synthetic-research",
+    "review": "synthetic-review"
+  },
+  "multi_agent": {
+    "shared_research": true
+  },
+  "require_latest": true,
+  "role_backends": {
+    "implement": "synthetic-bridge",
+    "research": "synthetic-codex",
+    "review": "synthetic-bridge"
+  },
+  "schema_version": 1,
+  "skills_manifest": "/synthetic/workspace/lab/.lab/latest/skills.json",
+  "state_dir": "/synthetic/workspace/lab/.lab",
+  "superpod": "/synthetic/workspace/superpod",
+  "task_timeout_seconds": 1800,
+  "tools": {
+    "computer-use-cli": {
+      "binary": "/synthetic/tools/computer-use-cli",
+      "probe": [
+        "--version"
+      ],
+      "repository": "/synthetic/workspace/computer-use-cli"
+    },
+    "into-markdown": {
+      "binary": "/synthetic/tools/into-markdown",
+      "probe": [
+        "--version"
+      ],
+      "repository": "/synthetic/workspace/into-markdown"
+    },
+    "qualitygate-cli": {
+      "binary": "/synthetic/tools/qualitygate-cli",
+      "probe": [
+        "--version"
+      ],
+      "repository": "/synthetic/workspace/qualitygate-cli"
+    },
+    "relay-knowledge": {
+      "binary": "/synthetic/tools/relay-knowledge",
+      "probe": [
+        "--version"
+      ],
+      "repository": "/synthetic/workspace/relay-knowledge"
+    },
+    "relay-memory": {
+      "binary": "/synthetic/tools/relay-memory",
+      "probe": [
+        "--version"
+      ],
+      "repository": "/synthetic/workspace/relay-memory"
+    },
+    "repo-sandbox": {
+      "binary": "/synthetic/tools/repo-sandbox",
+      "probe": [
+        "--version"
+      ],
+      "repository": "/synthetic/workspace/repo-sandbox"
+    },
+    "workflow-cli": {
+      "binary": "/synthetic/tools/workflow-cli",
+      "probe": [
+        "--version"
+      ],
+      "repository": "/synthetic/workspace/workflow-cli"
+    }
+  },
+  "workflow": "/synthetic/tools/workflow-cli",
+  "workspace": "/synthetic/workspace"
+}

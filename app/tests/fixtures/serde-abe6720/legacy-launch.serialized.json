@@ -1,0 +1,1 @@
+{"pid":1234,"process_start":"synthetic-start","lease":{"epoch":1,"expires_at_unix_ms":1700000060000,"issued_at_unix_ms":1700000000000,"run_id":"legacy-task-attempt-1"},"attempt":{"request":{"synthetic":true}},"log_dir":"/synthetic/state/runs/legacy-task-attempt-1","tools":null,"git_dir":""}

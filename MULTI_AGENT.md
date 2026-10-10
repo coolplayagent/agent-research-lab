@@ -1,9 +1,10 @@
 # Agent execution and shared communication
 
 The controller separates durable scheduling, interchangeable execution backends,
-and shared research proposals. The Rust entry points are `runtime`,
-`agent_backend`, `multi_agent`, and `communication`. Bazel builds and tests these
-modules together. The current production controller admits at most eight worker
+and shared research proposals. The Rust entry points are independent crates in
+`crates/runtime`, `crates/agent-backend`, `crates/multi-agent`, and
+`crates/communication`; `app/` composes them into the CLI and application service.
+Bazel builds and tests each crate. The current production controller admits at most eight worker
 processes; a logical topology containing 10,000 agents does not raise that limit.
 
 ```mermaid

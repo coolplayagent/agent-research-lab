@@ -1,0 +1,21 @@
+[package]
+name = "lab-automation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "automation"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+delivery.workspace = true
+knowledge.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+storage.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

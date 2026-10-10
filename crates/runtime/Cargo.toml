@@ -1,0 +1,37 @@
+[package]
+name = "lab-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "runtime"
+
+[dependencies]
+agent_policy.workspace = true
+agent_backend.workspace = true
+anyhow.workspace = true
+automation.workspace = true
+budget.workspace = true
+build_cache.workspace = true
+chrono.workspace = true
+communication.workspace = true
+config.workspace = true
+evolution.workspace = true
+evolution_cli.workspace = true
+freshness.workspace = true
+inputs.workspace = true
+isolation.workspace = true
+lease_heartbeat.workspace = true
+libc.workspace = true
+multi_agent.workspace = true
+process.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+storage.workspace = true
+targets.workspace = true
+task.workspace = true
+workflow.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
