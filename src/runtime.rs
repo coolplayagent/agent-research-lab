@@ -1310,6 +1310,18 @@ pub fn run_seeded(
             if job.launch.is_some() {
                 continue;
             }
+            // Sandbox verification executes a bounded sequence of real host
+            // commands. Do it in an idle window, before consuming a retry or
+            // claiming a write effect under a peer's 10-second allowance.
+            if !active.is_empty()
+                && job
+                    .task
+                    .required_tools
+                    .iter()
+                    .any(|name| name == "repo-sandbox")
+            {
+                continue;
+            }
             if let Some(due) = job.retry_after {
                 retry_waiting = true;
                 if due > time {
@@ -3273,9 +3285,7 @@ mod tests {
         assert!(!forbidden_candidate_path("src/parser.rs"));
     }
     #[cfg(unix)]
-    #[test]
-    #[ignore = "set LAB_WORKFLOW_BIN to test the real durable runtime with an explicit fake Codex provider"]
-    fn actual_workflow_fake_codex_completion_and_failure() {
+    fn scheduler_fixture() -> (tempfile::TempDir, Config) {
         use std::collections::BTreeMap;
         use std::os::unix::fs::PermissionsExt;
         let binary = std::env::var("LAB_WORKFLOW_BIN").expect("LAB_WORKFLOW_BIN");
@@ -3310,6 +3320,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 prompt=$(cat)
+case "$prompt" in *SLOW_PARALLEL*) date +%s%N; sleep 3; date +%s%N ;; esac
 case "$prompt" in *FAIL_READ*) exit 7 ;; esac
 case "$prompt" in *implement\ tested\ candidate*|*MALFORMED*) printf 'actual fixture write' > candidate.txt ;; esac
 case "$prompt" in
@@ -3364,6 +3375,105 @@ printf '{"type":"fixture.completed"}\n'
         if let Ok(binary) = std::env::var("LAB_MEMORY_BIN") {
             c.tools.get_mut("relay-memory").unwrap().binary = binary.into();
         }
+        (temp, c)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "set LAB_WORKFLOW_BIN and LAB_SANDBOX_BIN for real workflow/sandbox with explicit fake Codex"]
+    fn sandbox_write_claim_waits_for_idle_without_serializing_ordinary_workers() {
+        let (_temp, mut c) = scheduler_fixture();
+        c.max_agents = 3;
+        c.tools.get_mut("repo-sandbox").unwrap().binary = std::env::var("LAB_SANDBOX_BIN")
+            .expect("LAB_SANDBOX_BIN")
+            .into();
+        for (id, write) in [
+            ("a-read", false),
+            ("b-read", false),
+            ("c-sandbox-write", true),
+        ] {
+            enqueue(
+                &c,
+                Task {
+                    id: id.into(),
+                    role: if write { "implement" } else { "research" }.into(),
+                    repository: "superpod".into(),
+                    prompt: if write {
+                        "implement tested candidate"
+                    } else {
+                        "SLOW_PARALLEL"
+                    }
+                    .into(),
+                    prompt_version: None,
+                    use_memory: false,
+                    depth: 0,
+                    write,
+                    exploratory: false,
+                    dependencies: vec![],
+                    required_tools: if write {
+                        vec!["repo-sandbox".into()]
+                    } else {
+                        vec![]
+                    },
+                },
+            )
+            .unwrap();
+        }
+        run(&c, false, 30).unwrap();
+        let w = workflow(&c);
+        let mut intervals = vec![];
+        for id in ["a-read", "b-read", "c-sandbox-write"] {
+            let job: Job = storage::read(&job_path(&c, id)).unwrap();
+            assert_eq!(job.attempt, 1, "preparation must not consume a task retry");
+            assert!(job.last_error.is_none() && job.launch.is_none(), "{job:?}");
+            assert_eq!(w.status(&job.run_id).unwrap()["status"], "succeeded");
+            w.verify(&job.run_id).unwrap();
+            if !job.task.write {
+                let output = fs::read_to_string(
+                    c.state_dir
+                        .join("runs")
+                        .join(&job.run_id)
+                        .join("process/stdout.jsonl"),
+                )
+                .unwrap();
+                let times: Vec<u128> = output.lines().filter_map(|s| s.parse().ok()).collect();
+                assert_eq!(times.len(), 2, "{output}");
+                intervals.push(times);
+            } else {
+                let lease: Value = storage::read(
+                    &w.work_dir
+                        .join("host-leases")
+                        .join(format!("{}.json", job.run_id)),
+                )
+                .unwrap();
+                let acquired = lease["issued_at_unix_ms"].as_u64().unwrap() as u128 * 1_000_000;
+                assert!(
+                    intervals.iter().all(|times| acquired >= times[1]),
+                    "sandbox write was claimed while another worker was active"
+                );
+                let proof: Value = storage::read(
+                    &c.state_dir
+                        .join("runs")
+                        .join(&job.run_id)
+                        .join("targets-host.json"),
+                )
+                .unwrap();
+                assert_eq!(proof["verified"], true);
+                assert_eq!(proof["down"]["status"], "stopped");
+                assert!(job.worktree.join("candidate.txt").is_file());
+            }
+        }
+        assert!(
+            intervals[0][0] < intervals[1][1] && intervals[1][0] < intervals[0][1],
+            "ordinary workers should still overlap"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "set LAB_WORKFLOW_BIN to test the real durable runtime with an explicit fake Codex provider"]
+    fn actual_workflow_fake_codex_completion_and_failure() {
+        let (_temp, c) = scheduler_fixture();
         let task = |id: &str, write: bool, prompt: &str, dependencies: Vec<String>| Task {
             id: id.into(),
             role: if write {
