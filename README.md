@@ -69,22 +69,32 @@ Open `http://127.0.0.1:8090`. The optional
 observer independently; it does not start, pause or restart the research controller.
 The AI-IM workspace groups sessions into research rooms, with a digital-person list,
 a crystal-ball collaboration graph, a shared-board conversation and an evidence
-inspector. Select an agent to read public messages and results in the central
-conversation. Consecutive tool operations collapse into process cards, with commands,
-output and normalized stdio JSON available inside. Long messages have expandable
-bodies; errors retain a visible summary even when their process details are folded.
-Replies show `sender → @recipient`, broadcasts use `@公共板`, and host context
-deliveries are explicitly labeled as system events. These are group-visible records,
-not private direct messages. Replies link to their referenced proposals. The latest room is
-followed automatically; manual room selection lets you inspect historical runs.
+inspector. The shared chat shows only agent names and message bodies, with inline
+`@recipient` mentions for replies. Context deliveries, tool activity, state badges
+and evidence metadata do not interrupt the shared conversation. Revoked messages
+appear as withdrawn placeholders; expired messages remain historical records.
+These are group-visible publications, not private direct messages. The latest room
+is followed automatically; manual room selection lets you inspect historical runs.
 Current-room counts and historical blocked-task counts are shown separately.
-Both center panels have an enlarge control: focus the collaboration graph or the
-conversation across the workspace, then restore with the same button or Escape.
-Selection and expanded process details survive these view changes and live updates.
 
-Avatars, sender names and mentions open a digital-person board containing the model,
-backend, task, memory setting, required tools, activity and evidence bindings. Identity
-is stable across retries of one task; separate tasks are separate identities. Soul is
+Selecting a digital person, graph node or message author opens a separate desktop-style
+session window without replacing the group conversation. Public messages and results
+remain visible; consecutive tool operations collapse into process cards, with commands,
+output and normalized stdio JSON inside. Long messages expand on demand; errors retain
+a visible summary. Older/newer controls page through public session history. Browsing
+older records pauses live following; returning to the latest page resumes polling.
+The graph, shared chat and session window can each expand for focused viewing.
+Closing the session window returns to the same group chat. Expanded process details
+survive live updates and window size changes.
+
+Mentions and the digital-person board button open model, backend, task, memory,
+required tools, activity and evidence details. Each digital person receives a unique
+Chinese alias used consistently in messages, mentions, graph nodes and session windows.
+Aliases are reserved in host-owned `dashboard/personas.json` under private state,
+using a nonblocking lock and atomic writes. Restarting the observer, changing rooms,
+or retrying a task preserves its name; names of historical tasks are never recycled.
+The observer only writes this presentation directory, never research task state.
+Identity is stable across retries of one task; separate tasks are separate identities. Soul is
 the role guideline from the task's frozen lab source or explicitly registered prompt
 version, not an invented personality or the private rendered task prompt. The lazy
 profile endpoint reads only known tasks, bounds role text to 16 KiB and Git reads to
@@ -111,9 +121,13 @@ Sampling is bounded to the 512 most recently updated jobs within an 8,192-entry
 directory scan, 512 KiB per job, 32 associated boards and a 20-second workflow
 sampling deadline. The graph shows at most eight agents, prioritizing active runs;
 all selected tasks remain accessible in the session list. The conversation shows
-up to 256 board/context records. Each session reads at most the last 256 KiB and
-projects up to 48 public events with stable byte-offset IDs; truncated and partial
-lines are omitted. The UI reports truncation and observation errors. Samples are
+up to 256 board messages. Each session page reads at most 256 KiB and projects
+up to 48 public events with stable byte-offset IDs. The known-session endpoint
+accepts an exclusive `before` byte cursor to walk backward without dropping complete
+lines at page boundaries. The first page and live samples show the latest events;
+the session window polls every three seconds while following. Partial trailing lines
+and lines exceeding the byte budget are omitted; public text fields remain clipped.
+Older pages do not expose prompts, reasoning or raw protocol objects. Samples are
 sequential observations, not atomic database snapshots. A failed sample retains
 the preceding data with an error and timestamp. At most 16 HTTP clients are served
 concurrently; SSE connections rotate after 45 seconds. Shutdown can take up to one

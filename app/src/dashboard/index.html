@@ -105,10 +105,7 @@
         </section>
         <div class="chat-heading">
           <div>
-            <button id="public-chat" class="chat-tab active"># 公共板</button
-            ><button id="session-chat" class="chat-tab">
-              对话与过程 <span id="process-count"></span>
-            </button>
+            <span class="chat-title"># 协作群聊</span>
           </div>
           <span id="message-count"></span
           ><button id="open-profile" class="profile-toggle">数字人看板</button>
@@ -129,8 +126,8 @@
         ></div>
         <div class="composer">
           <span>◈</span>
-          <p>实时观察频道 · 主机验证后发布公共板提议</p>
-          <span class="readonly">知识沉淀至 SuperPOD</span>
+          <p>实时同步协作消息</p>
+          <span class="readonly">点击数字人查看会话</span>
         </div>
       </main>
       <aside class="inspector">
@@ -144,5 +141,39 @@
         </div>
       </aside>
     </div>
+    <dialog id="session-window" aria-labelledby="session-title">
+      <div class="session-heading">
+        <div id="session-avatar"></div>
+        <div class="session-heading-text">
+          <h2 id="session-title">数字人会话</h2>
+          <p id="session-subtitle"></p>
+        </div>
+        <button id="session-profile" class="profile-toggle">数字人看板</button>
+        <button
+          id="maximize-session"
+          class="maximize"
+          aria-label="放大会话窗口"
+          aria-pressed="false"
+        >
+          ↗ 放大
+        </button>
+        <button
+          id="close-session"
+          class="window-close"
+          aria-label="关闭会话窗口"
+        >
+          ×
+        </button>
+      </div>
+      <div
+        id="session-history"
+        class="session-history"
+        aria-label="会话历史"
+      ></div>
+      <div class="session-footer">
+        <span id="session-status" role="status">正在读取会话…</span>
+        <button id="session-latest">回到最新 ↓</button>
+      </div>
+    </dialog>
   </body>
 </html>

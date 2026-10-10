@@ -17,6 +17,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use task::Job;
+mod personas;
 mod profiles;
 mod sessions;
 
@@ -147,7 +148,7 @@ fn snapshot(c: &Config) -> Result<Value> {
         .iter()
         .filter_map(|v| v["id"].as_str().map(|id| (id, v)))
         .collect();
-    let projected: Vec<_> = jobs
+    let mut projected: Vec<_> = jobs
         .iter()
         .map(|j| {
             project(
@@ -158,6 +159,7 @@ fn snapshot(c: &Config) -> Result<Value> {
             )
         })
         .collect();
+    personas::assign(&c.state_dir, &mut projected)?;
     if projected.iter().any(|j| j["observation_error"] == true) {
         warnings.push("部分 workflow 状态读取失败或超过采样时限；未知状态不表示任务完成。".into());
     }
@@ -360,12 +362,28 @@ fn handle(
             }
         }
         Some(path) if path.starts_with("/api/session/") => {
-            let run = &path[13..];
+            let (run, query) = path[13..].split_once('?').unwrap_or((&path[13..], ""));
+            let before = if query.is_empty() {
+                None
+            } else if let Some(offset) = query
+                .strip_prefix("before=")
+                .filter(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
+                .and_then(|s| s.parse::<u64>().ok())
+            {
+                Some(offset)
+            } else {
+                return respond(
+                    &mut stream,
+                    "400 Bad Request",
+                    "text/plain",
+                    b"Invalid cursor",
+                );
+            };
             let known = shared.read().unwrap()["jobs"]
                 .as_array()
                 .is_some_and(|jobs| jobs.iter().any(|j| j["run_id"] == run));
             if known {
-                match sessions::read(state, run) {
+                match sessions::page(state, run, before) {
                     Ok(value) => respond(
                         &mut stream,
                         "200 OK",

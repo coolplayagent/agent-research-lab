@@ -63,6 +63,21 @@ fn actual_http_serves_embedded_assets_and_never_arbitrary_paths() {
             "Unknown profile",
         ),
         ("/api/profile/unknown", "404 Not Found", "Unknown profile"),
+        (
+            "/api/session/unknown?before=12",
+            "404 Not Found",
+            "Unknown session",
+        ),
+        (
+            "/api/session/unknown?before=-1",
+            "400 Bad Request",
+            "Invalid cursor",
+        ),
+        (
+            "/api/session/unknown?before=2&before=3",
+            "400 Bad Request",
+            "Invalid cursor",
+        ),
     ] {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
