@@ -379,7 +379,7 @@ improved or that a new capability has emerged.
 ```sh
 bazel test --lockfile_mode=error //...
 cargo fmt --all -- --check
-cargo clippy --locked --all-targets -- -D warnings
+cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
 
 Tests exercise real temporary Git worktrees, package installation/rollback,
