@@ -3815,7 +3815,7 @@ mod tests {
         assert!(!forbidden_candidate_path("src/parser.rs"));
     }
     #[cfg(unix)]
-    fn scheduler_fixture() -> (tempfile::TempDir, Config) {
+    pub(super) fn scheduler_fixture() -> (tempfile::TempDir, Config) {
         use std::collections::BTreeMap;
         use std::os::unix::fs::PermissionsExt;
         let binary = std::env::var("LAB_WORKFLOW_BIN").expect("LAB_WORKFLOW_BIN");
@@ -4743,3 +4743,7 @@ mod host_budget_tests {
         assert!(persisted.budget.days.values().sum::<u64>() >= 1);
     }
 }
+
+#[cfg(test)]
+#[path = "runtime/team_tests.rs"]
+mod team_tests;
