@@ -1,0 +1,17 @@
+{
+  "attempt": {
+    "request": {
+      "synthetic": true
+    }
+  },
+  "historical_unknown_metadata": "previous Job/Launch decoders intentionally ignore unknown fields",
+  "lease": {
+    "epoch": 1,
+    "expires_at_unix_ms": 1700000060000,
+    "issued_at_unix_ms": 1700000000000,
+    "run_id": "legacy-task-attempt-1"
+  },
+  "log_dir": "/synthetic/state/runs/legacy-task-attempt-1",
+  "pid": 1234,
+  "process_start": "synthetic-start"
+}

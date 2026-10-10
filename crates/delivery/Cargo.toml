@@ -1,0 +1,20 @@
+[package]
+name = "lab-delivery"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "delivery"
+
+[dependencies]
+anyhow.workspace = true
+freshness.workspace = true
+process.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+storage.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

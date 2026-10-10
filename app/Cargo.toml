@@ -1,0 +1,38 @@
+[package]
+name = "agent-research-lab"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Reproducible AI-SDLC and long-horizon agent research with SuperPOD"
+
+[dependencies]
+agent_backend.workspace = true
+agent_policy.workspace = true
+anyhow.workspace = true
+automation.workspace = true
+budget.workspace = true
+build_cache.workspace = true
+chrono.workspace = true
+clap.workspace = true
+collaboration_experiment.workspace = true
+communication.workspace = true
+config.workspace = true
+delivery.workspace = true
+evolution.workspace = true
+evolution_cli.workspace = true
+freshness.workspace = true
+inputs.workspace = true
+isolation.workspace = true
+knowledge.workspace = true
+lease_heartbeat.workspace = true
+multi_agent.workspace = true
+process.workspace = true
+runtime.workspace = true
+serde_json.workspace = true
+storage.workspace = true
+targets.workspace = true
+task.workspace = true
+workflow.workspace = true
+
+[dev-dependencies]
+serde.workspace = true

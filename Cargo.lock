@@ -9,13 +9,31 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
- "fs2",
- "libc",
+ "lab-agent-backend",
+ "lab-agent-policy",
+ "lab-automation",
+ "lab-budget",
+ "lab-build-cache",
+ "lab-collaboration-experiment",
+ "lab-communication",
+ "lab-config",
+ "lab-delivery",
+ "lab-evolution",
+ "lab-evolution-cli",
+ "lab-freshness",
+ "lab-inputs",
+ "lab-isolation",
+ "lab-knowledge",
+ "lab-lease-heartbeat",
+ "lab-multi-agent",
+ "lab-process",
+ "lab-runtime",
+ "lab-storage",
+ "lab-targets",
+ "lab-task",
+ "lab-workflow",
  "serde",
  "serde_json",
- "sha2",
- "tempfile",
- "toml",
 ]
 
 [[package]]
@@ -371,6 +389,334 @@ dependencies = [
  "cfg-if",
  "futures-util",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "lab-agent-backend"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "lab-agent-policy",
+ "lab-config",
+ "lab-isolation",
+ "lab-process",
+ "lab-storage",
+ "lab-task",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-agent-policy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+]
+
+[[package]]
+name = "lab-automation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "lab-delivery",
+ "lab-knowledge",
+ "lab-storage",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-budget"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "lab-build-cache"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-isolation",
+ "lab-process",
+ "lab-storage",
+ "libc",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
+name = "lab-collaboration-experiment"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-config",
+ "lab-evolution",
+ "lab-evolution-cli",
+ "lab-inputs",
+ "lab-process",
+ "lab-runtime",
+ "lab-storage",
+ "lab-workflow",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-communication"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-config",
+ "lab-storage",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-config"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-agent-policy",
+ "serde",
+ "toml",
+]
+
+[[package]]
+name = "lab-delivery"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-freshness",
+ "lab-process",
+ "lab-storage",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-evolution"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-evolution-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-delivery",
+ "lab-evolution",
+ "lab-freshness",
+ "lab-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-freshness"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "lab-config",
+ "lab-process",
+ "lab-storage",
+ "libc",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-inputs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-config",
+ "lab-delivery",
+ "lab-freshness",
+ "lab-process",
+ "lab-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-isolation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-agent-policy",
+ "libc",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
+name = "lab-knowledge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "lab-delivery",
+ "lab-process",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-lease-heartbeat"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-config",
+ "lab-process",
+ "lab-storage",
+ "lab-workflow",
+ "libc",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-multi-agent"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-communication",
+ "lab-config",
+ "lab-storage",
+ "lab-task",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-process"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "lab-agent-backend",
+ "lab-agent-policy",
+ "lab-automation",
+ "lab-budget",
+ "lab-build-cache",
+ "lab-communication",
+ "lab-config",
+ "lab-evolution",
+ "lab-evolution-cli",
+ "lab-freshness",
+ "lab-inputs",
+ "lab-isolation",
+ "lab-lease-heartbeat",
+ "lab-multi-agent",
+ "lab-process",
+ "lab-storage",
+ "lab-targets",
+ "lab-task",
+ "lab-workflow",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "fs2",
+ "libc",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-targets"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "lab-agent-backend",
+ "lab-agent-policy",
+ "lab-config",
+ "lab-isolation",
+ "lab-process",
+ "lab-storage",
+ "lab-workflow",
+ "libc",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "lab-task"
+version = "0.1.0"
+dependencies = [
+ "lab-communication",
+ "lab-config",
+ "lab-inputs",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "lab-workflow"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-process",
+ "lab-storage",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
 ]
 
 [[package]]

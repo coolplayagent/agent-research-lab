@@ -1,0 +1,48 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+exports_files([
+    "Cargo.toml",
+], visibility = ["//visibility:public"])
+
+rust_library(
+    name = "runtime",
+    crate_name = "runtime",
+    srcs = glob(["src/**/*.rs"]),
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    aliases = aliases(),
+    compile_data = ["//:prompt_assets"],
+    deps = [
+        "//crates/agent-backend:agent_backend",
+        "//crates/agent-policy:agent_policy",
+        "//crates/automation:automation",
+        "//crates/budget:budget",
+        "//crates/build-cache:build_cache",
+        "//crates/communication:communication",
+        "//crates/config:config",
+        "//crates/evolution-cli:evolution_cli",
+        "//crates/evolution:evolution",
+        "//crates/freshness:freshness",
+        "//crates/inputs:inputs",
+        "//crates/isolation:isolation",
+        "//crates/lease-heartbeat:lease_heartbeat",
+        "//crates/multi-agent:multi_agent",
+        "//crates/process:process",
+        "//crates/storage:storage",
+        "//crates/targets:targets",
+        "//crates/task:task",
+        "//crates/workflow:workflow",
+    ] + all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+)
+
+rust_test(
+    name = "tests",
+    crate = ":runtime",
+    aliases = aliases(normal_dev = True, proc_macro_dev = True),
+    deps = all_crate_deps(normal_dev = True),
+    proc_macro_deps = all_crate_deps(proc_macro_dev = True),
+    visibility = ["//visibility:public"],
+)

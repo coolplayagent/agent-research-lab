@@ -1,0 +1,6 @@
+{
+  "id": "legacy-task",
+  "prompt": "Independent synthetic task.\nNo runtime invocation.",
+  "repository": "superpod",
+  "role": "research"
+}

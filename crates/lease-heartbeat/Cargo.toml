@@ -1,0 +1,20 @@
+[package]
+name = "lab-lease-heartbeat"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "lease_heartbeat"
+
+[dependencies]
+anyhow.workspace = true
+config.workspace = true
+libc.workspace = true
+process.workspace = true
+serde_json.workspace = true
+storage.workspace = true
+workflow.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

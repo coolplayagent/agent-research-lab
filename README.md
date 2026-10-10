@@ -32,6 +32,28 @@ experiment. Detailed knowledge and source archives continue to live in SuperPOD.
 
 ## Build and configure
 
+The repository is a Cargo workspace with an independent crate for each module:
+
+```text
+app/                         # CLI and application service composition
+  src/{main,cli,service}.rs
+  systemd/                   # Optional user-service template
+crates/
+  config/                    # Configuration and backend/team declarations
+  task/                      # Frozen task, job and launch records
+  runtime/                   # Durable scheduling and recovery
+  agent-backend/              # Coding-agent invocation and result validation
+  multi-agent/               # Host coordination and scale simulations
+  communication/             # Bounded shared proposal boards
+  ...                        # One Cargo.toml and BUILD.bazel per module
+Cargo.toml                   # Workspace members and shared dependency versions
+BUILD.bazel                  # Stable binary, aggregate tests and package targets
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for module ownership and dependency rules.
+`app/` composes the libraries; library crates do not depend on the application.
+The application package and executable remain named `agent-research-lab`.
+
 Linux is the first supported runtime platform. Install Git, Bazelisk/Bazel,
 Bubblewrap (`bwrap` with working user namespaces), Codex CLI and GitHub CLI (`gh`).
 The pinned Bazel and Rust versions are recorded in `.bazelversion` and
@@ -215,7 +237,7 @@ bounded cycle and inspect its results before starting a service:
 bazel-bin/agent-research-lab --config local.toml run --continuous --seed
 ```
 
-`examples/agent-research-lab.service` is an optional systemd user-service template.
+`app/systemd/agent-research-lab.service` is an optional systemd user-service template.
 Adjust its executable, working directory and configuration paths to your machine;
 installation or service activation is not performed by building the project.
 
@@ -275,7 +297,8 @@ An operation has the JSON envelope `{"kind":"…","request":{…}}`.
 | `knowledge_publish` | `knowledge::PublishReportRequest` | Commit, push and open the reviewed SuperPOD PR |
 | `knowledge_refresh` | `knowledge::IndexRefreshRequest` | Update/poll the exact SuperPOD index target |
 
-These public Rust types in `src/delivery.rs` and `src/knowledge.rs` are the JSON
+These public Rust types in `crates/delivery/src/lib.rs` and
+`crates/knowledge/src/lib.rs` are the JSON
 request contracts. The queue stores immutable hashed requests and durable results.
 Identical requests reuse their existing state. Index tasks can remain `waiting`;
 unknown write outcomes become `needs_reconciliation`. After inspecting actual

@@ -1,0 +1,67 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+exports_files([
+    "Cargo.toml",
+    "src/main.rs",
+    "systemd/agent-research-lab.service",
+], visibility = ["//visibility:public"])
+
+rust_library(
+    name = "app_service",
+    crate_name = "agent_research_lab",
+    srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    aliases = aliases(),
+    version = "0.1.0",
+    rustc_env = {"CARGO_PKG_NAME": "agent-research-lab"},
+    deps = [
+        "//crates/agent-backend:agent_backend",
+        "//crates/agent-policy:agent_policy",
+        "//crates/automation:automation",
+        "//crates/budget:budget",
+        "//crates/build-cache:build_cache",
+        "//crates/collaboration-experiment:collaboration_experiment",
+        "//crates/communication:communication",
+        "//crates/config:config",
+        "//crates/delivery:delivery",
+        "//crates/evolution-cli:evolution_cli",
+        "//crates/evolution:evolution",
+        "//crates/freshness:freshness",
+        "//crates/inputs:inputs",
+        "//crates/isolation:isolation",
+        "//crates/knowledge:knowledge",
+        "//crates/lease-heartbeat:lease_heartbeat",
+        "//crates/multi-agent:multi_agent",
+        "//crates/process:process",
+        "//crates/runtime:runtime",
+        "//crates/storage:storage",
+        "//crates/targets:targets",
+        "//crates/task:task",
+        "//crates/workflow:workflow",
+    ] + all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+)
+
+rust_test(
+    name = "tests",
+    crate = ":app_service",
+    aliases = aliases(normal_dev = True, proc_macro_dev = True),
+    deps = all_crate_deps(normal_dev = True),
+    proc_macro_deps = all_crate_deps(proc_macro_dev = True),
+    visibility = ["//visibility:public"],
+)
+
+rust_test(
+    name = "serde_compatibility_tests",
+    srcs = ["tests/serde_compatibility.rs"],
+    crate_root = "tests/serde_compatibility.rs",
+    edition = "2024",
+    compile_data = glob(["tests/fixtures/**"]),
+    aliases = aliases(normal = True, normal_dev = True, proc_macro = True, proc_macro_dev = True),
+    deps = [":app_service"] + all_crate_deps(normal = True, normal_dev = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True, proc_macro_dev = True),
+    visibility = ["//visibility:public"],
+)

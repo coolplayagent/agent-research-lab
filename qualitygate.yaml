@@ -13,7 +13,7 @@ checks:
     timeout_seconds: 120
   - id: clippy
     kind: command
-    argv: [cargo, clippy, --locked, --all-targets, --, -D, warnings]
+    argv: [cargo, clippy, --locked, --workspace, --all-targets, --, -D, warnings]
     timeout_seconds: 600
   - id: bazel-build
     kind: command
@@ -36,6 +36,9 @@ verification_assets:
   - MODULE.bazel
   - MODULE.bazel.lock
   - BUILD.bazel
+  - app/**
+  - crates/**
+  - "**/*.bzl"
   - rust-toolchain.toml
   - .bazelrc
   - .bazelignore

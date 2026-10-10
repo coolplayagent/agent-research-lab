@@ -1,0 +1,1 @@
+{"id":"legacy-task","role":"research","repository":"superpod","prompt":"Independent synthetic task.\nNo runtime invocation.","write":false,"exploratory":false,"dependencies":[],"required_tools":[]}
