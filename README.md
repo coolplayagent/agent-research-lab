@@ -77,7 +77,7 @@ Independent skill and repository checks run in groups of at most four under the
 same absolute host deadline. All started checks finish before an error returns;
 a partial collection never replaces the current input manifest.
 
-Each idle admission batch verifies freshness before starting up to three agents of
+Each idle admission batch verifies freshness before starting up to eight agents of
 one cohort. An independent heartbeat renews each active workflow lease while
 the controller prepares other agents or handles results. The batch keeps
 its source snapshots fixed. Installed skill/runtime bytes are checked again at
@@ -133,7 +133,7 @@ It consumes provider usage and verifies transport, not independent model quality
 All controller-owned Codex workers and model probes explicitly use
 `approval_policy = "never"` and `sandbox_mode = "danger-full-access"` (all approved).
 Each attempt records these arguments in `agent-permissions.json`. The controller
-owns the three-agent limit and disables nested Codex agents. The outer mount/PID
+owns the eight-agent limit and disables nested Codex agents. The outer mount/PID
 boundary still keeps host credentials, other attempts and evaluation holdouts
 private. OS permission errors need target or namespace diagnosis; an approval flag
 cannot grant missing kernel privileges.
@@ -193,7 +193,7 @@ interrupted memory writeback remains explicitly unknown until reconciled, avoidi
 an unproven duplicate write. Completion work, freshness checks and seeding share
 the persisted daily budget and the `run --max-seconds` deadline.
 
-The default ceiling is three concurrent agents and 43,200 active wall-clock seconds
+The default ceiling is eight concurrent agents and 43,200 active wall-clock seconds
 per Asia/Singapore calendar day. Concurrent agents share the wall-clock allowance;
 it is not a dollar or token cap. Budget state survives controller restarts. Run the
 bounded cycle and inspect its results before starting a service:
