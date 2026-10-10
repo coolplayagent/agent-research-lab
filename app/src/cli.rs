@@ -14,6 +14,14 @@ pub(crate) struct Cli {
 }
 #[derive(Subcommand)]
 pub(crate) enum Commands {
+    /// Serve the local, read-only research dashboard alongside the controller.
+    Serve {
+        #[arg(long, default_value = "127.0.0.1:8090")]
+        listen: std::net::SocketAddr,
+        /// Bound this observer's lifetime independently from the research controller.
+        #[arg(long, default_value_t = 43200, value_parser = clap::value_parser!(u64).range(1..=43200))]
+        max_seconds: u64,
+    },
     /// Inspect agent adapters and bounded team communication, or simulate logical scale.
     Agents {
         #[arg(value_parser = ["backends", "boards", "view", "close", "prune", "simulate"])]

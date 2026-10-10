@@ -5,6 +5,7 @@ exports_files([
     "Cargo.toml",
     "src/main.rs",
     "systemd/agent-research-lab.service",
+    "systemd/agent-research-lab-dashboard.service",
 ], visibility = ["//visibility:public"])
 
 rust_library(
@@ -12,6 +13,7 @@ rust_library(
     crate_name = "agent_research_lab",
     srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
     crate_root = "src/lib.rs",
+    compile_data = glob(["src/dashboard/*.html", "src/dashboard/*.css", "src/dashboard/*.js"]),
     edition = "2024",
     aliases = aliases(),
     version = "0.1.0",

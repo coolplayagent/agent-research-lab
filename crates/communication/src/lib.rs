@@ -274,6 +274,16 @@ pub struct Board {
     root: PathBuf,
 }
 impl Board {
+    /// Open existing host authority without creating directories or changing permissions.
+    pub fn open(state_dir: &Path) -> Result<Self> {
+        ensure!(state_dir.is_absolute(), "board state path must be absolute");
+        let root = state_dir.join("communication");
+        let _ = directory(&root.join("authority"), false)?;
+        Ok(Self {
+            state_dir: state_dir.to_path_buf(),
+            root,
+        })
+    }
     pub fn new(state_dir: &Path) -> Result<Self> {
         ensure!(state_dir.is_absolute(), "board state path must be absolute");
         let _ = directory(state_dir, false)?;
@@ -763,6 +773,17 @@ impl Board {
         let c = self.load(id)?;
         ensure!(now >= c.last_time, "host time moved backwards");
         self.view_value(&c, now)
+    }
+    /// Observer-only retained history; expired/revoked proposals never become context.
+    pub fn inspect(&self, id: &str, now: u64) -> Result<serde_json::Value> {
+        let c = self.load(id)?;
+        ensure!(now >= c.last_time, "host time moved backwards");
+        let mut value = self.view_value(&c, now)?;
+        value["retained_messages"] = serde_json::Value::Array(c.messages.iter().map(|m| {
+            let origin = &c.members.iter().find(|member| member.identity.run_id == m.run_id).unwrap().status;
+            serde_json::json!({"message":m,"origin":origin,"expired":m.expires_at <= now,"trust":TRUST})
+        }).collect());
+        Ok(value)
     }
     /// At most one shard and 64 rows. The caller advances next_after, then next_shard.
     pub fn cohorts(

@@ -11,6 +11,7 @@ use std::{
     time::Duration,
 };
 use workflow::Workflow;
+mod watch;
 
 use multi_agent::TeamMembership;
 pub use task::{Job, Launch, Task};
@@ -254,6 +255,10 @@ fn frozen_input(job: &Job) -> Value {
 fn ensure_started(c: &Config, job: &Job) -> Result<()> {
     let w = workflow(c);
     w.initialize()?;
+    ensure_started_in_store(c, &w, job)
+}
+
+fn ensure_started_in_store(c: &Config, w: &Workflow, job: &Job) -> Result<()> {
     if w.replay_task_start(&job.run_id, job.task.write, frozen_input(job))?
         .is_some()
     {
@@ -785,12 +790,18 @@ pub fn doctor(c: &Config, probe_models: bool) -> Result<Value> {
 }
 
 pub fn status(c: &Config) -> Result<Value> {
-    let w = workflow(c);
     let all_jobs = jobs(c)?;
+    status_for_jobs(c, &all_jobs)
+}
+
+/// Observe a caller-bounded job selection using the same controller state rules.
+/// Missing dependencies remain explicit; callers must label incomplete selections.
+pub fn status_for_jobs(c: &Config, all_jobs: &[Job]) -> Result<Value> {
+    let w = workflow(c);
     let indexed: BTreeMap<_, _> = all_jobs.iter().map(|j| (j.task.id.clone(), j)).collect();
     let mut states = BTreeMap::new();
     let mut errors = BTreeMap::new();
-    for job in &all_jobs {
+    for job in all_jobs {
         match w.status(&job.run_id) {
             Ok(state) => {
                 states.insert(job.task.id.clone(), state);
@@ -803,7 +814,7 @@ pub fn status(c: &Config) -> Result<Value> {
     let paused = c.state_dir.join("paused").exists();
     let mut result = Vec::new();
     let mut summary = BTreeMap::<&str, usize>::new();
-    for job in &all_jobs {
+    for job in all_jobs {
         let (state, reason) =
             controller_state(job, &indexed, &states, paused, &mut BTreeSet::new());
         *summary.entry(state).or_default() += 1;
@@ -1177,6 +1188,7 @@ pub fn run_scoped(
         max_seconds,
     };
     let _lock = storage::lock(&c.state_dir.join("controller.lock"))?;
+    let mut observer = watch::Controller::start(c)?;
     kill_retained_workers(c)?;
     let scope = task_ids_file
         .map(|path| TaskScope::load(c, path))
@@ -1196,11 +1208,17 @@ pub fn run_scoped(
         w.version()?;
         w.initialize()?;
         for job in jobs(c)? {
-            ensure_started(c, &job)?;
+            ensure_started_in_store(c, &w, &job)?;
+            observer.record("recovering", &[])?;
         }
         reconcile_orphans(c, &w)?;
         if seed_requested {
-            seed_inputs(c)?;
+            observer.record("refreshing", &[])?;
+            if let Err(error) = watch::seed(c, || seed_inputs(c))
+                && !continuous
+            {
+                return Err(error);
+            }
         }
         Ok(())
     })?
@@ -1215,7 +1233,7 @@ pub fn run_scoped(
         ledger.exploration_percent = exploration.share_percent();
     }
     let mut last = now();
-    let mut next_seed_check = 0;
+    let mut next_seed_check = watch::next_seed(c);
     let mut next_host_tick = 0_i64;
     let mut next_communication_poll = 0_i64;
     let mut desktop_prepared = false;
@@ -1224,6 +1242,13 @@ pub fn run_scoped(
     let mut active: Vec<Active> = vec![];
     loop {
         let time = now();
+        observer.record(
+            if active.is_empty() { "idle" } else { "running" },
+            &active
+                .iter()
+                .map(|a| a.job.task.id.clone())
+                .collect::<Vec<_>>(),
+        )?;
         let elapsed = (time - last).max(0) as u64;
         if !active.is_empty() {
             if active[0].job.task.exploratory {
@@ -1672,14 +1697,17 @@ pub fn run_scoped(
                 break;
             }
             if continuous && now() >= next_seed_check {
-                if let Err(error) = idle_host(c, &mut ledger, window, || seed_inputs(c)) {
+                observer.record("refreshing", &[])?;
+                if let Err(error) =
+                    idle_host(c, &mut ledger, window, || watch::seed(c, || seed_inputs(c)))
+                {
                     storage::write(
                         &c.state_dir.join("seed-error.json"),
                         &json!({"at":now(),"error":format!("{error:#}")}),
                     )?;
                 }
                 last = now();
-                next_seed_check = now() + 900;
+                next_seed_check = watch::next_seed(c);
             }
             std::thread::sleep(Duration::from_millis(200));
         } else {

@@ -78,6 +78,7 @@ pkg_tar(
     srcs = [
         ":agent-research-lab",
         "//app:systemd/agent-research-lab.service",
+        "//app:systemd/agent-research-lab-dashboard.service",
     ] + glob(["examples/**", "prompts/**", "research/**", "skills/**", "assets/**", "*.md"]),
     package_dir = "agent-research-lab",
     strip_prefix = ".",

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>水晶球 · AI-IM 协作空间</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/"
+        ><span class="brand-icon">◈</span><strong>水晶球</strong
+        ><span>AI-IM · RESEARCH LAB</span></a
+      >
+      <div class="service-bar">
+        <span id="controller-status" class="status-pill">正在连接控制器</span
+        ><span id="connection-dot" class="dot"></span
+        ><span id="connection">连接中</span
+        ><button id="refresh" title="重新获取运行快照">↻</button>
+      </div>
+    </header>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="side-title">
+          <h2>协作空间</h2>
+          <span class="readonly">只读</span>
+        </div>
+        <label class="search"
+          ><input
+            id="search"
+            type="search"
+            placeholder="搜索 agent / 任务"
+            aria-label="搜索 agent 或任务" /></label
+        ><button id="latest-room" class="latest-button">◉ 跟随当前研究</button>
+        <div class="section-label">协作群 <span id="room-count"></span></div>
+        <div id="rooms" class="rooms"></div>
+        <div class="section-label">数字人 <span id="task-count"></span></div>
+        <div id="tasks" class="task-list"></div>
+        <div class="sidebar-foot">
+          <span class="dot knowledge"></span> 公共知识库
+          <strong>SuperPOD</strong><small id="history-count"></small>
+        </div>
+      </aside>
+      <main class="conversation">
+        <div class="room-header">
+          <div>
+            <p class="eyebrow">AI-IM · SHARED RESEARCH CHANNEL</p>
+            <h1 id="room-title">研究公共板</h1>
+            <p id="room-subtitle">等待运行快照…</p>
+          </div>
+          <div class="view-switch">
+            <button id="view-map" class="active">协作图</button
+            ><button id="view-chat">专注对话</button>
+          </div>
+        </div>
+        <div id="notice" role="status" hidden></div>
+        <div class="scope-stats">
+          <span>当前群</span
+          ><span><i class="dot running-dot"></i>运行 <b id="running">—</b></span
+          ><span>等待 <b id="pending">—</b></span
+          ><span>完成 <b id="succeeded">—</b></span
+          ><span>阻塞 <b id="blocked">—</b></span
+          ><label
+            >状态
+            <select id="state">
+              <option value="">全部</option>
+              <option value="running">运行中</option>
+              <option value="ready">就绪</option>
+              <option value="waiting_dependencies">等待依赖</option>
+              <option value="succeeded">已完成</option>
+              <option value="blocked">阻塞</option>
+              <option value="failed">失败</option>
+              <option value="needs_reconciliation">待核对</option>
+              <option value="unknown">未知</option>
+              <option value="paused">暂停</option>
+              <option value="retry_wait">重试等待</option>
+            </select></label
+          >
+        </div>
+        <section id="map-panel" class="map-panel">
+          <div class="map-heading">
+            <span>多 AGENT 实时协作</span
+            ><span class="legend"
+              ><i class="publish-line"></i>发布提议
+              <i class="context-line"></i>接收上下文</span
+            >
+            <button
+              id="maximize-graph"
+              class="maximize"
+              aria-label="放大协作图"
+              aria-pressed="false"
+            >
+              ↗ 放大
+            </button>
+          </div>
+          <div
+            id="graph"
+            class="graph"
+            aria-label="水晶球公共板与多 agent 实时协作图"
+          ></div>
+          <div class="map-foot">
+            <span id="graph-limit"></span><span id="sample-time"></span>
+          </div>
+        </section>
+        <div class="chat-heading">
+          <div>
+            <button id="public-chat" class="chat-tab active"># 公共板</button
+            ><button id="session-chat" class="chat-tab">
+              对话与过程 <span id="process-count"></span>
+            </button>
+          </div>
+          <span id="message-count"></span
+          ><button id="open-profile" class="profile-toggle">数字人看板</button>
+          <button
+            id="maximize-chat"
+            class="maximize"
+            aria-label="放大对话窗口"
+            aria-pressed="false"
+          >
+            ↗ 放大
+          </button>
+        </div>
+        <div
+          id="timeline"
+          class="timeline"
+          aria-live="polite"
+          aria-relevant="additions"
+        ></div>
+        <div class="composer">
+          <span>◈</span>
+          <p>实时观察频道 · 主机验证后发布公共板提议</p>
+          <span class="readonly">知识沉淀至 SuperPOD</span>
+        </div>
+      </main>
+      <aside class="inspector">
+        <div class="inspector-heading">
+          <p class="eyebrow">DIGITAL PERSONA</p>
+          <h2>数字人看板</h2>
+          <button id="close-profile" aria-label="关闭数字人看板">×</button>
+        </div>
+        <div id="detail" class="detail">
+          <div class="empty">点击头像、@名字或协作图节点查看数字人。</div>
+        </div>
+      </aside>
+    </div>
+  </body>
+</html>

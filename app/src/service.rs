@@ -47,6 +47,10 @@ fn execute(cli: Cli) -> Result<Value> {
         command => {
             let c = Config::load(&cli.config)?;
             match command {
+                Commands::Serve {
+                    listen,
+                    max_seconds,
+                } => crate::dashboard::serve(&c, listen, max_seconds),
                 Commands::Agents {
                     action,
                     cohort,

@@ -1,5 +1,6 @@
 //! Application service composition and compatibility exports for host integrations.
 mod cli;
+mod dashboard;
 pub mod service;
 
 pub use agent_backend;
