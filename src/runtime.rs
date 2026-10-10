@@ -1131,6 +1131,7 @@ pub fn run_seeded(
     let mut next_host_tick = 0_i64;
     let mut desktop_prepared = false;
     let mut next_desktop_prepare = 0_i64;
+    let mut next_build_prepare = BTreeMap::<String, i64>::new();
     let mut active: Vec<Active> = vec![];
     loop {
         let time = now();
@@ -1406,6 +1407,50 @@ pub fn run_seeded(
                         )?;
                         // No workflow attempt has been claimed. The next idle
                         // interval may safely resume dependency preparation.
+                        continue;
+                    }
+                }
+            }
+            let build_logs = c.state_dir.join("runs").join(&job.run_id);
+            if (job.task.write
+                || job
+                    .task
+                    .required_tools
+                    .iter()
+                    .any(|name| name == "qualitygate-cli"))
+                && crate::build_cache::applicable(&job.worktree)
+                && !crate::build_cache::ready(&job.worktree, &build_logs).unwrap_or(false)
+            {
+                // Dependency copies can be large. Prepare only in an idle,
+                // accounted host window, before acquiring/claiming any effect.
+                if !active.is_empty() {
+                    continue;
+                }
+                retry_waiting = true;
+                if next_build_prepare
+                    .get(&job.run_id)
+                    .is_some_and(|due| *due > now())
+                {
+                    continue;
+                }
+                let prepared = prepare_prerequisite(c, &mut ledger, window, false, || {
+                    crate::build_cache::prepare(&job.worktree, &build_logs)
+                });
+                last = now();
+                match prepared {
+                    Ok(Some(_)) => {
+                        next_build_prepare.remove(&job.run_id);
+                    }
+                    Ok(None) => break,
+                    Err(error) if crate::build_cache::deferred(&error) => {
+                        next_build_prepare.insert(job.run_id.clone(), now() + 30);
+                        continue;
+                    }
+                    Err(error) => {
+                        job.last_error = Some(format!(
+                            "build cache preparation failed before claim: {error:#}"
+                        ));
+                        storage::write(&job_path(c, &job.task.id), &job)?;
                         continue;
                     }
                 }
