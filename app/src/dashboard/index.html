@@ -29,6 +29,24 @@
       </div>
     </header>
     <div id="collaboration-page" class="shell">
+      <button
+        id="toggle-left-sidebar"
+        class="sidebar-edge-toggle"
+        aria-controls="left-sidebar"
+        aria-expanded="true"
+        aria-label="收起左侧栏"
+      >
+        ‹
+      </button>
+      <button
+        id="toggle-right-sidebar"
+        class="sidebar-edge-toggle"
+        aria-controls="right-sidebar"
+        aria-expanded="true"
+        aria-label="收起右侧栏"
+      >
+        ›
+      </button>
       <aside id="left-sidebar" class="sidebar">
         <div
           id="resize-left"
@@ -103,24 +121,6 @@
             <p id="room-subtitle">等待运行快照…</p>
           </div>
           <div class="room-actions">
-            <div class="sidebar-actions">
-              <button
-                id="toggle-left-sidebar"
-                class="panel-toggle"
-                aria-controls="left-sidebar"
-                aria-expanded="true"
-              >
-                ◧ 左栏
-              </button>
-              <button
-                id="toggle-right-sidebar"
-                class="panel-toggle"
-                aria-controls="right-sidebar"
-                aria-expanded="true"
-              >
-                ◨ 右栏
-              </button>
-            </div>
             <div class="view-switch">
               <button id="view-map" class="active">协作图</button
               ><button id="view-chat">专注对话</button>
@@ -263,92 +263,135 @@
         <div>
           <p class="eyebrow">SYSTEM SETTINGS</p>
           <h1 id="settings-title" tabindex="-1">系统设置</h1>
-          <p>调整你的协作观察体验。</p>
+          <p>管理数字人，调整观察体验，了解服务运行情况。</p>
         </div>
       </div>
-      <section class="settings-card" aria-labelledby="observation-settings">
-        <h2 id="observation-settings">观察设置</h2>
-        <label class="setting-row"
-          ><span
-            ><strong>跟随当前研究</strong
-            ><small
-              >新研究开始时自动切换协作群；手动选择会话会暂停跟随。</small
-            ></span
-          ><input id="setting-follow" type="checkbox"
-        /></label>
-        <label class="setting-row"
-          ><span
-            ><strong>动态图效</strong
-            ><small>显示数字人活动和协作图中的动态连线。</small></span
-          ><input id="setting-motion" type="checkbox"
-        /></label>
-        <p class="system-note">这些偏好保存在当前浏览器中。</p>
-      </section>
-      <section class="settings-card" aria-labelledby="people-settings">
-        <div class="people-heading">
-          <h2 id="people-settings">数字人名册</h2>
-          <button id="create-person">＋ 新增数字人</button>
-        </div>
-        <p class="system-note">
-          固定成员跨群复用；临时成员可以转为固定；研究成员保留独立身份与记忆。
-        </p>
-        <div id="people-defaults" class="people-defaults"></div>
-        <form id="person-form" class="person-form" hidden>
-          <h3 id="person-form-title">新增数字人</h3>
-          <label
-            >花名<input
-              id="person-name"
-              maxlength="32"
-              placeholder="留空自动取一个不重复的花名"
-          /></label>
-          <div class="form-columns">
-            <label>角色<select id="person-role"></select></label
-            ><label
-              >成员类型<select id="person-kind">
-                <option value="fixed">固定成员</option>
-                <option value="temporary">临时成员</option>
-                <option value="research">研究成员</option>
-              </select></label
-            >
-          </div>
-          <label
-            >研究方向 / 用途<input
-              id="person-purpose"
-              maxlength="300"
-              placeholder="例如：研究跨会话记忆的可靠性"
-          /></label>
-          <label
-            >Soul<textarea
-              id="person-soul"
-              rows="4"
-              maxlength="1200"
-              placeholder="描述它如何倾听、思考和表达；权限由任务决定。"
-            ></textarea>
-          </label>
-          <div class="form-actions">
-            <button type="submit" id="save-person">保存数字人</button
-            ><button type="button" id="cancel-person">取消</button
-            ><span id="person-form-status" role="status"></span>
-          </div>
-        </form>
-        <div class="people-filters">
-          <input
-            id="people-search"
-            placeholder="搜索花名、角色、研究方向"
-            aria-label="搜索数字人"
-          /><label
-            ><input id="people-temporary" type="checkbox" /> 显示临时成员</label
+      <div class="settings-layout">
+        <nav class="settings-nav" aria-label="设置分类">
+          <button
+            id="settings-nav-people"
+            aria-controls="settings-people"
+            aria-current="page"
           >
+            数字人<span>成员、角色与记忆</span>
+          </button>
+          <button
+            id="settings-nav-observation"
+            aria-controls="settings-observation"
+          >
+            观察体验<span>跟随与动态图效</span>
+          </button>
+          <button id="settings-nav-service" aria-controls="settings-service">
+            运行信息<span>服务与公共知识库</span>
+          </button>
+        </nav>
+        <div class="settings-content">
+          <section
+            id="settings-observation"
+            class="settings-panel settings-card"
+            aria-labelledby="observation-settings"
+            hidden
+          >
+            <h2 id="observation-settings">观察设置</h2>
+            <label class="setting-row"
+              ><span
+                ><strong>跟随当前研究</strong
+                ><small
+                  >新研究开始时自动切换协作群；手动选择会话会暂停跟随。</small
+                ></span
+              ><input id="setting-follow" type="checkbox"
+            /></label>
+            <label class="setting-row"
+              ><span
+                ><strong>动态图效</strong
+                ><small>显示数字人活动和协作图中的动态连线。</small></span
+              ><input id="setting-motion" type="checkbox"
+            /></label>
+            <p class="system-note">这些偏好保存在当前浏览器中。</p>
+          </section>
+          <section
+            id="settings-people"
+            class="settings-panel"
+            aria-labelledby="settings-nav-people"
+          >
+            <div id="people-list" class="settings-card">
+              <div class="people-heading">
+                <h2 id="people-settings">数字人名册</h2>
+                <button id="create-person">＋ 新增数字人</button>
+              </div>
+              <p class="system-note">
+                固定成员跨群复用；临时成员可以转为固定；研究成员保留独立身份与记忆。
+              </p>
+              <div id="people-defaults" class="people-defaults"></div>
+
+              <div class="people-filters">
+                <input
+                  id="people-search"
+                  placeholder="搜索花名、角色、研究方向"
+                  aria-label="搜索数字人"
+                /><label
+                  ><input id="people-temporary" type="checkbox" />
+                  显示临时成员</label
+                >
+              </div>
+              <div id="people-directory" class="people-directory"></div>
+              <button id="people-more" hidden>加载更多数字人</button>
+              <p id="people-settings-status" role="status"></p>
+            </div>
+            <form id="person-form" class="person-form" hidden>
+              <h3 id="person-form-title">新增数字人</h3>
+              <label
+                >花名<input
+                  id="person-name"
+                  maxlength="32"
+                  placeholder="留空自动取一个不重复的花名"
+              /></label>
+              <div class="form-columns">
+                <label>角色<select id="person-role"></select></label
+                ><label
+                  >成员类型<select id="person-kind">
+                    <option value="fixed">固定成员</option>
+                    <option value="temporary">临时成员</option>
+                    <option value="research">研究成员</option>
+                  </select></label
+                >
+              </div>
+              <label
+                >研究方向 / 用途<input
+                  id="person-purpose"
+                  maxlength="300"
+                  placeholder="例如：研究跨会话记忆的可靠性"
+              /></label>
+              <label
+                >Soul<textarea
+                  id="person-soul"
+                  rows="4"
+                  maxlength="1200"
+                  placeholder="描述它如何倾听、思考和表达；权限由任务决定。"
+                ></textarea>
+              </label>
+              <div class="form-actions">
+                <button type="submit" id="save-person">保存数字人</button
+                ><button type="button" id="cancel-person">取消</button
+                ><span id="person-form-status" role="status"></span>
+              </div>
+            </form>
+            <div id="person-inline-host" hidden></div>
+          </section>
+          <section
+            id="settings-service"
+            class="settings-panel settings-card"
+            aria-labelledby="service-settings"
+            hidden
+          >
+            <h2 id="service-settings">服务运行信息</h2>
+            <dl id="service-settings-info"></dl>
+            <p class="system-note">
+              运行参数由服务配置管理，此处展示当前状态。
+            </p>
+          </section>
         </div>
-        <div id="people-directory" class="people-directory"></div>
-        <button id="people-more" hidden>加载更多数字人</button>
-        <p id="people-settings-status" role="status"></p>
-      </section>
-      <section class="settings-card" aria-labelledby="service-settings">
-        <h2 id="service-settings">服务运行信息</h2>
-        <dl id="service-settings-info"></dl>
-        <p class="system-note">运行参数由服务配置管理，此处展示当前状态。</p>
-      </section>
+      </div>
     </main>
     <dialog id="person-window" aria-labelledby="person-title">
       <div class="session-heading">
