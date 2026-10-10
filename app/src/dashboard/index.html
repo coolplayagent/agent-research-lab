@@ -6,6 +6,7 @@
     <title>水晶球 · AI-IM 协作空间</title>
     <link rel="stylesheet" href="/style.css" />
     <script src="/app.js" defer></script>
+    <script src="/people.js" defer></script>
   </head>
   <body>
     <header>
@@ -40,7 +41,7 @@
         ></div>
         <div class="side-title">
           <h2>协作空间</h2>
-          <span class="readonly">只读</span>
+          <span class="readonly">协作</span>
         </div>
         <label class="search"
           ><input
@@ -283,12 +284,143 @@
         /></label>
         <p class="system-note">这些偏好保存在当前浏览器中。</p>
       </section>
+      <section class="settings-card" aria-labelledby="people-settings">
+        <div class="people-heading">
+          <h2 id="people-settings">数字人名册</h2>
+          <button id="create-person">＋ 新增数字人</button>
+        </div>
+        <p class="system-note">
+          固定成员跨群复用；临时成员可以转为固定；研究成员保留独立身份与记忆。
+        </p>
+        <div id="people-defaults" class="people-defaults"></div>
+        <form id="person-form" class="person-form" hidden>
+          <h3 id="person-form-title">新增数字人</h3>
+          <label
+            >花名<input
+              id="person-name"
+              maxlength="32"
+              placeholder="留空自动取一个不重复的花名"
+          /></label>
+          <div class="form-columns">
+            <label>角色<select id="person-role"></select></label
+            ><label
+              >成员类型<select id="person-kind">
+                <option value="fixed">固定成员</option>
+                <option value="temporary">临时成员</option>
+                <option value="research">研究成员</option>
+              </select></label
+            >
+          </div>
+          <label
+            >研究方向 / 用途<input
+              id="person-purpose"
+              maxlength="300"
+              placeholder="例如：研究跨会话记忆的可靠性"
+          /></label>
+          <label
+            >Soul<textarea
+              id="person-soul"
+              rows="4"
+              maxlength="1200"
+              placeholder="描述它如何倾听、思考和表达；权限由任务决定。"
+            ></textarea>
+          </label>
+          <div class="form-actions">
+            <button type="submit" id="save-person">保存数字人</button
+            ><button type="button" id="cancel-person">取消</button
+            ><span id="person-form-status" role="status"></span>
+          </div>
+        </form>
+        <div class="people-filters">
+          <input
+            id="people-search"
+            placeholder="搜索花名、角色、研究方向"
+            aria-label="搜索数字人"
+          /><label
+            ><input id="people-temporary" type="checkbox" /> 显示临时成员</label
+          >
+        </div>
+        <div id="people-directory" class="people-directory"></div>
+        <button id="people-more" hidden>加载更多数字人</button>
+        <p id="people-settings-status" role="status"></p>
+      </section>
       <section class="settings-card" aria-labelledby="service-settings">
         <h2 id="service-settings">服务运行信息</h2>
         <dl id="service-settings-info"></dl>
         <p class="system-note">运行参数由服务配置管理，此处展示当前状态。</p>
       </section>
     </main>
+    <dialog id="person-window" aria-labelledby="person-title">
+      <div class="session-heading">
+        <div id="person-avatar"></div>
+        <div class="session-heading-text">
+          <h2 id="person-title">数字人</h2>
+          <p id="person-subtitle"></p>
+        </div>
+        <button
+          id="maximize-person"
+          aria-label="放大数字人窗口"
+          aria-pressed="false"
+        >
+          ↗ 放大
+        </button>
+        <button id="edit-person">编辑资料</button
+        ><button id="promote-person">转为固定成员</button
+        ><button
+          id="close-person"
+          class="window-close"
+          aria-label="关闭数字人窗口"
+        >
+          ×
+        </button>
+      </div>
+      <div class="person-body">
+        <section class="person-introduction">
+          <h3>Soul</h3>
+          <div id="person-soul-view" class="public-text"></div>
+          <p id="person-purpose-view"></p>
+        </section>
+        <div class="person-tabs">
+          <button id="person-tab-history" class="active">全部会话</button
+          ><button id="person-tab-memory">记忆</button>
+        </div>
+        <section id="person-history-panel">
+          <p class="system-note">
+            按数字人汇总各群、各任务和执行轮次，切换群不会丢失会话。
+          </p>
+          <div id="person-history-list"></div>
+          <button id="person-history-more" hidden>更早的会话</button>
+        </section>
+        <section id="person-memory-panel" hidden>
+          <div id="person-memory-stats" class="memory-stats">
+            记忆由 relay-memory 管理
+          </div>
+          <form id="person-recall-form" class="memory-query">
+            <input
+              id="person-memory-query"
+              maxlength="1000"
+              placeholder="想起哪些研究线索？"
+              aria-label="记忆查询"
+            /><button type="submit">召回记忆</button>
+          </form>
+          <div id="person-memory-events"></div>
+          <form id="person-note-form">
+            <label
+              >为这个数字人记下一件事<textarea
+                id="person-memory-note"
+                rows="3"
+                maxlength="1000"
+                placeholder="偏好、研究线索、尚未解决的问题或证据位置"
+              ></textarea></label
+            ><button id="person-remember" type="submit">保存到记忆</button>
+          </form>
+          <p class="system-note">
+            后续任务使用已固定的记忆上下文；运行中的实验保持原有输入。不要记录凭证或私有评测答案。
+          </p>
+        </section>
+        <p id="person-status" role="status"></p>
+      </div>
+    </dialog>
     <dialog id="session-window" aria-labelledby="session-title">
       <div class="session-heading">
         <div id="session-avatar"></div>

@@ -14,7 +14,7 @@ pub(crate) struct Cli {
 }
 #[derive(Subcommand)]
 pub(crate) enum Commands {
-    /// Serve the local, read-only research dashboard alongside the controller.
+    /// Serve the local research dashboard and digital-person settings alongside the controller.
     Serve {
         #[arg(long, default_value = "127.0.0.1:8090")]
         listen: std::net::SocketAddr,

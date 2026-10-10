@@ -434,6 +434,13 @@ function renderSystemMessages() {
     control = data?.controller || {};
   if (snapshotError) current.set("snapshot-request", snapshotError);
   if (data?.error) current.set("snapshot", String(data.error));
+  for (const j of data?.jobs || []) {
+    if (j.postprocessing?.persona_memory_error)
+      current.set(
+        `persona-memory:${j.run_id}`,
+        `${name(j)} 的记忆写回尚未确认：${j.postprocessing.persona_memory_error}`,
+      );
+  }
   if (data && !connected)
     current.set(
       "connection",
@@ -683,10 +690,14 @@ function choose(id, showSession = false) {
 }
 function openSession(id) {
   const j = data?.jobs.find((job) => job.id === id);
-  if (!j) return;
+  if (j) openSessionRecord(j);
+}
+function openSessionRecord(j) {
+  const id = j.id;
   sessionReturnFocus = document.activeElement;
   sessionAgent = id;
   historyState = {
+    job: j,
     run: j.run_id,
     page: session(j),
     older: [],
@@ -749,7 +760,7 @@ function renderSession(resetScroll = false) {
   const state = historyState,
     dialog = $("session-window");
   if (!state || !dialog.open) return;
-  const j = data.jobs.find((job) => job.id === sessionAgent);
+  const j = data.jobs.find((job) => job.run_id === state.run) || state.job;
   if (!j || j.run_id !== state.run) {
     $("session-status").textContent =
       "这轮会话已结束或不在观察范围内，请重新选择数字人。";
@@ -1068,6 +1079,22 @@ function details(j) {
   });
   root.append(inspect, el("h3", "Soul · 角色准则"));
   if (!profiles.has(j.run_id)) loadProfile(j);
+  if (j.profile?.person_id) {
+    const personButton = el(
+      "button",
+      "数字人档案 · 全部会话与记忆",
+      "inspect-process",
+    );
+    personButton.addEventListener("click", () =>
+      openPerson(j.profile.person_id),
+    );
+    root.append(personButton);
+    if (j.persona?.soul)
+      root.append(
+        el("h3", `Soul · 版本 ${j.persona.revision}`),
+        readable(j.persona.soul, `persona-soul:${j.run_id}`, "soul-text"),
+      );
+  }
   if (profile?.soul?.available) {
     root.append(
       readable(profile.soul.content, `soul:${j.run_id}`, "soul-text"),
@@ -1102,7 +1129,7 @@ function details(j) {
   root.append(
     el(
       "p",
-      "Soul 来自任务的角色准则；尚无独立人格配置。身份按任务区分，同一任务重试沿用名片。",
+      "任务角色准则与独立 Soul 分别保留；任务使用创建时固定的身份、Soul 和记忆上下文。",
       "process-meta",
     ),
   );
@@ -1115,7 +1142,14 @@ function details(j) {
     ["模型", j.model],
     ["后端", j.backend],
     ["工作范围", `${j.repository} · ${j.write ? "候选写入" : "只读研究"}`],
-    ["记忆", j.profile?.use_memory ? "本任务隔离记忆" : "本任务未启用"],
+    [
+      "记忆",
+      j.persona?.memory
+        ? "relay-memory · 已固定上下文"
+        : j.profile?.use_memory
+          ? "本任务隔离记忆"
+          : "历史任务未注入数字人记忆",
+    ],
     ["必需工具", j.profile?.required_tools?.join("、") || "未指定"],
     ["当前活动", s?.events?.at(-1)?.title || "暂无公开活动"],
     ["日志更新", time(s?.modified_at)],
@@ -1166,6 +1200,7 @@ function details(j) {
     ["Prompt SHA-256", j.prompt_digest],
     ["配置 / 策略 SHA-256", j.config_digest],
     ["候选提交", j.candidate_commit],
+    ["数字人记忆 SHA-256", j.persona?.memory?.sha256],
   ]) {
     if (!v) continue;
     const b = el("div", undefined, "binding");
@@ -1599,7 +1634,11 @@ function render() {
   const rows = $("tasks");
   const scroll = rows.scrollTop;
   rows.replaceChildren();
+  const listedPeople = new Set();
   list.forEach((j) => {
+    const personId = j.profile?.person_id || j.id;
+    if (listedPeople.has(personId)) return;
+    listedPeople.add(personId);
     const b = el(
         "button",
         undefined,
@@ -1613,11 +1652,16 @@ function render() {
     dot.title = presenceLabel(j);
     b.append(avatar(j), text, dot);
     b.title = j.id;
-    b.addEventListener("click", () => choose(j.id, true));
+    b.addEventListener("click", () =>
+      j.profile?.person_id
+        ? openPerson(j.profile.person_id)
+        : choose(j.id, true),
+    );
     rows.append(b);
   });
   rows.scrollTop = scroll;
-  $("task-count").textContent = list.length;
+  $("task-count").textContent = listedPeople.size;
+  if (typeof renderPeopleSidebar === "function") renderPeopleSidebar(list);
   graph(list);
   details(data.jobs.find((j) => j.id === (inspected || selected)));
   timeline(list);
@@ -1628,6 +1672,7 @@ function accept(value) {
   value.jobs = value.jobs || [];
   value.boards = value.boards || [];
   value.sessions = value.sessions || [];
+  if (typeof syncPeople === "function") syncPeople(value.roster);
   const knownRuns = new Set(value.jobs.map((j) => j.run_id));
   for (const id of profiles.keys()) if (!knownRuns.has(id)) profiles.delete(id);
   for (const s of value.sessions) {
@@ -1725,7 +1770,8 @@ $("close-profile").addEventListener("click", () => {
   $("open-profile").focus();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape" || $("session-window").open) return;
+  if (e.key !== "Escape" || $("session-window").open || $("person-window").open)
+    return;
   if (document.body.classList.contains("profile-open")) dismissProfile(true);
   else if (focusPanel) maximize(focusPanel);
 });
@@ -1804,9 +1850,11 @@ $("maximize-session").addEventListener("click", () => {
   );
 });
 $("session-profile").addEventListener("click", () => {
+  const j = historyState?.job;
   const id = sessionAgent;
   closeSession();
-  openProfile(id);
+  if (j?.profile?.person_id) openPerson(j.profile.person_id);
+  else openProfile(id);
 });
 $("session-latest").addEventListener("click", () => {
   if (!historyState || historyState.loading) return;

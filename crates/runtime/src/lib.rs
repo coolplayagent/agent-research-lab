@@ -11,6 +11,7 @@ use std::{
     time::Duration,
 };
 use workflow::Workflow;
+pub mod people;
 mod watch;
 
 use multi_agent::TeamMembership;
@@ -129,6 +130,7 @@ pub fn enqueue_with_inputs(
             prior.backend == backend,
             "task ID already binds a different backend"
         );
+        people::bind(c, &prior)?;
         ensure_started(c, &prior)?;
         return Ok(prior);
     }
@@ -213,9 +215,17 @@ pub fn enqueue_with_inputs(
             ],
         )?;
     }
-    let prompt_digest =
-        storage::digest(rendered_experiment_prompt(c, &task, inputs.as_ref())?.as_bytes());
+    let persona = people::freeze(c, &task)?;
+    let prompt_digest = storage::digest(
+        format!(
+            "{}{}",
+            rendered_experiment_prompt(c, &task, inputs.as_ref())?,
+            people::prompt(persona.as_ref())?
+        )
+        .as_bytes(),
+    );
     let job = Job {
+        persona,
         model: c.models[&task.role].clone(),
         backend,
         source_commit: commit,
@@ -233,6 +243,7 @@ pub fn enqueue_with_inputs(
         task,
     };
     storage::write(&destination, &job)?;
+    people::bind(c, &job)?;
     ensure_started(c, &job)?;
     Ok(job)
 }
@@ -241,6 +252,9 @@ fn frozen_input(job: &Job) -> Value {
     let mut value = json!({"task":job.task,"model":job.model,"source_commit":job.source_commit,
         "superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,
         "config_digest":job.config_digest,"worktree":job.worktree});
+    if let Some(persona) = &job.persona {
+        value["persona"] = json!(persona);
+    }
     if let Some(backend) = &job.backend {
         value["backend"] = json!(backend);
     }
@@ -353,10 +367,18 @@ fn seed_inputs(c: &Config) -> Result<Value> {
     let day = budget::day(now());
     let inputs = inputs::collect(c)?;
     let config_id = storage::digest(&serde_json::to_vec(c)?);
-    let round = inputs
+    let roster = people::directory(c)?;
+    let roster_input: Vec<_> = roster
+        .defaults
+        .iter()
+        .map(|(role, id)| (role, &roster.people[id]))
+        .collect();
+    let roster_digest = storage::digest(&serde_json::to_vec(&roster_input)?);
+    let base_round = inputs
         .as_ref()
         .map(|v| format!("{day}-{}-{}", inputs::cohort(v), &config_id[..6]))
         .unwrap_or_else(|| day.to_string());
+    let round = format!("{base_round}-{}", &roster_digest[..8]);
     let shared = c.multi_agent.as_ref().is_some_and(|v| v.shared_research);
     let mut ids = Vec::new();
     for (topic, title) in [
@@ -407,6 +429,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
             enqueue_with_inputs(
                 c,
                 Task {
+                    persona_id: Some(roster.defaults[role].clone()),
                     id: id.clone(),
                     role: role.into(),
                     repository: "superpod".into(),
@@ -432,6 +455,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
         enqueue_with_inputs(
             c,
             Task {
+                persona_id: Some(roster.defaults["synthesis"].clone()),
                 id: synthesis_id.clone(),
                 role: "research".into(),
                 repository: "superpod".into(),
@@ -547,6 +571,14 @@ pub fn rendered_experiment_prompt(
         prompt.push_str(&inputs::prompt_context(inputs));
     }
     Ok(prompt)
+}
+
+pub fn rendered_job_prompt(c: &Config, job: &Job) -> Result<String> {
+    Ok(format!(
+        "{}{}",
+        rendered_experiment_prompt(c, &job.task, job.research_inputs.as_ref())?,
+        people::prompt(job.persona.as_ref())?
+    ))
 }
 
 fn committed_receipt(c: &Config, w: &Workflow, job: &Job) -> Result<Value> {
@@ -820,9 +852,11 @@ pub fn status_for_jobs(c: &Config, all_jobs: &[Job]) -> Result<Value> {
         *summary.entry(state).or_default() += 1;
         let postprocessing = if post_success_path(c, job).exists() {
             match storage::read::<PostSuccess>(&post_success_path(c, job)) {
-                Ok(record) => json!({"memory":record.memory,"memory_error":record.memory_error,
+                Ok(record) => {
+                    json!({"memory":record.memory,"memory_error":record.memory_error,"persona_memory":record.persona_memory,"persona_memory_error":record.persona_memory_error,
                     "followups":record.followups,"followup_error":record.followup_error,
-                    "queued":record.followup_queued,"rejected":record.followup_rejections}),
+                    "queued":record.followup_queued,"rejected":record.followup_rejections})
+                }
                 Err(error) => json!({"error":error.to_string()}),
             }
         } else {
@@ -1733,9 +1767,7 @@ fn launch(
         "worktree source commit changed"
     );
     ensure!(
-        storage::digest(
-            rendered_experiment_prompt(c, &job.task, job.research_inputs.as_ref())?.as_bytes()
-        ) == job.prompt_digest,
+        storage::digest(rendered_job_prompt(c, job)?.as_bytes()) == job.prompt_digest,
         "frozen prompt changed"
     );
     ensure!(
@@ -1825,7 +1857,7 @@ fn launch(
         let binding = json!({"source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,"config_digest":job.config_digest});
         let prompt = format!(
             "{}\n\nFrozen experiment bindings: {}\nUse only this task worktree. Do not create Git commits, change formal gates, access private evaluation holdouts, install tools globally, push or merge. Those operations belong to the host delivery adapters. Evidence missing means unverified.\n",
-            rendered_experiment_prompt(c, &job.task, job.research_inputs.as_ref())?,
+            rendered_job_prompt(c, job)?,
             binding
         );
         let prompt = format!(
@@ -2193,6 +2225,10 @@ enum FollowupAdmission {
     Done,
     Blocked,
 }
+fn memory_done() -> MemoryWriteback {
+    MemoryWriteback::Done
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PostSuccess {
@@ -2201,6 +2237,10 @@ struct PostSuccess {
     run_id: String,
     receipt_sha256: String,
     memory: MemoryWriteback,
+    #[serde(default = "memory_done")]
+    persona_memory: MemoryWriteback,
+    #[serde(default)]
+    persona_memory_error: Option<String>,
     followups: FollowupAdmission,
     memory_error: Option<String>,
     followup_error: Option<String>,
@@ -2332,6 +2372,8 @@ fn queue_post_success(c: &Config, w: &Workflow, job: &Job) -> Result<()> {
             task_id: job.task.id.clone(),
             run_id: job.run_id.clone(),
             receipt_sha256: digest,
+            persona_memory: if job.persona.is_some() { MemoryWriteback::Pending } else { MemoryWriteback::Done },
+            persona_memory_error: None,
             memory: if !job.task.use_memory { MemoryWriteback::Done }
                 else if legacy_memory { MemoryWriteback::Unknown }
                 else { MemoryWriteback::Pending },
@@ -2402,6 +2444,9 @@ fn drain_followups_scoped(
             record.memory,
             MemoryWriteback::Pending | MemoryWriteback::Running
         ) || matches!(
+            record.persona_memory,
+            MemoryWriteback::Pending | MemoryWriteback::Running
+        ) || matches!(
             record.followups,
             FollowupAdmission::Pending | FollowupAdmission::Running
         ) {
@@ -2450,6 +2495,22 @@ fn drain_followups_scoped(
         if record.memory == MemoryWriteback::Unknown {
             memory_gap(c, &job, record.memory_error.as_deref().unwrap())?;
         }
+    }
+    if matches!(
+        record.persona_memory,
+        MemoryWriteback::Pending | MemoryWriteback::Running
+    ) {
+        record.persona_memory = MemoryWriteback::Running;
+        storage::write(&path, &record)?;
+        match people::writeback(c, &job, &receipt) {
+            Ok(_) => record.persona_memory = MemoryWriteback::Done,
+            Err(error) => {
+                record.persona_memory = MemoryWriteback::Unknown;
+                record.persona_memory_error = Some(error.to_string());
+                memory_gap(c, &job, &format!("数字人记忆写回未确认：{error}"))?;
+            }
+        }
+        storage::write(&path, &record)?;
     }
     if matches!(
         record.followups,
@@ -2588,6 +2649,17 @@ fn admit_followups(
         enqueue_with_inputs(
             c,
             Task {
+                persona_id: if let Some(prior) = job_path(c, &id)
+                    .exists()
+                    .then(|| storage::read::<Job>(&job_path(c, &id)))
+                    .transpose()?
+                {
+                    prior.task.persona_id
+                } else if parent.persona.is_some() {
+                    Some(people::default_id(c, &proposal.role)?)
+                } else {
+                    None
+                },
                 id: id.clone(),
                 role: proposal.role,
                 repository: proposal.repository,
@@ -4009,6 +4081,7 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
     fn scoped_run_preserves_historical_followups_and_executes_only_selected_dag() {
         let (_temp, mut c) = scheduler_fixture();
         let task = |id: &str, prompt: &str, dependencies: Vec<String>| Task {
+            persona_id: None,
             id: id.into(),
             role: "research".into(),
             repository: "superpod".into(),
@@ -4131,6 +4204,7 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
             enqueue(
                 &c,
                 Task {
+                    persona_id: None,
                     id: id.clone(),
                     role: if dependent { "review" } else { "research" }.into(),
                     repository: "superpod".into(),
@@ -4254,6 +4328,7 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
             enqueue(
                 &c,
                 Task {
+                    persona_id: None,
                     id: id.into(),
                     role: if write { "implement" } else { "research" }.into(),
                     repository: "superpod".into(),
@@ -4336,6 +4411,7 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
     fn actual_workflow_fake_codex_completion_and_failure() {
         let (_temp, c) = scheduler_fixture();
         let task = |id: &str, write: bool, prompt: &str, dependencies: Vec<String>| Task {
+            persona_id: None,
             id: id.into(),
             role: if write {
                 "implement".into()
@@ -4525,8 +4601,10 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
             )]),
         };
         let mut job = Job {
+            persona: None,
             backend: None,
             task: Task {
+                persona_id: None,
                 id: "memory-baseline".into(),
                 role: "research".into(),
                 repository: "superpod".into(),

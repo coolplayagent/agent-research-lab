@@ -56,7 +56,7 @@ The application package and executable remain named `agent-research-lab`.
 
 ## Research dashboard
 
-The app includes a local, read-only research dashboard. Run it alongside the
+The app includes a local research dashboard with digital-person management. Run it alongside the
 controller using the same private configuration:
 
 ```sh
@@ -101,13 +101,25 @@ survive live updates and window size changes.
 Mentions and the digital-person board button open model, backend, task, memory,
 required tools, activity and evidence details. Each digital person receives a unique
 Chinese alias used consistently in messages, mentions, graph nodes and session windows.
-Aliases are reserved in host-owned `dashboard/personas.json` under private state,
-using a nonblocking lock and atomic writes. Restarting the observer, changing rooms,
-or retrying a task preserves its name; names of historical tasks are never recycled.
-The observer only writes this presentation directory, never research task state.
+Identities live in host-owned `people/directory.json` under private state, with
+nonblocking locks and atomic writes. The previous `dashboard/personas.json` is
+imported without deleting or renaming legacy people, tasks, sessions or memories.
+New ordinary research reuses fixed researcher, critic and synthesizer identities
+across topic groups. Model/task changes do not change a person's ID. Sidebar people
+are deduplicated within the current group; the person's window lists all associated
+tasks and attempts, including history outside the latest 512-task observation window.
 The main navigation separates collaboration, system messages and system settings.
 Alerts and recovery records appear in system messages, with a bounded in-page history.
-Settings control automatic following and motion; service parameters are displayed read-only.
+Settings control automatic following and motion, and manage the digital-person roster.
+Create fixed, temporary or research people; promote a temporary/research person without
+changing its ID, history or memory; edit its unique name, Soul and purpose; select a
+fixed default for each role. Profile revisions use optimistic concurrency checks.
+Default/profile changes apply to new research batches. They do not rewrite running
+experiments, grant tools, schedule arbitrary work or modify model bindings.
+A manually registered task selects an existing person with `"persona_id":"person-…"`.
+Omitting that optional field preserves legacy/formal-experiment behavior and isolation.
+The local HTTP management boundary only accepts bounded same-origin JSON requests with
+an explicit intent header; arbitrary commands and remote mutations remain unavailable.
 Sidebar groups, directed chats and people can be collapsed; pinned groups sort first.
 Both sidebars can also be hidden or resized by dragging their inner edges (arrow keys
 adjust a focused edge; double-click restores its default width). The shared chat folds
@@ -117,9 +129,24 @@ stacked left sidebar and a resizable digital-person overlay.
 The three left-hand lists share the remaining sidebar height. Drag their horizontal
 dividers to change the saved proportions; collapsing a list releases space to the
 others, and the collapsed people heading stays at the bottom.
-Identity is stable across retries of one task; separate tasks are separate identities. Soul is
-the role guideline from the task's frozen lab source or explicitly registered prompt
-version, not an invented biography or the private rendered task prompt. Role guidelines
+Every person has a separate relay-memory home at `people/memory/<person-id>`.
+The memory tab calls the configured CLI for recall/statistics and explicit user notes;
+it does not implement a second memory engine or edit SQLite. The host freezes a bounded
+`prepare` context at task registration, pins its context/pack/executable digests plus
+profile revision in the Job and prompt digest, and never mounts the shared person store
+into an agent. Retries use the same captured context. Independent formal experiments
+remain outside this opt-in identity-memory path; existing task-local memory stays isolated.
+After authoritative workflow success, the host writes a concise result checkpoint with
+source, prompt, policy/configuration, SuperPOD and receipt references through `remember`.
+Public results and user notes may become future research context; private conversations,
+raw runs, credentials and holdouts are not copied. SuperPOD remains the knowledge authority.
+Completion journaling prevents duplicate successful writeback. Ambiguous CLI exits remain
+explicitly unknown and appear in system messages; they are not blindly replayed. An unknown
+write requires reconciliation against relay-memory before retrying. Personal memory is
+historical evidence, never new authorization or proof of a research claim.
+
+Independent Soul and the existing task role guideline are displayed separately. The
+latter comes from the frozen lab source or registered prompt version. Role guidelines
 include a conversational voice: curious research, considerate skepticism, practical
 implementation and fair evaluation. Agents can express concern, interest and uncertainty
 through brief public reasons and testable questions. The UI preserves their actual words;

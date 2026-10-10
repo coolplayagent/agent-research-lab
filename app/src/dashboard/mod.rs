@@ -1,4 +1,4 @@
-//! A bounded local observer. No controller commands or arbitrary file routes.
+//! A bounded local collaboration observer with explicit identity management.
 use anyhow::{Context, Result, ensure};
 use config::Config;
 use multi_agent::TeamMembership;
@@ -17,6 +17,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use task::Job;
+mod manage;
 mod personas;
 mod profiles;
 mod sessions;
@@ -129,6 +130,8 @@ fn project(job: &Job, row: &Value) -> Value {
         "topics":job.task.communication.as_ref().map(|t| &t.topics),
         "context":context.map(|c| json!({"message_ids":c["context"]["message_ids"],
             "as_of":c["context"]["as_of"],"digest":c["context"]["digest"]})),
+        "persona":job.persona.as_ref().map(|p|json!({"id":p.id,"name":p.name,"revision":p.revision,"soul":p.soul,"memory":p.memory.as_ref().map(|m|json!({"sha256":m.sha256,"pack_sha256":m.pack_sha256,"executable_sha256":m.executable_sha256,"captured_at":m.captured_at}))})),
+        "postprocessing":row["postprocessing"],
         "candidate_commit":receipt.as_ref().map(|r| &r["candidate"]["candidate_commit"]),
         "communication_gap":job.launch.as_ref().and_then(|l| l.communication_gap.as_ref()),
         "report":receipt.as_ref().map(|r| json!({"summary":clipped(&r["agent_report"]["summary"]),
@@ -159,7 +162,7 @@ fn snapshot(c: &Config) -> Result<Value> {
             )
         })
         .collect();
-    personas::assign(&c.state_dir, &mut projected)?;
+    let roster = personas::assign(c, &jobs, &mut projected)?;
     if projected.iter().any(|j| j["observation_error"] == true) {
         warnings.push("部分 workflow 状态读取失败或超过采样时限；未知状态不表示任务完成。".into());
     }
@@ -195,7 +198,7 @@ fn snapshot(c: &Config) -> Result<Value> {
         json!({"schema_version":1,"sampled_at":now,"sample_duration_ms":started.elapsed().as_millis(),
         "refresh_seconds":5,"paused":status["paused"],"summary":status["summary"],
         "max_agents":c.max_agents,"jobs":projected,"boards":boards,"warnings":warnings,
-        "knowledge":"SuperPOD","read_only":true,"error":null}),
+        "knowledge":"SuperPOD","read_only":false,"identity_management":true,"roster":roster,"error":null}),
     )
 }
 
@@ -291,6 +294,7 @@ fn handle(
     state: &Path,
     workspace: &Path,
     stop: &AtomicBool,
+    config: Option<&Config>,
 ) -> Result<()> {
     stream.set_read_timeout(Some(Duration::from_millis(500)))?;
     stream.set_write_timeout(Some(Duration::from_secs(2)))?;
@@ -305,6 +309,21 @@ fn handle(
         data.extend_from_slice(&buffer[..size]);
         if data.windows(4).any(|w| w == b"\r\n\r\n") {
             break;
+        }
+    }
+    if let Some(end) = data.windows(4).position(|w| w == b"\r\n\r\n") {
+        let headers = std::str::from_utf8(&data[..end + 4])?;
+        if headers.starts_with("POST ") {
+            return if let Some(c) = config {
+                manage::handle(&mut stream, c, headers, &data[end + 4..], addr)
+            } else {
+                respond(
+                    &mut stream,
+                    "403 Forbidden",
+                    "text/plain",
+                    b"Management unavailable",
+                )
+            };
         }
     }
     let route = std::str::from_utf8(&data)
@@ -324,6 +343,12 @@ fn handle(
             "text/javascript; charset=utf-8",
             include_bytes!("app.js"),
         ),
+        Some("/people.js") => respond(
+            &mut stream,
+            "200 OK",
+            "text/javascript; charset=utf-8",
+            include_bytes!("people.js"),
+        ),
         Some("/style.css") => respond(
             &mut stream,
             "200 OK",
@@ -339,12 +364,55 @@ fn handle(
                 &body,
             )
         }
+        Some(path) if path == "/api/people" || path.starts_with("/api/people?after=") => {
+            let c = config.context("identity service unavailable")?;
+            let after = path.strip_prefix("/api/people?after=").unwrap_or("");
+            match personas::list(c, after) {
+                Ok(value) => respond(
+                    &mut stream,
+                    "200 OK",
+                    "application/json; charset=utf-8",
+                    &serde_json::to_vec(&value)?,
+                ),
+                Err(_) => respond(
+                    &mut stream,
+                    "400 Bad Request",
+                    "application/json",
+                    br#"{"error":"Identity directory unavailable"}"#,
+                ),
+            }
+        }
+        Some(path) if path.starts_with("/api/people/") => {
+            let c = config.context("identity service unavailable")?;
+            let (id, after) = path[12..]
+                .split_once("?after=")
+                .unwrap_or((&path[12..], ""));
+            match personas::history(c, id, after, shared) {
+                Ok(value) => respond(
+                    &mut stream,
+                    "200 OK",
+                    "application/json; charset=utf-8",
+                    &serde_json::to_vec(&value)?,
+                ),
+                Err(_) => respond(
+                    &mut stream,
+                    "404 Not Found",
+                    "application/json",
+                    br#"{"error":"Identity history unavailable"}"#,
+                ),
+            }
+        }
         Some(path) if path.starts_with("/api/profile/") => {
             let run = &path[13..];
             let job = shared.read().unwrap()["jobs"]
                 .as_array()
                 .and_then(|jobs| jobs.iter().find(|j| j["run_id"] == run))
-                .cloned();
+                .cloned()
+                .or_else(|| {
+                    personas::historical_job(state, run)
+                        .ok()
+                        .map(|j| project(&j, &json!({"state":"historical"})))
+                });
             if let Some(job) = job {
                 respond(
                     &mut stream,
@@ -382,7 +450,7 @@ fn handle(
             let known = shared.read().unwrap()["jobs"]
                 .as_array()
                 .is_some_and(|jobs| jobs.iter().any(|j| j["run_id"] == run));
-            if known {
+            if known || personas::historical_job(state, run).is_ok() {
                 match sessions::page(state, run, before) {
                     Ok(value) => respond(
                         &mut stream,
@@ -461,7 +529,7 @@ pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<
     ));
     let stop = AtomicBool::new(false);
     let clients = std::sync::atomic::AtomicUsize::new(0);
-    eprintln!("Research dashboard: http://{addr} (read-only, {max_seconds}s)");
+    eprintln!("Research dashboard: http://{addr} (identity management enabled, {max_seconds}s)");
     let result = thread::scope(|scope| -> Result<()> {
         scope.spawn(|| collect(c, &shared, &stop));
         scope.spawn(|| sessions::collect(c, &shared, &stop));
@@ -486,7 +554,15 @@ pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<
                             let stop = &stop;
                             let state = &c.state_dir;
                             scope.spawn(move || {
-                                let _ = handle(stream, addr, shared, state, &c.workspace, stop);
+                                let _ = handle(
+                                    stream,
+                                    addr,
+                                    shared,
+                                    state,
+                                    &c.workspace,
+                                    stop,
+                                    Some(c),
+                                );
                                 clients.fetch_sub(1, Ordering::Relaxed);
                             });
                         }

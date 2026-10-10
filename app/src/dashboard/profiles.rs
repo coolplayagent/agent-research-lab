@@ -70,7 +70,7 @@ pub(super) fn read(state: &Path, workspace: &Path, job: &Value) -> Value {
         "reason":"绑定的角色准则暂不可读取；未使用当前版本替代历史来源。"})
     });
     json!({"run_id":job["run_id"],"soul":soul,
-        "notice":"Soul 展示任务绑定的角色准则；本项目尚未单独配置人格，不包含完整任务提示词。"})
+        "notice":"这里展示任务绑定的角色准则，不包含完整任务提示词；独立 Soul 与记忆见数字人档案。"})
 }
 
 #[cfg(test)]

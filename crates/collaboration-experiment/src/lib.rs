@@ -303,6 +303,7 @@ fn build_tasks(
                     slot: slot.id.clone(),
                     model: slot.model.clone(),
                     task: Task {
+                        persona_id: None,
                         id,
                         role: slot.role.clone(),
                         repository: "superpod".into(),
@@ -552,7 +553,7 @@ fn check_registered_job(c: &Config, plan: &Plan, entry: &PlannedTask, job: &Job)
         "existing batch job has a different frozen run or candidate baseline"
     );
     // Re-render the job's original checked_at values, never the new refresh.
-    let prompt = runtime::rendered_experiment_prompt(c, &job.task, job.research_inputs.as_ref())?;
+    let prompt = runtime::rendered_job_prompt(c, job)?;
     ensure!(
         storage::digest(prompt.as_bytes()) == job.prompt_digest,
         "existing job prompt binding differs from its frozen inputs"
@@ -1303,6 +1304,7 @@ mod tests {
     ) -> (Job, Value, Value) {
         let commit = &plan.inputs.repositories["superpod"].upstream.commit;
         let job = Job {
+            persona: None,
             backend: None,
             task: entry.task.clone(),
             model: entry.model.clone(),

@@ -4,9 +4,9 @@
   "adapter_origin": "project-maintained; upstream has no SKILL.md",
   "runtime_repository": "coolplayagent/relay-memory",
   "runtime_relative_path": "assets/linux-x86_64/relay-memory",
-  "runtime_sha256": "2461816b4bde8ccb8819b18d9501f518f3eecbaa8f49a6af5eac12dcb70517b8",
-  "checked_at": "2026-10-09T09:50:07.209524+00:00",
-  "upstream_default_head": "e188a5b2031c336169ffe5488e346c17949e14a4",
-  "source_commit": "e188a5b2031c336169ffe5488e346c17949e14a4",
+  "runtime_sha256": "3eeea2342e8a786e4f294ded57c86d40e2883d5a5e841d78db4245735037273e",
+  "checked_at": "2026-10-10T10:24:17.983414+00:00",
+  "upstream_default_head": "fd151bce0bcefa9fbaefe941200ec08937dfd4b7",
+  "source_commit": "fd151bce0bcefa9fbaefe941200ec08937dfd4b7",
   "release_status": "latest stable release endpoint returned HTTP 404; built from default HEAD"
 }
