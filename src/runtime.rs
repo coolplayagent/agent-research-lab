@@ -480,16 +480,18 @@ fn rendered_task_prompt(c: &Config, task: &Task) -> Result<String> {
         }
         .to_owned()
     };
-    Ok(format!(
-        "{role}\n{}\n\n{}\n{}",
+    let mut prompt = format!(
+        "{role}\n{}\n\n{}\n",
         task.prompt,
         followup_instructions(task),
-        if task.required_tools.iter().any(|t| t == "computer-use-cli") {
-            "Owned target experiment: use the installed computer-use CLI against DISPLAY/XAUTHORITY provided by the controller and the unique LAB_DESKTOP_WINDOW. Observe windows and screenshot first, then type a unique harmless token into this dedicated fixture and check LAB_DESKTOP_TARGET/observed.json. Task artifacts may be written under LAB_DESKTOP_TARGET; do not modify the repository. Read targets-host.json beside that directory for the host's real repo-sandbox evidence and retained registry. Do not connect to personal desktops or attempt nested sandbox execution: this host restricts nested user namespaces. Missing target capability is an implementation finding to address, not evidence of success."
-        } else {
-            ""
-        }
-    ))
+    );
+    if task.required_tools.iter().any(|t| t == "computer-use-cli") {
+        prompt.push_str("Owned target experiment: use the installed computer-use CLI against DISPLAY/XAUTHORITY provided by the controller and the unique LAB_DESKTOP_WINDOW. Observe windows and screenshot first, then type a unique harmless token into this dedicated fixture and check LAB_DESKTOP_TARGET/observed.json. Task artifacts may be written under LAB_DESKTOP_TARGET; do not modify the repository. Do not connect to personal desktops. Missing target capability is an implementation finding to address, not evidence of success.\n");
+    }
+    if task.required_tools.iter().any(|t| t == "repo-sandbox") {
+        prompt.push_str("Owned sandbox experiment: read targets-host.json in the task artifact directory (the parent directory of RELAY_MEMORY_HOME) for the host's real repo-sandbox evidence and retained registry. Do not attempt nested sandbox execution: this host restricts nested user namespaces. Missing target capability is an implementation finding to address, not evidence of success.\n");
+    }
+    Ok(prompt)
 }
 
 fn may_propose_followups(task: &Task) -> bool {
@@ -2560,6 +2562,54 @@ pub fn retry(c: &Config, id: &str) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn target_prompt_matches_required_tools() {
+        let c: Config = serde_json::from_value(json!({
+            "schema_version":1,"workspace":"/workspace","state_dir":"/state",
+            "superpod":"/superpod","codex":"unused","workflow":"unused",
+            "daily_seconds":3600,"max_agents":1,"task_timeout_seconds":20,
+            "models":{},"tools":{},"require_latest":false,"skills_manifest":null
+        }))
+        .unwrap();
+        for (tools, desktop, sandbox) in [
+            (vec!["computer-use-cli"], true, false),
+            (vec!["repo-sandbox"], false, true),
+            (vec!["computer-use-cli", "repo-sandbox"], true, true),
+            (vec![], false, false),
+        ] {
+            let task: Task = serde_json::from_value(json!({
+                "id":"target-prompt","role":"research","repository":"superpod",
+                "prompt":"Observe the requested target.","required_tools":tools
+            }))
+            .unwrap();
+            let prompt = rendered_experiment_prompt(&c, &task, None).unwrap();
+            for instruction in [
+                "DISPLAY/XAUTHORITY",
+                "LAB_DESKTOP_WINDOW",
+                "LAB_DESKTOP_TARGET/observed.json",
+                "Do not connect to personal desktops",
+            ] {
+                assert_eq!(
+                    prompt.contains(instruction),
+                    desktop,
+                    "{tools:?}: {instruction}"
+                );
+            }
+            for instruction in [
+                "targets-host.json",
+                "parent directory of RELAY_MEMORY_HOME",
+                "Do not attempt nested sandbox execution",
+            ] {
+                assert_eq!(
+                    prompt.contains(instruction),
+                    sandbox,
+                    "{tools:?}: {instruction}"
+                );
+            }
+            assert!(prompt.contains("next_tasks must be []"));
+        }
+    }
 
     fn completion_fixture(
         memory: bool,
