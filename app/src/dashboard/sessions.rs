@@ -64,6 +64,12 @@ fn event(value: &Value, offset: u64) -> Option<Value> {
 }
 
 pub(super) fn read(state: &Path, run: &str) -> Result<Value> {
+    page(state, run, None)
+}
+
+/// Read one bounded page ending at an exclusive byte offset. Cursors preserve
+/// complete line boundaries so walking backward neither duplicates nor drops events.
+pub(super) fn page(state: &Path, run: &str, before: Option<u64>) -> Result<Value> {
     ensure!(
         !run.is_empty()
             && run.len() <= 128
@@ -89,17 +95,31 @@ pub(super) fn read(state: &Path, run: &str) -> Result<Value> {
                 .map(|s| json!(s.chars().take(100).collect::<String>()))
         })
         .unwrap_or(Value::Null);
-    let start = size.saturating_sub(TAIL_BYTES);
-    file.seek(SeekFrom::Start(start))?;
+    let end = before.unwrap_or(size).min(size);
+    let start = end.saturating_sub(TAIL_BYTES);
+    let mut boundary = *b"\n";
+    if start > 0 {
+        file.seek(SeekFrom::Start(start - 1))?;
+        file.read_exact(&mut boundary)?;
+    } else {
+        file.seek(SeekFrom::Start(0))?;
+    }
     let mut bytes = Vec::new();
-    file.take(TAIL_BYTES).read_to_end(&mut bytes)?;
+    file.take(end - start).read_to_end(&mut bytes)?;
     let mut offset = start;
+    let mut older_end = start;
     let mut events = Vec::new();
     let mut invalid = 0;
     for (i, line) in bytes.split_inclusive(|b| *b == b'\n').enumerate() {
         let at = offset;
         offset += line.len() as u64;
-        if (start > 0 && i == 0) || !line.ends_with(b"\n") {
+        if i == 0 && boundary[0] != b'\n' {
+            // Re-read this crossing line in the preceding page. A line larger
+            // than the entire byte budget is skipped to ensure forward progress.
+            older_end = if offset < end { offset } else { start };
+            continue;
+        }
+        if !line.ends_with(b"\n") {
             continue;
         }
         match serde_json::from_slice::<Value>(line) {
@@ -114,10 +134,12 @@ pub(super) fn read(state: &Path, run: &str) -> Result<Value> {
     let truncated = start > 0 || events.len() > MAX_EVENTS;
     if events.len() > MAX_EVENTS {
         events.drain(..events.len() - MAX_EVENTS);
+        older_end = events[0]["id"].as_u64().unwrap();
     }
     Ok(json!({"run_id":run,"session_id":session_id,"bytes":size,
         "modified_at":metadata.modified()?.duration_since(UNIX_EPOCH)?.as_secs(),
         "events":events,"truncated":truncated,"invalid_lines":invalid,
+        "page_end":end,"next_before":(older_end > 0).then_some(older_end),
         "notice":"stdio-json 公开事件摘要；时间为日志更新时间，原始事件未提供时间戳。"}))
 }
 
@@ -192,6 +214,69 @@ pub(super) fn collect(c: &Config, shared: &Shared, stop: &AtomicBool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn history_pages_preserve_public_events_across_byte_and_event_limits() {
+        let root = std::env::temp_dir().join(format!(
+            "lab-history-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        struct Cleanup(std::path::PathBuf);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+        let _cleanup = Cleanup(root.clone());
+        for padding in [10, 12_000] {
+            let path = root.join("runs/history/process/stdout.jsonl");
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            let mut log = File::create(&path).unwrap();
+            for index in 0..125 {
+                writeln!(log, "{}", json!({"type":"item.completed","item":{"type":"agent_message","text":format!("消息-{index}:{}", "文".repeat(padding))}})).unwrap();
+                writeln!(log, "{}", json!({"type":"item.completed","item":{"type":"reasoning","text":"PRIVATE_REASONING"}})).unwrap();
+            }
+            write!(log, "{{\"type\":\"item.completed\"").unwrap();
+            drop(log);
+            let mut before = None;
+            let mut seen = BTreeMap::new();
+            let mut pages = 0;
+            loop {
+                let current = page(&root, "history", before).unwrap();
+                assert!(!current.to_string().contains("PRIVATE_REASONING"));
+                let events = current["events"].as_array().unwrap();
+                assert!(events.len() <= MAX_EVENTS);
+                for event in events {
+                    let id = event["id"].as_u64().unwrap();
+                    assert!(
+                        seen.insert(id, event["text"].as_str().unwrap().to_owned())
+                            .is_none(),
+                        "duplicate history event"
+                    );
+                }
+                pages += 1;
+                assert!(pages < 100, "cursor must make bounded progress");
+                let next = current["next_before"].as_u64();
+                if let Some(next) = next {
+                    assert!(next < current["page_end"].as_u64().unwrap());
+                } else {
+                    break;
+                }
+                before = next;
+            }
+            assert!(pages > 1);
+            assert_eq!(seen.len(), 125);
+            for (index, text) in seen.values().enumerate() {
+                assert!(text.starts_with(&format!("消息-{index}:")));
+            }
+            let empty = page(&root, "history", Some(0)).unwrap();
+            assert!(empty["events"].as_array().unwrap().is_empty());
+            assert!(empty["next_before"].is_null());
+        }
+    }
     #[test]
     fn session_tail_is_bounded_tolerates_partial_lines_and_rejects_traversal() {
         let root = std::env::temp_dir().join(format!(

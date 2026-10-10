@@ -30,7 +30,6 @@ let data = null,
   room = "",
   selected = "",
   following = true,
-  chatMode = "public",
   connected = false,
   stream,
   fetching = false,
@@ -40,7 +39,10 @@ let data = null,
   inspected = "",
   focusPanel = "",
   focusScroll = null,
-  extraSession = null;
+  extraSession = null,
+  sessionAgent = "",
+  historyState = null,
+  sessionReturnFocus = null;
 const opened = new Set(),
   profiles = new Map(),
   pulses = new Map(),
@@ -50,11 +52,14 @@ function role(j) {
   return j.id.startsWith("synthesis-") ? "synthesis" : j.role;
 }
 function name(j) {
-  const phase =
+  return j.profile?.display_name || j.id;
+}
+function roleLabel(j) {
+  return (
     { research: "研究", review: "质疑", implement: "实现", synthesis: "综合" }[
       role(j)
-    ] || j.role;
-  return `${phase} · ${(j.topics || [])[0] || j.repository}`;
+    ] || j.role
+  );
 }
 function avatar(j) {
   const face = el("span", undefined, `avatar ${role(j)}`),
@@ -90,11 +95,7 @@ function handle(j) {
   return j.profile?.handle || j.id;
 }
 function mention(j) {
-  const button = el(
-    "button",
-    `@${name(j)} · ${handle(j).slice(-6)}`,
-    "mention",
-  );
+  const button = el("button", `@${name(j)}`, "mention");
   button.title = `@${handle(j)} · ${j.id}`;
   button.addEventListener("click", () => openProfile(j.id));
   return button;
@@ -196,28 +197,143 @@ function session(j) {
     (extraSession?.run_id === j.run_id ? extraSession : null)
   );
 }
-async function choose(id, process = false) {
+function choose(id, showSession = false) {
   selected = id;
   inspected = id;
-  if (process) {
-    if (focusPanel === "graph") maximize("chat");
-    chatMode = "process";
-    const j = data.jobs.find((j) => j.id === id);
-    if (j) opened.add(`process:${j.run_id}`);
-  }
   render();
-  const j = data.jobs.find((j) => j.id === id);
-  if (j && !session(j)) {
-    try {
-      const r = await fetch(`/api/session/${encodeURIComponent(j.run_id)}`, {
+  if (showSession) openSession(id);
+}
+function openSession(id) {
+  const j = data?.jobs.find((job) => job.id === id);
+  if (!j) return;
+  sessionReturnFocus = document.activeElement;
+  sessionAgent = id;
+  historyState = {
+    run: j.run_id,
+    page: session(j),
+    older: [],
+    loading: false,
+    following: true,
+    error: "",
+    key: "",
+    request: 0,
+  };
+  document.body.classList.remove("profile-open");
+  if (!$("session-window").open) $("session-window").showModal();
+  renderSession(true);
+  fetchSession();
+}
+function closeSession() {
+  $("session-window").close();
+  sessionAgent = "";
+  historyState = null;
+  if (sessionReturnFocus?.isConnected)
+    sessionReturnFocus.focus({ preventScroll: true });
+  else $("open-profile").focus({ preventScroll: true });
+}
+async function fetchSession(before = null, direction = "older") {
+  const state = historyState;
+  if (!state || state.loading) return;
+  state.loading = true;
+  state.error = "";
+  const request = ++state.request;
+  renderSession();
+  try {
+    const response = await fetch(
+      `/api/session/${encodeURIComponent(state.run)}${before === null ? "" : `?before=${before}`}`,
+      {
+        cache: "no-store",
         signal: AbortSignal.timeout(5000),
-      });
-      if (r.ok) {
-        extraSession = await r.json();
-        if (selected === id) render();
-      }
-    } catch (_) {}
+      },
+    );
+    if (!response.ok) throw new Error("session");
+    const page = await response.json();
+    if (historyState !== state || request !== state.request) return;
+    if (before !== null) {
+      if (direction === "older") state.older.push(state.page?.page_end ?? null);
+      if (direction === "newer") state.older.pop();
+      state.following = direction === "newer" && !state.older.length;
+    }
+    if (before === null) state.following = true;
+    state.page = page;
+    extraSession = before === null ? page : extraSession;
+    renderSession(before !== null);
+  } catch (_) {
+    if (historyState === state) state.error = "暂时无法读取会话，请稍后重试。";
+  } finally {
+    if (historyState === state) {
+      state.loading = false;
+      renderSession();
+    }
   }
+}
+function renderSession(resetScroll = false) {
+  const state = historyState,
+    dialog = $("session-window");
+  if (!state || !dialog.open) return;
+  const j = data.jobs.find((job) => job.id === sessionAgent);
+  if (!j || j.run_id !== state.run) {
+    $("session-status").textContent =
+      "这轮会话已结束或不在观察范围内，请重新选择数字人。";
+    return;
+  }
+  $("session-title").textContent = name(j);
+  $("session-subtitle").textContent =
+    `${j.model} · ${labels[j.state] || j.state} · 第 ${j.attempt} 轮`;
+  $("session-avatar").replaceChildren(avatar(j));
+  const s = state.page;
+  $("session-status").textContent =
+    state.error ||
+    (state.loading
+      ? "正在读取会话…"
+      : state.following
+        ? `实时跟随 · ${time(s?.modified_at)} 更新`
+        : "正在浏览历史记录");
+  for (const button of $("session-history").querySelectorAll(".history-button"))
+    button.disabled = state.loading;
+  const key = JSON.stringify([
+    j.run_id,
+    j.state,
+    j.report,
+    s,
+    state.following,
+    state.error,
+  ]);
+  if (key === state.key && !resetScroll) return;
+  state.key = key;
+  const root = $("session-history"),
+    bottom = root.scrollHeight - root.clientHeight - root.scrollTop < 80,
+    scroll = root.scrollTop;
+  root.replaceChildren();
+  const navigation = el("div", undefined, "history-navigation");
+  if (s?.next_before != null) {
+    const earlier = el("button", "↑ 更早的记录", "history-button");
+    earlier.disabled = state.loading;
+    earlier.addEventListener("click", () => fetchSession(s.next_before));
+    navigation.append(earlier);
+  } else if (s) navigation.append(el("span", "会话开始", "history-start"));
+  if (state.older.length) {
+    const newer = el("button", "较新的记录 ↓", "history-button");
+    newer.disabled = state.loading;
+    newer.addEventListener("click", () => {
+      const before = state.older.at(-1);
+      fetchSession(before, "newer");
+    });
+    navigation.append(newer);
+  }
+  if (state.error) {
+    const retry = el("button", "重试", "history-button");
+    retry.addEventListener("click", () =>
+      fetchSession(
+        state.following ? null : (state.page?.page_end ?? null),
+        "retry",
+      ),
+    );
+    navigation.append(retry);
+  }
+  root.append(navigation, processBlock(j, s));
+  if (resetScroll) root.scrollTop = state.following ? root.scrollHeight : 0;
+  else root.scrollTop = bottom && state.following ? root.scrollHeight : scroll;
 }
 function svg(tag, attrs, text) {
   const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -360,7 +476,6 @@ function graph(list) {
   );
   const open = () => {
     if (focusPanel === "graph") maximize("chat");
-    chatMode = "public";
     chatKey = "";
     render();
     $("timeline").scrollTop = $("timeline").scrollHeight;
@@ -402,7 +517,7 @@ function graph(list) {
       svg(
         "text",
         { x: 12, y: 37, class: "node-sub" },
-        `${j.model} · ${labels[j.state] || j.state}`,
+        `${roleLabel(j)} · ${j.model} · ${labels[j.state] || j.state}`,
       ),
       svg(
         "text",
@@ -413,7 +528,6 @@ function graph(list) {
     );
     const inspect = () => {
       choose(j.id, true);
-      openProfile(j.id);
     };
     group.addEventListener("click", inspect);
     group.addEventListener("keydown", (e) => {
@@ -446,7 +560,7 @@ function details(j) {
   title.append(el("h2", name(j)), el("code", "@" + handle(j)), badge(j.state));
   hero.append(avatar(j), title);
   root.append(hero, el("p", `${j.model} · ${j.backend}`, "persona-model"));
-  const inspect = el("button", "查看 TA 的对话与过程", "inspect-process");
+  const inspect = el("button", "打开会话历史", "inspect-process");
   inspect.addEventListener("click", () => {
     document.body.classList.remove("profile-open");
     if (j.cohort_id !== room) {
@@ -500,6 +614,7 @@ function details(j) {
   root.append(el("h3", "职责与当前任务"));
   const dl = el("dl");
   for (const [k, v] of [
+    ["花名", name(j)],
     ["任务", j.id],
     ["角色", role(j)],
     ["模型", j.model],
@@ -597,31 +712,12 @@ function eventDetails(j, e) {
   return row;
 }
 function processBlock(j, s) {
-  const key = `process:${j.run_id}`,
-    block = fold(key, `${name(j)} · 对话与执行过程`, "process-block");
-  const events = s?.events || [],
-    errors = events.filter(isError);
-  block.firstChild.append(
-    el(
-      "small",
-      `${events.filter((e) => e.item_type === "agent_message").length} 条发言 · ${events.length} 条活动${errors.length ? ` · ${errors.length} 条异常` : ""}`,
-    ),
-  );
-  if (errors.length) block.classList.add("has-errors");
-  const body = el("div", undefined, "process-body"),
-    identity = el("div", undefined, "process-identity");
-  identity.append(avatar(j), mention(j), badge(j.state));
-  body.append(identity);
-  if (!s)
-    body.append(el("p", "该轮尚未生成可读取的活动记录。", "process-meta"));
-  else
-    body.append(
-      el(
-        "p",
-        `Session ${s.session_id || "未提供"} · 日志更新 ${time(s.modified_at)}${s.truncated ? " · 当前仅为最近活动片段" : ""}`,
-        "process-meta",
-      ),
-    );
+  const block = el("div", undefined, "session-transcript"),
+    body = el("div", undefined, "process-body"),
+    events = s?.events || [];
+  if (!s) body.append(el("p", "这位数字人还没有可读取的会话记录。", "empty"));
+  else if (!events.length)
+    body.append(el("p", "这一段没有公开对话，可继续查看其他记录。", "empty"));
   let tools = [];
   const flush = () => {
     if (!tools.length) return;
@@ -649,7 +745,7 @@ function processBlock(j, s) {
     if (speaking) {
       flush();
       const message = el("article", undefined, "bot-message");
-      message.append(el("div", "Agent 发言", "bot-label"));
+      message.append(el("div", name(j), "bot-label"));
       let structured = null;
       try {
         structured = JSON.parse(e.text);
@@ -681,7 +777,7 @@ function processBlock(j, s) {
     } else tools.push(e);
   }
   flush();
-  if (j.report?.summary) {
+  if (historyState?.following && j.report?.summary) {
     const result = el("article", undefined, "bot-message result-message");
     result.append(
       el("div", "已提交的研究结果", "bot-label"),
@@ -700,11 +796,7 @@ function processBlock(j, s) {
     body.append(result);
   }
   body.append(
-    el(
-      "p",
-      "发言与进度来自 worker 公开事件，未经独立验证。命令、输出与 JSON 默认折叠；原始事件未提供时间戳。",
-      "process-meta",
-    ),
+    el("p", "仅显示公开会话；工具调用与 JSON 可按需展开。", "process-meta"),
   );
   if (s?.invalid_lines)
     body.append(
@@ -717,210 +809,65 @@ function timeline(list) {
   const root = $("timeline"),
     ids = new Set(list.map((j) => j.id)),
     byId = new Map(data.jobs.map((j) => [j.id, j]));
-  const boards = data.boards.filter((b) => !room || b.cohort_id === room);
-  const records = boards
-    .flatMap((b) => b.retained_messages || [])
-    .filter((m) => ids.has(m.message.task_id));
-  const sources = new Map(
-    boards
-      .flatMap((b) => b.retained_messages || [])
-      .map((m) => [m.message.id, m]),
-  );
-  const key = JSON.stringify([
-    room,
-    chatMode,
-    selected,
-    $("search").value,
-    $("state").value,
-    records.map((m) => [m.message.id, m.origin.state, m.expired]),
-    list.map((j) => [j.id, j.state, session(j)?.bytes, j.context?.digest]),
-  ]);
+  const allRecords = data.boards
+    .filter((b) => !room || b.cohort_id === room)
+    .flatMap((b) => b.retained_messages || []);
+  const records = allRecords
+    .filter((m) => ids.has(m.message.task_id))
+    .sort((a, b) => a.message.created_at - b.message.created_at);
+  const sources = new Map(allRecords.map((m) => [m.message.id, m]));
+  const key = JSON.stringify([room, records, list.map((j) => [j.id, name(j)])]);
   if (key === chatKey) return;
   chatKey = key;
-  const view = `${room}:${chatMode}:${chatMode === "process" ? selected : ""}`,
-    changedView = view !== chatView;
-  chatView = view;
+  const changedView = room !== chatView;
+  chatView = room;
   const bottom = root.scrollHeight - root.clientHeight - root.scrollTop < 80,
     scroll = root.scrollTop;
   root.replaceChildren();
-  $("public-chat").classList.toggle("active", chatMode === "public");
-  $("session-chat").classList.toggle("active", chatMode === "process");
-  if (chatMode === "process") {
-    const j = data.jobs.find((j) => j.id === selected) || list[0];
-    if (j) root.append(processBlock(j, session(j)));
-    else root.append(el("div", "选择一个 agent session。", "empty"));
-    $("message-count").textContent = "可折叠的执行记录";
-  } else {
-    const items = records.map((m) => ({
-      at: m.message.created_at,
-      kind: "message",
-      record: m,
-    }));
-    list.forEach((j) => {
-      if (j.context?.message_ids?.length)
-        items.push({ at: j.context.as_of, kind: "context", job: j });
-    });
-    items.sort((a, b) => a.at - b.at);
-    $("message-count").textContent = `${records.length} 条公共板消息`;
-    if (!items.length)
-      root.append(
-        el(
-          "div",
-          "公共板等待新的协作提议。选择左侧数字人，查看它的对话与执行过程。",
-          "empty",
-        ),
-      );
-    for (const item of items.slice(-256)) {
-      const j = item.job ||
-        byId.get(item.record.message.task_id) || {
-          id: item.record.message.task_id,
-          role: "research",
-          repository: "",
-          topics: [],
-        };
-      const row = el(
-        "article",
-        undefined,
-        `event ${role(j)} ${item.record?.expired ? "expired" : ""}`,
-      );
-      if (item.record) row.id = "msg-" + item.record.message.id;
-      const face = el("button", undefined, "avatar-button");
-      face.setAttribute(
-        "aria-label",
-        item.kind === "context" ? "水晶球公共板" : `查看 ${name(j)} 的名片`,
-      );
-      if (item.kind === "context")
-        face.append(el("span", "◈", "avatar board-avatar"));
-      else {
-        face.append(avatar(j));
-        face.addEventListener("click", () => openProfile(j.id));
-      }
-      row.append(face);
-      const body = el("div", undefined, "event-body"),
-        head = el("div", undefined, "event-head"),
-        sender = el(
-          "button",
-          item.kind === "context" ? "水晶球" : name(j),
-          "sender",
-        );
-      sender.title = j.id;
-      sender.addEventListener("click", () =>
-        item.kind === "context" ? $("public-chat").click() : openProfile(j.id),
-      );
-      head.append(sender, el("span", "→", "direction"));
-      if (item.kind === "context") head.append(mention(j));
-      else {
-        const parentId = item.record.message.proposal.reply_to,
-          parent = sources.get(parentId),
+  $("message-count").textContent = `${records.length} 条消息`;
+  if (!records.length)
+    root.append(
+      el("div", "还没有群聊消息。数字人的会话可从左侧头像打开。", "empty"),
+    );
+  for (const record of records.slice(-256)) {
+    const m = record.message,
+      p = m.proposal,
+      j = byId.get(m.task_id);
+    const row = el("article", undefined, "chat-message");
+    row.id = "msg-" + m.id;
+    const face = el("button", undefined, "avatar-button"),
+      body = el("div", undefined, "chat-message-body"),
+      sender = el("button", name(j), "sender");
+    face.setAttribute("aria-label", `打开 ${name(j)} 的会话`);
+    face.append(avatar(j));
+    face.addEventListener("click", () => choose(j.id, true));
+    sender.addEventListener("click", () => choose(j.id, true));
+    const bubble = el("div", undefined, "chat-bubble");
+    if (record.origin.state === "revoked") {
+      bubble.append(el("p", "这条消息已撤销。", "withdrawn-message"));
+      bubble.title = record.origin.reason || "";
+    } else {
+      if (p.reply_to) {
+        const parent = sources.get(p.reply_to),
           recipient = byId.get(parent?.message.task_id);
-        if (recipient) head.append(mention(recipient));
-        else if (parentId)
-          head.append(
+        if (recipient) bubble.append(mention(recipient));
+        else
+          bubble.append(
             el(
               "span",
-              parent ? `@${parent.message.task_id}` : "回复对象未保留",
+              parent ? `@${parent.message.task_id}` : "@原消息作者",
               "mention unavailable",
             ),
           );
-        else {
-          const board = el("button", "@公共板", "mention");
-          board.addEventListener("click", () => $("public-chat").click());
-          head.append(board);
-        }
       }
-      head.append(el("time", time(item.at)));
-      body.append(head);
-      if (item.kind === "context") {
-        head.append(el("span", "上下文投递 · 非发言", "chip"));
-        body.append(
-          el(
-            "div",
-            `启动时收到 ${j.context.message_ids.length} 条公共板提议。`,
-            "context-event",
-          ),
-        );
-        j.context.message_ids.forEach((id) => {
-          const b = el(
-            "button",
-            `↳ ${sources.get(id)?.message.proposal.text.slice(0, 75) || short(id, 24)}`,
-            "reply",
-          );
-          b.addEventListener("click", () =>
-            document
-              .getElementById("msg-" + id)
-              ?.scrollIntoView({ block: "center" }),
-          );
-          body.append(b);
-        });
-      } else {
-        const m = item.record.message,
-          p = m.proposal;
-        head.append(
-          el("span", p.reply_to ? "群内回复" : "群内广播", "audience"),
-        );
-        head.append(
-          el(
-            "span",
-            {
-              finding: "发现",
-              question: "问题",
-              counterexample: "反例",
-              reference: "参考",
-            }[p.kind] || p.kind,
-            "chip",
-          ),
-          badge(item.record.origin.state),
-        );
-        if (item.record.expired) head.append(el("span", "已过期", "badge"));
-        const bubble = el("div", undefined, "bubble");
-        if (p.reply_to) {
-          const parent = sources.get(p.reply_to),
-            reply = el(
-              "button",
-              `回复 ${parent?.message.task_id || short(p.reply_to)}\n${parent?.message.proposal.text.slice(0, 160) || "原消息不在当前保留窗口"}`,
-              "reply",
-            );
-          reply.addEventListener("click", () =>
-            document
-              .getElementById("msg-" + p.reply_to)
-              ?.scrollIntoView({ block: "center" }),
-          );
-          bubble.append(reply);
-        }
-        bubble.append(readable(p.text, `board-message:${m.id}`));
-        body.append(bubble);
-        p.references.forEach((r) =>
-          body.append(
-            el(
-              "span",
-              `${r.repository}@${short(r.commit)} · ${r.path}:${r.start_line}–${r.end_line} · SHA-256 ${r.sha256}`,
-              "reference",
-            ),
-          ),
-        );
-        if (item.record.origin.state === "revoked")
-          body.append(
-            el("span", `撤销：${item.record.origin.reason}`, "reference"),
-          );
-        if (byId.has(j.id)) {
-          const process = el(
-            "button",
-            "查看发言者的执行过程 →",
-            "thread-action",
-          );
-          process.addEventListener("click", () => choose(j.id, true));
-          body.append(process);
-        }
-      }
-      row.append(body);
-      root.append(row);
+      bubble.append(readable(p.text, `board-message:${m.id}`));
+      if (record.expired) bubble.title = "历史消息，已过期";
     }
+    body.append(sender, bubble);
+    row.append(face, body);
+    root.append(row);
   }
-  $("process-count").textContent = list.filter((j) => session(j)).length || "";
-  if (changedView)
-    root.scrollTop = chatMode === "process" ? 0 : root.scrollHeight;
-  else if (bottom) root.scrollTop = root.scrollHeight;
-  else root.scrollTop = scroll;
+  root.scrollTop = changedView || bottom ? root.scrollHeight : scroll;
 }
 function rooms() {
   const container = $("rooms");
@@ -955,7 +902,6 @@ function rooms() {
       room = id;
       inspected = "";
       following = false;
-      chatMode = "public";
       chatKey = "";
       render();
     });
@@ -1039,7 +985,12 @@ function render() {
         `task-row ${j.id === selected ? "selected" : ""}`,
       ),
       text = el("span", name(j), "task-name");
-    text.append(el("small", `${j.model} · ${labels[j.state] || j.state}`));
+    text.append(
+      el(
+        "small",
+        `${roleLabel(j)} · ${j.model} · ${labels[j.state] || j.state}`,
+      ),
+    );
     b.append(avatar(j), text, el("span", undefined, `presence ${j.state}`));
     b.title = j.id;
     b.addEventListener("click", () => choose(j.id, true));
@@ -1050,6 +1001,7 @@ function render() {
   graph(list);
   details(data.jobs.find((j) => j.id === (inspected || selected)));
   timeline(list);
+  renderSession();
   connection();
 }
 function accept(value) {
@@ -1150,7 +1102,7 @@ $("close-profile").addEventListener("click", () => {
   $("open-profile").focus();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape") return;
+  if (e.key !== "Escape" || $("session-window").open) return;
   if (document.body.classList.contains("profile-open"))
     document.body.classList.remove("profile-open");
   else if (focusPanel) maximize(focusPanel);
@@ -1174,11 +1126,36 @@ $("view-chat").addEventListener("click", () => {
   $("view-chat").classList.add("active");
   $("view-map").classList.remove("active");
 });
-$("public-chat").addEventListener("click", () => {
-  chatMode = "public";
-  render();
+$("close-session").addEventListener("click", closeSession);
+$("session-window").addEventListener("cancel", (e) => {
+  e.preventDefault();
+  closeSession();
 });
-$("session-chat").addEventListener("click", () => choose(selected, true));
+$("maximize-session").addEventListener("click", () => {
+  const expanded = $("session-window").classList.toggle("expanded");
+  $("maximize-session").textContent = expanded ? "↙ 还原" : "↗ 放大";
+  $("maximize-session").setAttribute("aria-pressed", String(expanded));
+  $("maximize-session").setAttribute(
+    "aria-label",
+    `${expanded ? "还原" : "放大"}会话窗口`,
+  );
+});
+$("session-profile").addEventListener("click", () => {
+  const id = sessionAgent;
+  closeSession();
+  openProfile(id);
+});
+$("session-latest").addEventListener("click", () => {
+  if (!historyState || historyState.loading) return;
+  historyState.older = [];
+  historyState.following = true;
+  historyState.key = "";
+  fetchSession();
+  $("session-history").scrollTop = $("session-history").scrollHeight;
+});
+setInterval(() => {
+  if (historyState?.following && $("session-window").open) fetchSession();
+}, 3000);
 setInterval(connection, 1000);
 setInterval(() => {
   if (!connected) refresh();

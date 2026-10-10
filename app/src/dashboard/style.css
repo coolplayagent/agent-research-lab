@@ -1392,3 +1392,212 @@ body.focus-graph.profile-open .inspector {
     font-size: 10px;
   }
 }
+
+/* The shared channel is a conversation; execution details live in their own window. */
+.chat-title {
+  color: #2b555b;
+  font-size: 13px;
+  font-weight: 600;
+}
+.chat-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 auto 22px;
+  max-width: 900px;
+}
+.chat-message-body {
+  min-width: 0;
+  max-width: calc(100% - 48px);
+}
+.chat-message .sender {
+  color: #64777b;
+  font-size: 12px;
+  margin: 0 0 7px;
+}
+.chat-message .sender:hover {
+  color: var(--teal);
+}
+.chat-bubble {
+  padding: 12px 16px;
+  background: #f3f6f6;
+  border-radius: 3px 13px 13px;
+  overflow-wrap: anywhere;
+}
+.chat-bubble .public-text {
+  color: #293e44;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.chat-bubble > .mention {
+  display: inline-block;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+.withdrawn-message {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+#session-window {
+  padding: 0;
+  width: min(1000px, calc(100vw - 64px));
+  height: min(850px, calc(100dvh - 80px));
+  max-width: none;
+  max-height: none;
+  border: 1px solid #dce4e5;
+  border-radius: 16px;
+  color: #293e44;
+  background: #fff;
+  box-shadow: 0 24px 100px #142f4333;
+  overflow: hidden;
+}
+#session-window[open] {
+  display: flex;
+  flex-direction: column;
+}
+#session-window::backdrop {
+  background: #15354055;
+  backdrop-filter: blur(3px);
+}
+#session-window.expanded {
+  width: calc(100vw - 24px);
+  height: calc(100dvh - 24px);
+}
+.session-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 22px;
+  border-bottom: 1px solid #eaf0f0;
+  flex-shrink: 0;
+}
+.session-heading-text {
+  min-width: 0;
+  flex: 1;
+}
+.session-heading h2 {
+  font-size: 15px;
+  margin: 0 0 5px;
+  overflow-wrap: anywhere;
+}
+.session-heading p {
+  font-size: 11px;
+  color: #829398;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.window-close {
+  border: 0;
+  background: transparent;
+  color: #7a8c91;
+  font-size: 24px;
+  padding: 2px 7px;
+}
+.session-history {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px max(24px, calc((100% - 760px) / 2));
+  overscroll-behavior: contain;
+}
+.session-transcript .process-body {
+  padding: 0;
+}
+.session-transcript .bot-message {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 8px 0 24px;
+  margin: 0;
+}
+.session-transcript .bot-label {
+  color: #375b5c;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.session-transcript .public-text {
+  font-size: 14px;
+  line-height: 1.9;
+  color: #293e44;
+}
+.session-transcript .tool-group {
+  background: #f8faf9;
+  margin: 0 0 22px;
+  border-color: #e8eeec;
+}
+.session-transcript .protocol-detail {
+  margin-top: 10px;
+}
+.history-navigation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.history-button,
+#session-latest {
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #43877b;
+  background: #edf6f2;
+}
+.history-button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.history-start {
+  color: #96a5a7;
+  font-size: 11px;
+}
+.session-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #edf2f0;
+  padding: 12px 22px;
+  color: #859898;
+  font-size: 11px;
+}
+@media (max-width: 720px) {
+  #session-window,
+  #session-window.expanded {
+    width: 100vw;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+  .session-heading {
+    padding: 14px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .session-heading-text {
+    flex-basis: calc(100% - 100px);
+  }
+  #close-session {
+    position: absolute;
+    right: 12px;
+    top: 14px;
+  }
+  .session-heading h2 {
+    padding-right: 22px;
+  }
+  .session-history {
+    padding: 20px 16px;
+  }
+  .session-footer {
+    padding: 10px 14px;
+  }
+  .chat-message {
+    gap: 9px;
+  }
+  .chat-bubble {
+    padding: 11px 13px;
+  }
+}
