@@ -8,6 +8,7 @@ mod services;
 pub use scenarios::{Collaboration, Scenario, ScenarioAdapter, ScenarioField};
 mod assets;
 pub mod operator;
+mod research;
 mod rooms;
 mod server;
 pub mod transport;

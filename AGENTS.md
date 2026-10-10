@@ -52,9 +52,10 @@ depend on one vendor's CLI, credentials or native output format. Configuration i
 not compatibility evidence: distinguish service health, configured adapters and
 actual task results. Fence every execution result to its current goal attempt.
 
-Collaboration storage owns its durable database in one service. Other services
-use its API and event streams, never open the live database or share mutable
-handles. Lightweight sandbox execution is a separate, replaceable service with
+Production collaboration storage owns its durable database in one service. Other
+services use its API and event streams, never open that service's live database or
+share mutable handles. An embedded development adapter must use the same client
+contract and an explicitly separate local store. Lightweight sandbox execution is a separate, replaceable service with
 bounded lifetimes, output, mounts and disposable per-run state. Keep credentials
 in service environments and refer to them by name; do not expose values in the UI,
 configuration responses or command-line arguments.
@@ -63,3 +64,11 @@ System settings must manage service endpoints, enabled state, protocol health,
 dependencies and Agent bindings. Validate references and configuration revisions.
 Storage endpoint changes require a deliberate restart against prepared data;
 never silently replace a live store. Preserve the existing research evidence gates.
+
+## Research coordination and lineage
+
+Keep research topics and subject/version lineage as coordination metadata linked
+to collaboration groups and goals. Knowledge contents remain in SuperPOD.
+Version nodes and parent edges are append-only, scoped to one subject and acyclic.
+Derive graph assessment states from recorded goal execution and host acceptance;
+never present an unassessed reference or a worker's claim as verified promotion.

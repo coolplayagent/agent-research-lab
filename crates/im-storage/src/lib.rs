@@ -13,6 +13,22 @@ use tokio::net::UnixStream;
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    ResearchChange {
+        change: ResearchChange,
+    },
+    Topics {
+        after: String,
+        query: String,
+    },
+    Subjects {
+        topic: String,
+        after: String,
+    },
+    Graph {
+        topic: String,
+        subject: String,
+        after: u64,
+    },
     Probe,
     Metrics,
     Changes,
@@ -159,6 +175,69 @@ impl From<Hub> for Client {
     }
 }
 impl Client {
+    pub async fn research_change(&self, change: ResearchChange) -> Result<Value> {
+        match self {
+            Self::Local(hub) => hub.research_change(change).await,
+            Self::Remote(path) => {
+                rpc::call(
+                    path,
+                    &Request::ResearchChange { change },
+                    Duration::from_secs(10),
+                )
+                .await
+            }
+        }
+    }
+    pub async fn topics(&self, after: &str, query: &str) -> Result<Value> {
+        match self {
+            Self::Local(hub) => hub.topics(after, query).await,
+            Self::Remote(path) => {
+                rpc::call(
+                    path,
+                    &Request::Topics {
+                        after: after.into(),
+                        query: query.into(),
+                    },
+                    Duration::from_secs(10),
+                )
+                .await
+            }
+        }
+    }
+    pub async fn subjects(&self, topic: &str, after: &str) -> Result<Value> {
+        match self {
+            Self::Local(hub) => hub.subjects(topic, after).await,
+            Self::Remote(path) => {
+                rpc::call(
+                    path,
+                    &Request::Subjects {
+                        topic: topic.into(),
+                        after: after.into(),
+                    },
+                    Duration::from_secs(10),
+                )
+                .await
+            }
+        }
+    }
+    pub async fn graph(&self, topic: &str, subject: &str, after: u64) -> Result<Value> {
+        match self {
+            Self::Local(hub) => hub.graph(topic, subject, after).await,
+            Self::Remote(path) => {
+                rpc::call(
+                    path,
+                    &Request::Graph {
+                        topic: topic.into(),
+                        subject: subject.into(),
+                        after,
+                    },
+                    Duration::from_secs(10),
+                )
+                .await
+            }
+        }
+    }
+
     pub fn remote(path: PathBuf) -> Result<Self> {
         rpc::endpoint(&path)?;
         Ok(Self::Remote(path))
@@ -786,6 +865,14 @@ fn info() -> rpc::ServiceInfo {
 }
 async fn execute(hub: &Hub, request: Request) -> Result<Value> {
     match request {
+        Request::ResearchChange { change } => hub.research_change(change).await,
+        Request::Topics { after, query } => hub.topics(&after, &query).await,
+        Request::Subjects { topic, after } => hub.subjects(&topic, &after).await,
+        Request::Graph {
+            topic,
+            subject,
+            after,
+        } => hub.graph(&topic, &subject, after).await,
         Request::Probe => Ok(json!(info())),
         Request::Metrics => Ok(hub.metrics()),
         Request::Receives { actor, group } => {

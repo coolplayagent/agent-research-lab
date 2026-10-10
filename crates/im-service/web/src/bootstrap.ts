@@ -1,3 +1,5 @@
+import { initTopics } from "./topics.js";
+import { initEvolution, refreshEvolution } from "./evolution.js";
 import { initServices } from "./settings.js";
 import { apply } from "./i18n.js";
 import { t } from "./i18n.js";
@@ -27,6 +29,8 @@ async function start(): Promise<void> {
   initPeople();
   initGoals();
   initServices();
+  initTopics();
+  initEvolution();
   initNavigation();
   await loadGroups();
   const directory = new EventSource("/api/crystal/events");
@@ -40,6 +44,7 @@ async function start(): Promise<void> {
     const changed = Number(data.catalog_revision);
     if (revision !== changed) {
       revision = changed;
+      refreshEvolution();
       void loadGroups();
     }
   });

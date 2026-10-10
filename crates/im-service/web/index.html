@@ -45,6 +45,8 @@
           <button data-page="groups" data-i18n="html.6bf9df0bea"></button
           ><button data-page="direct" data-i18n="html.ec794dbdea"></button
           ><button data-page="boards" data-i18n="html.4082709aae"></button
+          ><button data-page="topics" data-i18n="research.topics"></button
+          ><button data-page="evolution" data-i18n="research.graph"></button
           ><button data-page="people" data-i18n="html.993489042b"></button
           ><button
             data-page="applications"
@@ -209,6 +211,80 @@
           <h2 data-i18n="html.28f6b6e645"></h2>
           <p data-i18n="html.6771a427f6"></p>
           <div id="application-list" class="cards"></div>
+        </section>
+        <section id="topics-page" class="content-page" hidden>
+          <div class="toolbar">
+            <h2 data-i18n="research.topics"></h2>
+            <button
+              id="new-topic"
+              class="primary"
+              data-i18n="research.newTopic"
+            ></button>
+          </div>
+          <p data-i18n="research.topicsNote"></p>
+          <div class="toolbar">
+            <input
+              id="topic-search"
+              data-i18n-placeholder="research.search"
+              data-i18n-aria-label="research.search"
+            /><button
+              id="topic-search-button"
+              data-i18n="research.search"
+            ></button>
+          </div>
+          <div id="topic-list" class="cards"></div>
+          <button id="more-topics" hidden data-i18n="research.more"></button>
+          <section id="topic-detail" hidden class="research-detail">
+            <h3 id="topic-detail-title"></h3>
+            <p id="topic-detail-objective"></p>
+            <div class="toolbar">
+              <button
+                id="topic-open-group"
+                data-i18n="research.openGroup"
+              ></button
+              ><button id="topic-open-graph" data-i18n="research.graph"></button
+              ><button
+                id="new-subject"
+                data-i18n="research.newSubject"
+              ></button>
+            </div>
+            <div id="subject-list" class="cards"></div>
+            <button
+              id="more-subjects"
+              hidden
+              data-i18n="research.more"
+            ></button>
+          </section>
+        </section>
+        <section id="evolution-page" class="content-page" hidden>
+          <div class="toolbar">
+            <h2 data-i18n="research.graph"></h2>
+            <button
+              id="new-evolution-node"
+              class="primary"
+              disabled
+              data-i18n="research.newNode"
+            ></button>
+          </div>
+          <p data-i18n="research.graphNote"></p>
+          <div id="evolution-filters" class="toolbar"></div>
+          <div class="toolbar">
+            <button id="refresh-evolution" data-i18n="research.refresh"></button
+            ><button
+              id="evolution-zoom-out"
+              data-i18n="research.zoomOut"
+            ></button
+            ><button
+              id="evolution-zoom-in"
+              data-i18n="research.zoomIn"
+            ></button>
+          </div>
+          <p id="evolution-summary"></p>
+          <div class="evolution-layout">
+            <div id="evolution-canvas" class="graph-viewport"></div>
+            <aside id="evolution-detail" class="research-detail" hidden></aside>
+          </div>
+          <button id="more-evolution" hidden data-i18n="research.more"></button>
         </section>
         <section id="settings-page" class="content-page" hidden="">
           <h2 data-i18n="html.e8a4f7c09d"></h2>

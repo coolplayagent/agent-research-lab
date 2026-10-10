@@ -1,3 +1,5 @@
+import { loadTopics } from "./topics.js";
+import { loadEvolution } from "./evolution.js";
 import { loadServices } from "./settings.js";
 import { t } from "./i18n.js";
 import { get } from "./dom.js";
@@ -5,6 +7,8 @@ import { setSection } from "./directory.js";
 import { loadPeople } from "./people.js";
 import { loadApplications } from "./applications.js";
 const titles = {
+    topics: t("research.topics"),
+    evolution: t("research.graph"),
     groups: t("navigation.f3f8bcf3f5"),
     direct: t("navigation.484c0ffc97"),
     boards: t("navigation.ca4773c5ff"),
@@ -15,12 +19,22 @@ const titles = {
 export function navigate() {
     const requested = location.hash.slice(1), page = titles[requested] ? requested : "groups";
     get("page-title").textContent = titles[page];
-    for (const name of ["people", "applications", "settings"])
+    for (const name of [
+        "people",
+        "applications",
+        "settings",
+        "topics",
+        "evolution",
+    ])
         get(name + "-page").hidden = name !== page;
     const conversation = ["groups", "direct", "boards"].includes(page);
     get("conversations").hidden = !conversation;
     if (conversation)
         setSection(page);
+    if (page === "topics")
+        void loadTopics();
+    if (page === "evolution")
+        void loadEvolution();
     if (page === "settings")
         void loadServices();
     if (page === "people")

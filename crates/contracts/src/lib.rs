@@ -47,6 +47,20 @@ macro_rules! states {
 }
 
 states! {
+    PullRequestState { Open => "OPEN", Closed => "CLOSED", Merged => "MERGED" }
+    ReviewState { Approved => "APPROVED", ChangesRequested => "CHANGES_REQUESTED", Dismissed => "DISMISSED", Pending => "PENDING", Commented => "COMMENTED", Unknown => "UNKNOWN" }
+    CheckState { Completed => "COMPLETED", InProgress => "IN_PROGRESS", Queued => "QUEUED", Pending => "PENDING", Waiting => "WAITING", Requested => "REQUESTED" }
+    CheckConclusion { Success => "SUCCESS", Failure => "FAILURE", Error => "ERROR", Pending => "PENDING", Unknown => "UNKNOWN", Neutral => "NEUTRAL", Skipped => "SKIPPED", Cancelled => "CANCELLED", TimedOut => "TIMED_OUT", ActionRequired => "ACTION_REQUIRED", Stale => "STALE", StartupFailure => "STARTUP_FAILURE" }
+    MergeabilityState { Mergeable => "MERGEABLE", Conflicting => "CONFLICTING", Unknown => "UNKNOWN" }
+    MergeQueueState { Clean => "CLEAN", Blocked => "BLOCKED", Behind => "BEHIND", Dirty => "DIRTY", Draft => "DRAFT", HasHooks => "HAS_HOOKS", Unknown => "UNKNOWN", Unstable => "UNSTABLE" }
+    VerificationVerdict { Pass => "pass", Fail => "fail" }
+    SandboxSessionState { Ready => "ready", Stopped => "stopped" }
+    SandboxExecutionState { Completed => "completed", Running => "running", Failed => "failed" }
+    ContentIntegrityState { Complete => "complete", Degraded => "degraded" }
+    TopicState { Active => "active", Archived => "archived" }
+    SubjectKind { Repository => "repository", Agent => "agent", Tool => "tool", Model => "model", Workflow => "workflow", Dataset => "dataset", Prompt => "prompt", Other => "other" }
+    EvolutionState { Unassessed => "unassessed", Pending => "pending", Running => "running", Submitted => "submitted", Accepted => "accepted", Failed => "failed", Cancelled => "cancelled" }
+    EvolutionOperation { Baseline => "baseline", Mutation => "mutation", Recombination => "recombination" }
     ServiceKind { Storage => "storage", Executor => "executor", Sandbox => "sandbox" }
     ServiceHealth { Healthy => "healthy", Unavailable => "unavailable", Disabled => "disabled", ProtocolMismatch => "protocol_mismatch", RestartRequired => "restart_required" }
     CodingAgent { ClaudeCode => "cc", Codex => "codex", DeepseekHarness => "hds", Pi => "pi", Custom => "custom" }

@@ -261,3 +261,31 @@ and all tasks get fresh disposable workspaces. A service crash or cancellation
 terminates its process groups; interrupted claims require lease expiry/retry,
 never an automatic successful result. Independent services can be replaced by
 implementations of the same versioned API.
+
+
+## Research topics and population evolution
+
+The main workspace includes research topics and an interactive evolution graph.
+A topic references an existing collaboration group. Subjects describe the research
+object (repository, agent, tool, model, workflow, dataset, prompt or another type).
+Topic and subject edits use optimistic revisions, with stable group/topic ownership.
+
+Each append-only evolution node records a version reference, up to four existing
+parents, optional source/prompt/policy/SuperPOD commit pins and an optional group
+goal. Parent edges must remain within one subject. Parents already exist before a
+child is written, so cycles cannot be introduced. Multiple children represent
+population branching; multiple parents represent recombination. Repeating an
+identical node request is idempotent; replacing an existing node is rejected.
+
+The graph's assessment state is derived from its linked goal and assignments.
+A successful worker submission remains pending host acceptance. A node without a
+linked goal remains unassessed. References and declared commit pins are provenance
+metadata, not independent promotion evidence; existing research gates are preserved.
+Knowledge contents stay in SuperPOD rather than a second local knowledge base.
+
+Host APIs: `GET /api/im/topics`, `GET /api/im/subjects`,
+`GET /api/im/evolution`, and `POST /api/im/research` (intent `manage-research`).
+Topic/subject lists use stable ID cursors; graph pages use durable sequence cursors.
+Additive SQLite schema v5 owns topics, subjects, nodes and parent edges in the
+storage service. The graph UI supports subject/topic filters, pagination, zoom,
+keyboard node selection and inspection of goal results and evidence.

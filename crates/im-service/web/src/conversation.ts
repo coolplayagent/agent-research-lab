@@ -175,3 +175,11 @@ export function initConversation(): void {
     }
   };
 }
+
+export async function openGroup(id: string): Promise<void> {
+  const view = await api<GroupView>(
+    "/api/crystal/view?" + query({ group_id: id }),
+  );
+  location.hash = "groups";
+  await select(view.group);
+}

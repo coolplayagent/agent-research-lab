@@ -8,6 +8,7 @@ license.workspace = true
 name = "targets"
 
 [dependencies]
+contracts.workspace = true
 agent_backend.workspace = true
 agent_policy.workspace = true
 anyhow.workspace = true

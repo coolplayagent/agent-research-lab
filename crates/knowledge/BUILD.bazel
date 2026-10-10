@@ -13,6 +13,7 @@ rust_library(
     edition = "2024",
     aliases = aliases(),
     deps = [
+        "//crates/contracts:contracts",
         "//crates/delivery:delivery",
         "//crates/process:process",
     ] + all_crate_deps(normal = True),

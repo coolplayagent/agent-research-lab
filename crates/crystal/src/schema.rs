@@ -7,7 +7,7 @@ pub(crate) fn migrate(connection: &Connection) -> Result<()> {
         [],
         |r| r.get(0),
     )?;
-    ensure!((1..=4).contains(&version), "unsupported crystal schema");
+    ensure!((1..=5).contains(&version), "unsupported crystal schema");
     if version == 1 {
         connection.execute_batch(
             "BEGIN IMMEDIATE;
@@ -34,6 +34,16 @@ pub(crate) fn migrate(connection: &Connection) -> Result<()> {
             ALTER TABLE messages ADD COLUMN event TEXT;
             UPDATE crystal_meta SET value=4 WHERE key='schema'; COMMIT;",
         )?;
+    }
+    if version < 5 {
+        connection.execute_batch("BEGIN IMMEDIATE;
+          CREATE TABLE research_topics(id TEXT PRIMARY KEY,group_id TEXT NOT NULL REFERENCES groups(id),revision INTEGER NOT NULL,value TEXT NOT NULL);
+          CREATE TABLE research_subjects(id TEXT PRIMARY KEY,topic_id TEXT NOT NULL REFERENCES research_topics(id),revision INTEGER NOT NULL,value TEXT NOT NULL);
+          CREATE INDEX subjects_topic ON research_subjects(topic_id,id);
+          CREATE TABLE research_nodes(sequence INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT NOT NULL UNIQUE,subject_id TEXT NOT NULL REFERENCES research_subjects(id),goal_id TEXT REFERENCES goals(id),value TEXT NOT NULL);
+          CREATE INDEX nodes_subject ON research_nodes(subject_id,sequence);
+          CREATE TABLE research_edges(child_id TEXT NOT NULL REFERENCES research_nodes(id),parent_id TEXT NOT NULL REFERENCES research_nodes(id),PRIMARY KEY(child_id,parent_id));
+          UPDATE crystal_meta SET value=5 WHERE key='schema'; COMMIT;")?;
     }
     Ok(())
 }

@@ -189,28 +189,34 @@ impl Registry {
                     .map(|s| (id.clone(), s.endpoint.clone()))
             })
             .transpose()?;
-        let mut health = Vec::new();
-        for service in &config.services {
-            let (status, info, error) = if !service.enabled {
-                (ServiceHealth::Disabled, None, None)
-            } else {
-                match probe(&service.endpoint, service.kind).await {
-                    Ok(info) => (ServiceHealth::Healthy, Some(info), None),
-                    Err(e) => {
-                        let message = e.to_string();
-                        let state = if message.contains("mismatch") || message.contains("version") {
-                            ServiceHealth::ProtocolMismatch
-                        } else {
-                            ServiceHealth::Unavailable
-                        };
-                        (state, None, Some(message))
+        let mut probes = tokio::task::JoinSet::new();
+        for service in config.services.clone() {
+            probes.spawn(async move {
+                let (status, info, error) = if !service.enabled {
+                    (ServiceHealth::Disabled, None, None)
+                } else {
+                    match probe(&service.endpoint, service.kind).await {
+                        Ok(info) => (ServiceHealth::Healthy, Some(info), None),
+                        Err(error) => {
+                            let message = error.to_string();
+                            let status =
+                                if message.contains("mismatch") || message.contains("version") {
+                                    ServiceHealth::ProtocolMismatch
+                                } else {
+                                    ServiceHealth::Unavailable
+                                };
+                            (status, None, Some(message))
+                        }
                     }
-                }
-            };
-            health.push(
-                serde_json::json!({"id":service.id,"status":status,"info":info,"error":error}),
-            );
+                };
+                serde_json::json!({"id":service.id,"status":status,"info":info,"error":error})
+            });
         }
+        let mut health = Vec::new();
+        while let Some(result) = probes.join_next().await {
+            health.push(result?);
+        }
+        health.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
         Ok(
             serde_json::json!({"configuration":config,"health":health,"restart_required":pending!=self.active_storage,"active_storage":self.active_storage,"protocol_version":rpc::VERSION}),
         )

@@ -173,3 +173,8 @@ export function initConversation() {
         }
     };
 }
+export async function openGroup(id) {
+    const view = await api("/api/crystal/view?" + query({ group_id: id }));
+    location.hash = "groups";
+    await select(view.group);
+}

@@ -159,7 +159,7 @@ fn remember(
             "memory request key already binds different input"
         );
         ensure!(
-            prior["state"] == "done",
+            MemoryWriteback::from_value(&prior["state"]) == Some(MemoryWriteback::Done),
             "memory write outcome unknown; reconciliation required"
         );
         return Ok(prior);

@@ -158,6 +158,14 @@ fn publish_batch(store: &mut Store, shared: &Shared, batch: Vec<Command>) {
 }
 fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
     let result = match op {
+        Control::Research(command) => {
+            let write = matches!(&command, crate::research::ResearchCommand::Change(_));
+            let result = store.research_command(command)?;
+            if !write {
+                return Ok(result);
+            }
+            result
+        }
         Control::Goal(command) => {
             let read = matches!(&command, crate::goals::GoalCommand::List { .. });
             let result = store.goal_command(command)?;

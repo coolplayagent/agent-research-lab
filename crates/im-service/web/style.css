@@ -751,3 +751,114 @@ dialog p {
   font-size: 13px;
   color: #66766e;
 }
+.research-detail {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #dce3df;
+  border-radius: 12px;
+  background: #fff;
+  min-width: 0;
+}
+.research-detail pre,
+.research-detail code,
+.card code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.research-detail pre {
+  max-height: 300px;
+  overflow: auto;
+  font-size: 12px;
+}
+.evolution-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.graph-viewport {
+  overflow: auto;
+  max-height: 680px;
+  min-width: 0;
+  border: 1px solid #dce3df;
+  border-radius: 16px;
+  background: #f7faf8;
+  padding: 12px;
+}
+.evolution-svg {
+  display: block;
+  max-width: none;
+}
+.evolution-node {
+  cursor: pointer;
+  outline: none;
+}
+.evolution-node rect {
+  fill: white;
+  stroke: #bdcfc4;
+  stroke-width: 1.5;
+}
+.evolution-node:hover rect,
+.evolution-node:focus rect,
+.evolution-node[aria-pressed="true"] rect {
+  stroke: #14724e;
+  stroke-width: 3;
+}
+.evolution-node[data-state="accepted"] rect {
+  fill: #e8f5ed;
+}
+.evolution-node[data-state="failed"] rect {
+  fill: #fff0ee;
+}
+.evolution-node text {
+  fill: #173e2c;
+  font-size: 13px;
+  pointer-events: none;
+}
+.evolution-node .evolution-version,
+.evolution-node .evolution-status {
+  font-size: 11px;
+  fill: #587163;
+}
+.evolution-edge {
+  fill: none;
+  stroke: #94b4a2;
+  stroke-width: 2;
+}
+.generation {
+  fill: #587163;
+  font-size: 12px;
+}
+#evolution-filters select {
+  max-width: 330px;
+}
+#binding-list form {
+  max-width: 500px;
+}
+@media (min-width: 1300px) {
+  .evolution-layout:has(#evolution-detail:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+  .evolution-layout .research-detail {
+    margin-top: 0;
+  }
+}
+.evolution-layout {
+  align-items: start;
+}
+#evolution-detail {
+  max-height: 720px;
+  overflow: auto;
+}
+@media (max-width: 720px) {
+  .sidebar nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    overflow: visible;
+  }
+  .sidebar nav button {
+    white-space: normal;
+    min-width: 0;
+    text-align: left;
+  }
+}

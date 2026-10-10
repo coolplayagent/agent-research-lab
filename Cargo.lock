@@ -857,6 +857,7 @@ name = "lab-delivery"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "lab-contracts",
  "lab-freshness",
  "lab-process",
  "lab-storage",
@@ -940,6 +941,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "lab-contracts",
  "lab-delivery",
  "lab-process",
  "serde",
@@ -1040,6 +1042,7 @@ dependencies = [
  "lab-agent-backend",
  "lab-agent-policy",
  "lab-config",
+ "lab-contracts",
  "lab-isolation",
  "lab-process",
  "lab-storage",

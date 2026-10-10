@@ -265,6 +265,7 @@ pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<
     let stop = AtomicBool::new(false);
     let (updates, _) = tokio::sync::watch::channel(0);
     let (shutdown, _) = tokio::sync::watch::channel(false);
+    std::fs::create_dir_all(&c.state_dir)?;
     let services = Arc::new(service_api::Registry::open(&c.state_dir)?);
     let hub = services.configuration().storage(&c.state_dir)?;
     let mut web = transport::Web::new(

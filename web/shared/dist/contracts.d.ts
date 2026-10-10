@@ -1,3 +1,112 @@
+export declare const PullRequestState: {
+    readonly Open: "OPEN";
+    readonly Closed: "CLOSED";
+    readonly Merged: "MERGED";
+};
+export type PullRequestState = (typeof PullRequestState)[keyof typeof PullRequestState];
+export declare const ReviewState: {
+    readonly Approved: "APPROVED";
+    readonly ChangesRequested: "CHANGES_REQUESTED";
+    readonly Dismissed: "DISMISSED";
+    readonly Pending: "PENDING";
+    readonly Commented: "COMMENTED";
+    readonly Unknown: "UNKNOWN";
+};
+export type ReviewState = (typeof ReviewState)[keyof typeof ReviewState];
+export declare const CheckState: {
+    readonly Completed: "COMPLETED";
+    readonly InProgress: "IN_PROGRESS";
+    readonly Queued: "QUEUED";
+    readonly Pending: "PENDING";
+    readonly Waiting: "WAITING";
+    readonly Requested: "REQUESTED";
+};
+export type CheckState = (typeof CheckState)[keyof typeof CheckState];
+export declare const CheckConclusion: {
+    readonly Success: "SUCCESS";
+    readonly Failure: "FAILURE";
+    readonly Error: "ERROR";
+    readonly Pending: "PENDING";
+    readonly Unknown: "UNKNOWN";
+    readonly Neutral: "NEUTRAL";
+    readonly Skipped: "SKIPPED";
+    readonly Cancelled: "CANCELLED";
+    readonly TimedOut: "TIMED_OUT";
+    readonly ActionRequired: "ACTION_REQUIRED";
+    readonly Stale: "STALE";
+    readonly StartupFailure: "STARTUP_FAILURE";
+};
+export type CheckConclusion = (typeof CheckConclusion)[keyof typeof CheckConclusion];
+export declare const MergeabilityState: {
+    readonly Mergeable: "MERGEABLE";
+    readonly Conflicting: "CONFLICTING";
+    readonly Unknown: "UNKNOWN";
+};
+export type MergeabilityState = (typeof MergeabilityState)[keyof typeof MergeabilityState];
+export declare const MergeQueueState: {
+    readonly Clean: "CLEAN";
+    readonly Blocked: "BLOCKED";
+    readonly Behind: "BEHIND";
+    readonly Dirty: "DIRTY";
+    readonly Draft: "DRAFT";
+    readonly HasHooks: "HAS_HOOKS";
+    readonly Unknown: "UNKNOWN";
+    readonly Unstable: "UNSTABLE";
+};
+export type MergeQueueState = (typeof MergeQueueState)[keyof typeof MergeQueueState];
+export declare const VerificationVerdict: {
+    readonly Pass: "pass";
+    readonly Fail: "fail";
+};
+export type VerificationVerdict = (typeof VerificationVerdict)[keyof typeof VerificationVerdict];
+export declare const SandboxSessionState: {
+    readonly Ready: "ready";
+    readonly Stopped: "stopped";
+};
+export type SandboxSessionState = (typeof SandboxSessionState)[keyof typeof SandboxSessionState];
+export declare const SandboxExecutionState: {
+    readonly Completed: "completed";
+    readonly Running: "running";
+    readonly Failed: "failed";
+};
+export type SandboxExecutionState = (typeof SandboxExecutionState)[keyof typeof SandboxExecutionState];
+export declare const ContentIntegrityState: {
+    readonly Complete: "complete";
+    readonly Degraded: "degraded";
+};
+export type ContentIntegrityState = (typeof ContentIntegrityState)[keyof typeof ContentIntegrityState];
+export declare const TopicState: {
+    readonly Active: "active";
+    readonly Archived: "archived";
+};
+export type TopicState = (typeof TopicState)[keyof typeof TopicState];
+export declare const SubjectKind: {
+    readonly Repository: "repository";
+    readonly Agent: "agent";
+    readonly Tool: "tool";
+    readonly Model: "model";
+    readonly Workflow: "workflow";
+    readonly Dataset: "dataset";
+    readonly Prompt: "prompt";
+    readonly Other: "other";
+};
+export type SubjectKind = (typeof SubjectKind)[keyof typeof SubjectKind];
+export declare const EvolutionState: {
+    readonly Unassessed: "unassessed";
+    readonly Pending: "pending";
+    readonly Running: "running";
+    readonly Submitted: "submitted";
+    readonly Accepted: "accepted";
+    readonly Failed: "failed";
+    readonly Cancelled: "cancelled";
+};
+export type EvolutionState = (typeof EvolutionState)[keyof typeof EvolutionState];
+export declare const EvolutionOperation: {
+    readonly Baseline: "baseline";
+    readonly Mutation: "mutation";
+    readonly Recombination: "recombination";
+};
+export type EvolutionOperation = (typeof EvolutionOperation)[keyof typeof EvolutionOperation];
 export declare const ServiceKind: {
     readonly Storage: "storage";
     readonly Executor: "executor";

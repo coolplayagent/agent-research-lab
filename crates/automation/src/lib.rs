@@ -255,7 +255,10 @@ pub fn tick(outbox: &Path) -> Result<Option<QueueEntry>> {
                     entry.state = QueueState::Waiting;
                     entry.retry_after_unix = chrono::Utc::now().timestamp() + 30;
                 }
-                if matches!(operation, Operation::Merge(_)) && result["state"] != "MERGED" {
+                if matches!(operation, Operation::Merge(_))
+                    && contracts::PullRequestState::from_value(&result["state"])
+                        != Some(contracts::PullRequestState::Merged)
+                {
                     entry.state = QueueState::NeedsReconciliation;
                     entry.error = Some("GitHub accepted the request but has not confirmed a merge; inspect the merge queue before retry.".into());
                 }

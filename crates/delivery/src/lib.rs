@@ -107,7 +107,8 @@ impl ReleaseEvidence {
             "Qualitygate report must cover a full delivery, task or repository scope"
         );
         ensure!(
-            qualitygate["gate"]["complete"] == true && qualitygate["gate"]["decision"] == "pass",
+            qualitygate["gate"]["complete"] == true
+                && qualitygate["gate"]["decision"] == contracts::VerificationVerdict::Pass.as_str(),
             "Qualitygate report is incomplete or failed"
         );
         ensure!(
@@ -155,7 +156,7 @@ impl ReleaseEvidence {
         );
         ensure!(
             evaluation["role"] == "independent_evaluator"
-                && evaluation["status"] == "pass"
+                && evaluation["status"] == contracts::VerificationVerdict::Pass.as_str()
                 && evaluation["complete"] == true,
             "independent evaluation receipt is incomplete or failed"
         );
@@ -745,7 +746,9 @@ pub fn ensure_pull_request(request: &PullRequestRequest) -> Result<PullRequestRe
         return Ok(receipt);
     }
     ensure!(
-        !values.iter().any(|v| v["state"] == "OPEN"),
+        !values
+            .iter()
+            .any(|v| v["state"] == contracts::PullRequestState::Open.as_str()),
         "branch has an open PR at another head; evidence must be refreshed"
     );
     let reference = gh_json(
@@ -873,15 +876,20 @@ pub fn evaluate_merge_gate(request: &MergeRequest, snapshot: &MergeSnapshot) -> 
     );
     ensure!(snapshot.complete, "GitHub evidence is missing or truncated");
     ensure!(
-        snapshot.state == "OPEN" && !snapshot.draft,
+        snapshot.state == contracts::PullRequestState::Open.as_str() && !snapshot.draft,
         "PR must be open and ready"
     );
     ensure!(
-        snapshot.mergeable == "MERGEABLE" && snapshot.merge_state == "CLEAN",
+        snapshot.mergeable == contracts::MergeabilityState::Mergeable.as_str()
+            && snapshot.merge_state == contracts::MergeQueueState::Clean.as_str(),
         "GitHub merge requirements are not satisfied"
     );
     ensure!(
-        !snapshot.checks.is_empty() && snapshot.checks.iter().all(|check| check == "SUCCESS"),
+        !snapshot.checks.is_empty()
+            && snapshot
+                .checks
+                .iter()
+                .all(|check| check == contracts::CheckConclusion::Success.as_str()),
         "all CI checks must have succeeded"
     );
     ensure!(
@@ -892,20 +900,22 @@ pub fn evaluate_merge_gate(request: &MergeRequest, snapshot: &MergeSnapshot) -> 
         snapshot
             .review_decision
             .as_deref()
-            .is_none_or(|value| value == "APPROVED"),
+            .is_none_or(|value| value == contracts::ReviewState::Approved.as_str()),
         "required GitHub approvals are missing"
     );
     let mut latest = BTreeMap::new();
     for review in &snapshot.reviews {
-        if review.state == "APPROVED"
-            || review.state == "CHANGES_REQUESTED"
-            || review.state == "DISMISSED"
+        if review.state == contracts::ReviewState::Approved.as_str()
+            || review.state == contracts::ReviewState::ChangesRequested.as_str()
+            || review.state == contracts::ReviewState::Dismissed.as_str()
         {
             latest.insert(&review.author, review);
         }
     }
     ensure!(
-        !latest.values().any(|r| r.state == "CHANGES_REQUESTED"),
+        !latest
+            .values()
+            .any(|r| r.state == contracts::ReviewState::ChangesRequested.as_str()),
         "changes have been requested"
     );
     // reviewDecision is GitHub's aggregate of the repository's required approval policy.
@@ -981,15 +991,21 @@ fn github_snapshot(request: &MergeRequest) -> Result<MergeSnapshot> {
             .flatten()
             .map(|c| {
                 if c["__typename"] == "CheckRun" {
-                    if c["status"] == "COMPLETED" {
-                        c["conclusion"].as_str().unwrap_or("UNKNOWN").into()
+                    if c["status"] == contracts::CheckState::Completed.as_str() {
+                        c["conclusion"]
+                            .as_str()
+                            .unwrap_or(contracts::CheckConclusion::Unknown.as_str())
+                            .into()
                     } else {
-                        "PENDING".into()
+                        contracts::CheckConclusion::Pending.to_string()
                     }
                 } else if c["__typename"] == "StatusContext" {
-                    c["state"].as_str().unwrap_or("UNKNOWN").into()
+                    c["state"]
+                        .as_str()
+                        .unwrap_or(contracts::CheckConclusion::Unknown.as_str())
+                        .into()
                 } else {
-                    "UNKNOWN".into()
+                    contracts::CheckConclusion::Unknown.to_string()
                 }
             })
             .collect(),
@@ -999,7 +1015,10 @@ fn github_snapshot(request: &MergeRequest) -> Result<MergeSnapshot> {
             .flatten()
             .map(|r| ReviewRecord {
                 author: r["author"]["login"].as_str().unwrap_or("").into(),
-                state: r["state"].as_str().unwrap_or("UNKNOWN").into(),
+                state: r["state"]
+                    .as_str()
+                    .unwrap_or(contracts::CheckConclusion::Unknown.as_str())
+                    .into(),
                 commit: r["commit"]["oid"].as_str().unwrap_or("").into(),
             })
             .collect(),
@@ -1015,7 +1034,7 @@ fn github_snapshot(request: &MergeRequest) -> Result<MergeSnapshot> {
 pub fn merge_pull_request(request: &MergeRequest) -> Result<PullRequestReceipt> {
     validate_commit(&request.expected_head)?;
     let snapshot = github_snapshot(request)?;
-    if snapshot.state == "MERGED" {
+    if snapshot.state == contracts::PullRequestState::Merged.as_str() {
         ensure!(
             snapshot.head == request.expected_head,
             "already merged PR has another head"

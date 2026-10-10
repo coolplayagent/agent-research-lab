@@ -101,6 +101,30 @@ fn asset(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../web/dist/service-types.js").as_slice(),
         )),
+        "/assets/topics.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/topics.js").as_slice(),
+        )),
+        "/assets/evolution-render.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/evolution-render.js").as_slice(),
+        )),
+        "/assets/research-types.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/research-types.js").as_slice(),
+        )),
+        "/assets/evolution.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/evolution.js").as_slice(),
+        )),
+        "/assets/forms.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/forms.js").as_slice(),
+        )),
+        "/assets/research-forms.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/research-forms.js").as_slice(),
+        )),
         _ => None,
     }
 }

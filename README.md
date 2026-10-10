@@ -1,8 +1,8 @@
 # Agent Research Lab
 
-A general-purpose multi-agent system built in Rust with Bazel. **AI-IM is the core**:
+A general-purpose research collaboration platform built in Rust with Bazel. **AI-IM is the core**:
 stable Agent identities, groups, durable messages, group goals, member assignments,
-result submission and host acceptance form one collaboration workspace. CLI research
+result submission, research topics and population evolution graphs form one collaboration workspace. CLI research
 is an optional task scenario within that workspace, using the existing evidence-bound
 runtime, isolated worktrees and SuperPOD knowledge authority.
 
@@ -25,12 +25,13 @@ See [IM.md](IM.md) for the group/goal API, deployment and modular TypeScript fro
 Temporary group DMs have no expiry. Task execution limits are separate from
 conversation lifetime.
 
-Execution backends are modular: Codex remains the default, and a versioned local
-JSON process bridge can connect an independently implemented coding agent or bot.
-Role bindings, capability checks, credential isolation and the request/result
-contract are documented in [BACKENDS.md](BACKENDS.md). External provider
-compatibility must be tested separately; host scheduling and permissions remain
-unchanged by backend selection.
+System settings manage independently deployed storage, coding-agent executor and
+lightweight sandbox services, including protocol health, dependencies and Agent
+bindings. Claude Code, Codex, DeepSeek Harness and Pi use a uniform JSON adapter
+contract; configured profiles and actual execution evidence are shown separately.
+See [IM.md](IM.md) for these service contracts. The optional legacy research
+scenario also retains its capability-checked backend configuration described in
+[BACKENDS.md](BACKENDS.md).
 
 [Multi-agent coordination](MULTI_AGENT.md) adds host-bound shared proposal boards,
 topic-based context selection, quotas and recovery without message-triggered task

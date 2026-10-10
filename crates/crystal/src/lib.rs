@@ -1,6 +1,9 @@
 //! Durable digital-person conversations, independent of model execution.
 //! Host-authorized membership, ordered logs, bounded live delivery and replay.
 mod conversations;
+mod research;
+mod research_model;
+pub use research_model::*;
 mod directory;
 mod goal_model;
 mod goal_work;
@@ -31,6 +34,7 @@ use store::{Catalog, Store};
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 pub(crate) enum Control {
+    Research(research::ResearchCommand),
     Goal(goals::GoalCommand),
     #[cfg(test)]
     ReadOnlyFault,
@@ -620,3 +624,6 @@ mod im_tests;
 
 #[cfg(test)]
 mod goal_tests;
+
+#[cfg(test)]
+mod research_tests;

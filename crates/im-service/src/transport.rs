@@ -68,6 +68,10 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
             "/api/im/work",
             get(crate::goals::assigned).post(crate::goals::work),
         )
+        .route("/api/im/topics", get(crate::research::topics))
+        .route("/api/im/subjects", get(crate::research::subjects))
+        .route("/api/im/evolution", get(crate::research::graph))
+        .route("/api/im/research", post(crate::research::change))
         .merge(application)
         .fallback(resource)
         .layer(axum::middleware::from_fn_with_state(

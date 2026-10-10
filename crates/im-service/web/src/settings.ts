@@ -2,13 +2,8 @@ import { ServiceKind } from "/assets/shared/contracts.js";
 import { api } from "./api.js";
 import { get } from "./dom.js";
 import { t, label } from "./i18n.js";
-import {
-  element,
-  editAdapter,
-  editService,
-  select,
-  field,
-} from "./service-forms.js";
+import { editAdapter, editService } from "./service-forms.js";
+import { element, select, field } from "./forms.js";
 import type { Configuration, ServiceView } from "./service-types.js";
 let current: ServiceView | undefined;
 function button(
