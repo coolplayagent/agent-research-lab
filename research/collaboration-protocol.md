@@ -12,7 +12,7 @@
 
 ## 本地命令
 
-先等待控制器空闲，再由宿主选择私有配置、共同 SuperPOD 来源和实验预算。应复用现有隔离边界与状态目录，避免另一个状态目录使原私有资料重新可见。示例配置的模型映射与 300 秒超时必须与实际控制器完全一致。
+先等待当前 worker 自然结束并停止控制器，再由宿主选择私有配置、共同 SuperPOD 来源和实验预算，依次 plan、批量注册和限定范围运行。普通异步 enqueue 不会阻止另一个控制器发现新任务；批量命令不提供全局暂停保证。应复用现有隔离边界与状态目录，避免另一个状态目录使原私有资料重新可见。示例配置的模型映射与 300 秒超时必须与实际控制器完全一致。
 
 ```sh
 agent-research-lab --config /ABS/pilot.toml collaboration plan examples/collaboration/pilot.json --output /ABS/STATE/private/collaboration/pilot-001
@@ -20,7 +20,7 @@ agent-research-lab --config /ABS/pilot.toml collaboration plan examples/collabor
 
 `plan` 联网检查当前来源与已安装技能，冻结全部绑定、视角、问题、主假设和 DAG；注册带父版本的不可变提示词，不选择或晋级它们。重放同一计划是幂等的；来源、配置或请求变化必须使用新实验 ID。每个 task 必须实际读取声明的共同 SuperPOD 文件，引用固定 commit、路径、文件 SHA-256、行段及短原文。缺少可解析的共同知识内容引用属于协议无效，不能当成功结果。
 
-按 manifest 顺序用现有 `enqueue TASK.json` 注册 32 个任务，再由现有控制器执行。第一轮任务必须先注册，依赖才可引用；从 manifest 的 `tasks[].task.id` 提取 JSON 字符串数组，写入同一 `state_dir/private` 下的普通文件，再使用非 continuous 的 `run --max-seconds 3600 --task-ids-file /ABS/STATE/private/pilot-ids.json`，不传 `--seed`，执行完即退出。范围文件必须含 1..256 个唯一、已入队的 ID，所有依赖必须同时入选，任务配置摘要必须匹配当前运行配置；输入最多 64 KiB 且不能经过符号链接。当前 continuous 模式即使未传 `--seed` 仍会在空闲时补充研究任务，因此不能用于此固定预算 pilot。不得用额外研究调用污染本次预算。任务超时、失败与无效输出保留在计划分母中；不得只挑成功任务，也不得悄悄重试增加某一臂预算。每个计划任务固定 `max_attempts=1`，控制器的自动、恢复及手动重试都遵守此上限；历史未指定任务保留原有三次上限。需要重试时建立新实例并说明原因。任务时间上限由控制器真实 watchdog 执行。
+使用 `collaboration enqueue MANIFEST --output /ABS/STATE/private/pilot-enqueued.json` 批量注册 32 个任务，再由现有控制器执行。批量命令只做一次最新来源/技能收集，对照冻结计划、配置和已注册提示词，预检全部既有任务，再按 manifest 顺序复用同一输入通过原有 enqueue 路径注册。既有匹配任务保留原始输入与提示词摘要；中断后重放只补缺项，任何陈旧基线或不匹配既有任务均拒绝。返回的 `worker_launch_requested=false` 仅说明该命令自身没有请求启动 worker；启动阶段仍重新检查 freshness。批次不是事务：普通 enqueue 竞态或后续 I/O 错误可能留下有效前缀，重放会检查后补缺，不回滚已注册任务。原有逐任务 `enqueue TASK.json` 继续可用。第一轮任务必须先注册，依赖才可引用；从 manifest 的 `tasks[].task.id` 提取 JSON 字符串数组，写入同一 `state_dir/private` 下的普通文件，再使用非 continuous 的 `run --max-seconds 3600 --task-ids-file /ABS/STATE/private/pilot-ids.json`，不传 `--seed`，执行完即退出。范围文件必须含 1..256 个唯一、已入队的 ID，所有依赖必须同时入选，任务配置摘要必须匹配当前运行配置；输入最多 64 KiB 且不能经过符号链接。当前 continuous 模式即使未传 `--seed` 仍会在空闲时补充研究任务，因此不能用于此固定预算 pilot。不得用额外研究调用污染本次预算。任务超时、失败与无效输出保留在计划分母中；不得只挑成功任务，也不得悄悄重试增加某一臂预算。每个计划任务固定 `max_attempts=1`，控制器的自动、恢复及手动重试都遵守此上限；历史未指定任务保留原有三次上限。需要重试时建立新实例并说明原因。任务时间上限由控制器真实 watchdog 执行。
 
 ```sh
 agent-research-lab --config /ABS/pilot.toml collaboration collect /ABS/STATE/private/collaboration/pilot-001/manifest.json --output /ABS/STATE/private/collaboration/pilot-001/collection-001.json
