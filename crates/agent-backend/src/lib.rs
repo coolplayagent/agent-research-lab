@@ -49,20 +49,95 @@ pub fn check_capabilities(spec: &BackendSpec, task: &Task) -> Result<()> {
 }
 
 pub fn freeze(c: &Config, task: &Task) -> Result<Option<Binding>> {
+    freeze_selected(c, task, None)
+}
+
+pub fn validate_preference(c: &Config, preference: &task::ExecutionPreference) -> Result<()> {
+    if let Some(id) = &preference.backend {
+        ensure!(
+            id == "codex" || c.agent_backends.contains_key(id),
+            "unknown execution backend"
+        );
+    }
+    if let Some(model) = &preference.model {
+        ensure!(
+            c.models
+                .values()
+                .chain(c.backend_models.values().flatten())
+                .any(|configured| configured == model),
+            "model is not configured by the host"
+        );
+        if let Some(backend) = &preference.backend {
+            validate_model(c, backend, model)?;
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_model(c: &Config, backend: &str, model: &str) -> Result<()> {
+    let allowed = c.backend_models.get(backend).map_or_else(
+        || c.models.values().any(|m| m == model),
+        |models| models.iter().any(|m| m == model),
+    );
+    ensure!(
+        allowed,
+        "model is not configured for execution backend {backend}"
+    );
+    Ok(())
+}
+
+pub fn freeze_selected(c: &Config, task: &Task, selected: Option<&str>) -> Result<Option<Binding>> {
     validate_config(c)?;
-    let Some(id) = c.role_backends.get(&task.role).filter(|id| *id != "codex") else {
+    let id = selected
+        .or_else(|| c.role_backends.get(&task.role).map(String::as_str))
+        .unwrap_or("codex");
+    if id == "codex" {
         return Ok(None);
-    };
+    }
     let spec = c.agent_backends.get(id).context("unknown backend")?;
     check_capabilities(spec, task)?;
     let executable = isolation::executable(spec.program())?;
     let executable_sha256 = storage::digest(&read_regular(&executable, 256 * 1024 * 1024)?);
     Ok(Some(Binding {
-        id: id.clone(),
+        id: id.into(),
         spec: spec.clone(),
         executable,
         executable_sha256,
     }))
+}
+
+/// Verify against the frozen profile, never the person's mutable current preference.
+pub fn verify_job(c: &Config, job: &task::Job) -> Result<()> {
+    let preference = job.persona.as_ref().and_then(|p| p.execution.as_ref());
+    if let Some(preference) = preference {
+        validate_preference(c, preference)?;
+    }
+    let model = preference
+        .and_then(|p| p.model.as_ref())
+        .or_else(|| c.models.get(&job.task.role));
+    ensure!(model == Some(&job.model), "frozen model selection changed");
+    validate_model(
+        c,
+        job.backend.as_ref().map_or("codex", |b| b.id.as_str()),
+        &job.model,
+    )?;
+    ensure!(
+        freeze_selected(c, &job.task, preference.and_then(|p| p.backend.as_deref()))?
+            == job.backend,
+        "frozen backend configuration, capability or executable changed"
+    );
+    Ok(())
+}
+
+/// Browser-safe inventory: no programs, arguments, credential names or host paths.
+pub fn public_inventory(c: &Config) -> Value {
+    let builtin = BackendSpec::Codex {
+        program: c.codex.clone(),
+    };
+    let executors: Vec<_> = std::iter::once(("codex", &builtin))
+        .chain(c.agent_backends.iter().map(|(id, spec)| (id.as_str(), spec)))
+        .map(|(id, spec)| json!({"id":id,"kind":match spec {BackendSpec::Codex{..}=>"codex",BackendSpec::JsonProcess{..}=>"json_process"},"models":c.backend_models.get(id).cloned().unwrap_or_else(|| c.models.values().cloned().collect::<std::collections::BTreeSet<_>>().into_iter().collect()),"capabilities":spec.capabilities(),"verification":"configured_only"})).collect();
+    json!({"backends":executors,"models":c.models.values().chain(c.backend_models.values().flatten()).collect::<std::collections::BTreeSet<_>>(),"role_backends":c.role_backends})
 }
 
 pub fn verify(c: &Config, task: &Task, binding: Option<&Binding>) -> Result<()> {

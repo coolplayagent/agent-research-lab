@@ -33,7 +33,7 @@ pub(super) fn assign(c: &Config, jobs: &[Job], projected: &mut [Value]) -> Resul
     });
     let counts = task_counts(&directory);
     Ok(
-        json!({"people":people.into_iter().take(1024).map(|p| person(p, &counts)).collect::<Vec<_>>(),"total":directory.people.len(),"revision":directory.revision,"defaults":directory.defaults,"models":c.models}),
+        json!({"people":people.into_iter().take(1024).map(|p| person(p, &counts)).collect::<Vec<_>>(),"total":directory.people.len(),"revision":directory.revision,"defaults":directory.defaults,"models":c.models,"execution_catalog":agent_backend::public_inventory(c)}),
     )
 }
 fn task_counts(directory: &runtime::people::Directory) -> BTreeMap<String, usize> {
@@ -44,7 +44,7 @@ fn task_counts(directory: &runtime::people::Directory) -> BTreeMap<String, usize
     counts
 }
 fn person(p: &runtime::people::Person, counts: &BTreeMap<String, usize>) -> Value {
-    json!({"id":p.id,"name":p.name,"kind":p.kind,"role":p.role,"soul":sessions::text_field(&json!(p.soul),4096),"purpose":sessions::text_field(&json!(p.purpose),1024),"revision":p.revision,"created_at":p.created_at,"task_count":counts.get(&p.id).copied().unwrap_or(0)})
+    json!({"id":p.id,"name":p.name,"kind":p.kind,"role":p.role,"execution":p.execution,"soul":sessions::text_field(&json!(p.soul),4096),"purpose":sessions::text_field(&json!(p.purpose),1024),"revision":p.revision,"created_at":p.created_at,"task_count":counts.get(&p.id).copied().unwrap_or(0)})
 }
 pub(super) fn list(c: &Config, after: &str) -> Result<Value> {
     if !after.is_empty() {
@@ -60,7 +60,7 @@ pub(super) fn list(c: &Config, after: &str) -> Result<Value> {
         .collect();
     let next = (rows.len() > 100).then(|| rows[99].id.clone());
     Ok(
-        json!({"people":rows.into_iter().take(100).map(|p|person(p,&counts)).collect::<Vec<_>>(),"next_after":next,"total":directory.people.len(),"revision":directory.revision,"defaults":directory.defaults,"models":c.models}),
+        json!({"people":rows.into_iter().take(100).map(|p|person(p,&counts)).collect::<Vec<_>>(),"next_after":next,"total":directory.people.len(),"revision":directory.revision,"defaults":directory.defaults,"models":c.models,"execution_catalog":agent_backend::public_inventory(c)}),
     )
 }
 pub(super) fn historical_job(state: &Path, run: &str) -> Result<Job> {

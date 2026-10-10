@@ -197,6 +197,7 @@ fn cross_group_identity_history_pages_older_tasks_and_all_attempts_without_promp
         j.attempt = 2;
         j.run_id = format!("{}-attempt-2", j.task.id);
         j.persona = Some(task::PersonaSnapshot {
+            execution: None,
             id: id.clone(),
             name: directory.people[&id].name.clone(),
             revision: 1,
@@ -257,4 +258,19 @@ fn cross_group_identity_history_pages_older_tasks_and_all_attempts_without_promp
         assert!(personas::historical_job(&c.state_dir, run).is_err());
     }
     assert!(personas::history(&c, &id, "foreign-attempt-1", &shared).is_err());
+}
+
+#[test]
+fn execution_catalog_exposes_choices_without_executor_secrets() {
+    let c:Config = serde_json::from_value(json!({"schema_version":1,"workspace":"/private","state_dir":"/private/state","superpod":"/private/superpod","codex":"PRIVATE_CODEX_PATH","workflow":"/unused","daily_seconds":600,"max_agents":2,"task_timeout_seconds":60,"require_latest":false,"models":{"research":"model-a"},"tools":{},
+        "agent_backends":{"bridge":{"kind":"json_process","program":"/PRIVATE_PROGRAM","args":["PRIVATE_ARGUMENT"],"env_allowlist":["PRIVATE_TOKEN"],"capabilities":{"structured_result":true,"read_workspace":true,"write_workspace":false,"tool_execution":false,"desktop":false}}},
+        "backend_models":{"bridge":["model-b"]}})).unwrap();
+    let catalog = agent_backend::public_inventory(&c);
+    assert_eq!(catalog["backends"][0]["id"], "codex");
+    assert_eq!(catalog["backends"][1]["models"], json!(["model-b"]));
+    assert_eq!(catalog["backends"][1]["verification"], "configured_only");
+    assert!(!catalog.to_string().contains("PRIVATE_"));
+    let view = project(&job(), &json!({"state":"running"}));
+    assert_eq!(view["session_id"], "research-one");
+    assert_eq!(view["execution_id"], "research-one-attempt-1");
 }

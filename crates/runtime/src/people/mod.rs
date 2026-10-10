@@ -56,6 +56,8 @@ pub struct Person {
     pub purpose: String,
     pub revision: u64,
     pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution: Option<task::ExecutionPreference>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -91,6 +93,11 @@ pub enum Change {
     SetDefault {
         role: String,
         id: String,
+    },
+    ConfigureExecution {
+        id: String,
+        revision: u64,
+        execution: Option<task::ExecutionPreference>,
     },
 }
 fn path(c: &Config) -> PathBuf {
@@ -144,14 +151,12 @@ fn validate(directory: &Directory) -> Result<()> {
         );
     }
     for (role, id) in &directory.defaults {
+        safe_id(role)?;
         let person = directory
             .people
             .get(id)
             .context("default identity missing")?;
-        ensure!(
-            person.kind == Kind::Fixed && &person.role == role,
-            "default must be a fixed person with the same role"
-        );
+        ensure!(person.kind == Kind::Fixed, "default must be a fixed person");
     }
     Ok(())
 }
@@ -190,6 +195,7 @@ fn new_person(
             purpose: purpose.into(),
             revision: 1,
             created_at: now(),
+            execution: None,
         },
     );
     Ok(id)
@@ -304,14 +310,8 @@ pub fn change(c: &Config, change: Change) -> Result<Person> {
             soul,
             purpose,
         } => {
-            ensure!(
-                c.models.contains_key(if role == "synthesis" {
-                    "research"
-                } else {
-                    &role
-                }),
-                "unknown model role"
-            );
+            // A person's specialty is descriptive, not a model or task permission.
+            safe_id(&role)?;
             let key = format!(
                 "manual:{}:{}",
                 std::process::id(),
@@ -356,12 +356,37 @@ pub fn change(c: &Config, change: Change) -> Result<Person> {
             id
         }
         Change::SetDefault { role, id } => {
-            let person = directory.people.get(&id).context("unknown person")?;
             ensure!(
-                person.kind == Kind::Fixed && person.role == role,
-                "default must be a fixed member of this role"
+                c.models.contains_key(if role == "synthesis" {
+                    "research"
+                } else {
+                    &role
+                }),
+                "unknown task role"
             );
+            let person = directory.people.get(&id).context("unknown person")?;
+            ensure!(person.kind == Kind::Fixed, "default must be a fixed member");
             directory.defaults.insert(role, id.clone());
+            id
+        }
+        Change::ConfigureExecution {
+            id,
+            revision,
+            execution,
+        } => {
+            if let Some(preference) = &execution {
+                agent_backend::validate_preference(c, preference)?;
+            }
+            let person = directory.people.get_mut(&id).context("unknown person")?;
+            ensure!(
+                revision == person.revision,
+                "profile changed; refresh before editing execution"
+            );
+            person.execution = execution.filter(|p| p.backend.is_some() || p.model.is_some());
+            person.revision = person
+                .revision
+                .checked_add(1)
+                .context("profile revision overflow")?;
             id
         }
     };
@@ -422,17 +447,16 @@ pub(super) fn freeze(c: &Config, task: &Task) -> Result<Option<PersonaSnapshot>>
         .get(id)
         .cloned()
         .context("unknown digital person")?;
-    ensure!(
-        person.role == role_for(&task.id, &task.role)
-            || (person.role == "synthesis" && task.role == "research"),
-        "digital person role does not match task"
-    );
+    if let Some(preference) = &person.execution {
+        agent_backend::validate_preference(c, preference)?;
+    }
     let memory = memory::capture(c, &person, task)?;
     Ok(Some(PersonaSnapshot {
         id: person.id,
         name: person.name,
         revision: person.revision,
         soul: person.soul,
+        execution: person.execution,
         memory: Some(memory),
     }))
 }

@@ -18,3 +18,11 @@ research = "local-bot"
 # Omitted roles retain the legacy Codex backend.
 # implement = "local-bot"
 # review = "codex"
+
+# Optional model inventories are technical configuration, independent of people/roles.
+# Omit a backend here to retain the existing [models] defaults for that executor.
+# When present, include all role-default models routed to this backend as well.
+# [backend_models]
+# codex = ["your-research-model", "your-review-model", "your-implementation-model"]
+# local-bot = ["your-local-model"]
+# A person selects one configured backend/model pair in Settings → People → Execution.

@@ -421,7 +421,7 @@ function roomName(id) {
 }
 let settingsCategory = "people";
 function showSettingsCategory(category) {
-  if (!["people", "observation", "service"].includes(category))
+  if (!["people", "executors", "observation", "service"].includes(category))
     category = settingsCategory;
   if (
     category !== "people" &&
@@ -430,7 +430,7 @@ function showSettingsCategory(category) {
   )
     closePerson();
   settingsCategory = category;
-  for (const id of ["people", "observation", "service"]) {
+  for (const id of ["people", "executors", "observation", "service"]) {
     $("settings-" + id).hidden = id !== category;
     if (id === category)
       $("settings-nav-" + id).setAttribute("aria-current", "page");
@@ -1169,7 +1169,7 @@ function details(j) {
     ["任务", j.id],
     ["角色", role(j)],
     ["模型", j.model],
-    ["后端", j.backend],
+    ["执行技术", j.backend],
     ["工作范围", `${j.repository} · ${j.write ? "候选写入" : "只读研究"}`],
     [
       "记忆",
@@ -1814,7 +1814,7 @@ for (const page of ["collaboration", "messages", "settings"]) {
   });
 }
 window.addEventListener("hashchange", () => showPage(location.hash.slice(1)));
-for (const category of ["people", "observation", "service"]) {
+for (const category of ["people", "executors", "observation", "service"]) {
   $("settings-nav-" + category).addEventListener("click", () => {
     location.hash = `settings/${category}`;
     showPage(`settings/${category}`);
