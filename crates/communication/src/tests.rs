@@ -686,3 +686,189 @@ fn crystal_ball_routes_public_private_and_group_messages_without_audience_leaks(
             .exists()
     );
 }
+
+#[test]
+fn presence_queues_busy_and_offline_messages_until_authorized_reconnection() {
+    let temp = tempfile::tempdir().unwrap();
+    let board = Board::new(temp.path()).unwrap();
+    let a = member(1, "a", "a-run");
+    let b = member(1, "b", "b-run");
+    let ea = board.register(&a, 100).unwrap();
+    board.register(&b, 100).unwrap();
+    board.set_presence(&b, Presence::Busy, 101).unwrap();
+    let mut private = proposal("busy");
+    private.recipients = vec!["b".into()];
+    write(&ea, 0, &private);
+    write(&ea, 1, &proposal("public-while-busy"));
+    assert_eq!(board.poll(&a.cohort_id, 102).unwrap().accepted, 2);
+    assert!(
+        board.inbox(&b, 102).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        board
+            .context(&b, &selection(), 102)
+            .unwrap()
+            .message_ids
+            .is_empty()
+    );
+    let queued = board.inspect(&a.cohort_id, 102).unwrap();
+    assert_eq!(
+        queued["retained_messages"][0]["delivery"][0]["state"],
+        "pending"
+    );
+    board.set_presence(&b, Presence::Online, 103).unwrap();
+    assert_eq!(
+        board.inbox(&b, 103).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    let before = board.inspect(&a.cohort_id, 103).unwrap();
+    assert_eq!(
+        before["retained_messages"][0]["delivery"][0]["state"],
+        "delivered"
+    );
+    board.set_presence(&b, Presence::Offline, 104).unwrap();
+    assert!(board.set_presence(&b, Presence::Busy, 105).is_err());
+    private.id = "offline".into();
+    private.text = "Queue this until b reconnects".into();
+    write(&ea, 2, &private);
+    assert_eq!(board.poll(&a.cohort_id, 105).unwrap().accepted, 1);
+    assert_eq!(
+        board.inbox(&b, 105).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    // Queue and availability survive controller restart; reconnecting does not
+    // create another accepted message or restore consumed quota.
+    let board = Board::new(temp.path()).unwrap();
+    board.set_presence(&b, Presence::Online, 106).unwrap();
+    board.set_presence(&b, Presence::Online, 106).unwrap();
+    assert_eq!(
+        board.inbox(&b, 106).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    assert_eq!(board.view(&a.cohort_id, 106).unwrap()["accepted_total"], 3);
+    board.complete_run(&b, &"a".repeat(64), 107).unwrap();
+    assert!(board.set_presence(&b, Presence::Online, 108).is_err());
+    private.id = "retry-delivery".into();
+    private.text = "For the same digital person after a new authorized run".into();
+    write(&ea, 3, &private);
+    assert_eq!(board.poll(&a.cohort_id, 108).unwrap().accepted, 1);
+    assert_eq!(
+        board.inbox(&b, 108).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    let retry = member(1, "b", "b-retry");
+    board.register(&retry, 109).unwrap();
+    assert_eq!(
+        board.inbox(&retry, 109).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        4
+    );
+    assert_eq!(
+        board.inbox(&b, 109).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    board.set_presence(&retry, Presence::Offline, 110).unwrap();
+    private.id = "expires-in-queue".into();
+    private.text = "Never deliver this after TTL".into();
+    write(&ea, 4, &private);
+    board.poll(&a.cohort_id, 111).unwrap();
+    board.poll(&a.cohort_id, 111).unwrap();
+    board
+        .set_presence(&retry, Presence::Online, 111 + TTL_SECONDS)
+        .unwrap();
+    assert!(
+        board.inbox(&retry, 111 + TTL_SECONDS).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    let history = board.inspect(&a.cohort_id, 111 + TTL_SECONDS).unwrap();
+    assert_eq!(history["accepted_total"], 5);
+    assert_eq!(
+        history["retained_messages"][4]["delivery"][0]["state"],
+        "expired"
+    );
+}
+
+#[test]
+fn public_session_activity_tracks_overlapping_tools_and_partial_lines() {
+    use std::io::Write;
+    let temp = tempfile::tempdir().unwrap();
+    let board = Board::new(temp.path()).unwrap();
+    let a = member(1, "a", "a-run");
+    let b = member(1, "b", "b-run");
+    let ea = board.register(&a, 100).unwrap();
+    board.register(&b, 100).unwrap();
+    let process = temp.path().join("runs/b-run/process");
+    fs::create_dir_all(&process).unwrap();
+    let log = process.join("stdout.jsonl");
+    fs::write(&log, b"{\"type\":\"item.started\",\"item\":{\"id\":\"tool1\",\"type\":\"command_execution\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"tool2\",\"type\":\"mcp_tool_call\"}}\n").unwrap();
+    let mut p = proposal("queued-during-tools");
+    p.recipients = vec!["b".into()];
+    write(&ea, 0, &p);
+    board
+        .poll_live(&a.cohort_id, std::slice::from_ref(&b), 101)
+        .unwrap();
+    let state = |time| board.inbox(&b, time).unwrap()["members"][1]["presence"]["state"].clone();
+    assert_eq!(state(101), "busy");
+    assert!(
+        board.inbox(&b, 101).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    let mut out = OpenOptions::new().append(true).open(&log).unwrap();
+    out.write_all(b"{\"type\":\"item.completed\",\"item\":{\"id\":\"tool1\",\"type\":\"command_execution\"}}\n{\"type\":\"item.completed\",\"item\":{").unwrap();
+    board
+        .poll_live(&a.cohort_id, std::slice::from_ref(&b), 102)
+        .unwrap();
+    assert_eq!(state(102), "busy");
+    out.write_all(b"\"id\":\"tool2\",\"type\":\"mcp_tool_call\"}}\n")
+        .unwrap();
+    board
+        .poll_live(&a.cohort_id, std::slice::from_ref(&b), 103)
+        .unwrap();
+    assert_eq!(state(103), "online");
+    assert_eq!(
+        board.inbox(&b, 103).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    out.write_all(b"{\"type\":\"item.completed\",\"item\":{\"id\":\"reply\",\"type\":\"agent_message\",\"text\":\"public response\"}}\n").unwrap();
+    board
+        .poll_live(&a.cohort_id, std::slice::from_ref(&b), 104)
+        .unwrap();
+    assert_eq!(state(104), "chatting");
+    board
+        .poll_live(&a.cohort_id, std::slice::from_ref(&b), 110)
+        .unwrap();
+    assert_eq!(state(110), "online");
+    let mut impostor = b.clone();
+    impostor.authority_sha256 = "f".repeat(64);
+    assert!(board.poll_live(&a.cohort_id, &[impostor], 111).is_err());
+    fs::remove_file(&log).unwrap();
+    std::os::unix::fs::symlink(temp.path().join("private"), &log).unwrap();
+    assert!(board.poll_live(&a.cohort_id, &[b], 111).is_err());
+}

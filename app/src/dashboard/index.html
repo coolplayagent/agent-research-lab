@@ -13,6 +13,13 @@
         ><span class="brand-icon">◈</span><strong>水晶球</strong
         ><span>AI-IM · RESEARCH LAB</span></a
       >
+      <nav class="main-nav" aria-label="主导航">
+        <button id="nav-collaboration" aria-current="page">协作</button>
+        <button id="nav-messages">
+          系统消息 <span id="system-unread" hidden></span>
+        </button>
+        <button id="nav-settings">系统设置</button>
+      </nav>
       <div class="service-bar">
         <span id="controller-status" class="status-pill">正在连接控制器</span
         ><span id="connection-dot" class="dot"></span
@@ -20,7 +27,7 @@
         ><button id="refresh" title="重新获取运行快照">↻</button>
       </div>
     </header>
-    <div class="shell">
+    <div id="collaboration-page" class="shell">
       <aside class="sidebar">
         <div class="side-title">
           <h2>协作空间</h2>
@@ -33,14 +40,28 @@
             placeholder="搜索 agent / 任务"
             aria-label="搜索 agent 或任务" /></label
         ><button id="latest-room" class="latest-button">◉ 跟随当前研究</button>
-        <div class="section-label">协作群 <span id="room-count"></span></div>
-        <div id="rooms" class="rooms"></div>
-        <div class="section-label">
-          定向会话 <span id="private-count"></span>
-        </div>
-        <div id="private-chats" class="private-chats"></div>
-        <div class="section-label">数字人 <span id="task-count"></span></div>
-        <div id="tasks" class="task-list"></div>
+        <details id="section-rooms" class="sidebar-section" open>
+          <summary class="section-label">
+            协作群 <span id="room-count"></span>
+          </summary>
+          <div id="rooms" class="rooms"></div>
+        </details>
+        <details id="section-private" class="sidebar-section" open>
+          <summary class="section-label">
+            定向会话 <span id="private-count"></span>
+          </summary>
+          <div id="private-chats" class="private-chats"></div>
+        </details>
+        <details
+          id="section-people"
+          class="sidebar-section people-section"
+          open
+        >
+          <summary class="section-label">
+            数字人 <span id="task-count"></span>
+          </summary>
+          <div id="tasks" class="task-list"></div>
+        </details>
         <div class="sidebar-foot">
           <span class="dot knowledge"></span> 公共知识库
           <strong>SuperPOD</strong><small id="history-count"></small>
@@ -58,7 +79,6 @@
             ><button id="view-chat">专注对话</button>
           </div>
         </div>
-        <div id="notice" role="status" hidden></div>
         <div class="scope-stats">
           <span>当前群</span
           ><span><i class="dot running-dot"></i>运行 <b id="running">—</b></span
@@ -147,6 +167,64 @@
         </div>
       </aside>
     </div>
+    <main
+      id="messages-page"
+      class="system-page"
+      aria-labelledby="messages-title"
+      hidden
+    >
+      <div class="system-page-heading">
+        <div>
+          <p class="eyebrow">SYSTEM MESSAGES</p>
+          <h1 id="messages-title" tabindex="-1">系统消息</h1>
+          <p>查看服务告警、连接状态与恢复记录。</p>
+        </div>
+        <span id="system-message-count" class="status-pill"></span>
+      </div>
+      <div
+        id="system-messages"
+        class="system-messages"
+        aria-live="polite"
+      ></div>
+      <p class="system-note">保留本次打开页面期间最近 100 条状态记录。</p>
+    </main>
+    <main
+      id="settings-page"
+      class="system-page"
+      aria-labelledby="settings-title"
+      hidden
+    >
+      <div class="system-page-heading">
+        <div>
+          <p class="eyebrow">SYSTEM SETTINGS</p>
+          <h1 id="settings-title" tabindex="-1">系统设置</h1>
+          <p>调整你的协作观察体验。</p>
+        </div>
+      </div>
+      <section class="settings-card" aria-labelledby="observation-settings">
+        <h2 id="observation-settings">观察设置</h2>
+        <label class="setting-row"
+          ><span
+            ><strong>跟随当前研究</strong
+            ><small
+              >新研究开始时自动切换协作群；手动选择会话会暂停跟随。</small
+            ></span
+          ><input id="setting-follow" type="checkbox"
+        /></label>
+        <label class="setting-row"
+          ><span
+            ><strong>动态图效</strong
+            ><small>显示数字人活动和协作图中的动态连线。</small></span
+          ><input id="setting-motion" type="checkbox"
+        /></label>
+        <p class="system-note">这些偏好保存在当前浏览器中。</p>
+      </section>
+      <section class="settings-card" aria-labelledby="service-settings">
+        <h2 id="service-settings">服务运行信息</h2>
+        <dl id="service-settings-info"></dl>
+        <p class="system-note">运行参数由服务配置管理，此处展示当前状态。</p>
+      </section>
+    </main>
     <dialog id="session-window" aria-labelledby="session-title">
       <div class="session-heading">
         <div id="session-avatar"></div>

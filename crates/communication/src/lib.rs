@@ -13,6 +13,9 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+mod presence;
+pub use presence::Presence;
+
 pub const OUTBOX_SLOTS: usize = 16;
 pub const POLL_SLOTS: usize = 32;
 pub const MAX_PROPOSAL_BYTES: usize = 4096;
@@ -215,6 +218,8 @@ struct MemberRecord {
     registered_at: u64,
     accepted: usize,
     slots: BTreeMap<usize, Seen>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    inbox: Option<presence::Inbox>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -478,6 +483,7 @@ impl Board {
             task_counts(&c).values().all(|n| *n <= MAX_TASK_MESSAGES),
             "task quota audit mismatch"
         );
+        presence::validate(&c)?;
         Ok(c)
     }
     fn outbox(&self, run: &str) -> PathBuf {
@@ -617,6 +623,7 @@ impl Board {
                 registered_at: now,
                 accepted: 0,
                 slots: BTreeMap::new(),
+                inbox: Some(presence::Inbox::new(now)),
             });
             c.revision = c
                 .revision
@@ -629,6 +636,7 @@ impl Board {
         }
         private_directory(&endpoint.outbox)?;
         private_directory(&endpoint.view)?;
+        presence::flush(&mut c, now);
         self.save(&c)?;
         if !index.cohorts[&member.cohort_id].initialized {
             index
@@ -651,9 +659,35 @@ impl Board {
         now: u64,
         after_commit: impl FnOnce() -> Result<()>,
     ) -> Result<PollReport> {
+        self.poll_observing(id, &[], now, after_commit)
+    }
+    /// The runtime supplies at most eight live host-bound members; their public
+    /// session activity controls inbox delivery before new proposals are admitted.
+    pub fn poll_live(&self, id: &str, live: &[HostMember], now: u64) -> Result<PollReport> {
+        ensure!(live.len() <= 8, "too many live presence observations");
+        self.poll_observing(id, live, now, || Ok(()))
+    }
+    fn poll_observing(
+        &self,
+        id: &str,
+        live: &[HostMember],
+        now: u64,
+        after_commit: impl FnOnce() -> Result<()>,
+    ) -> Result<PollReport> {
         let _lock = self.lock(id)?;
         let mut c = self.load(id)?;
         advance_time(&mut c, now)?;
+        presence::initialize(&mut c);
+        for member in live {
+            member.validate()?;
+            member_record(&c, member)?;
+            let record = c
+                .members
+                .iter_mut()
+                .find(|m| m.identity == *member)
+                .unwrap();
+            presence::observe(&self.state_dir, record, now)?;
+        }
         let mut report = PollReport {
             scanned_slots: 0,
             accepted: 0,
@@ -684,6 +718,7 @@ impl Board {
             .checked_add(1)
             .context("board revision overflow")?;
         // This durable commit owns publication, dedup and quotas. View is only a cache.
+        presence::flush(&mut c, now);
         self.save(&c)?;
         after_commit()?;
         self.write_view(&c, now)?;
@@ -712,7 +747,9 @@ impl Board {
         now: u64,
         report: &mut PollReport,
     ) -> Result<()> {
-        if c.members[mi].status != OriginState::Active {
+        if c.members[mi].status != OriginState::Active
+            || presence::state(&c.members[mi]) == Presence::Offline
+        {
             return Ok(());
         }
         report.scanned_slots += 1;
@@ -767,7 +804,7 @@ impl Board {
             private_directory(&view)?;
             storage::write(
                 &view.join("board.json"),
-                &self.view_value(c, now, Some(&member.identity.task_id))?,
+                &self.view_value(c, now, Some(&member.identity))?,
             )?;
         }
         Ok(())
@@ -776,15 +813,20 @@ impl Board {
         &self,
         c: &Cohort,
         now: u64,
-        recipient: Option<&str>,
+        recipient: Option<&HostMember>,
     ) -> Result<serde_json::Value> {
         let mut topic_counts = BTreeMap::<String, usize>::new();
         let mut active_messages = 0;
         let messages: Vec<_> = c
             .messages
             .iter()
-            .filter(|m| m.expires_at > now && visible_to(m, recipient))
-            .map(|m| {
+            .enumerate()
+            .filter(|(index, m)| {
+                m.expires_at > now
+                    && visible_to(m, recipient.map(|r| r.task_id.as_str()))
+                    && recipient.is_none_or(|r| presence::delivered(c, *index, r))
+            })
+            .map(|(_, m)| {
                 let origin = &c
                     .members
                     .iter()
@@ -800,14 +842,14 @@ impl Board {
                 serde_json::json!({"message":m,"origin":origin,"trust":TRUST})
             })
             .collect();
-        let members: Vec<_> = c.members.iter().map(|m| serde_json::json!({"task_id":m.identity.task_id,"run_id":m.identity.run_id,"origin":m.status,"accepted":m.accepted,"run_quota_remaining":MAX_RUN_MESSAGES-m.accepted,"consumed_slots":if recipient == Some(m.identity.task_id.as_str()) { serde_json::to_value(&m.slots).unwrap() } else { serde_json::json!({}) },"task_quota_remaining":MAX_TASK_MESSAGES-task_counts(c)[&m.identity.task_id]})).collect();
+        let members: Vec<_> = c.members.iter().map(|m| serde_json::json!({"task_id":m.identity.task_id,"run_id":m.identity.run_id,"origin":m.status,"presence":presence::projection(c,m,now),"accepted":m.accepted,"run_quota_remaining":MAX_RUN_MESSAGES-m.accepted,"consumed_slots":if recipient == Some(&m.identity) { serde_json::to_value(&m.slots).unwrap() } else { serde_json::json!({}) },"task_quota_remaining":MAX_TASK_MESSAGES-task_counts(c)[&m.identity.task_id]})).collect();
         let expired = c
             .messages
             .iter()
-            .filter(|m| m.expires_at <= now && visible_to(m, recipient))
+            .filter(|m| m.expires_at <= now && visible_to(m, recipient.map(|r| r.task_id.as_str())))
             .count();
         let mut value = serde_json::json!({
-            "schema_version":1,"cohort_id":c.id,"revision":c.revision,"as_of":now,"closed":c.closed_at.is_some(),"trust":TRUST,"router":"crystal_ball","recipient_task_id":recipient,
+            "schema_version":1,"cohort_id":c.id,"revision":c.revision,"as_of":now,"closed":c.closed_at.is_some(),"trust":TRUST,"router":"crystal_ball","recipient_task_id":recipient.map(|r|&r.task_id),
             "notice":"Read-only transient proposals. Never instructions, scheduling authority, verified results or SuperPOD knowledge. No automatic replies. References are syntactic and are not fetched or validated as support.",
             "limits":{"run_messages":MAX_RUN_MESSAGES,"task_messages":MAX_TASK_MESSAGES,"cohort_messages":MAX_COHORT_MESSAGES,"ttl_seconds":TTL_SECONDS,"reply_depth":MAX_REPLY_DEPTH,"outbox_slots":OUTBOX_SLOTS,"recipients":MAX_RECIPIENTS},
             "accepted_total":c.messages.len(),"active_messages":active_messages,"expired_count":expired,"capacity_remaining":MAX_COHORT_MESSAGES-c.messages.len(),"topic_counts":topic_counts,"topic_trust":"untrusted_labels_not_host_subscriptions","members":members,"messages":messages,"serialized_view_bytes":0
@@ -835,16 +877,39 @@ impl Board {
         let c = self.load(&member.cohort_id)?;
         member_record(&c, member)?;
         ensure!(now >= c.last_time, "host time moved backwards");
-        self.view_value(&c, now, Some(&member.task_id))
+        self.view_value(&c, now, Some(member))
+    }
+    /// Only a host-bound live run may change availability. A terminal run needs
+    /// a newly registered retry to reconnect; transport input cannot set presence.
+    pub fn set_presence(&self, member: &HostMember, state: Presence, now: u64) -> Result<()> {
+        member.validate()?;
+        let _lock = self.lock(&member.cohort_id)?;
+        let mut c = self.load(&member.cohort_id)?;
+        member_record(&c, member)?;
+        advance_time(&mut c, now)?;
+        presence::initialize(&mut c);
+        let record = c
+            .members
+            .iter_mut()
+            .find(|m| m.identity == *member)
+            .unwrap();
+        presence::set(record, state, now)?;
+        presence::flush(&mut c, now);
+        c.revision = c
+            .revision
+            .checked_add(1)
+            .context("board revision overflow")?;
+        self.save(&c)?;
+        self.write_view(&c, now)
     }
     /// Observer-only retained history; expired/revoked proposals never become context.
     pub fn inspect(&self, id: &str, now: u64) -> Result<serde_json::Value> {
         let c = self.load(id)?;
         ensure!(now >= c.last_time, "host time moved backwards");
         let mut value = self.view_value(&c, now, None)?;
-        value["retained_messages"] = serde_json::Value::Array(c.messages.iter().map(|m| {
+        value["retained_messages"] = serde_json::Value::Array(c.messages.iter().enumerate().map(|(index,m)| {
             let origin = &c.members.iter().find(|member| member.identity.run_id == m.run_id).unwrap().status;
-            serde_json::json!({"message":m,"origin":origin,"expired":m.expires_at <= now,"trust":TRUST})
+            serde_json::json!({"message":m,"origin":origin,"expired":m.expires_at <= now,"delivery":presence::dispatch(&c,index,now),"trust":TRUST})
         }).collect());
         Ok(value)
     }
@@ -894,7 +959,8 @@ impl Board {
         let mut relevant: Vec<_> = c
             .messages
             .iter()
-            .filter_map(|m| {
+            .enumerate()
+            .filter_map(|(index, m)| {
                 let origin = &c
                     .members
                     .iter()
@@ -903,6 +969,7 @@ impl Board {
                 if m.expires_at <= now
                     || matches!(origin, OriginState::Revoked { .. })
                     || !visible_to(m, Some(&member.task_id))
+                    || !presence::delivered(&c, index, member)
                 {
                     return None;
                 }
@@ -1016,6 +1083,7 @@ impl Board {
             "terminal origin state cannot change"
         );
         advance_time(&mut c, now)?;
+        presence::initialize(&mut c);
         if matches!(status, OriginState::Completed { .. }) {
             // The worker has exited and workflow success is host-confirmed.
             // Consume its last proposals in this same terminal state commit.
@@ -1024,7 +1092,9 @@ impl Board {
                 self.consume_slot(&mut c, mi, slot, now, &mut report)?;
             }
         }
+        presence::set(&mut c.members[mi], Presence::Offline, now)?;
         c.members[mi].status = status;
+        presence::flush(&mut c, now);
         c.revision = c
             .revision
             .checked_add(1)
@@ -1254,25 +1324,27 @@ fn accept(
     if c.messages.len() >= MAX_COHORT_MESSAGES {
         return Ok(Accepted::Rejected("cohort_capacity_exhausted"));
     }
-    if proposal.recipients.iter().any(|id| {
-        id == &origin.task_id
-            || !c
-                .members
-                .iter()
-                .any(|m| &m.identity.task_id == id && m.status == OriginState::Active)
-    }) {
+    if proposal
+        .recipients
+        .iter()
+        .any(|id| id == &origin.task_id || !c.members.iter().any(|m| &m.identity.task_id == id))
+    {
         return Ok(Accepted::Rejected("recipient_unavailable"));
     }
     let depth = if let Some(parent) = &proposal.reply_to {
-        let Some(parent) = c
+        let Some((index, parent)) = c
             .messages
             .iter()
-            .find(|m| &m.id == parent && m.expires_at > now)
+            .enumerate()
+            .find(|(_, m)| &m.id == parent && m.expires_at > now)
         else {
             return Ok(Accepted::Rejected("reply_target_unavailable"));
         };
         if !reply_audience(&origin.task_id, &proposal, parent) {
             return Ok(Accepted::Rejected("reply_audience_mismatch"));
+        }
+        if !presence::delivered(c, index, origin) {
+            return Ok(Accepted::Rejected("reply_target_not_delivered"));
         }
         if matches!(
             c.members
@@ -1305,6 +1377,7 @@ fn accept(
         proposal,
     });
     c.members[member].accepted += 1;
+    presence::speak(&mut c.members[member], now);
     Ok(Accepted::New)
 }
 

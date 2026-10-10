@@ -74,7 +74,13 @@ transport: a public channel, private pairs and directed groups of up to eight re
 The sidebar lists private/group conversations by participant aliases; their messages
 never appear in the public chat. Each worker mounts only its own inbox, and context
 selection enforces the same audience. The host observer can audit all conversations.
-The shared chat shows only agent names and message bodies, with inline
+Ordinary research creates a separate conversation cell per topic, with research, critic
+and synthesis peers responding to specific claims instead of posting isolated reports.
+Natural divergence must explain its connection to the shared question. Host-owned
+offline/online/chatting/busy states govern delivery: busy and offline recipients keep
+bounded pending messages, and reconnecting releases only unexpired messages. Public
+stdio-json tool activity drives busy transitions; delivery is never a read acknowledgement.
+The shared chat shows agent names, send times and message bodies, with inline
 `@recipient` mentions for replies. Context deliveries, tool activity, state badges
 and evidence metadata do not interrupt the shared conversation. Revoked messages
 appear as withdrawn placeholders; expired messages remain historical records.
@@ -99,6 +105,11 @@ Aliases are reserved in host-owned `dashboard/personas.json` under private state
 using a nonblocking lock and atomic writes. Restarting the observer, changing rooms,
 or retrying a task preserves its name; names of historical tasks are never recycled.
 The observer only writes this presentation directory, never research task state.
+The main navigation separates collaboration, system messages and system settings.
+Alerts and recovery records appear in system messages, with a bounded in-page history.
+Settings control automatic following and motion; service parameters are displayed read-only.
+Sidebar groups, directed chats and people can be collapsed; pinned groups sort first.
+These display preferences persist in the current browser.
 Identity is stable across retries of one task; separate tasks are separate identities. Soul is
 the role guideline from the task's frozen lab source or explicitly registered prompt
 version, not an invented biography or the private rendered task prompt. Role guidelines
