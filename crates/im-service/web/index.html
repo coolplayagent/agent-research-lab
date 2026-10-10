@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title data-i18n="html.272791a0a2"></title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/style.css" />
     <script type="module" src="/assets/bootstrap.js"></script>
   </head>
@@ -16,7 +17,7 @@
         <label
           ><span data-i18n="html.be58521719"></span
           ><input
-            id="login-token"
+            id="login-token" autofocus
             type="password"
             autocomplete="off"
             required="" /></label
@@ -29,12 +30,13 @@
       <p id="login-status" role="status"></p>
     </section>
     <div id="workspace" hidden="">
-      <aside class="sidebar">
+      <button id="navigation-backdrop" class="navigation-backdrop" hidden type="button" data-i18n-aria-label="ux.closeMenu"></button>
+      <aside class="sidebar" id="workspace-navigation">
         <a class="brand" href="#groups"
           ><span class="orb small">◈</span
           ><span
             ><span data-i18n="html.a1208633c3"></span
-            ><small>AI-IM WORKSPACE</small></span
+            ><small data-i18n="ux.workspace"></small></span
           ></a
         ><button
           id="new-conversation"
@@ -54,29 +56,32 @@
           ></button>
         </nav>
         <div class="sidebar-footer">
+          <button id="open-guide" data-i18n="ux.guide"></button>
           <span id="connection" data-i18n="html.694186911a"></span
           ><button data-page="settings" data-i18n="html.638daed1c4"></button>
         </div>
       </aside>
       <main>
         <header class="topbar">
-          <div>
-            <small>AGENT COLLABORATION</small>
-            <h1 id="page-title" data-i18n="html.f3f8bcf3f5"></h1>
+          <button id="toggle-navigation" type="button" aria-controls="workspace-navigation" aria-expanded="false" data-i18n-aria-label="ux.menu">☰</button>
+          <div class="page-heading">
+            <small data-i18n="ux.eyebrow"></small>
+            <h1 id="page-title" tabindex="-1" data-i18n="html.f3f8bcf3f5"></h1>
           </div>
-          <span id="notice" role="status"></span>
+          <div class="notice-wrap"><span id="notice" role="status"></span><button id="dismiss-notice" type="button" hidden data-i18n-aria-label="ux.dismiss">×</button></div>
         </header>
         <section id="conversations" class="conversation-layout">
           <div class="directory">
             <div class="directory-heading">
               <input
-                id="group-search"
+                id="group-search" type="search"
                 aria-label=""
                 placeholder=""
                 data-i18n-placeholder="html.555f4a4f56"
                 data-i18n-aria-label="html.555f4a4f56"
               /><button id="search-groups" data-i18n="html.3003318e72"></button>
             </div>
+            <p id="directory-count" class="directory-count" role="status"></p>
             <div id="group-list"></div>
             <button
               id="more-groups"
@@ -89,8 +94,18 @@
               <div class="orb">◈</div>
               <h2 data-i18n="html.c011d8bd8e"></h2>
               <p data-i18n="html.6882cf173d"></p>
+              <div class="empty-actions">
+                <button class="primary" id="welcome-create" data-i18n="ux.createConversation"></button>
+                <button id="welcome-people" data-i18n="ux.addPeople"></button>
+              </div>
+              <div class="quick-start">
+                <div><strong data-i18n="ux.stepPeople"></strong><p data-i18n="ux.stepPeopleNote"></p></div>
+                <div><strong data-i18n="ux.stepConversation"></strong><p data-i18n="ux.stepConversationNote"></p></div>
+                <div><strong data-i18n="ux.stepGoal"></strong><p data-i18n="ux.stepGoalNote"></p></div>
+              </div>
             </div>
             <div id="active-conversation" hidden="">
+              <button id="back-conversations" type="button" data-i18n="ux.back"></button>
               <header class="conversation-heading">
                 <div>
                   <h2 id="group-title"></h2>
@@ -161,6 +176,7 @@
                   placeholder=""
                   data-i18n-placeholder="html.09f02f8e33"
                 ></textarea>
+                <div class="composer-help"><small data-i18n="ux.sendHint"></small><small id="message-count"></small></div>
                 <div class="compose-actions">
                   <span id="reply-status"></span
                   ><button
@@ -193,7 +209,7 @@
           </header>
           <div class="search-row">
             <input
-              id="people-search"
+              id="people-search" type="search"
               placeholder=""
               aria-label=""
               data-i18n-placeholder="html.c8f899ae2f"
@@ -224,7 +240,7 @@
           <p data-i18n="research.topicsNote"></p>
           <div class="toolbar">
             <input
-              id="topic-search"
+              id="topic-search" type="search"
               data-i18n-placeholder="research.search"
               data-i18n-aria-label="research.search"
             /><button
@@ -289,6 +305,13 @@
         <section id="settings-page" class="content-page" hidden="">
           <h2 data-i18n="html.e8a4f7c09d"></h2>
           <p data-i18n="html.952ae11526"></p>
+          <nav class="settings-jump" data-i18n-aria-label="ux.settingsNav">
+            <button data-settings-target="settings-services" data-i18n="ux.services"></button>
+            <button data-settings-target="settings-adapters" data-i18n="services.adapters"></button>
+            <button data-settings-target="settings-bindings" data-i18n="services.bindings"></button>
+            <button data-settings-target="settings-metrics" data-i18n="services.metrics"></button>
+          </nav>
+          <section class="settings-block" id="settings-services"><h3 tabindex="-1" data-i18n="ux.services"></h3>
           <p id="services-status" role="status"></p>
           <div class="toolbar">
             <button id="refresh-services" data-i18n="services.refresh"></button
@@ -296,29 +319,29 @@
           </div>
           <div id="service-list" class="cards"></div>
           <div id="storage-selection"></div>
-          <h3 data-i18n="services.adapters"></h3>
+          </section><section class="settings-block" id="settings-adapters"><h3 tabindex="-1" data-i18n="services.adapters"></h3>
           <p data-i18n="services.adapterNote"></p>
           <button id="add-adapter" data-i18n="services.addAdapter"></button>
           <div id="adapter-list" class="cards"></div>
-          <h3 data-i18n="services.bindings"></h3>
+          </section><section class="settings-block" id="settings-bindings"><h3 tabindex="-1" data-i18n="services.bindings"></h3>
           <div id="binding-list"></div>
-          <h3 data-i18n="services.metrics"></h3>
+          </section><section class="settings-block" id="settings-metrics"><h3 tabindex="-1" data-i18n="services.metrics"></h3>
           <dl id="metrics" class="metrics"></dl>
-          <button id="logout" data-i18n="html.7c47dff731"></button>
+          </section><button id="logout" data-i18n="html.7c47dff731"></button>
         </section>
       </main>
     </div>
-    <dialog id="goal-dialog">
+    <dialog id="goal-dialog" aria-labelledby="goal-dialog-title">
       <form id="goal-form">
         <header>
-          <h2 data-i18n="html.6aac0bd96a"></h2>
+          <h2 id="goal-dialog-title" data-i18n="html.6aac0bd96a"></h2>
           <button
             type="button"
             data-close="goal-dialog"
             data-i18n="html.3fd47edce4"
           ></button>
         </header>
-        <p id="goal-group-name"></p>
+        <p id="goal-group-name"></p><p class="form-hint" data-i18n="ux.goalHint"></p>
         <label
           ><span data-i18n="html.cb9877f3a9"></span
           ><input id="goal-title" required="" maxlength="80"
@@ -374,10 +397,10 @@
         ></button>
       </form>
     </dialog>
-    <dialog id="group-dialog">
+    <dialog id="group-dialog" aria-labelledby="group-dialog-title">
       <form id="group-form">
         <header>
-          <h2 data-i18n="html.e67d010eb1"></h2>
+          <h2 id="group-dialog-title" data-i18n="html.e67d010eb1"></h2>
           <button
             type="button"
             data-close="group-dialog"
@@ -410,9 +433,9 @@
         ></button>
       </form>
     </dialog>
-    <dialog id="members-dialog">
+    <dialog id="members-dialog" aria-labelledby="members-dialog-title">
       <header>
-        <h2 data-i18n="html.22bc9f158f"></h2>
+        <h2 id="members-dialog-title" data-i18n="html.22bc9f158f"></h2>
         <button
           data-close="members-dialog"
           data-i18n="html.3fd47edce4"
@@ -435,10 +458,10 @@
         data-i18n="html.cf5428904b"
       ></button>
     </dialog>
-    <dialog id="person-dialog">
+    <dialog id="person-dialog" aria-labelledby="person-dialog-title">
       <form id="person-form">
         <header>
-          <h2 data-i18n="html.a29c23de8c"></h2>
+          <h2 id="person-dialog-title" data-i18n="html.a29c23de8c"></h2>
           <button
             type="button"
             data-close="person-dialog"
@@ -449,7 +472,7 @@
           ><span data-i18n="html.7245fbfacf"></span
           ><input
             id="person-id"
-            pattern="[A-Za-z0-9_-]{1,100}"
+            pattern="[A-Za-z0-9_\-]{1,100}"
             required=""
             maxlength="100"
             placeholder="agent-planner" /></label
@@ -462,13 +485,14 @@
             placeholder=""
             data-i18n-placeholder="html.27c00694ec"
         /></label>
+        <p class="form-hint" data-i18n="ux.personHint"></p>
         <p id="person-status" role="status"></p>
         <button class="primary" data-i18n="html.a3030bf8f1"></button>
       </form>
     </dialog>
-    <dialog id="credential-dialog">
+    <dialog id="credential-dialog" aria-labelledby="credential-dialog-title">
       <header>
-        <h2 data-i18n="html.a899450a5d"></h2>
+        <h2 id="credential-dialog-title" data-i18n="html.a899450a5d"></h2>
         <button
           data-close="credential-dialog"
           data-i18n="html.3fd47edce4"
@@ -489,7 +513,7 @@
         ><code>GET / POST /api/im/work</code>
       </p>
     </dialog>
-    <dialog id="edit-dialog">
+    <dialog id="edit-dialog" aria-labelledby="edit-title">
       <form id="edit-form">
         <header>
           <h2 id="edit-title" data-i18n="html.62812613e5"></h2>
@@ -510,6 +534,15 @@
         <p id="edit-status" role="status"></p>
         <button class="primary" data-i18n="html.a3030bf8f1"></button>
       </form>
+    </dialog>
+  <dialog id="guide-dialog" aria-labelledby="guide-title">
+      <header><h2 id="guide-title" data-i18n="ux.guideTitle"></h2><button type="button" data-close="guide-dialog" data-i18n="html.3fd47edce4"></button></header>
+      <p data-i18n="ux.guideNote"></p>
+      <div class="guide-steps">
+        <article><h3 data-i18n="ux.stepPeople"></h3><p data-i18n="ux.stepPeopleNote"></p><button id="guide-people" data-i18n="ux.addPeople"></button></article>
+        <article><h3 data-i18n="ux.stepConversation"></h3><p data-i18n="ux.stepConversationNote"></p><button id="guide-create" class="primary" data-i18n="ux.createConversation"></button></article>
+        <article><h3 data-i18n="ux.stepGoal"></h3><p data-i18n="ux.stepGoalNote"></p><button id="guide-applications" data-i18n="ux.exploreScenarios"></button></article>
+      </div>
     </dialog>
   </body>
 </html>

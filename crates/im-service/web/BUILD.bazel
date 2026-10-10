@@ -8,7 +8,7 @@ typescript(
 )
 filegroup(
     name = "assets",
-    srcs = glob(["dist/**/*.js", "*.html", "*.css"]),
+    srcs = glob(["dist/**/*.js", "*.html", "*.css", "*.svg"]),
     visibility = ["//visibility:public"],
 )
 genrule(

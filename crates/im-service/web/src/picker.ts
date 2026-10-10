@@ -33,7 +33,7 @@ export class Picker {
     this.chosen.clear();
     this.excluded = new Set(excluded);
     this.search.value = "";
-    this.selection.replaceChildren();
+    this.selection.textContent = t("ux.selectionEmpty");
     void this.load();
   }
   async load(append = false): Promise<void> {

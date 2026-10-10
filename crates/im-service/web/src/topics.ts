@@ -28,7 +28,7 @@ export async function loadTopics(more = false): Promise<void> {
           "p",
           `${label("TopicState", topic.state)} · ${t("research.counts", { p0: row.subject_count, p1: row.goal_count })}`,
         ),
-        button(t("research.open"), () => void openTopic(topic)),
+        button(t("research.open"), () => openTopic(topic)),
         button(
           t("research.edit"),
           () =>

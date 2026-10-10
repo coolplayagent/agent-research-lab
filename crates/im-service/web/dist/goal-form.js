@@ -1,3 +1,4 @@
+import { busy } from "./feedback.js";
 import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { label } from "./i18n.js";
@@ -97,7 +98,9 @@ export function initGoals() {
     get("goal-form").onsubmit = async (event) => {
         event.preventDefault();
         const submit = get("goal-submit");
-        submit.disabled = true;
+        const done = busy(submit);
+        if (!done)
+            return;
         try {
             const assignments = [...selectedMembers]
                 .filter(([, m]) => m.check.checked)
@@ -132,7 +135,7 @@ export function initGoals() {
             notice(error, "goal-status");
         }
         finally {
-            submit.disabled = false;
+            done();
         }
     };
 }

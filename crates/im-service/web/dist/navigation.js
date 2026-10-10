@@ -2,6 +2,7 @@ import { loadTopics } from "./topics.js";
 import { loadEvolution } from "./evolution.js";
 import { loadServices } from "./settings.js";
 import { t } from "./i18n.js";
+import { showConversation } from "./experience.js";
 import { get } from "./dom.js";
 import { setSection } from "./directory.js";
 import { loadPeople } from "./people.js";
@@ -29,8 +30,10 @@ export function navigate() {
         get(name + "-page").hidden = name !== page;
     const conversation = ["groups", "direct", "boards"].includes(page);
     get("conversations").hidden = !conversation;
-    if (conversation)
+    if (conversation) {
         setSection(page);
+        showConversation(false);
+    }
     if (page === "topics")
         void loadTopics();
     if (page === "evolution")

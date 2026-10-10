@@ -4,12 +4,15 @@ import { get } from "./dom.js";
 import { t, label } from "./i18n.js";
 import { editAdapter, editService } from "./service-forms.js";
 import { element, select, field } from "./forms.js";
+import { busy } from "./feedback.js";
 let current;
 function button(title, action) {
     const node = element("button", title);
     node.type = "button";
     node.onclick = async () => {
-        node.disabled = true;
+        const done = busy(node);
+        if (!done)
+            return;
         try {
             await action();
         }
@@ -17,7 +20,7 @@ function button(title, action) {
             get("services-status").textContent = String(error);
         }
         finally {
-            node.disabled = false;
+            done();
         }
     };
     return node;
@@ -49,6 +52,8 @@ function render(view) {
         if (health?.error)
             card.append(element("p", health.error));
         card.append(button(t("services.edit"), () => editService(config, service, save)), button(t("services.remove"), async () => {
+            if (!confirm(t("ux.confirmRemove", { title: service.id })))
+                return;
             const next = structuredClone(config);
             next.services = next.services.filter((s) => s.id !== service.id);
             await save(next);
@@ -63,6 +68,8 @@ function render(view) {
         card.append(element("h3", `${adapter.id} · ${label("CodingAgent", adapter.agent)}`), element("p", adapter.enabled
             ? t("services.adapterEnabled")
             : t("services.adapterDisabled")), element("p", `${label("AgentProtocol", adapter.protocol)} · ${adapter.executor_id}`), button(t("services.edit"), () => editAdapter(config, adapter, save)), button(t("services.remove"), async () => {
+            if (!confirm(t("ux.confirmRemove", { title: adapter.id })))
+                return;
             const next = structuredClone(config);
             next.adapters = next.adapters.filter((a) => a.id !== adapter.id);
             await save(next);
@@ -102,7 +109,9 @@ function render(view) {
     form.append(field(t("services.person"), person), field(t("services.adapter"), adapter), submit);
     form.onsubmit = async (event) => {
         event.preventDefault();
-        submit.disabled = true;
+        const done = busy(submit);
+        if (!done)
+            return;
         try {
             const next = structuredClone(config);
             next.bindings[person.value.trim()] = adapter.value;
@@ -112,7 +121,7 @@ function render(view) {
             get("services-status").textContent = String(error);
         }
         finally {
-            submit.disabled = false;
+            done();
         }
     };
     bindings.append(form);

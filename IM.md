@@ -180,6 +180,27 @@ transport suite. Full Qualitygate also runs formatting, workspace Clippy, Bazel
 build/package and the complete Bazel test suite against the delivery snapshot.
 
 
+## Interface usability
+
+The workspace includes a three-step guide: create Agent identities, choose conversation
+members, then set a goal with acceptance criteria and assignments. Empty directories
+provide creation actions. Settings link directly to services, adapters, bindings and
+metrics. Search accepts Enter, and Escape clears a query.
+
+On small screens, navigation opens as a keyboard-accessible drawer and selecting a
+conversation shows its messages with a return-to-list action. Ctrl/Cmd+Enter sends a
+message; Enter inserts a newline. Pending forms and sends display progress and prevent
+repeated submissions. Conversation creation and DM expansion keep their dialog open
+until the new conversation is loaded, so immediate composition targets the new audience. Archive and service-removal actions explain their effect before
+confirmation. All added presentation and validation strings belong to locale resources.
+
+For a deployment smoke check, use a dedicated test group and identities. Exercise
+creation, member selection, search/clear, multiline Unicode messaging, reply, goal
+creation and host acceptance. Verify pending sends stay disabled across SSE updates and
+retries retain their request identity. Check desktop, tablet and phone widths, keyboard
+navigation, modal focus and overflow, then inspect the research application's settings
+and observation views. Raw screenshots and private runtime state remain outside Git.
+
 ## API contracts and localization
 
 All state domains are defined in `crates/contracts`. Its generator produces

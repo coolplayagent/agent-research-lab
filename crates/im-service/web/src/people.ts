@@ -1,3 +1,4 @@
+import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
 import {
@@ -31,6 +32,7 @@ export async function loadPeople(append = false): Promise<void> {
     if (!append) root.replaceChildren();
     next = page.next_after;
     get("more-people").hidden = !next;
+    if (!root.childElementCount && !page.people.length) root.append(el("p", t("ux.peopleEmpty"), "empty"));
     for (const person of page.people) {
       people.set(person.id, person);
       const card = el("article", undefined, "card");
@@ -51,7 +53,7 @@ export async function loadPeople(append = false): Promise<void> {
         );
       if (person.id !== "operator")
         card.append(
-          button(t("people.529a88ccb5"), () => void grant(person.id)),
+          button(t("people.529a88ccb5"), () => grant(person.id)),
         );
       root.append(card);
     }
@@ -84,6 +86,8 @@ export function initPeople(): void {
   get("more-people").onclick = () => void loadPeople(true);
   get<HTMLFormElement>("person-form").onsubmit = async (event) => {
     event.preventDefault();
+    const done = busy(get<HTMLFormElement>("person-form").querySelector<HTMLButtonElement>("button.primary")!);
+    if (!done) return;
     try {
       await change({
         operation: "person",
@@ -93,6 +97,8 @@ export function initPeople(): void {
       await loadPeople();
     } catch (error) {
       notice(error, "person-status");
+    } finally {
+      done();
     }
   };
 }
