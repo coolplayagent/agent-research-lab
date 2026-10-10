@@ -67,10 +67,10 @@ fn soul(state: &Path, workspace: &Path, job: &Value) -> Result<Value> {
 pub(super) fn read(state: &Path, workspace: &Path, job: &Value) -> Value {
     let soul = soul(state, workspace, job).unwrap_or_else(|_| {
         json!({"available":false,
-        "reason":"绑定的角色准则暂不可读取；未使用当前版本替代历史来源。"})
+        "reason":contracts::ApiNotice::BoundPolicyUnavailable.notice(json!({}))})
     });
     json!({"run_id":job["run_id"],"soul":soul,
-        "notice":"这里展示任务绑定的角色准则，不包含完整任务提示词；独立 Soul 与记忆见数字人档案。"})
+        "notice":contracts::ApiNotice::BoundPolicyScope.notice(json!({}))})
 }
 
 #[cfg(test)]

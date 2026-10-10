@@ -1,3 +1,4 @@
+import { label } from "./i18n.js";
 export function get(id) {
     const node = document.getElementById(id);
     if (!node)
@@ -36,9 +37,4 @@ export function initDialogs() {
         get("credential-value").value = "";
     });
 }
-export const presence = {
-    offline: "离线",
-    online: "在线",
-    chatting: "对话中",
-    busy: "忙碌",
-};
+export const presence = (value) => label("Presence", value);

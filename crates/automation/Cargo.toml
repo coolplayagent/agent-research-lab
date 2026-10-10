@@ -8,6 +8,7 @@ license.workspace = true
 name = "automation"
 
 [dependencies]
+contracts.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
 delivery.workspace = true

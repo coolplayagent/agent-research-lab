@@ -79,6 +79,10 @@ pkg_tar(
     name = "package",
     srcs = [
         ":agent-research-lab",
+        "//crates/im-storage:ai-im-storage",
+        "//crates/im-storage:units",
+        "//crates/service-workers:ai-im-services",
+        "//crates/service-workers:units",
         "//app:systemd/agent-research-lab.service",
         "//app:systemd/agent-research-lab-dashboard.service",
     ] + glob(["examples/**", "prompts/**", "research/**", "skills/**", "assets/**", "*.md"]),
@@ -92,3 +96,41 @@ pkg_tar(
 # Minimal AI-IM core package; the main system also supports optional research scenarios.
 alias(name = "ai-im", actual = "//crates/im-service:ai-im", visibility = ["//visibility:public"])
 alias(name = "im-package", actual = "//crates/im-service:package", visibility = ["//visibility:public"])
+
+filegroup(name = "policy_sources", srcs = [
+    "//crates/service-workers:policy_sources",
+    "//crates/service-api:policy_sources",
+    "//crates/im-storage:policy_sources",
+    "//crates/service-protocol:policy_sources",
+    "//app:policy_sources",
+    "//crates/agent-backend:policy_sources",
+    "//crates/build-cache:policy_sources",
+    "//crates/im-service:policy_sources",
+    "//crates/lease-heartbeat:policy_sources",
+    "//crates/contracts:policy_sources",
+    "//crates/budget:policy_sources",
+    "//crates/process:policy_sources",
+    "//crates/agent-policy:policy_sources",
+    "//crates/collaboration-experiment:policy_sources",
+    "//crates/evolution-cli:policy_sources",
+    "//crates/isolation:policy_sources",
+    "//crates/crystal:policy_sources",
+    "//crates/evolution:policy_sources",
+    "//crates/automation:policy_sources",
+    "//crates/storage:policy_sources",
+    "//crates/targets:policy_sources",
+    "//crates/knowledge:policy_sources",
+    "//crates/multi-agent:policy_sources",
+    "//crates/delivery:policy_sources",
+    "//crates/config:policy_sources",
+    "//crates/communication:policy_sources",
+    "//crates/freshness:policy_sources",
+    "//crates/task:policy_sources",
+    "//crates/inputs:policy_sources",
+    "//crates/runtime:policy_sources",
+    "//crates/workflow:policy_sources",
+    "//web/shared:policy_sources",
+    "//crates/im-service/web:policy_sources",
+    "//app/src/dashboard/web:policy_sources",
+], visibility = ["//visibility:public"])
+genrule(name = "source_inventory", srcs = [":policy_sources"], outs = ["source_inventory.txt"], cmd = "printf '%s\n' $(locations :policy_sources) > $@", visibility = ["//visibility:public"])

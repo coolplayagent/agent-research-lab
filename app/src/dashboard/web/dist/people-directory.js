@@ -1,3 +1,6 @@
+import { ExecutionState, PersonKind, Presence, } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
+import { label } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { agentPresence, avatar } from "./identity.js";
 import { renderExecutorDirectory } from "./executors.js";
@@ -9,7 +12,7 @@ export function digitalPersonId(j) {
 }
 export function currentPersonJob(id) {
     const list = (workspaceState.data?.jobs || []).filter((j) => digitalPersonId(j) === id);
-    return (list.find((j) => j.state === "running") ||
+    return (list.find((j) => j.state === ExecutionState.Running) ||
         list.find((j) => j.cohort_id === workspaceState.room) ||
         list[0]);
 }
@@ -19,15 +22,15 @@ export function personPresence(id) {
     return (list
         .map(agentPresence)
         .sort((a, b) => priority[b.state] - priority[a.state])[0]
-        ?.state || "offline");
+        ?.state || Presence.Offline);
 }
 export function personRepresentative(person) {
     return (currentPersonJob(person.id) || {
         id: person.id,
         role: person.role,
-        model: person.execution?.model || "按任务选择",
-        backend: person.execution?.backend || "按任务选择",
-        state: "offline",
+        model: person.execution?.model || t("people-directory.634d99415a"),
+        backend: person.execution?.backend || t("people-directory.634d99415a"),
+        state: Presence.Offline,
         profile: {
             person_id: person.id,
             display_name: person.name,
@@ -70,7 +73,7 @@ export async function peopleApi(body) {
     });
     const value = await response.json();
     if (!response.ok)
-        throw new Error(value.error || "请求未完成，请稍后重试。");
+        throw new Error(value.error || t("people-directory.8c2dc7ac6b"));
     return value;
 }
 export async function loadPeople(after = "") {
@@ -81,12 +84,14 @@ export async function loadPeople(after = "") {
     try {
         const response = await fetch(`/api/people${after ? `?after=${encodeURIComponent(after)}` : ""}`, { signal: AbortSignal.timeout(8000) });
         if (!response.ok)
-            throw new Error("名册暂不可读。");
+            throw new Error(t("people-directory.41e49908f2"));
         const value = await response.json();
         workspaceState.peopleCursor = value.next_after;
         syncPeople(value);
-        $("people-settings-status").textContent =
-            `共 ${value.total} 位数字人，已加载 ${workspaceState.peopleIndex.size} 位。`;
+        $("people-settings-status").textContent = t("people-directory.bd02336f4b", {
+            p0: value.total,
+            p1: workspaceState.peopleIndex.size,
+        });
     }
     catch (error) {
         $("people-settings-status").textContent = error.message;
@@ -113,8 +118,12 @@ export function renderPeopleDirectory() {
     const defaults = $("people-defaults");
     defaults.replaceChildren();
     for (const [role, id] of Object.entries(workspaceState.peopleDefaults)) {
-        const label = el("label", `${workspaceState.personRoles[role] || role} · 默认成员`), select = el("select");
-        select.setAttribute("aria-label", `${workspaceState.personRoles[role] || role}默认成员`);
+        const label = el("label", t("people-directory.2b9db94336", {
+            p0: workspaceState.personRoles[role] || role,
+        })), select = el("select");
+        select.setAttribute("aria-label", t("people-directory.ded44c028d", {
+            p0: workspaceState.personRoles[role] || role,
+        }));
         for (const p of workspaceState.peopleIndex.values())
             if (p.kind === "fixed") {
                 const option = el("option", p.name);
@@ -130,8 +139,7 @@ export function renderPeopleDirectory() {
                     change: { action: "set_default", role, id: select.value },
                 });
                 workspaceState.peopleDefaults[role] = select.value;
-                $("people-settings-status").textContent =
-                    "默认成员已保存，新的研究任务会复用它。";
+                $("people-settings-status").textContent = t("people-directory.cf928dc67f");
                 await loadPeople();
                 await refresh();
             }
@@ -149,7 +157,7 @@ export function renderPeopleDirectory() {
     const root = $("people-directory"), query = $("people-search").value.toLowerCase();
     root.replaceChildren();
     const list = Array.from(workspaceState.peopleIndex.values())
-        .filter((p) => ($("people-temporary").checked || p.kind !== "temporary") &&
+        .filter((p) => ($("people-temporary").checked || p.kind !== PersonKind.Temporary) &&
         [p.name, p.role, workspaceState.personRoles[p.role], p.purpose]
             .join(" ")
             .toLowerCase()
@@ -157,13 +165,17 @@ export function renderPeopleDirectory() {
         .sort((a, b) => b.created_at - a.created_at || a.name.localeCompare(b.name));
     for (const p of list) {
         const card = el("button", undefined, "person-card"), text = el("span", p.name, "task-name");
-        text.append(el("small", `${workspaceState.personKinds[p.kind]} · ${workspaceState.personRoles[p.role] || p.role} · ${p.task_count || 0} 个任务`));
+        text.append(el("small", t("people-directory.a8dfa8c082", {
+            p0: label("PersonKind", p.kind),
+            p1: workspaceState.personRoles[p.role] || p.role,
+            p2: p.task_count || 0,
+        })));
         card.append(avatar(personRepresentative(p)), text);
         card.addEventListener("click", () => openPerson(p.id));
         root.append(card);
     }
     if (!list.length)
-        root.append(el("p", "没有匹配的数字人。可以新增成员，或显示临时成员。", "empty"));
+        root.append(el("p", t("people-directory.29145a8366"), "empty"));
 }
 export function settingsPeopleView(view) {
     $("people-list").hidden = view !== "list";
@@ -185,7 +197,7 @@ export function renderPeopleSidebar(list) {
         return;
     const root = $("tasks"), scroll = root.scrollTop, query = $("search").value.toLowerCase().replace(/^@/, "");
     const current = new Set(list.map(digitalPersonId));
-    const filtered = Array.from(workspaceState.peopleIndex.values()).filter((p) => (p.kind !== "temporary" || current.has(p.id)) &&
+    const filtered = Array.from(workspaceState.peopleIndex.values()).filter((p) => (p.kind !== PersonKind.Temporary || current.has(p.id)) &&
         [
             p.id,
             p.name,
@@ -206,9 +218,18 @@ export function renderPeopleSidebar(list) {
         if ($("state").value && j.state !== $("state").value)
             continue;
         const row = el("button", undefined, `task-row ${digitalPersonId(workspaceState.data.jobs.find((j) => j.id === workspaceState.selected)) === p.id ? "selected" : ""}`), text = el("span", p.name, "task-name");
-        text.append(el("small", `${workspaceState.personRoles[p.role] || p.role} · ${{ offline: "离线", online: "在线", busy: "忙碌", chatting: "对话中" }[state]} · ${p.task_count || 0} 个任务`));
+        text.append(el("small", t("people-directory.a8dfa8c082", {
+            p0: workspaceState.personRoles[p.role] || p.role,
+            p1: {
+                offline: t("people-directory.be1b4f3c6c"),
+                online: t("people-directory.b9086662b1"),
+                busy: t("people-directory.2e260a37cb"),
+                chatting: t("people-directory.e6485ec698"),
+            }[state],
+            p2: p.task_count || 0,
+        })));
         row.append(avatar(j), text, el("span", undefined, `presence ${state}`));
-        row.title = `${workspaceState.personKinds[p.kind]} · @${p.name}`;
+        row.title = `${label("PersonKind", p.kind)} · @${p.name}`;
         row.addEventListener("click", () => openPerson(p.id));
         root.append(row);
     }

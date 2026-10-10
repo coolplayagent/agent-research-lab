@@ -5,6 +5,9 @@ pub(crate) fn contains(path: &str) -> bool {
     asset(path).is_some()
 }
 fn asset(path: &str) -> Option<(&'static str, &'static [u8])> {
+    if let Some(asset) = web_assets::get(path) {
+        return Some(asset);
+    }
     match path {
         "/" => Some((
             "text/html; charset=utf-8",
@@ -38,9 +41,29 @@ fn asset(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../web/dist/dom.js").as_slice(),
         )),
+        "/assets/goal-form.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/goal-form.js").as_slice(),
+        )),
+        "/assets/goal-types.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/goal-types.js").as_slice(),
+        )),
+        "/assets/goals.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/goals.js").as_slice(),
+        )),
         "/assets/groups.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../web/dist/groups.js").as_slice(),
+        )),
+        "/assets/i18n.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/i18n.js").as_slice(),
+        )),
+        "/assets/locales/zh-CN.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/locales/zh-CN.js").as_slice(),
         )),
         "/assets/members.js" => Some((
             "text/javascript; charset=utf-8",
@@ -66,17 +89,17 @@ fn asset(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../web/dist/types.js").as_slice(),
         )),
-        "/assets/goals.js" => Some((
+        "/assets/service-forms.js" => Some((
             "text/javascript; charset=utf-8",
-            include_bytes!("../web/dist/goals.js").as_slice(),
+            include_bytes!("../web/dist/service-forms.js").as_slice(),
         )),
-        "/assets/goal-form.js" => Some((
+        "/assets/settings.js" => Some((
             "text/javascript; charset=utf-8",
-            include_bytes!("../web/dist/goal-form.js").as_slice(),
+            include_bytes!("../web/dist/settings.js").as_slice(),
         )),
-        "/assets/goal-types.js" => Some((
+        "/assets/service-types.js" => Some((
             "text/javascript; charset=utf-8",
-            include_bytes!("../web/dist/goal-types.js").as_slice(),
+            include_bytes!("../web/dist/service-types.js").as_slice(),
         )),
         _ => None,
     }

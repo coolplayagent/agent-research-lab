@@ -1,27 +1,33 @@
+import { t } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { $, el } from "./ui.js";
 export function renderExecutorDirectory() {
     const root = $("executor-directory");
     root.replaceChildren();
     const labels = {
-        structured_result: "结构化结果",
-        read_workspace: "读取工作区",
-        write_workspace: "修改工作区",
-        tool_execution: "工具与协作",
-        desktop: "桌面操作",
+        structured_result: t("executors.0aa3cde470"),
+        read_workspace: t("executors.0a7e537b79"),
+        write_workspace: t("executors.a3c2910666"),
+        tool_execution: t("executors.29b410e92b"),
+        desktop: t("executors.46d820f7cd"),
     };
     for (const backend of workspaceState.executionCatalog.backends) {
         const card = el("article", undefined, "memory-event");
-        card.append(el("h3", backend.id), el("p", backend.kind === "codex" ? "Codex 执行器" : "stdio JSON 执行器"));
+        card.append(el("h3", backend.id), el("p", backend.kind === "codex"
+            ? t("executors.16861ed351")
+            : t("executors.7c2a2a8e89")));
         card.append(el("p", Object.entries(backend.capabilities || {})
             .filter(([, enabled]) => enabled)
             .map(([key]) => labels[key] || key)
             .join(" · ")));
-        card.append(el("p", `模型：${(backend.models || []).join(" · ")}`));
-        card.append(el("small", "服务已配置 · 能力为配置声明；任务仍需通过权限检查"));
+        card.append(el("p", t("executors.c971dbc596", { p0: (backend.models || []).join(" · ") })));
+        card.append(el("small", t("executors.1d66d49e28")));
         root.append(card);
     }
-    root.append(el("p", `可选模型：${workspaceState.executionCatalog.models.join(" · ") || "尚未加载"}`));
+    root.append(el("p", t("executors.ddb7fd26c2", {
+        p0: workspaceState.executionCatalog.models.join(" · ") ||
+            t("executors.63c1fe8533"),
+    })));
 }
 export function editPersonExecution() {
     const person = workspaceState.peopleIndex.get(workspaceState.personFocus);
@@ -38,18 +44,17 @@ export function editPersonExecution() {
     ]) {
         const select = $("person-" + field);
         select.replaceChildren();
-        const inherited = el("option", "按任务默认配置");
+        const inherited = el("option", t("executors.64bfaa1be0"));
         inherited.value = "";
         select.append(inherited);
         for (const id of new Set([...options, ...(value ? [value] : [])])) {
-            const option = el("option", options.includes(id) ? id : `${id}（当前未配置）`);
+            const option = el("option", options.includes(id) ? id : t("executors.de44191531", { p0: id }));
             option.value = id;
             select.append(option);
         }
         select.value = value || "";
     }
-    $("person-execution-description").textContent =
-        "专长描述思考方式，任务角色决定本次职责与权限。执行技术是可替换的工具；固定成员可以承担不同任务角色。";
+    $("person-execution-description").textContent = t("executors.ecee08a207");
     $("person-execution-status").textContent = "";
 }
 export function updateExecutionModels() {

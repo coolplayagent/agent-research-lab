@@ -11,13 +11,15 @@ use axum::{
     },
     routing::{get, post},
 };
-use crystal::{Hub, Publish};
+use crystal::Publish;
+use im_storage::Client as Hub;
 use serde::Deserialize;
 use std::convert::Infallible;
 use tokio::sync::{Semaphore, watch};
 
 #[derive(Clone)]
 pub struct Web {
+    pub services: Option<Arc<service_api::Registry>>,
     pub scenarios: Arc<Vec<Arc<dyn crate::ScenarioAdapter>>>,
     pub hub: Hub,
     pub operator: Option<Arc<super::operator::Operator>>,
@@ -27,10 +29,11 @@ pub struct Web {
     pub reads: Arc<Semaphore>,
 }
 impl Web {
-    pub fn new(hub: Hub, addr: SocketAddr, shutdown: watch::Sender<bool>) -> Self {
+    pub fn new(hub: impl Into<Hub>, addr: SocketAddr, shutdown: watch::Sender<bool>) -> Self {
         Self {
+            services: None,
             scenarios: Arc::new(vec![Arc::new(crate::Collaboration)]),
-            hub,
+            hub: hub.into(),
             operator: None,
             addr,
             shutdown,
@@ -42,6 +45,10 @@ impl Web {
 pub fn router(web: Web, application: Router<Web>) -> Router {
     Router::new()
         .merge(super::operator::routes())
+        .route(
+            "/api/im/services",
+            get(super::services::view).post(super::services::save),
+        )
         .route("/api/crystal/send", post(send))
         .route("/api/crystal/stream", get(stream))
         .route("/api/crystal/ack", post(ack))
@@ -177,10 +184,10 @@ struct StateChange {
 async fn presence(State(web): State<Web>, request: Request) -> Response {
     let result = async {
         boundary(request.headers(), web.addr)?;
-        let actor = web.hub.authenticate(token(request.headers())?)?;
+        let actor = web.hub.authenticate(token(request.headers())?).await?;
         let input: StateChange = serde_json::from_slice(&body(request, 1024).await?)?;
         web.hub.set_presence(&actor, input.state).await?;
-        Ok(json!(web.hub.presence(&actor)?))
+        Ok(json!(web.hub.presence(&actor).await?))
     }
     .await;
     json_response(result)
@@ -198,9 +205,9 @@ async fn stream(
     let setup = async {
         boundary(&headers, web.addr)?;
         let token = token(&headers)?.to_owned();
-        let actor = web.hub.authenticate(&token)?;
-        let expiry = web.hub.grant_expiry(&token)?;
-        let subscription = web.hub.subscribe(&actor, &query.group_id)?;
+        let actor = web.hub.authenticate(&token).await?;
+        let expiry = web.hub.grant_expiry(&token).await?;
+        let subscription = web.hub.subscribe(&actor, &query.group_id).await?;
         let after = if let Some(after) = query.after {
             after
         } else if let Some(after) = headers.get("last-event-id") {
@@ -209,7 +216,7 @@ async fn stream(
             web.hub.cursor(&actor, &query.group_id).await?
         };
         ensure!(
-            after <= web.hub.group(&query.group_id)?.last_sequence,
+            after <= web.hub.group(&query.group_id).await?.last_sequence,
             "cursor exceeds conversation history"
         );
         let permit = web
@@ -232,8 +239,8 @@ async fn stream(
         let mut replay=true;
         'delivery: loop {
             if *shutdown.borrow() {break;}
-            if web.hub.authenticate(&token).is_err(){yield Ok(Event::default().event("revoked").data("{}"));break;}
-            match subscription.receives() {
+            if web.hub.authenticate(&token).await.is_err(){yield Ok(Event::default().event("revoked").data("{}"));break;}
+            match subscription.receives().await {
                 Err(error)=>{let kind=if error.to_string().contains("writer fault"){"fault"}else{"revoked"};yield Ok(Event::default().event(kind).data("{}"));break;}
                 Ok(false)=>{
                     tokio::select!{_ = shutdown.changed()=>break,_=&mut expires=>break,_=subscription.wait_control()=>{}}
@@ -244,10 +251,10 @@ async fn stream(
             if replay {
                 let page=match web.hub.history(&query.group_id,cursor,crystal::PAGE_SIZE).await{Ok(p)=>p,Err(e)=>{yield Ok(Event::default().event("fault").data(e.to_string()));break;}};
                 // A control operation can run while the disk read is in flight.
-                if !subscription.receives().unwrap_or(false)||web.hub.authenticate(&token).is_err(){continue;}
+                if !subscription.receives().await.unwrap_or(false)||web.hub.authenticate(&token).await.is_err(){continue;}
                 subscription.replayed(page.len());
                 for message in &page {
-                    if !subscription.receives().unwrap_or(false)||web.hub.authenticate(&token).is_err(){replay=true;continue 'delivery;}
+                    if !subscription.receives().await.unwrap_or(false)||web.hub.authenticate(&token).await.is_err(){replay=true;continue 'delivery;}
                     cursor=message.sequence;yield Ok(Event::default().event("message").id(cursor.to_string()).json_data(message).unwrap());}
                 if page.len()==crystal::PAGE_SIZE {continue;}
                 replay=false;
@@ -257,7 +264,7 @@ async fn stream(
                 _=&mut expires=>break,
                 next=subscription.recv()=>match next {
                     Ok(Some(message)) if message.sequence>cursor=>{
-                        if !subscription.receives().unwrap_or(false)||web.hub.authenticate(&token).is_err(){replay=true;continue;}
+                        if !subscription.receives().await.unwrap_or(false)||web.hub.authenticate(&token).await.is_err(){replay=true;continue;}
                         cursor=message.sequence;yield Ok(Event::default().event("message").id(cursor.to_string()).json_data(&*message).unwrap());
                     }
                     Ok(Some(_))=>{},

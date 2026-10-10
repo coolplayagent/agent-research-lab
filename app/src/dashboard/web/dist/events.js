@@ -1,3 +1,4 @@
+import { t } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { $ } from "./ui.js";
 import { openProfile, maximize } from "./identity.js";
@@ -107,9 +108,13 @@ export function initialize() {
     });
     $("maximize-session").addEventListener("click", () => {
         const expanded = $("session-window").classList.toggle("expanded");
-        $("maximize-session").textContent = expanded ? "↙ 还原" : "↗ 放大";
+        $("maximize-session").textContent = expanded
+            ? t("events.01831fe8e3")
+            : t("events.5a2a22c0d8");
         $("maximize-session").setAttribute("aria-pressed", String(expanded));
-        $("maximize-session").setAttribute("aria-label", `${expanded ? "还原" : "放大"}会话窗口`);
+        $("maximize-session").setAttribute("aria-label", t("events.f65c97353d", {
+            p0: expanded ? t("events.ddde089462") : t("events.80f8fbcfa0"),
+        }));
     });
     $("session-profile").addEventListener("click", () => {
         const j = workspaceState.historyState?.job;

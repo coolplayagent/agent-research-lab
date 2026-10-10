@@ -1,7 +1,12 @@
 schema_version: 1
 languages: [rust]
 rulesets: [core]
+custom_rules: qualitygate/rules
 rules:
+  rust-no-chinese:
+    enabled: true
+    required: true
+    severity: error
   line-ending:
     enabled: true
     required: true
@@ -28,8 +33,11 @@ profiles:
   quick:
     include: [line-ending, format]
   full:
-    include: [line-ending, format, clippy, bazel-build, bazel-test]
+    include: [line-ending, rust-no-chinese, format, clippy, bazel-build, bazel-test]
 verification_assets:
+  - AGENTS.md
+  - qualitygate/rules/**
+  - web/**
   - qualitygate.yaml
   - Cargo.toml
   - Cargo.lock

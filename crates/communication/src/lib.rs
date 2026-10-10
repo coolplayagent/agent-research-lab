@@ -203,13 +203,7 @@ pub struct ContextSnapshot {
     pub digest: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
-pub enum OriginState {
-    Active,
-    Completed { receipt_sha256: String },
-    Revoked { reason: String },
-}
+pub use contracts::OriginState;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct MemberRecord {

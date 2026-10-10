@@ -31,5 +31,5 @@ http_archive(
     urls = ["https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz"],
     sha256 = "10e108c9cf7d5f2879053dff18515fb405abf2ccef63eaaf017d9c571687a1d3",
     strip_prefix = "package",
-    build_file_content = 'exports_files(["bin/tsc"], visibility = ["//visibility:public"])\nfilegroup(name="compiler", srcs=glob(["lib/**", "bin/**"]), visibility=["//visibility:public"])',
+    build_file_content = 'exports_files(["bin/tsc", "lib/typescript.js"], visibility = ["//visibility:public"])\nfilegroup(name="compiler", srcs=glob(["lib/**", "bin/**"]), visibility=["//visibility:public"])',
 )

@@ -55,6 +55,7 @@ fn submit(work: &str, claim: &str, succeeded: bool) -> WorkChange {
         work_id: work.into(),
         claim_id: claim.into(),
         result: WorkResult {
+            code: None,
             summary: "Findings and limitations recorded".into(),
             succeeded,
             evidence: json!({"artifact":"test-report","sha256":"pinned"}),
@@ -79,7 +80,10 @@ async fn concurrent_claims_fence_results_and_require_host_acceptance_with_durabl
         .unwrap()
         .unwrap()
         .unwrap();
-    assert!(audit.text.contains("已创建"));
+    assert_eq!(
+        audit.event.as_ref().unwrap().kind,
+        contracts::GoalEventKind::Created
+    );
     let duplicate = hub
         .change_goal(GoalChange::Create { goal: input() })
         .await
@@ -199,15 +203,19 @@ async fn concurrent_claims_fence_results_and_require_host_acceptance_with_durabl
         hub.goals("team", "", "", false).await.unwrap()["goals"][0]["state"],
         "completed"
     );
-    assert!(
+    assert_eq!(
         hub.history("team", 0, 100)
             .await
             .unwrap()
             .last()
             .unwrap()
-            .text
-            .contains("已验收")
+            .event
+            .as_ref()
+            .unwrap()
+            .kind,
+        contracts::GoalEventKind::Accepted
     );
+
     assert!(hub.work(&other, claim("work-1", "again")).await.is_err());
 }
 #[tokio::test]

@@ -8,6 +8,7 @@ license.workspace = true
 name = "communication"
 
 [dependencies]
+contracts.workspace = true
 anyhow.workspace = true
 config.workspace = true
 libc.workspace = true

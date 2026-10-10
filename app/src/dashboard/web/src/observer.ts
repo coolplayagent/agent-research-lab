@@ -1,3 +1,5 @@
+import { ExecutionState } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import {
   jobs,
@@ -28,48 +30,58 @@ export function render(): any {
   privateChats();
   $("room-title").textContent = workspaceState.room
     ? "# " + roomName(workspaceState.room)
-    : "# 全部研究记录";
-  $("room-subtitle").textContent =
-    `${all.length} 个任务 · ${workspaceState.data.max_agents || 8} 个并发上限 · SuperPOD 公共知识库`;
+    : t("observer.f6ec211770");
+  $("room-subtitle").textContent = t("observer.c337f088de", {
+    p0: all.length,
+    p1: workspaceState.data.max_agents || 8,
+  });
   const count = (states?: any) =>
     all.filter((j?: any) => states.includes(j.state)).length;
-  $("running").textContent = count(["running"]);
+  $("running").textContent = count([ExecutionState.Running]);
   $("pending").textContent = count([
-    "ready",
-    "waiting_dependencies",
-    "retry_wait",
+    ExecutionState.Ready,
+    ExecutionState.WaitingDependencies,
+    ExecutionState.RetryWait,
   ]);
-  $("succeeded").textContent = count(["succeeded"]);
+  $("succeeded").textContent = count([ExecutionState.Succeeded]);
   $("blocked").textContent = count([
-    "blocked",
-    "failed",
-    "needs_reconciliation",
-    "unknown",
+    ExecutionState.Blocked,
+    ExecutionState.Failed,
+    ExecutionState.NeedsReconciliation,
+    ExecutionState.Unknown,
   ]);
-  $("history-count").textContent =
-    `全库 ${workspaceState.data.jobs.length} 个任务 · 历史阻塞 ${workspaceState.data.summary?.blocked || 0} 个`;
+  $("history-count").textContent = t("observer.f5a287c86f", {
+    p0: workspaceState.data.jobs.length,
+    p1: workspaceState.data.summary?.blocked || 0,
+  });
   const control = workspaceState.data.controller || {},
     phases = {
-      starting: "启动中",
-      recovering: "恢复历史任务",
-      refreshing: "核对最新版本",
-      idle: "待命",
-      running: "研究运行中",
-      stopped: "已停止",
-      unknown: "状态未上报",
+      starting: t("observer.33439d2631"),
+      recovering: t("observer.24f458b7f5"),
+      refreshing: t("observer.c6395daadb"),
+      idle: t("observer.1a474c3207"),
+      running: t("observer.8408d4fa09"),
+      stopped: t("observer.f006455e3b"),
+      unknown: t("observer.2f040192b1"),
     };
   $("controller-status").textContent = control.live
     ? phases[control.phase] || control.phase
-    : "控制器离线";
+    : t("observer.b09fa4a571");
   $("setting-follow").checked = workspaceState.following;
   $("setting-motion").checked = workspaceState.preferences.motion !== false;
   const info = $("service-settings-info");
   info.replaceChildren();
   for (const [label, value] of [
-    ["服务状态", $("controller-status").textContent],
-    ["并发上限", `${workspaceState.data.max_agents || 8} 个数字人`],
-    ["当前任务", `${workspaceState.data.jobs.length} 个`],
-    ["知识库", "SuperPOD"],
+    [t("observer.e8a4f7c09d"), $("controller-status").textContent],
+    [
+      t("observer.652a6f861b"),
+      t("observer.c0ca38f586", { p0: workspaceState.data.max_agents || 8 }),
+    ],
+    [
+      t("observer.75db758dea"),
+      t("observer.8eaa29c22a", { p0: workspaceState.data.jobs.length }),
+    ],
+    [t("observer.975b35f9c2"), "SuperPOD"],
   ])
     info.append(el("dt", label), el("dd", value));
   const rows = $("tasks");
@@ -161,7 +173,7 @@ export function accept(value?: any): any {
     workspaceState.inspected = "";
   if (workspaceState.following) {
     const active = workspaceState.data.jobs.find(
-        (j?: any) => j.state === "running" && j.cohort_id,
+        (j?: any) => j.state === ExecutionState.Running && j.cohort_id,
       ),
       seed = workspaceState.data.jobs.find(
         (j?: any) =>
@@ -196,12 +208,14 @@ export function connection(): any {
     !workspaceState.data.error;
   $("connection-dot").classList.toggle("live", healthy);
   $("connection").textContent = healthy
-    ? "实时连接"
+    ? t("observer.a1b56411cc")
     : workspaceState.connected
-      ? "连接已建立"
-      : "正在重连";
+      ? t("observer.8ad7b78fb1")
+      : t("observer.7a58d3d9d3");
   $("sample-time").textContent =
-    age === null ? "等待快照" : `最近变化 ${age} 秒前 · 事件推送`;
+    age === null
+      ? t("observer.e740c32f21")
+      : t("observer.1e0a0d0e4c", { p0: age });
 }
 export async function refresh(): Promise<any> {
   if (workspaceState.fetching) return;
@@ -216,7 +230,7 @@ export async function refresh(): Promise<any> {
     workspaceState.snapshotError = "";
     accept(await r.json());
   } catch (_) {
-    workspaceState.snapshotError = "无法获取运行快照，正在自动重试。";
+    workspaceState.snapshotError = t("observer.164e17de13");
     workspaceState.connected = false;
     connection();
   } finally {

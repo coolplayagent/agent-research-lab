@@ -13,12 +13,13 @@ rust_library(
     crate_name = "agent_research_lab",
     srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
     crate_root = "src/lib.rs",
-    compile_data = glob(["src/dashboard/*.html", "src/dashboard/*.css"]) + ["//app/src/dashboard/web:assets", "//app/src/dashboard/web:checked"],
+    compile_data = glob(["src/dashboard/fixtures/*", "src/dashboard/*.html", "src/dashboard/*.css"]) + ["//app/src/dashboard/web:assets", "//app/src/dashboard/web:checked"],
     edition = "2024",
     aliases = aliases(),
     version = "0.1.0",
     rustc_env = {"CARGO_PKG_NAME": "agent-research-lab"},
     deps = [
+        "//crates/contracts:contracts",
         "//crates/im-service:im_service",
         "//crates/agent-backend:agent_backend",
         "//crates/agent-policy:agent_policy",
@@ -27,7 +28,7 @@ rust_library(
         "//crates/build-cache:build_cache",
         "//crates/collaboration-experiment:collaboration_experiment",
         "//crates/communication:communication",
-        "//crates/crystal:crystal",
+        "//crates/crystal:crystal", "//crates/service-api:service_api", "//crates/im-storage:im_storage",
         "//crates/config:config",
         "//crates/delivery:delivery",
         "//crates/evolution-cli:evolution_cli",
@@ -69,3 +70,5 @@ rust_test(
     proc_macro_deps = all_crate_deps(proc_macro = True, proc_macro_dev = True),
     visibility = ["//visibility:public"],
 )
+
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])

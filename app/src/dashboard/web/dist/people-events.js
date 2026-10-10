@@ -1,3 +1,5 @@
+import { t } from "./i18n.js";
+import { label } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { $ } from "./ui.js";
 import { peopleApi, renderPeopleDirectory, loadPeople, closePerson, settingsPeopleView, } from "./people-directory.js";
@@ -139,9 +141,15 @@ export function initialize() {
     });
     $("maximize-person").addEventListener("click", () => {
         const expanded = $("person-window").classList.toggle("expanded");
-        $("maximize-person").textContent = expanded ? "↙ 还原" : "↗ 放大";
+        $("maximize-person").textContent = expanded
+            ? t("people-events.01831fe8e3")
+            : t("people-events.5a2a22c0d8");
         $("maximize-person").setAttribute("aria-pressed", String(expanded));
-        $("maximize-person").setAttribute("aria-label", `${expanded ? "还原" : "放大"}数字人窗口`);
+        $("maximize-person").setAttribute("aria-label", t("people-events.c20269537e", {
+            p0: expanded
+                ? t("people-events.ddde089462")
+                : t("people-events.80f8fbcfa0"),
+        }));
     });
     $("person-tab-execution").addEventListener("click", () => {
         switchPersonTab("execution");
@@ -170,10 +178,14 @@ export function initialize() {
             await refresh();
             if (workspaceState.personFocus === person.id &&
                 workspaceState.personRequest === request) {
-                $("person-execution-status").textContent =
-                    "已保存，新任务将使用此偏好。已有会话、记忆和执行记录保持不变。";
-                $("person-subtitle").textContent =
-                    `${workspaceState.personKinds[result.person.kind]} · ${workspaceState.personRoles[result.person.role] || result.person.role} · 执行偏好：${backend || "按任务选择"} / ${model || "按任务选择模型"}`;
+                $("person-execution-status").textContent = t("people-events.a8f69c4025");
+                $("person-subtitle").textContent = t("people-events.3e349f0f3d", {
+                    p0: label("PersonKind", result.person.kind),
+                    p1: workspaceState.personRoles[result.person.role] ||
+                        result.person.role,
+                    p2: backend || t("people-events.634d99415a"),
+                    p3: model || t("people-events.65bc196425"),
+                });
             }
         }
         catch (error) {

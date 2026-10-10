@@ -1,3 +1,4 @@
+import { label } from "./i18n.js";
 export function get<T extends HTMLElement = HTMLElement>(id: string): T {
   const node = document.getElementById(id);
   if (!node) throw new Error(`Missing interface element: ${id}`);
@@ -38,9 +39,4 @@ export function initDialogs(): void {
     get<HTMLTextAreaElement>("credential-value").value = "";
   });
 }
-export const presence: Record<string, string> = {
-  offline: "离线",
-  online: "在线",
-  chatting: "对话中",
-  busy: "忙碌",
-};
+export const presence = (value: string): string => label("Presence", value);

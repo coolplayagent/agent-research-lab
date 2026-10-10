@@ -7,7 +7,7 @@ pub(crate) fn migrate(connection: &Connection) -> Result<()> {
         [],
         |r| r.get(0),
     )?;
-    ensure!((1..=3).contains(&version), "unsupported crystal schema");
+    ensure!((1..=4).contains(&version), "unsupported crystal schema");
     if version == 1 {
         connection.execute_batch(
             "BEGIN IMMEDIATE;
@@ -27,6 +27,13 @@ pub(crate) fn migrate(connection: &Connection) -> Result<()> {
             CREATE TABLE goal_assignees(goal_id TEXT NOT NULL REFERENCES goals(id), actor_id TEXT NOT NULL REFERENCES actors(id), PRIMARY KEY(goal_id,actor_id));
             CREATE INDEX goal_actor ON goal_assignees(actor_id,goal_id);
             UPDATE crystal_meta SET value=3 WHERE key='schema'; COMMIT;")?;
+    }
+    if version < 4 {
+        connection.execute_batch(
+            "BEGIN IMMEDIATE;
+            ALTER TABLE messages ADD COLUMN event TEXT;
+            UPDATE crystal_meta SET value=4 WHERE key='schema'; COMMIT;",
+        )?;
     }
     Ok(())
 }

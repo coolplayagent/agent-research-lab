@@ -1,3 +1,6 @@
+import { initServices } from "./settings.js";
+import { apply } from "./i18n.js";
+import { t } from "./i18n.js";
 import { api } from "./api.js";
 import { get, initDialogs, notice, value } from "./dom.js";
 import { initDirectory, loadGroups, metrics } from "./directory.js";
@@ -8,6 +11,7 @@ import { initMessages } from "./messages.js";
 import { initPeople } from "./people.js";
 import { initGoals } from "./goal-form.js";
 import { initNavigation } from "./navigation.js";
+apply();
 let started = false;
 async function start() {
     if (started)
@@ -23,6 +27,7 @@ async function start() {
     initMessages();
     initPeople();
     initGoals();
+    initServices();
     initNavigation();
     await loadGroups();
     const directory = new EventSource("/api/crystal/events");
@@ -37,10 +42,10 @@ async function start() {
         }
     });
     directory.onerror = () => {
-        get("connection").textContent = "连接中断，正在重连";
+        get("connection").textContent = t("bootstrap.dd2b0733b6");
     };
     directory.onopen = () => {
-        get("connection").textContent = "● 已连接";
+        get("connection").textContent = t("bootstrap.021bd7f674");
     };
     get("logout").onclick = async () => {
         try {

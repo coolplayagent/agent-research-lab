@@ -1,3 +1,4 @@
+import { t } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { $ } from "./ui.js";
 import { savePreferences } from "./preferences.js";
@@ -36,8 +37,11 @@ export function updateSectionSizing(): any {
       "aria-valuenow",
       String(Math.max(72, Math.round(height))),
     );
-    handle.setAttribute("aria-valuetext", `${Math.round(height)} 像素`);
-    handle.title = "上下拖动调整分区高度；方向键微调，双击还原比例";
+    handle.setAttribute(
+      "aria-valuetext",
+      t("sizing.2f4ff0d062", { p0: Math.round(height) }),
+    );
+    handle.title = t("sizing.e18d960169");
   }
 }
 export function initSectionSizing(): any {

@@ -3,7 +3,7 @@ fn input(request: &str) -> Publish {
     Publish {
         group_id: "research".into(),
         request_id: request.into(),
-        text: "我倾向先验证反例：它是否改变了共同的问题？".into(),
+        text: "I would test the counterexample first: does it change our shared question?".into(),
         reply_to: None,
     }
 }
@@ -13,8 +13,8 @@ async fn setup(hub: &Hub) -> String {
         .unwrap();
     hub.create_group(NewGroup {
         id: "research".into(),
-        title: "共同研究".into(),
-        topic: "检验协作是否产生新假设".into(),
+        title: "Joint research".into(),
+        topic: "Test whether collaboration produces new hypotheses".into(),
         private: true,
         kind: Default::default(),
         members: vec!["lumen".into(), "cedar".into()],
@@ -146,8 +146,8 @@ async fn control_transactions_roll_back_and_archives_keep_readable_history() {
     let change = GroupChange {
         id: "research".into(),
         revision: 1,
-        title: "归档".into(),
-        topic: "保留历史".into(),
+        title: "Archive".into(),
+        topic: "Preserve history".into(),
         archived: true,
         pinned: true,
     };

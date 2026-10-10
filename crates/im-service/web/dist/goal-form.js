@@ -1,3 +1,6 @@
+import { GroupKind } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
+import { label } from "./i18n.js";
 import { api, query } from "./api.js";
 import { current } from "./conversation.js";
 import { close, el, get, notice, open, value } from "./dom.js";
@@ -10,17 +13,19 @@ function parameters() {
     const scenario = scenarios.find((s) => s.id === value("goal-scenario"));
     const root = get("goal-parameters");
     root.replaceChildren();
-    get("goal-scenario-note").textContent = scenario?.description || "";
+    get("goal-scenario-note").textContent = scenario
+        ? label("ScenarioDescription", scenario.id)
+        : "";
     for (const field of scenario?.fields || []) {
-        const label = el("label", field.label), select = el("select");
+        const fieldLabel = el("label", label("ScenarioField", field.id)), select = el("select");
         select.dataset.parameter = field.id;
         for (const choice of field.options) {
             const option = el("option", choice);
             option.value = choice;
             select.append(option);
         }
-        label.append(select);
-        root.append(label);
+        fieldLabel.append(select);
+        root.append(fieldLabel);
     }
 }
 async function members(append = false) {
@@ -37,9 +42,9 @@ async function members(append = false) {
     for (const person of page.members.members.filter((m) => m.person_id !== "operator")) {
         const label = el("label", undefined, "assignment-choice"), check = el("input"), instruction = el("textarea");
         check.type = "checkbox";
-        check.setAttribute("aria-label", `指派 ${person.person_id}`);
-        instruction.placeholder = "这位 Agent 的具体分工";
-        instruction.setAttribute("aria-label", `${person.person_id} 的分工`);
+        check.setAttribute("aria-label", t("goal-form.26b6e8ba95", { p0: person.person_id }));
+        instruction.placeholder = t("goal-form.4fa35368ad");
+        instruction.setAttribute("aria-label", t("goal-form.ff10e73735", { p0: person.person_id }));
         instruction.maxLength = 1200;
         instruction.rows = 2;
         instruction.disabled = true;
@@ -55,7 +60,7 @@ async function members(append = false) {
     get("more-goal-members").hidden = !next;
 }
 export async function openGoal(scenarioId = "collaboration") {
-    if (!current || current.kind === "board" || current.archived)
+    if (!current || current.kind === GroupKind.Board || current.archived)
         return;
     groupId = current.id;
     goalId = "goal-" + crypto.randomUUID();
@@ -68,7 +73,7 @@ export async function openGoal(scenarioId = "collaboration") {
         const select = get("goal-scenario");
         select.replaceChildren();
         for (const scenario of scenarios) {
-            const option = el("option", scenario.name);
+            const option = el("option", label("Scenario", scenario.id));
             option.value = scenario.id;
             select.append(option);
         }
@@ -101,7 +106,7 @@ export function initGoals() {
                 instruction: m.instruction.value.trim(),
             }));
             if (!assignments.length)
-                throw new Error("至少选择一位群成员并填写分工。");
+                throw new Error(t("goal-form.cf73f0c9c7"));
             const parameters = Object.fromEntries([
                 ...get("goal-parameters").querySelectorAll("[data-parameter]"),
             ].map((node) => [node.dataset.parameter, node.value]));
@@ -121,7 +126,7 @@ export function initGoals() {
             });
             close("goal-dialog");
             await loadGoals();
-            notice("目标已分配；Agent 提交结果后可在群内验收。");
+            notice(t("goal-form.ed2c6ba6a6"));
         }
         catch (error) {
             notice(error, "goal-status");

@@ -1,3 +1,4 @@
+import { t } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { session, name, presenceLabel, avatar } from "./identity.js";
 import { dismissProfile } from "./preferences.js";
@@ -72,7 +73,7 @@ export async function fetchSession(before = null, direction = "older") {
     }
     catch (_) {
         if (workspaceState.historyState === state)
-            state.error = "暂时无法读取会话，请稍后重试。";
+            state.error = t("sessions.121861364e");
     }
     finally {
         if (workspaceState.historyState === state) {
@@ -88,22 +89,24 @@ export function renderSession(resetScroll = false) {
     const j = workspaceState.data.jobs.find((job) => job.run_id === state.run) ||
         state.job;
     if (!j || j.run_id !== state.run) {
-        $("session-status").textContent =
-            "这轮会话已结束或不在观察范围内，请重新选择数字人。";
+        $("session-status").textContent = t("sessions.8fd6057379");
         return;
     }
     $("session-title").textContent = name(j);
-    $("session-subtitle").textContent =
-        `${j.model} · ${presenceLabel(j)} · 第 ${j.attempt} 轮`;
+    $("session-subtitle").textContent = t("sessions.f58ba9e1af", {
+        p0: j.model,
+        p1: presenceLabel(j),
+        p2: j.attempt,
+    });
     $("session-avatar").replaceChildren(avatar(j));
     const s = state.page;
     $("session-status").textContent =
         state.error ||
             (state.loading
-                ? "正在读取会话…"
+                ? t("sessions.c4de4ad42c")
                 : state.following
-                    ? `实时跟随 · ${time(s?.modified_at)} 更新`
-                    : "正在浏览历史记录");
+                    ? t("sessions.c865a1c2f2", { p0: time(s?.modified_at) })
+                    : t("sessions.75aa3171da"));
     for (const button of $("session-history").querySelectorAll(".history-button"))
         button.disabled = state.loading;
     const key = JSON.stringify([
@@ -121,15 +124,15 @@ export function renderSession(resetScroll = false) {
     root.replaceChildren();
     const navigation = el("div", undefined, "history-navigation");
     if (s?.next_before != null) {
-        const earlier = el("button", "↑ 更早的记录", "history-button");
+        const earlier = el("button", t("sessions.be18c080ba"), "history-button");
         earlier.disabled = state.loading;
         earlier.addEventListener("click", () => fetchSession(s.next_before));
         navigation.append(earlier);
     }
     else if (s)
-        navigation.append(el("span", "会话开始", "history-start"));
+        navigation.append(el("span", t("sessions.62e40dc944"), "history-start"));
     if (state.older.length) {
-        const newer = el("button", "较新的记录 ↓", "history-button");
+        const newer = el("button", t("sessions.bca802269c"), "history-button");
         newer.disabled = state.loading;
         newer.addEventListener("click", () => {
             const before = state.older.at(-1);
@@ -138,7 +141,7 @@ export function renderSession(resetScroll = false) {
         navigation.append(newer);
     }
     if (state.error) {
-        const retry = el("button", "重试", "history-button");
+        const retry = el("button", t("sessions.b8784c8dd5"), "history-button");
         retry.addEventListener("click", () => fetchSession(state.following ? null : (state.page?.page_end ?? null), "retry"));
         navigation.append(retry);
     }

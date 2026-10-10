@@ -40,47 +40,10 @@ pub fn text(value: &str, max: usize) -> Result<()> {
     );
     Ok(())
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum Presence {
-    Offline,
-    Online,
-    Chatting,
-    Busy,
-}
-impl Presence {
-    pub fn receives(self) -> bool {
-        matches!(self, Self::Online | Self::Chatting)
-    }
-    pub(crate) fn code(self) -> &'static str {
-        match self {
-            Self::Offline => "offline",
-            Self::Online => "online",
-            Self::Chatting => "chatting",
-            Self::Busy => "busy",
-        }
-    }
-    pub(crate) fn parse(s: &str) -> Result<Self> {
-        Ok(serde_json::from_value(serde_json::Value::String(s.into()))?)
-    }
-}
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum GroupKind {
-    #[default]
-    Conversation,
-    Temporary,
-    Board,
-}
-impl GroupKind {
-    pub(crate) fn code(self) -> &'static str {
-        match self {
-            Self::Conversation => "conversation",
-            Self::Temporary => "temporary",
-            Self::Board => "board",
-        }
-    }
-}
+pub use contracts::Presence;
+
+pub use contracts::GroupKind;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Person {
@@ -174,6 +137,8 @@ impl Publish {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<GoalEvent>,
     pub sequence: u64,
     pub group_id: String,
     pub sender_id: String,
@@ -198,9 +163,20 @@ pub struct GroupChange {
     pub archived: bool,
     pub pinned: bool,
 }
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ActorStatus {
     pub person_id: String,
     pub presence: Presence,
     pub connections: usize,
+}
+
+/// Host-authored audit data. Worker publish requests cannot set this field.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GoalEvent {
+    pub kind: contracts::GoalEventKind,
+    pub goal_id: String,
+    pub title: String,
+    pub person_id: Option<String>,
+    pub work_id: Option<String>,
+    pub attempt: Option<u32>,
 }

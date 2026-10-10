@@ -13,6 +13,7 @@ rust_library(
     edition = "2024",
     aliases = aliases(),
     deps = [
+        "//crates/contracts:contracts",
         "//crates/storage:storage",
     ] + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
@@ -27,3 +28,5 @@ rust_test(
     proc_macro_deps = all_crate_deps(proc_macro_dev = True),
     visibility = ["//visibility:public"],
 )
+
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])

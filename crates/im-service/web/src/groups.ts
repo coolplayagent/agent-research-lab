@@ -1,3 +1,5 @@
+import { GroupKind } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
 import { change } from "./api.js";
 import { close, get, notice, open, value } from "./dom.js";
 import { select } from "./conversation.js";
@@ -8,24 +10,24 @@ export function initGroups(): void {
   const picker = new Picker(get("create-picker"));
   const kind = get<HTMLSelectElement>("group-kind");
   const updateKind = (): void => {
-    const temporary = kind.value === "temporary";
+    const temporary = kind.value === GroupKind.Temporary;
     get<HTMLInputElement>("group-name").required = !temporary;
     get("group-name-label").hidden = temporary;
     get("group-kind-note").textContent = temporary
-      ? "选择参与者即可开始。适合临时讨论，可以随时转为正式群组。"
-      : kind.value === "board"
-        ? "管理员发布公告，成员可以订阅和查阅消息。"
-        : "按团队或主题组织 Agent，成员共享群组历史。";
+      ? t("groups.570d94d691")
+      : kind.value === GroupKind.Board
+        ? t("groups.9b7278eca3")
+        : t("groups.73a02c2189");
   };
   kind.onchange = updateKind;
   get("new-conversation").onclick = () => {
     get<HTMLFormElement>("group-form").reset();
     kind.value =
       location.hash === "#boards"
-        ? "board"
+        ? GroupKind.Board
         : location.hash === "#direct"
-          ? "temporary"
-          : "conversation";
+          ? GroupKind.Temporary
+          : GroupKind.Conversation;
     updateKind();
     picker.reset();
     notice("", "create-status");
@@ -35,9 +37,9 @@ export function initGroups(): void {
     event.preventDefault();
     get<HTMLButtonElement>("create-submit").disabled = true;
     try {
-      if (!picker.chosen.size) throw new Error("请选择至少一位参与者。");
+      if (!picker.chosen.size) throw new Error(t("groups.64919f14f1"));
       const names = [...picker.chosen.values()].map((p) => p.name).join("、");
-      const temporary = kind.value === "temporary";
+      const temporary = kind.value === GroupKind.Temporary;
       const result = await change<Group>({
         operation: "create",
         group: {
@@ -48,16 +50,20 @@ export function initGroups(): void {
           topic:
             value("group-description") ||
             (temporary
-              ? "临时多人讨论"
-              : kind.value === "board"
-                ? "共享公告与团队进展"
-                : "共同讨论与协作"),
+              ? t("groups.90752e1a59")
+              : kind.value === GroupKind.Board
+                ? t("groups.1f519ce823")
+                : t("groups.0224052fc0")),
           members: [...picker.chosen.keys()],
         },
       });
       close("group-dialog");
       location.hash =
-        kind.value === "board" ? "#boards" : temporary ? "#direct" : "#groups";
+        kind.value === GroupKind.Board
+          ? "#boards"
+          : temporary
+            ? "#direct"
+            : "#groups";
       await loadGroups();
       await select(result);
     } catch (error) {

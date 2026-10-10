@@ -10,12 +10,13 @@ use axum::{
     },
     routing::get,
 };
-use crystal::Hub;
+use im_storage::Client as Hub;
 use std::convert::Infallible;
 use tokio::sync::{Semaphore, watch};
 
 #[derive(Clone)]
 pub(super) struct Web {
+    pub services: Option<Arc<service_api::Registry>>,
     pub hub: Hub,
     pub operator: Option<Arc<super::operator::Operator>>,
     pub addr: SocketAddr,
@@ -28,7 +29,7 @@ pub(super) struct Web {
 }
 impl Web {
     pub fn new(
-        hub: Hub,
+        hub: impl Into<Hub>,
         addr: SocketAddr,
         config: Option<Arc<Config>>,
         snapshot: Shared,
@@ -36,7 +37,8 @@ impl Web {
         shutdown: watch::Sender<bool>,
     ) -> Self {
         Self {
-            hub,
+            services: None,
+            hub: hub.into(),
             operator: None,
             addr,
             config,
@@ -50,6 +52,7 @@ impl Web {
 }
 pub(super) fn router(web: Web) -> Router {
     let mut core = im_service::transport::Web::new(web.hub.clone(), web.addr, web.shutdown.clone());
+    core.services = web.services.clone();
     core.operator = web.operator.clone();
     if let Some(config) = &web.config {
         core.scenarios = Arc::new(vec![

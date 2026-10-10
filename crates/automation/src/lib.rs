@@ -20,15 +20,7 @@ pub enum Operation {
     KnowledgeRefresh(knowledge::IndexRefreshRequest),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum QueueState {
-    Pending,
-    Running,
-    Complete,
-    Waiting,
-    NeedsReconciliation,
-}
+pub use contracts::QueueState;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QueueEntry {

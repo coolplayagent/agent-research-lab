@@ -68,7 +68,7 @@ pub async fn manage(State(web): State<Web>, request: Request) -> Response {
             },
             Change::Update{change}=>{web.hub.update_group(change).await?;Ok(json!({"updated":true}))},
             Change::Membership{group_id,person_id,add}=>{web.hub.membership(&group_id,&person_id,add).await?;Ok(json!({"updated":true}))},
-            Change::Presence{person_id,state}=>{web.hub.set_presence(&person_id,state).await?;Ok(json!(web.hub.presence(&person_id)?))},
+            Change::Presence{person_id,state}=>{web.hub.set_presence(&person_id,state).await?;Ok(json!(web.hub.presence(&person_id).await?))},
             Change::Grant{person_id,lifetime_seconds}=>Ok(json!({"token":web.hub.grant(&person_id,lifetime_seconds).await?,"person_id":person_id,"expires_in_seconds":lifetime_seconds})),
         }
     }.await;
@@ -92,8 +92,8 @@ pub async fn view(
     Query(query): Query<View>,
 ) -> Response {
     let result=async{boundary(&headers,web.addr)?;
-        if query.group_id.is_empty(){return Ok(json!({"metrics":web.hub.metrics(),"directory":web.hub.groups(&query.after,&query.query,100)?}));}
-        Ok(json!({"group":web.hub.group(&query.group_id)?,"members":web.hub.members(&query.group_id,&query.after,100)?,"messages":if query.before.is_some() || query.sequence==0 { web.hub.history_before(&query.group_id, query.before.unwrap_or(i64::MAX as u64),128).await? } else { web.hub.history(&query.group_id,query.sequence,128).await? }}))
+        if query.group_id.is_empty(){return Ok(json!({"metrics":web.hub.metrics().await?,"directory":web.hub.groups(&query.after,&query.query,100).await?}));}
+        Ok(json!({"group":web.hub.group(&query.group_id).await?,"members":web.hub.members(&query.group_id,&query.after,100).await?,"messages":if query.before.is_some() || query.sequence==0 { web.hub.history_before(&query.group_id, query.before.unwrap_or(i64::MAX as u64),128).await? } else { web.hub.history(&query.group_id,query.sequence,128).await? }}))
     }.await;
     json_response(result)
 }
@@ -109,10 +109,13 @@ pub async fn events(
         Ok(p) => p,
         Err(e) => return error(format!("observer backpressure: {e}")),
     };
-    if !query.group_id.is_empty() && web.hub.group(&query.group_id).is_err() {
+    if !query.group_id.is_empty() && web.hub.group(&query.group_id).await.is_err() {
         return error("unknown conversation");
     }
-    let mut changes = web.hub.changes();
+    let mut changes = match web.hub.changes().await {
+        Ok(changes) => changes,
+        Err(e) => return error(e),
+    };
     let mut stop = web.shutdown.subscribe();
     let mut cursor = match headers
         .get("last-event-id")
@@ -126,8 +129,9 @@ pub async fn events(
         let _permit=permit;
         loop {
             if *stop.borrow(){break;}
-            let group=(!query.group_id.is_empty()).then(||web.hub.group(&query.group_id).ok()).flatten();
-            let value=json!({"metrics":web.hub.metrics(),"group":group});
+            let group=if query.group_id.is_empty(){None}else{web.hub.group(&query.group_id).await.ok()};
+            let metrics=match web.hub.metrics().await{Ok(v)=>v,Err(_)=>break};
+            let value=json!({"metrics":metrics,"group":group});
             yield Ok::<_,Infallible>(Event::default().event("status").json_data(value).unwrap());
             if !query.group_id.is_empty(){
                 loop{
@@ -137,7 +141,7 @@ pub async fn events(
                     }
                 }
             }
-            tokio::select!{_=stop.changed()=>break,_=changes.changed()=>{}}
+            tokio::select!{_=stop.changed()=>break,changed=changes.changed()=>{if changed.is_err(){break;}}}
             // Coalesce a burst of notifications, never periodically fetch state.
             tokio::select!{_=stop.changed()=>break,_=tokio::time::sleep(Duration::from_millis(50))=>{}}
         }

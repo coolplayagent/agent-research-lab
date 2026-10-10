@@ -7,12 +7,14 @@ pub use memory::{inspect_memory, remember_note};
 const MAX_PERSONAS: usize = 50_000;
 const MAX_LINKS: usize = 100_000;
 const FIRST: [&str; 32] = [
-    "云", "星", "月", "雨", "松", "竹", "青", "白", "银", "清", "墨", "秋", "朝", "远", "听", "逐",
-    "南", "北", "长", "晓", "晚", "晴", "初", "若", "沐", "知", "怀", "望", "舒", "静", "明", "灵",
+    "Cloud", "Star", "Moon", "Rain", "Pine", "Reed", "Azure", "White", "Silver", "Clear", "Ink",
+    "Autumn", "Dawn", "Far", "Echo", "Swift", "South", "North", "Long", "Early", "Dusk", "Fair",
+    "New", "Near", "Brook", "Sage", "Warm", "Hope", "Calm", "Still", "Bright", "Spirit",
 ];
 const LAST: [&str; 32] = [
-    "舟", "河", "岚", "川", "溪", "林", "禾", "澜", "羽", "泉", "竹", "辰", "野", "帆", "山", "风",
-    "海", "月", "雪", "岑", "棠", "榆", "苓", "芷", "珂", "瑾", "言", "音", "光", "露", "笙", "桐",
+    "Boat", "River", "Mist", "Creek", "Stream", "Grove", "Grain", "Wave", "Feather", "Spring",
+    "Bamboo", "Orbit", "Field", "Sail", "Hill", "Wind", "Sea", "Moon", "Snow", "Ridge", "Bloom",
+    "Elm", "Herb", "Fern", "Gem", "Jade", "Word", "Tone", "Light", "Dew", "Song", "Tree",
 ];
 
 fn available_name(id: &str, used: &BTreeSet<String>) -> String {
@@ -38,13 +40,7 @@ fn available_name(id: &str, used: &BTreeSet<String>) -> String {
     unreachable!("N reserved names cannot fill N+1 distinct candidates")
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum Kind {
-    Fixed,
-    Temporary,
-    Research,
-}
+pub use contracts::PersonKind as Kind;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Person {
@@ -246,7 +242,7 @@ fn load(c: &Config) -> Result<Directory> {
                 role,
                 Kind::Temporary,
                 "",
-                "历史数字人；可转为固定成员继续复用。",
+                "Historical persona; promote to a fixed member for reuse.",
             )?;
             directory.tasks.insert(task, id);
         }
@@ -262,13 +258,13 @@ fn load(c: &Config) -> Result<Directory> {
         }
         let soul = match role {
             "review" => {
-                "我关心被忽略的反例，会坦诚表达疑虑，也愿意在证据面前修正判断。先理解同伴的论点，再提出有依据的质疑。"
+                "Look for overlooked counterexamples, express concerns candidly, and revise judgments with evidence. Understand peers before raising grounded objections."
             }
             "synthesis" => {
-                "我珍惜讨论中的分歧，愿意连接不同视角，但不急于把共识当作答案。让每个判断回到证据与尚未解决的问题。"
+                "Preserve disagreement and connect perspectives without treating consensus as the answer. Ground judgments in evidence and open questions."
             }
             _ => {
-                "我对未知保持好奇，认真倾听同伴，也会说出自己的困惑。把直觉当作可检验的假设，用证据回应讨论。"
+                "Stay curious, listen carefully and express uncertainty. Treat intuitions as testable hypotheses and respond with evidence."
             }
         };
         let id = new_person(
@@ -278,7 +274,7 @@ fn load(c: &Config) -> Result<Directory> {
             role,
             Kind::Fixed,
             soul,
-            "跨主题复用的固定成员",
+            "Fixed member reusable across topics",
         )?;
         directory.defaults.insert(role.into(), id);
     }
@@ -435,7 +431,7 @@ pub fn register_history(c: &Config, jobs: &[Job]) -> Result<Directory> {
                 &role_for(&job.task.id, &job.task.role),
                 Kind::Temporary,
                 "",
-                "历史数字人；任务和会话记录保留。",
+                "Historical persona; task and conversation records retained.",
             )?;
             directory.tasks.insert(job.task.id.clone(), id);
         }

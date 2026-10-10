@@ -199,7 +199,7 @@ impl Store {
             limit > 0 && limit <= PAGE_SIZE,
             "history page exceeds bound"
         );
-        let mut q=self.connection.prepare_cached("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms FROM messages WHERE group_id=?1 AND sequence>?2 ORDER BY sequence LIMIT ?3")?;
+        let mut q=self.connection.prepare_cached("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms,event FROM messages WHERE group_id=?1 AND sequence>?2 ORDER BY sequence LIMIT ?3")?;
         let rows = q.query_map(params![group, after, limit], message_row)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
@@ -209,7 +209,7 @@ impl Store {
             "history page exceeds bound"
         );
         let before = before.min(i64::MAX as u64);
-        let mut q=self.connection.prepare_cached("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms FROM messages WHERE group_id=?1 AND sequence<?2 ORDER BY sequence DESC LIMIT ?3")?;
+        let mut q=self.connection.prepare_cached("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms,event FROM messages WHERE group_id=?1 AND sequence<?2 ORDER BY sequence DESC LIMIT ?3")?;
         let mut rows = q
             .query_map(params![group, before, limit], message_row)?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -249,6 +249,18 @@ fn message_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
         text: row.get(4)?,
         reply_to: row.get(5)?,
         accepted_ms: row.get(6)?,
+        event: row
+            .get::<_, Option<String>>(7)?
+            .map(|s| {
+                serde_json::from_str(&s).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        7,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })
+            })
+            .transpose()?,
     })
 }
 /// Only the writer calls this within its bounded commit batch.
@@ -269,7 +281,7 @@ pub(crate) fn append(
         member,
         "digital person is not a member of this conversation"
     );
-    let prior=tx.query_row("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms FROM messages WHERE group_id=?1 AND sender_id=?2 AND request_id=?3",params![input.group_id,actor,input.request_id],message_row).optional()?;
+    let prior=tx.query_row("SELECT sequence,group_id,sender_id,request_id,text,reply_to,accepted_ms,event FROM messages WHERE group_id=?1 AND sender_id=?2 AND request_id=?3",params![input.group_id,actor,input.request_id],message_row).optional()?;
     if let Some(prior) = prior {
         ensure!(
             prior.text == input.text && prior.reply_to == input.reply_to,
@@ -320,6 +332,7 @@ pub(crate) fn append(
     *remaining -= 1;
     Ok(Receipt {
         message: Message {
+            event: None,
             sequence,
             group_id: input.group_id.clone(),
             sender_id: actor.into(),

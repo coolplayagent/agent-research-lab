@@ -1,3 +1,6 @@
+import { ExecutionState, Presence } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
+import { label } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { el, svg, $ } from "./ui.js";
 import { savePreferences, applySidebarLayout, dismissProfile, setChatCollapsed, } from "./preferences.js";
@@ -11,22 +14,29 @@ export function agentPresence(j) {
     const member = workspaceState.data?.boards
         .flatMap((b) => b.members || [])
         .find((m) => m.run_id === j.run_id);
-    const offline = j.state !== "running" ||
+    const offline = j.state !== ExecutionState.Running ||
         !workspaceState.data?.controller?.live ||
         workspaceState.data?.controller?.stale;
     return {
-        state: offline ? "offline" : member?.presence?.state || "online",
+        state: offline
+            ? Presence.Offline
+            : member?.presence?.state || Presence.Online,
         pending: member?.presence?.pending || 0,
     };
 }
 export function presenceLabel(j) {
-    return ({ offline: "离线", online: "在线", chatting: "对话中", busy: "忙碌" }[agentPresence(j).state] || "离线");
+    return label("Presence", agentPresence(j).state);
 }
 export function name(j) {
     return j.profile?.display_name || j.id;
 }
 export function roleLabel(j) {
-    return ({ research: "研究", review: "质疑", implement: "实现", synthesis: "综合" }[role(j)] || j.role);
+    return ({
+        research: t("identity.4ff0f1dda8"),
+        review: t("identity.07bf038d63"),
+        implement: t("identity.11dd7ef8a8"),
+        synthesis: t("identity.4a0d4edef9"),
+    }[role(j)] || j.role);
 }
 export function avatar(j) {
     const face = el("span", undefined, `avatar ${role(j)}`), picture = svg("svg", { viewBox: "0 0 40 40", "aria-hidden": "true" });
@@ -85,9 +95,11 @@ export function maximize(panel) {
     document.body.classList.toggle("focus-chat", next === "chat");
     for (const name of ["graph", "chat"]) {
         const button = $("maximize-" + name), active = next === name;
-        button.textContent = active ? "↙ 还原" : "↗ 放大";
+        button.textContent = active
+            ? t("identity.01831fe8e3")
+            : t("identity.5a2a22c0d8");
         button.setAttribute("aria-pressed", String(active));
-        button.setAttribute("aria-label", `${active ? "还原" : "放大"}${name === "graph" ? "协作图" : "对话窗口"}`);
+        button.setAttribute("aria-label", `${active ? t("identity.ddde089462") : t("identity.80f8fbcfa0")}${name === "graph" ? t("identity.ca546f3abe") : t("identity.d155c1aac5")}`);
     }
     if (!next && workspaceState.focusScroll !== null) {
         const scroll = workspaceState.focusScroll;
@@ -111,7 +123,7 @@ export async function loadProfile(j) {
     }
     catch (_) {
         workspaceState.profiles.set(j.run_id, {
-            error: "名片加载失败，可稍后重试。",
+            error: t("identity.b16790b66b"),
         });
     }
     if ((workspaceState.inspected || workspaceState.selected) === j.id)
@@ -138,7 +150,7 @@ export function readable(text, key, cls = "public-text") {
         root.append(el("div", text));
     else {
         root.append(el("div", text.slice(0, 600) + "…"));
-        const more = fold(key, "展开全文", "message-more");
+        const more = fold(key, t("identity.fb654bf587"), "message-more");
         more.append(el("div", text));
         root.append(more);
     }

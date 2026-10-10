@@ -211,8 +211,8 @@ async fn exercise(
     for i in 0..groups {
         hub.create_group(crystal::NewGroup {
             id: format!("bench-group-{i:05}"),
-            title: format!("研究群 {i}"),
-            topic: "性能实验：真实网络与持久日志".into(),
+            title: format!("Research group {i}"),
+            topic: "Performance experiment with real network and durable logs".into(),
             private: false,
             kind: Default::default(),
             members: if mode == "mixed" {

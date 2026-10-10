@@ -87,12 +87,7 @@ impl Harness {
 #[tokio::test]
 async fn independent_host_manages_agents_groups_dms_boards_without_research_configuration() {
     let h = Harness::new().await;
-    assert!(
-        h.request("/", None, false, None)
-            .await
-            .1
-            .contains("水晶球公告板")
-    );
+    assert!(h.request("/", None, false, None).await.1.contains("AI-IM"));
     assert_eq!(h.request("/api/im/people", None, false, None).await.0, 401);
     assert_eq!(h.request("/api/snapshot", None, true, None).await.0, 404);
     let response = h.request("/api/im/scenarios", None, true, None).await;

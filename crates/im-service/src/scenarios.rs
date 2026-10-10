@@ -4,14 +4,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Scenario {
     pub id: String,
-    pub name: String,
-    pub description: String,
     pub fields: Vec<ScenarioField>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ScenarioField {
     pub id: String,
-    pub label: String,
     pub options: Vec<String>,
 }
 pub trait ScenarioAdapter: Send + Sync {
@@ -19,7 +16,7 @@ pub trait ScenarioAdapter: Send + Sync {
     /// Validation is read-only. Durable admission and scheduling follow goal creation.
     fn validate(&self, goal: &crystal::GoalInput) -> Result<()>;
     fn status(&self) -> Value {
-        json!({"available":true})
+        json!({"available":true,"status":contracts::ScenarioStatus::Ready})
     }
 }
 pub struct Collaboration;
@@ -27,8 +24,6 @@ impl ScenarioAdapter for Collaboration {
     fn descriptor(&self) -> Scenario {
         Scenario {
             id: "collaboration".into(),
-            name: "通用协作".into(),
-            description: "向群成员分配任务，由接入的 Agent 领取、协作并提交结果。".into(),
             fields: vec![],
         }
     }

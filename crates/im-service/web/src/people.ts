@@ -1,3 +1,4 @@
+import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
 import {
   button,
@@ -12,7 +13,7 @@ import {
 import type { Page, Person } from "./types.js";
 export const people = new Map<string, Person>();
 export const display = (id: string): string =>
-  id === "operator" ? "管理员" : people.get(id)?.name || id;
+  id === "operator" ? t("people.e19796712f") : people.get(id)?.name || id;
 let next: string | null = null,
   generation = 0;
 export async function loadPeople(append = false): Promise<void> {
@@ -36,12 +37,22 @@ export async function loadPeople(append = false): Promise<void> {
       card.append(
         el("h3", person.name),
         el("code", person.id),
-        el("p", `${presence[person.presence]} · ${person.connections} 个连接`),
+        el(
+          "p",
+          t("people.63daae1beb", {
+            p0: presence(person.presence),
+            p1: person.connections,
+          }),
+        ),
       );
       if (person.application_id)
-        card.append(el("small", `来自应用：${person.application_id}`));
+        card.append(
+          el("small", t("people.ad1028ba2a", { p0: person.application_id })),
+        );
       if (person.id !== "operator")
-        card.append(button("签发接入凭据", () => void grant(person.id)));
+        card.append(
+          button(t("people.529a88ccb5"), () => void grant(person.id)),
+        );
       root.append(card);
     }
   } catch (error) {
@@ -50,7 +61,9 @@ export async function loadPeople(append = false): Promise<void> {
 }
 export async function grant(person_id: string): Promise<void> {
   try {
-    const result = await change<{ token: string }>({
+    const result = await change<{
+      token: string;
+    }>({
       operation: "grant",
       person_id,
       lifetime_seconds: 86400,

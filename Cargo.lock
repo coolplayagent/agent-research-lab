@@ -7,6 +7,8 @@ name = "agent-research-lab"
 version = "0.1.0"
 dependencies = [
  "ai-im",
+ "ai-im-service-api",
+ "ai-im-storage",
  "anyhow",
  "async-stream",
  "axum",
@@ -21,6 +23,7 @@ dependencies = [
  "lab-collaboration-experiment",
  "lab-communication",
  "lab-config",
+ "lab-contracts",
  "lab-crystal",
  "lab-delivery",
  "lab-evolution",
@@ -48,10 +51,15 @@ dependencies = [
 name = "ai-im"
 version = "0.1.0"
 dependencies = [
+ "ai-im-service-api",
+ "ai-im-service-protocol",
+ "ai-im-storage",
+ "ai-im-web-assets",
  "anyhow",
  "async-stream",
  "axum",
  "clap",
+ "lab-contracts",
  "lab-crystal",
  "lab-storage",
  "serde",
@@ -59,6 +67,71 @@ dependencies = [
  "tempfile",
  "tokio",
 ]
+
+[[package]]
+name = "ai-im-service-api"
+version = "0.1.0"
+dependencies = [
+ "ai-im-service-protocol",
+ "ai-im-storage",
+ "anyhow",
+ "lab-contracts",
+ "lab-crystal",
+ "lab-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "ai-im-service-protocol"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-contracts",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "ai-im-service-workers"
+version = "0.1.0"
+dependencies = [
+ "ai-im-service-api",
+ "ai-im-service-protocol",
+ "anyhow",
+ "clap",
+ "lab-contracts",
+ "lab-process",
+ "lab-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "ai-im-storage"
+version = "0.1.0"
+dependencies = [
+ "ai-im-service-protocol",
+ "anyhow",
+ "clap",
+ "lab-contracts",
+ "lab-crystal",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "ai-im-web-assets"
+version = "0.1.0"
 
 [[package]]
 name = "android_system_properties"
@@ -678,6 +751,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "lab-contracts",
  "lab-delivery",
  "lab-knowledge",
  "lab-storage",
@@ -718,6 +792,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "lab-config",
+ "lab-contracts",
  "lab-evolution",
  "lab-evolution-cli",
  "lab-inputs",
@@ -737,6 +812,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "lab-config",
+ "lab-contracts",
  "lab-storage",
  "libc",
  "serde",
@@ -755,10 +831,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lab-contracts"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "lab-crystal"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "lab-contracts",
  "lab-storage",
  "rusqlite",
  "serde",
@@ -913,6 +998,7 @@ dependencies = [
  "lab-build-cache",
  "lab-communication",
  "lab-config",
+ "lab-contracts",
  "lab-evolution",
  "lab-evolution-cli",
  "lab-freshness",
@@ -979,6 +1065,7 @@ name = "lab-workflow"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "lab-contracts",
  "lab-process",
  "lab-storage",
  "serde",

@@ -1,3 +1,6 @@
+import { label } from "./i18n.js";
+import { t } from "./i18n.js";
+import { describe } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { $, el, badge, short, time } from "./ui.js";
 import { session, agentPresence, name, handle, presenceLabel, avatar, choose, loadProfile, readable, role, fold, } from "./identity.js";
@@ -12,7 +15,7 @@ export function details(j) {
     const scroll = root.parentElement.scrollTop;
     root.replaceChildren();
     if (!j) {
-        root.append(el("div", "选择数字人，查看身份、角色准则和协作记录。", "empty"));
+        root.append(el("div", t("profile.17f06fdfb0"), "empty"));
         return;
     }
     const hero = el("div", undefined, "persona-hero"), title = el("div");
@@ -21,8 +24,8 @@ export function details(j) {
     hero.append(avatar(j), title);
     root.append(hero, el("p", `${j.model} · ${j.backend}`, "persona-model"));
     if (agentPresence(j).pending)
-        root.append(el("p", `${agentPresence(j).pending} 条消息待投递；在线后继续接收。`, "process-meta"));
-    const inspect = el("button", "打开会话历史", "inspect-process");
+        root.append(el("p", t("profile.b4c41c68b7", { p0: agentPresence(j).pending }), "process-meta"));
+    const inspect = el("button", t("profile.33c7a8e250"), "inspect-process");
     inspect.addEventListener("click", () => {
         dismissProfile();
         if (j.cohort_id !== workspaceState.room) {
@@ -33,28 +36,30 @@ export function details(j) {
         $("state").value = "";
         choose(j.id, true);
     });
-    root.append(inspect, el("h3", "Soul · 角色准则"));
+    root.append(inspect, el("h3", t("profile.13f475c626")));
     if (!workspaceState.profiles.has(j.run_id))
         loadProfile(j);
     if (j.profile?.person_id) {
-        const personButton = el("button", "数字人档案 · 全部会话与记忆", "inspect-process");
+        const personButton = el("button", t("profile.576d0e3e0d"), "inspect-process");
         personButton.addEventListener("click", () => openPerson(j.profile.person_id));
         root.append(personButton);
         if (j.persona?.soul)
-            root.append(el("h3", `Soul · 版本 ${j.persona.revision}`), readable(j.persona.soul, `persona-soul:${j.run_id}`, "soul-text"));
+            root.append(el("h3", t("profile.3d4ec3a219", { p0: j.persona.revision })), readable(j.persona.soul, `persona-soul:${j.run_id}`, "soul-text"));
     }
     if (profile?.soul?.available) {
         root.append(readable(profile.soul.content, `soul:${j.run_id}`, "soul-text"));
         const source = profile.soul.source;
         root.append(el("p", source.kind === "frozen_source"
             ? `${source.path} @ ${short(source.commit, 12)}`
-            : `已注册策略 ${source.version}`, "process-meta"));
-        root.append(el("code", `角色准则 SHA-256 ${profile.soul.sha256}`));
+            : t("profile.70be7d71ef", { p0: source.version }), "process-meta"));
+        root.append(el("code", t("profile.48eec06514", { p0: profile.soul.sha256 })));
     }
     else
-        root.append(el("p", profile?.error || profile?.soul?.reason || "正在读取绑定的角色准则…"));
+        root.append(el("p", profile?.error ||
+            describe(profile?.soul?.reason) ||
+            t("profile.241dbcfe0e")));
     if (profile?.error || profile?.soul?.available === false) {
-        const retry = el("button", "重新读取名片", "mention");
+        const retry = el("button", t("profile.0a9f4350f4"), "mention");
         retry.addEventListener("click", () => {
             workspaceState.profiles.delete(j.run_id);
             workspaceState.detailKey = "";
@@ -62,59 +67,72 @@ export function details(j) {
         });
         root.append(retry);
     }
-    root.append(el("p", "任务角色准则与独立 Soul 分别保留；任务使用创建时固定的身份、Soul 和记忆上下文。", "process-meta"));
-    root.append(el("h3", "职责与当前任务"));
+    root.append(el("p", t("profile.d92203c3f9"), "process-meta"));
+    root.append(el("h3", t("profile.b6bb9f0247")));
     const dl = el("dl");
     for (const [k, v] of [
-        ["花名", name(j)],
-        ["任务", j.id],
-        ["角色", role(j)],
-        ["模型", j.model],
-        ["执行技术", j.backend],
-        ["工作范围", `${j.repository} · ${j.write ? "候选写入" : "只读研究"}`],
+        [t("profile.6ec7d273ff"), name(j)],
+        [t("profile.5253040db8"), j.id],
+        [t("profile.c47b54e84e"), role(j)],
+        [t("profile.c98e118e0a"), j.model],
+        [t("profile.d43d31419b"), j.backend],
         [
-            "记忆",
-            j.persona?.memory
-                ? "relay-memory · 已固定上下文"
-                : j.profile?.use_memory
-                    ? "本任务隔离记忆"
-                    : "历史任务未注入数字人记忆",
+            t("profile.6d93811810"),
+            `${j.repository} · ${j.write ? t("profile.f1fbda2077") : t("profile.82a3f3881e")}`,
         ],
-        ["必需工具", j.profile?.required_tools?.join("、") || "未指定"],
-        ["当前活动", s?.events?.at(-1)?.title || "暂无公开活动"],
-        ["日志更新", time(s?.modified_at)],
-        ["执行轮次", `${j.attempt} / ${j.profile?.max_attempts || 3}`],
-        ["Session", s?.session_id || "尚无会话 ID"],
-        ["前置任务", j.dependencies.join("、") || "无"],
+        [
+            t("profile.7a6335b379"),
+            j.persona?.memory
+                ? t("profile.291bec195a")
+                : j.profile?.use_memory
+                    ? t("profile.73432d8ce5")
+                    : t("profile.4547515a3c"),
+        ],
+        [
+            t("profile.9db1176b4e"),
+            j.profile?.required_tools?.join("、") || t("profile.7409a60806"),
+        ],
+        [
+            t("profile.c57c08eaa5"),
+            label("SessionEventKind", s?.events?.at(-1)?.title || "") ||
+                t("profile.27a3021cc5"),
+        ],
+        [t("profile.bb4c173a76"), time(s?.modified_at)],
+        [t("profile.18906f317e"), `${j.attempt} / ${j.profile?.max_attempts || 3}`],
+        ["Session", s?.session_id || t("profile.e687470d7e")],
+        [
+            t("profile.2f191177ec"),
+            j.dependencies.join("、") || t("profile.484d556139"),
+        ],
     ])
         dl.append(el("dt", k), el("dd", v));
     root.append(dl);
     if (j.reason)
-        root.append(el("h3", "主机阻塞记录"), el("div", j.reason, "reason"));
+        root.append(el("h3", t("profile.97c7c7de85")), el("div", j.reason, "reason"));
     if (j.observation_error)
-        root.append(el("p", "workflow 状态暂时不可读。"));
+        root.append(el("p", t("profile.6ec3e45740")));
     const records = workspaceState.data.boards.flatMap((b) => b.retained_messages || []), sent = records.filter((m) => m.message.task_id === j.id), ids = j.context?.message_ids || [];
-    root.append(el("h3", "协作看板"), el("p", `已发布 ${sent.length} 条留存消息 · 已注入 ${ids.length} 条公共板提议`));
+    root.append(el("h3", t("profile.2971ef6a3e")), el("p", t("profile.02b536a336", { p0: sent.length, p1: ids.length })));
     if (j.report?.summary) {
-        root.append(el("h3", "已提交的研究结果"), readable(j.report.summary, `report-summary:${j.run_id}`));
-        const report = fold(`report:${j.run_id}`, "研究发现与局限", "profile-section");
+        root.append(el("h3", t("profile.1051b21266")), readable(j.report.summary, `report-summary:${j.run_id}`));
+        const report = fold(`report:${j.run_id}`, t("profile.4685d41801"), "profile-section");
         for (const text of j.report.findings || [])
             if (text)
-                report.append(el("p", "发现：" + text));
+                report.append(el("p", t("profile.b8451eebe5") + text));
         for (const text of j.report.limitations || [])
             if (text)
-                report.append(el("p", "局限：" + text));
+                report.append(el("p", t("profile.4d7ab217a4") + text));
         root.append(report);
     }
-    const evidence = fold(`evidence:${j.run_id}`, "版本与证据绑定", "profile-section");
+    const evidence = fold(`evidence:${j.run_id}`, t("profile.e94661dc67"), "profile-section");
     for (const [k, v] of [
-        ["运行 ID", j.run_id],
-        ["任务源码", j.source_commit],
+        [t("profile.b80b726024"), j.run_id],
+        [t("profile.958e4091eb"), j.source_commit],
         ["SuperPOD", j.superpod_commit],
         ["Prompt SHA-256", j.prompt_digest],
-        ["配置 / 策略 SHA-256", j.config_digest],
-        ["候选提交", j.candidate_commit],
-        ["数字人记忆 SHA-256", j.persona?.memory?.sha256],
+        [t("profile.bf08c94e0f"), j.config_digest],
+        [t("profile.47496076bd"), j.candidate_commit],
+        [t("profile.a33bafc764"), j.persona?.memory?.sha256],
     ]) {
         if (!v)
             continue;
@@ -125,6 +143,6 @@ export function details(j) {
     ids.forEach((id) => evidence.append(el("p", id)));
     if (j.context?.digest)
         evidence.append(el("code", j.context.digest));
-    root.append(evidence, el("p", "上下文注入表示传递；是否采纳仍需核对。留存消息数受当前观察窗口限制。", "process-meta"));
+    root.append(evidence, el("p", t("profile.080c0efdd0"), "process-meta"));
     root.parentElement.scrollTop = scroll;
 }

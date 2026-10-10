@@ -10,7 +10,7 @@ rust_library(
     compile_data = ["//crates/im-service/web:assets", "//crates/im-service/web:checked"],
     edition = "2024",
     aliases = aliases(),
-    deps = ["//crates/crystal:crystal", "//crates/storage:storage"] + all_crate_deps(normal = True),
+    deps = ["//web/shared:web_assets", "//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/crystal:crystal", "//crates/service-api:service_api", "//crates/im-storage:im_storage", "//crates/storage:storage"] + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
 )
@@ -33,9 +33,11 @@ rust_test(
 )
 pkg_tar(
     name = "package",
-    srcs = [":ai-im", "systemd/ai-im.service"],
+    srcs = [":ai-im", "//crates/im-storage:ai-im-storage", "//crates/im-storage:units", "//crates/service-workers:ai-im-services", "//crates/service-workers:units", "systemd/ai-im.service"],
     package_dir = "ai-im",
     extension = "tar.gz",
     mode = "0755",
     visibility = ["//visibility:public"],
 )
+
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])

@@ -6,6 +6,9 @@ license.workspace = true
 description = "AI-IM multi-agent collaboration with optional evidence-bound research scenarios"
 
 [dependencies]
+service_api.workspace = true
+im_storage.workspace = true
+contracts.workspace = true
 im_service.workspace = true
 async-stream.workspace = true
 axum.workspace = true

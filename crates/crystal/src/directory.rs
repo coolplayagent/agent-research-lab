@@ -79,7 +79,7 @@ impl Hub {
     pub async fn register_operator(&self) -> Result<()> {
         self.save_person(Person {
             id: "operator".into(),
-            name: "管理员".into(),
+            name: "Operator".into(),
             application_id: None,
         })
         .await?;

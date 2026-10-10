@@ -1,3 +1,5 @@
+import { GroupKind } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
 import { current, refreshCurrent, select } from "./conversation.js";
 import { button, close, el, get, notice, open, presence, value, } from "./dom.js";
@@ -26,12 +28,12 @@ export function initMembers() {
                 picker.excluded.add(member.person_id);
                 const row = el("div", undefined, "member");
                 row.append(el("span", display(member.person_id)), el("small", member.person_id === "operator"
-                    ? "管理员"
-                    : presence[member.presence]));
+                    ? t("members.e19796712f")
+                    : presence(member.presence)));
                 if (member.person_id !== "operator" &&
                     !selected.archived &&
                     !selected.private)
-                    row.append(button("移除", async () => {
+                    row.append(button(t("members.6135d4159e"), async () => {
                         try {
                             await change({
                                 operation: "membership",
@@ -49,12 +51,12 @@ export function initMembers() {
                 root.append(row);
             }
             get("add-members-title").textContent = selected.private
-                ? "邀请更多人，开始新的多人私信"
-                : "添加成员";
+                ? t("members.52a35c8e00")
+                : t("members.ad9737dafd");
             get("history-choice").hidden = !selected.private;
             get("add-members").textContent = selected.private
-                ? "创建新会话"
-                : "添加所选成员";
+                ? t("members.e054907454")
+                : t("members.cf5428904b");
             get("add-members").disabled = selected.archived;
             await picker.load();
         }
@@ -79,7 +81,7 @@ export function initMembers() {
         get("add-members").disabled = true;
         try {
             if (!picker.chosen.size)
-                throw new Error("请选择要加入的 Agent。");
+                throw new Error(t("members.d63e7ca19b"));
             const group = selected;
             if (group.private) {
                 const existing = new Set();
@@ -98,7 +100,7 @@ export function initMembers() {
                         id: "dm-" + crypto.randomUUID(),
                         title: `${group.title}、${[...picker.chosen.values()].map((p) => p.name).join("、")}`.slice(0, 70),
                         topic: group.topic,
-                        kind: "temporary",
+                        kind: GroupKind.Temporary,
                         private: true,
                         members: [...existing],
                     },
@@ -117,7 +119,7 @@ export function initMembers() {
                     });
                     picker.chosen.delete(person_id);
                 }
-                notice("成员已添加。", "member-status");
+                notice(t("members.1ba68d9cce"), "member-status");
                 await load();
                 await refreshCurrent();
             }

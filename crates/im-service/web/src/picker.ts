@@ -1,3 +1,4 @@
+import { t } from "./i18n.js";
 import { api, query } from "./api.js";
 import { button, el, notice } from "./dom.js";
 import { people } from "./people.js";
@@ -9,15 +10,15 @@ export class Picker {
   private search = el("input");
   private list = el("div", undefined, "picker-list");
   private selection = el("div", undefined, "selection");
-  private more = button("更多 Agent", () => void this.load(true));
+  private more = button(t("picker.655bddfaf7"), () => void this.load(true));
   excluded = new Set<string>(["operator"]);
   constructor(root: HTMLElement) {
-    this.search.placeholder = "搜索参与者";
-    this.search.setAttribute("aria-label", "搜索参与者");
+    this.search.placeholder = t("picker.d2326e7cf5");
+    this.search.setAttribute("aria-label", t("picker.d2326e7cf5"));
     const row = el("div", undefined, "search-row");
     row.append(
       this.search,
-      button("查找", () => void this.load()),
+      button(t("picker.3003318e72"), () => void this.load()),
     );
     this.search.onkeydown = (event) => {
       if (event.key === "Enter") {
@@ -60,15 +61,16 @@ export class Picker {
         check.onchange = () => {
           if (check.checked) this.chosen.set(person.id, person);
           else this.chosen.delete(person.id);
-          this.selection.textContent = `已选 ${this.chosen.size} 位：${[...this.chosen.values()].map((p) => p.name).join("、")}`;
+          this.selection.textContent = t("picker.980bd2c7a9", {
+            p0: this.chosen.size,
+            p1: [...this.chosen.values()].map((p) => p.name).join("、"),
+          });
         };
         label.append(check, el("span", person.name), el("small", person.id));
         this.list.append(label);
       }
       if (!this.list.childElementCount)
-        this.list.append(
-          el("p", "没有可选的 Agent，请先在名册中添加。", "empty"),
-        );
+        this.list.append(el("p", t("picker.840deee408"), "empty"));
     } catch (error) {
       notice(error);
     }

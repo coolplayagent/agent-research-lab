@@ -1,3 +1,5 @@
+import { GroupKind } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
 import { button, el, get, notice } from "./dom.js";
 import { display } from "./people.js";
@@ -33,10 +35,10 @@ export function updateComposer(selected: Group): void {
   get<HTMLTextAreaElement>("message-text").disabled = selected.archived;
   get<HTMLButtonElement>("send-message").disabled = selected.archived;
   get("composer-label").textContent = selected.archived
-    ? "此会话已归档，历史消息仍可查阅。"
-    : selected.kind === "board"
-      ? "发布公告 · 管理员"
-      : "发送消息 · 管理员";
+    ? t("messages.39338dbfe1")
+    : selected.kind === GroupKind.Board
+      ? t("messages.b921d5ef68")
+      : t("messages.f32eb53703");
 }
 export function incoming(message: Message): void {
   if (message.group_id !== group?.id || browsing) return;
@@ -45,7 +47,9 @@ export function incoming(message: Message): void {
   renderMessages();
 }
 function updateReply(): void {
-  get("reply-status").textContent = reply ? `回复 #${reply}` : "";
+  get("reply-status").textContent = reply
+    ? t("messages.a40f9e2d59", { p0: reply })
+    : "";
   get("cancel-reply").hidden = reply === null;
 }
 function renderMessages(): void {
@@ -53,8 +57,8 @@ function renderMessages(): void {
     bottom = root.scrollHeight - root.scrollTop - root.clientHeight < 80;
   root.replaceChildren();
   get("history-status").textContent = browsing
-    ? "正在查看较早消息"
-    : "实时消息";
+    ? t("messages.f1fcde6deb")
+    : t("messages.2bd1c987a4");
   for (const message of [...messages.values()].sort(
     (a, b) => a.sequence - b.sequence,
   )) {
@@ -69,14 +73,29 @@ function renderMessages(): void {
     heading.append(
       el("strong", display(message.sender_id)),
       stamp,
-      button("回复", () => {
+      button(t("messages.cf945e21dd"), () => {
         reply = message.sequence;
         updateReply();
         get("message-text").focus();
       }),
     );
-    if (message.reply_to) row.append(el("small", `回复 #${message.reply_to}`));
-    row.append(heading, el("p", message.text));
+    if (message.reply_to)
+      row.append(
+        el("small", t("messages.a40f9e2d59", { p0: message.reply_to })),
+      );
+    row.append(
+      heading,
+      el(
+        "p",
+        message.event
+          ? t("GoalEvent." + message.event.kind, {
+              title: message.event.title,
+              person: display(message.event.person_id || "operator"),
+              attempt: message.event.attempt,
+            })
+          : message.text,
+      ),
+    );
     row.dataset.sequence = String(message.sequence);
     root.append(row);
   }
@@ -84,9 +103,9 @@ function renderMessages(): void {
     root.append(
       el(
         "p",
-        group?.kind === "board"
-          ? "暂无公告。发布第一条公告，让成员及时了解进展。"
-          : "还没有消息，发出第一声问候吧。",
+        group?.kind === GroupKind.Board
+          ? t("messages.7bd4c97a5a")
+          : t("messages.25b7624487"),
         "empty",
       ),
     );
@@ -160,7 +179,9 @@ export function initMessages(): void {
       };
     get<HTMLButtonElement>("send-message").disabled = true;
     try {
-      const result = await change<{ message: Message }>({
+      const result = await change<{
+        message: Message;
+      }>({
         operation: "send",
         message: pending,
       });
@@ -170,7 +191,7 @@ export function initMessages(): void {
       reply = null;
       updateReply();
       incoming(result.message);
-      notice("已发送");
+      notice(t("messages.60823aaec7"));
     } catch (error) {
       notice(error);
     } finally {

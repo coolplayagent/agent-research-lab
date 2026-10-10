@@ -1,4 +1,5 @@
 use crate::{goals::*, *};
+use contracts::GoalEventKind;
 use rusqlite::params;
 impl Store {
     pub(crate) fn goal_work(
@@ -30,7 +31,7 @@ impl Store {
             .find(|w| w.id == work_id && w.person_id == actor)
             .context("assignment belongs to another Agent")?;
         ensure!(work.attempt == attempt, "attempt has been superseded");
-        let note = match &change {
+        let kind = match &change {
             WorkChange::Claim { .. } => {
                 if work.claim_id.as_deref() == Some(claim_id) && work.state == WorkState::Running {
                     ensure!(
@@ -46,7 +47,7 @@ impl Store {
                 work.state = WorkState::Running;
                 work.claim_id = Some(claim_id.into());
                 work.deadline_ms = Some(now_ms() + goal.input.max_seconds * 1000);
-                format!("{actor} 已领取任务")
+                GoalEventKind::Claimed
             }
             WorkChange::Submit { result, .. } => {
                 text(&result.summary, 8000)?;
@@ -73,19 +74,16 @@ impl Store {
                 } else {
                     WorkState::Failed
                 };
-                format!(
-                    "{actor} {}：{}",
-                    if result.succeeded {
-                        "已提交结果，等待验收"
-                    } else {
-                        "任务失败"
-                    },
-                    result.summary
-                )
+                if result.succeeded {
+                    GoalEventKind::Submitted
+                } else {
+                    GoalEventKind::Failed
+                }
             }
         };
+        let changed_work = work.clone();
         goal.revision += 1;
-        save(&tx, &goal, &note)?;
+        save(&tx, &goal, kind, Some(&changed_work))?;
         tx.commit()?;
         Ok(json!(goal))
     }

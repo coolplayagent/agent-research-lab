@@ -69,24 +69,13 @@ impl GoalInput {
         Ok(())
     }
 }
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum GoalState {
-    Active,
-    Completed,
-    Cancelled,
-}
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum WorkState {
-    Ready,
-    Running,
-    Submitted,
-    Failed,
-}
+pub use contracts::GoalState;
+pub use contracts::WorkState;
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkResult {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<contracts::WorkResultCode>,
     pub summary: String,
     pub succeeded: bool,
     #[serde(default)]

@@ -1,3 +1,5 @@
+import { GroupKind } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
 import { close, get, notice, open, value } from "./dom.js";
 import { loadGroups, metrics, setSelected } from "./directory.js";
@@ -8,11 +10,23 @@ let generation = 0, stream = null, converting = false, editSnapshot = null;
 export function renderHeader(group) {
     get("group-title").textContent = group.title;
     get("group-topic").textContent = group.topic;
-    get("group-summary").textContent =
-        `${group.member_count} 位成员 · ${group.kind === "temporary" ? "临时多人私信" : group.kind === "board" ? "水晶球公告板" : "正式群组"}${group.archived ? " · 已归档" : ""}`;
-    get("convert-group").hidden = group.kind !== "temporary" || group.archived;
-    get("pin-group").textContent = group.pinned ? "取消置顶" : "置顶";
-    get("archive-group").textContent = group.archived ? "恢复会话" : "归档";
+    get("group-summary").textContent = t("conversation.77a11c13f3", {
+        p0: group.member_count,
+        p1: group.kind === GroupKind.Temporary
+            ? t("conversation.3ceac95dcf")
+            : group.kind === GroupKind.Board
+                ? t("conversation.ca4773c5ff")
+                : t("conversation.ff40f5a38d"),
+        p2: group.archived ? t("conversation.3788d7bcf0") : "",
+    });
+    get("convert-group").hidden =
+        group.kind !== GroupKind.Temporary || group.archived;
+    get("pin-group").textContent = group.pinned
+        ? t("conversation.c92179b74a")
+        : t("conversation.173f88d28e");
+    get("archive-group").textContent = group.archived
+        ? t("conversation.cbe48cfa3a")
+        : t("conversation.5292ab1a36");
     get("new-goal").disabled = group.archived;
     updateComposer(group);
 }
@@ -57,13 +71,13 @@ export async function select(group) {
         });
         stream.onerror = () => {
             if (request === generation)
-                get("connection").textContent = "连接中断，正在重连";
+                get("connection").textContent = t("conversation.dd2b0733b6");
         };
         stream.onopen = () => {
             if (request === generation)
-                get("connection").textContent = "● 已连接";
+                get("connection").textContent = t("conversation.021bd7f674");
         };
-        stream.addEventListener("fault", () => notice("历史读取暂不可用，正在等待恢复。"));
+        stream.addEventListener("fault", () => notice(t("conversation.a94f45360c")));
     }
     catch (error) {
         if (request === generation)
@@ -112,13 +126,15 @@ export function initConversation() {
                 return;
             converting = convert;
             editSnapshot = { ...current };
-            get("edit-title").textContent = convert ? "转为正式群组" : "编辑会话";
+            get("edit-title").textContent = convert
+                ? t("conversation.e514f49ff0")
+                : t("conversation.0eae0e9bbc");
             get("edit-name").value = current.title;
             get("edit-topic").value = current.topic;
             get("edit-topic").disabled = convert;
             notice("", "edit-status");
             get("edit-note").textContent = convert
-                ? "保留全部历史和当前成员。转为正式群组后可直接添加成员，新成员可以查阅群历史。"
+                ? t("conversation.ac849d8ff0")
                 : "";
             open("edit-dialog");
         };

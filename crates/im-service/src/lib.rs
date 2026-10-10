@@ -1,8 +1,10 @@
 //! Independently deployable AI-IM. Applications attach routes to this host;
 //! the core has no research controller, experiment configuration or CLI dependency.
 mod agents;
+pub mod execution;
 mod goals;
 mod scenarios;
+mod services;
 pub use scenarios::{Collaboration, Scenario, ScenarioAdapter, ScenarioField};
 mod assets;
 pub mod operator;

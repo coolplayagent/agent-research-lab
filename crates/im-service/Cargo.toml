@@ -12,6 +12,11 @@ name = "ai-im"
 path = "src/main.rs"
 
 [dependencies]
+service_protocol.workspace = true
+service_api.workspace = true
+im_storage.workspace = true
+web_assets.workspace = true
+contracts.workspace = true
 anyhow.workspace = true
 async-stream.workspace = true
 axum.workspace = true

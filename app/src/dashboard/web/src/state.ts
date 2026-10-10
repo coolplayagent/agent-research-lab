@@ -1,21 +1,7 @@
+import { t } from "./i18n.js";
 import { readPreferences } from "./preferences.js";
 // Dynamic records are the bounded research API projections, owned only by this application.
 export const workspaceState: Record<string, any> = {};
-workspaceState.labels = {
-  running: "运行中",
-  succeeded: "已完成",
-  completed: "已完成",
-  active: "运行中",
-  revoked: "已撤销",
-  blocked: "阻塞",
-  ready: "就绪",
-  waiting_dependencies: "等待依赖",
-  retry_wait: "等待重试",
-  paused: "暂停",
-  failed: "失败",
-  unknown: "未知",
-  needs_reconciliation: "待核对",
-};
 workspaceState.preferences = readPreferences();
 workspaceState.data = null;
 workspaceState.room = "";
@@ -45,18 +31,13 @@ workspaceState.pulses = new Map<any, any>();
 workspaceState.publishPulses = new Map<any, any>();
 workspaceState.lastBytes = new Map<any, any>();
 workspaceState.settingsCategory = "people";
-workspaceState.personKinds = {
-  fixed: "固定成员",
-  temporary: "临时成员",
-  research: "研究成员",
-};
 workspaceState.personRoles = {
-  research: "研究员",
-  review: "质疑者",
-  synthesis: "综合者",
-  implement: "实现者",
-  evaluate: "评估者",
-  evaluator: "评估者",
+  research: t("state.fb2f4efd84"),
+  review: t("state.f62f3d185a"),
+  synthesis: t("state.6153861271"),
+  implement: t("state.f8ef43e420"),
+  evaluate: t("state.104b51a6e8"),
+  evaluator: t("state.104b51a6e8"),
 };
 workspaceState.peopleRevision = -1;
 workspaceState.peopleIndex = new Map<any, any>();

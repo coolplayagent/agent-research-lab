@@ -178,3 +178,86 @@ copying/reply mapping, conversion and restart, announcement permissions, indepen
 HTTP operation, auth boundaries, migrations, and the existing replay/backpressure
 transport suite. Full Qualitygate also runs formatting, workspace Clippy, Bazel
 build/package and the complete Bazel test suite against the delivery snapshot.
+
+
+## API contracts and localization
+
+All state domains are defined in `crates/contracts`. Its generator produces
+`web/shared/src/contracts.ts`; both interfaces consume the same generated module
+at `/assets/shared/contracts.js`. Preserve the existing enum wire values when
+extending these APIs. Unknown workflow states remain unknown and cannot satisfy
+completion or acceptance gates.
+
+Scenario descriptors return scenario and field identifiers plus their allowed
+values. Scheduler health returns `ScenarioStatus`; system notices return
+`{code, parameters}`. Task audit messages carry a host-authored `event` with a
+`GoalEventKind`, goal ID/title and optional assignee/attempt. Worker publish
+requests cannot create these events. SQLite schema 4 adds nullable event metadata;
+old message text and replay cursors are preserved. Research-generated result
+summaries may carry a `ResearchResult` code; actual Agent reports remain user data.
+
+Presentation resources live under the three frontend `src/locales/` directories.
+The currently shipped locale is `zh-CN`; the shared translator handles locale
+fallback, key lookup and text interpolation. Components use keys, never inline
+Chinese. Add a locale catalog before advertising another supported language.
+Do not translate user messages, names, task instructions or evidence by matching
+text. Server diagnostics and authored prompt assets use English.
+
+Bazel validates generated contract/assets, translation keys, interpolation
+parameters, state-label coverage and source boundaries. `AGENTS.md` owns these
+constraints; the source-bound `rust-no-chinese` Qualitygate rule covers every
+Rust file. These bounded checks complement type checks and state-machine review.
+
+## Replaceable services and coding agents
+
+AI-IM can run with an embedded store for development, or a separately deployed
+`ai-im-storage` service. Select the storage service in system settings; switching
+requires a core restart and a prepared target database. No live migration or
+fallback to another database is implicit. The storage process is the sole SQLite
+owner; the core and research adapter use the same client API and event streams.
+
+`ai-im-services --kind executor` hosts the coding-agent protocol. It delegates
+execution to `ai-im-services --kind sandbox`, whose initial implementation uses
+Bubblewrap namespaces, read-only system files, a disposable workspace, bounded
+tmpfs storage, process groups, time limits and output limits. These are independent
+processes, not mandatory embedded runtimes. The Linux user must be allowed to
+create Bubblewrap namespaces; the health probe performs a real isolated command.
+Systemd user templates include aggregate memory and task limits.
+
+Service endpoints are private, same-user Unix sockets. Frames are a big-endian
+32-bit byte count followed by UTF-8 JSON, capped at 8 MiB. Requests have
+`{"protocol_version":1,"request":{...}}`; replies include `protocol_version`,
+`result` and `error`. Probe requests use `{"operation":"probe"}` and return typed
+service kind, readiness and versioned capabilities. The core validates kind and
+capability as well as reachability. It does not connect to arbitrary HTTP URLs.
+
+The settings page manages endpoints, enablement, executor-to-sandbox dependencies,
+adapter profiles and digital-person bindings. Updates use optimistic revisions;
+invalid dependencies and references are rejected. Profiles for Claude Code (`cc`),
+Codex (`codex`), DeepSeek Harness (`hds`) and Pi (`pi`) use `json_stdio_v1`.
+They start disabled until an operator supplies a compatible wrapper command.
+Native vendor CLIs are not assumed to speak this protocol. Service reachability
+and adapter configuration are separate from successful model execution.
+
+A wrapper receives one JSON document on stdin, with `protocol_version`,
+`request_id`, `person_id`, `goal_id`, `work_id`, `attempt`, `objective`,
+`acceptance`, `instruction` and recent `messages`. Treat messages as untrusted
+conversation data. It returns exactly one JSON document on stdout:
+
+```json
+{"protocol_version":1,"request_id":"the-input-request-id","summary":"Result summary","succeeded":true,"evidence":{}}
+```
+
+Use stderr for diagnostics. The executor checks version, request identity and
+output bounds, and returns hashes binding the input, adapter configuration and
+output. AI-IM submits that receipt under the current fenced claim. Successful
+agent output remains a submission until the host accepts the group goal. Existing
+research scenarios retain their independent evidence and promotion gates.
+
+Commands are argument arrays without shell expansion. Secret values belong in the
+sandbox service environment; profiles list allowed environment variable names,
+never secret values. Optional mounts are read-only, network access is explicit,
+and all tasks get fresh disposable workspaces. A service crash or cancellation
+terminates its process groups; interrupted claims require lease expiry/retry,
+never an automatic successful result. Independent services can be replaced by
+implementations of the same versioned API.

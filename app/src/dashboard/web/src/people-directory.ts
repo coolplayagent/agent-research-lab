@@ -1,3 +1,10 @@
+import {
+  ExecutionState,
+  PersonKind,
+  Presence,
+} from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
+import { label } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { agentPresence, avatar } from "./identity.js";
 import { renderExecutorDirectory } from "./executors.js";
@@ -12,7 +19,7 @@ export function currentPersonJob(id?: any): any {
     (j?: any) => digitalPersonId(j) === id,
   );
   return (
-    list.find((j?: any) => j.state === "running") ||
+    list.find((j?: any) => j.state === ExecutionState.Running) ||
     list.find((j?: any) => j.cohort_id === workspaceState.room) ||
     list[0]
   );
@@ -26,7 +33,7 @@ export function personPresence(id?: any): any {
     list
       .map(agentPresence)
       .sort((a?: any, b?: any) => priority[b.state] - priority[a.state])[0]
-      ?.state || "offline"
+      ?.state || Presence.Offline
   );
 }
 export function personRepresentative(person?: any): any {
@@ -34,9 +41,9 @@ export function personRepresentative(person?: any): any {
     currentPersonJob(person.id) || {
       id: person.id,
       role: person.role,
-      model: person.execution?.model || "按任务选择",
-      backend: person.execution?.backend || "按任务选择",
-      state: "offline",
+      model: person.execution?.model || t("people-directory.634d99415a"),
+      backend: person.execution?.backend || t("people-directory.634d99415a"),
+      state: Presence.Offline,
       profile: {
         person_id: person.id,
         display_name: person.name,
@@ -80,7 +87,8 @@ export async function peopleApi(body?: any): Promise<any> {
     signal: AbortSignal.timeout(25000),
   });
   const value = await response.json();
-  if (!response.ok) throw new Error(value.error || "请求未完成，请稍后重试。");
+  if (!response.ok)
+    throw new Error(value.error || t("people-directory.8c2dc7ac6b"));
   return value;
 }
 export async function loadPeople(after: any = ""): Promise<any> {
@@ -92,12 +100,14 @@ export async function loadPeople(after: any = ""): Promise<any> {
       `/api/people${after ? `?after=${encodeURIComponent(after)}` : ""}`,
       { signal: AbortSignal.timeout(8000) },
     );
-    if (!response.ok) throw new Error("名册暂不可读。");
+    if (!response.ok) throw new Error(t("people-directory.41e49908f2"));
     const value = await response.json();
     workspaceState.peopleCursor = value.next_after;
     syncPeople(value);
-    $("people-settings-status").textContent =
-      `共 ${value.total} 位数字人，已加载 ${workspaceState.peopleIndex.size} 位。`;
+    $("people-settings-status").textContent = t("people-directory.bd02336f4b", {
+      p0: value.total,
+      p1: workspaceState.peopleIndex.size,
+    });
   } catch (error) {
     $("people-settings-status").textContent = error.message;
   } finally {
@@ -123,12 +133,16 @@ export function renderPeopleDirectory(): any {
   for (const [role, id] of Object.entries(workspaceState.peopleDefaults)) {
     const label = el(
         "label",
-        `${workspaceState.personRoles[role] || role} · 默认成员`,
+        t("people-directory.2b9db94336", {
+          p0: workspaceState.personRoles[role] || role,
+        }),
       ),
       select = el("select");
     select.setAttribute(
       "aria-label",
-      `${workspaceState.personRoles[role] || role}默认成员`,
+      t("people-directory.ded44c028d", {
+        p0: workspaceState.personRoles[role] || role,
+      }),
     );
     for (const p of workspaceState.peopleIndex.values())
       if (p.kind === "fixed") {
@@ -145,8 +159,9 @@ export function renderPeopleDirectory(): any {
           change: { action: "set_default", role, id: select.value },
         });
         workspaceState.peopleDefaults[role] = select.value;
-        $("people-settings-status").textContent =
-          "默认成员已保存，新的研究任务会复用它。";
+        $("people-settings-status").textContent = t(
+          "people-directory.cf928dc67f",
+        );
         await loadPeople();
         await refresh();
       } catch (error) {
@@ -165,7 +180,7 @@ export function renderPeopleDirectory(): any {
   const list = Array.from<any>(workspaceState.peopleIndex.values())
     .filter(
       (p?: any) =>
-        ($("people-temporary").checked || p.kind !== "temporary") &&
+        ($("people-temporary").checked || p.kind !== PersonKind.Temporary) &&
         [p.name, p.role, workspaceState.personRoles[p.role], p.purpose]
           .join(" ")
           .toLowerCase()
@@ -181,7 +196,11 @@ export function renderPeopleDirectory(): any {
     text.append(
       el(
         "small",
-        `${workspaceState.personKinds[p.kind]} · ${workspaceState.personRoles[p.role] || p.role} · ${p.task_count || 0} 个任务`,
+        t("people-directory.a8dfa8c082", {
+          p0: label("PersonKind", p.kind),
+          p1: workspaceState.personRoles[p.role] || p.role,
+          p2: p.task_count || 0,
+        }),
       ),
     );
     card.append(avatar(personRepresentative(p)), text);
@@ -189,9 +208,7 @@ export function renderPeopleDirectory(): any {
     root.append(card);
   }
   if (!list.length)
-    root.append(
-      el("p", "没有匹配的数字人。可以新增成员，或显示临时成员。", "empty"),
-    );
+    root.append(el("p", t("people-directory.29145a8366"), "empty"));
 }
 export function settingsPeopleView(view?: any): any {
   $("people-list").hidden = view !== "list";
@@ -216,7 +233,7 @@ export function renderPeopleSidebar(list?: any): any {
   const current = new Set<any>(list.map(digitalPersonId));
   const filtered = Array.from<any>(workspaceState.peopleIndex.values()).filter(
     (p?: any) =>
-      (p.kind !== "temporary" || current.has(p.id)) &&
+      (p.kind !== PersonKind.Temporary || current.has(p.id)) &&
       [
         p.id,
         p.name,
@@ -249,11 +266,20 @@ export function renderPeopleSidebar(list?: any): any {
     text.append(
       el(
         "small",
-        `${workspaceState.personRoles[p.role] || p.role} · ${{ offline: "离线", online: "在线", busy: "忙碌", chatting: "对话中" }[state]} · ${p.task_count || 0} 个任务`,
+        t("people-directory.a8dfa8c082", {
+          p0: workspaceState.personRoles[p.role] || p.role,
+          p1: {
+            offline: t("people-directory.be1b4f3c6c"),
+            online: t("people-directory.b9086662b1"),
+            busy: t("people-directory.2e260a37cb"),
+            chatting: t("people-directory.e6485ec698"),
+          }[state],
+          p2: p.task_count || 0,
+        }),
       ),
     );
     row.append(avatar(j), text, el("span", undefined, `presence ${state}`));
-    row.title = `${workspaceState.personKinds[p.kind]} · @${p.name}`;
+    row.title = `${label("PersonKind", p.kind)} · @${p.name}`;
     row.addEventListener("click", () => openPerson(p.id));
     root.append(row);
   }

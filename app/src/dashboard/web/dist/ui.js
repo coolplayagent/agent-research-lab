@@ -1,4 +1,5 @@
-import { workspaceState } from "./state.js";
+import { t } from "./i18n.js";
+import { label } from "./i18n.js";
 export const $ = (id) => document.getElementById(id);
 export const el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -8,13 +9,13 @@ export const el = (tag, text, cls) => {
         n.className = cls;
     return n;
 };
-export const badge = (state) => el("span", workspaceState.labels[state] || state || "未知", `badge ${state || "unknown"}`);
+export const badge = (state) => el("span", label("ExecutionState", state) || state || t("ui.4d8c1c5b42"), `badge ${state || "unknown"}`);
 export const short = (s, n = 10) => (s || "").slice(0, n);
 export const time = (t) => t ? new Date(t * 1000).toLocaleTimeString("zh-CN", { hour12: false }) : "—";
 export function messageTimestamp(seconds) {
     const date = new Date(seconds * 1000);
     if (typeof seconds !== "number" || !Number.isFinite(date.getTime()))
-        return el("span", "时间未知", "message-time");
+        return el("span", t("ui.664939a1fa"), "message-time");
     const options = {
         hour: "2-digit",
         minute: "2-digit",

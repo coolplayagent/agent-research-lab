@@ -1,3 +1,4 @@
+import { t } from "./i18n.js";
 export async function api(path, body, intent = "manage-crystal") {
     const response = await fetch(path, {
         method: body === undefined ? "GET" : "POST",
@@ -10,7 +11,7 @@ export async function api(path, body, intent = "manage-crystal") {
     });
     const value = await response.json();
     if (!response.ok)
-        throw new Error(value.error || "请求失败，请重试。");
+        throw new Error(value.error || t("api.a472d51792"));
     return value;
 }
 export const change = (body) => api("/api/crystal/manage", body);

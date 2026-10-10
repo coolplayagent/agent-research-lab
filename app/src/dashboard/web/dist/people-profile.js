@@ -1,3 +1,5 @@
+import { t } from "./i18n.js";
+import { label } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { closePerson, settingsPeopleView, loadPeople, personPresence, personRepresentative, peopleApi, } from "./people-directory.js";
 import { showPage } from "./navigation.js";
@@ -11,8 +13,8 @@ export function editPerson(person = null) {
     workspaceState.editingPerson = person;
     settingsPeopleView("form");
     $("person-form-title").textContent = person
-        ? `编辑 ${person.name}`
-        : "新增数字人";
+        ? t("people-profile.8865ac1c54", { p0: person.name })
+        : t("people-profile.e47aec6e4e");
     $("person-name").value = person?.name || "";
     $("person-purpose").value = person?.purpose || "";
     $("person-soul").value = person?.soul || "";
@@ -53,19 +55,21 @@ export async function openPerson(id) {
         closeSession();
     $("person-title").textContent = person.name;
     $("person-subtitle").textContent =
-        `${workspaceState.personKinds[person.kind]} · ${workspaceState.personRoles[person.role] || person.role} · ${{ offline: "离线", online: "在线", busy: "忙碌", chatting: "对话中" }[personPresence(id)]}`;
-    $("person-subtitle").textContent +=
-        ` · 执行偏好：${person.execution?.backend || "按任务选择"} / ${person.execution?.model || "按任务选择模型"}`;
+        `${label("PersonKind", person.kind)} · ${workspaceState.personRoles[person.role] || person.role} · ${label("Presence", personPresence(id))}`;
+    $("person-subtitle").textContent += t("people-profile.bfc561b34f", {
+        p0: person.execution?.backend || t("people-profile.634d99415a"),
+        p1: person.execution?.model || t("people-profile.65bc196425"),
+    });
     $("person-avatar").replaceChildren(avatar(personRepresentative(person)));
     $("person-soul-view").textContent =
-        person.soul || "尚未设置独立 Soul；历史任务的角色准则保留在原会话中。";
+        person.soul || t("people-profile.3656fa477b");
     $("person-purpose-view").textContent = person.purpose;
     $("promote-person").hidden = person.kind === "fixed";
     $("person-status").textContent = "";
     $("person-memory-note").value = "";
     $("person-memory-query").value = "";
     $("person-memory-events").replaceChildren();
-    $("person-memory-stats").textContent = "记忆由 relay-memory 管理";
+    $("person-memory-stats").textContent = t("people-profile.3a1aa40c43");
     switchPersonTab("history");
     const panel = $("person-window"), embedded = !$("settings-page").hidden &&
         workspaceState.settingsCategory === "people";
@@ -73,8 +77,10 @@ export async function openPerson(id) {
         panel.close();
     panel.classList.toggle("embedded", embedded);
     $("maximize-person").hidden = embedded;
-    $("close-person").textContent = embedded ? "← 返回名册" : "×";
-    $("close-person").setAttribute("aria-label", embedded ? "返回数字人名册" : "关闭数字人窗口");
+    $("close-person").textContent = embedded
+        ? t("people-profile.773a7a5f36")
+        : "×";
+    $("close-person").setAttribute("aria-label", embedded ? t("people-profile.24308c1b13") : t("people-profile.693a4aec52"));
     if (embedded) {
         settingsPeopleView("detail");
         if (panel.parentElement !== $("person-inline-host"))
@@ -93,12 +99,12 @@ export async function openPerson(id) {
 }
 export async function loadPersonHistory(after = "") {
     const id = workspaceState.personFocus, request = workspaceState.personRequest;
-    $("person-status").textContent = "正在读取会话历史…";
+    $("person-status").textContent = t("people-profile.eb11f9cc41");
     $("person-history-more").disabled = true;
     try {
         const response = await fetch(`/api/people/${encodeURIComponent(id)}${after ? `?after=${encodeURIComponent(after)}` : ""}`, { signal: AbortSignal.timeout(10000) });
         if (!response.ok)
-            throw new Error("会话历史暂不可读。");
+            throw new Error(t("people-profile.02889d8bb6"));
         const value = await response.json();
         if (workspaceState.personFocus !== id ||
             workspaceState.personRequest !== request)
@@ -110,7 +116,12 @@ export async function loadPersonHistory(after = "") {
         root.replaceChildren();
         for (const job of workspaceState.personHistory) {
             const card = el("button", undefined, "person-session"), text = el("span", job.topics?.join(" · ") || job.repository);
-            text.append(el("small", `${job.backend} · ${job.model} · 第 ${job.attempt} 次执行 · ${job.session_id || job.id}`));
+            text.append(el("small", t("people-profile.f217d2a4df", {
+                p0: job.backend,
+                p1: job.model,
+                p2: job.attempt,
+                p3: job.session_id || job.id,
+            })));
             card.append(text, badge(job.state));
             card.addEventListener("click", () => {
                 if (!$("person-window").classList.contains("embedded"))
@@ -120,9 +131,10 @@ export async function loadPersonHistory(after = "") {
             root.append(card);
         }
         if (!workspaceState.personHistory.length)
-            root.append(el("p", "还没有任务会话。将它设为默认成员，或在新任务中选用这个数字人。", "empty"));
-        $("person-status").textContent =
-            `已加载 ${workspaceState.personHistory.length} 轮会话`;
+            root.append(el("p", t("people-profile.336e961396"), "empty"));
+        $("person-status").textContent = t("people-profile.2a8119b3bd", {
+            p0: workspaceState.personHistory.length,
+        });
         $("person-history-more").hidden = !workspaceState.personHistoryCursor;
     }
     catch (error) {
@@ -142,7 +154,7 @@ export function switchPersonTab(tab) {
 }
 export async function recallPerson() {
     const id = workspaceState.personFocus, request = workspaceState.personRequest;
-    $("person-status").textContent = "正在召回记忆…";
+    $("person-status").textContent = t("people-profile.f2e925879e");
     try {
         const result = await peopleApi({
             operation: "recall",
@@ -152,29 +164,32 @@ export async function recallPerson() {
         if (id !== workspaceState.personFocus ||
             request !== workspaceState.personRequest)
             return;
-        $("person-memory-stats").textContent =
-            `${result.stats.event_count} 条记忆 · ${result.stats.session_count} 个会话 · ${result.stats.topic_count} 个主题`;
+        $("person-memory-stats").textContent = t("people-profile.cfde887ca6", {
+            p0: result.stats.event_count,
+            p1: result.stats.session_count,
+            p2: result.stats.topic_count,
+        });
         const root = $("person-memory-events");
         root.replaceChildren();
         for (const event of result.events) {
             const card = el("article", undefined, "memory-event");
             card.append((() => {
                 const label = el("small");
-                label.append(messageTimestamp(Number(event.at)), el("span", ` · ${event.session === "profile-notes" ? "手动记录" : "研究记录"}${event.excerpt ? " · 召回片段" : ""}`));
+                label.append(messageTimestamp(Number(event.at)), el("span", ` · ${event.session === "profile-notes" ? t("people-profile.891c388b24") : t("people-profile.f59e69859e")}${event.excerpt ? t("people-profile.f3a471d717") : ""}`));
                 return label;
             })(), readable(event.response || event.summary || "", `memory:${event.id}`));
             if (event.metadata?.receipt_sha256) {
-                const evidence = fold(`memory-evidence:${event.id}`, "证据来源", "protocol-detail");
+                const evidence = fold(`memory-evidence:${event.id}`, t("people-profile.723fa05fe3"), "protocol-detail");
                 evidence.append(el("pre", JSON.stringify(event.metadata, null, 2)));
                 card.append(evidence);
             }
             root.append(card);
         }
         if (!result.events.length)
-            root.append(el("p", "还没有相关记忆。可以先记录一条研究线索。", "empty"));
+            root.append(el("p", t("people-profile.c288a7d7d6"), "empty"));
         $("person-status").textContent = result.unconfirmed_writebacks
-            ? `${result.unconfirmed_writebacks} 次写回尚未确认，请在系统消息中检查。`
-            : "记忆已读取";
+            ? t("people-profile.045e900c82", { p0: result.unconfirmed_writebacks })
+            : t("people-profile.32fece2a5e");
     }
     catch (error) {
         if (id === workspaceState.personFocus &&

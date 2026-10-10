@@ -1,3 +1,5 @@
+import { ExecutionState } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { $, el, svg } from "./ui.js";
 import {
@@ -15,21 +17,22 @@ export function graph(list?: any): any {
   root.replaceChildren();
   const ranked = [...list].sort(
     (a?: any, b?: any) =>
-      Number(a.state !== "running") - Number(b.state !== "running"),
+      Number(a.state !== ExecutionState.Running) -
+      Number(b.state !== ExecutionState.Running),
   );
   const shown = ranked.slice(0, 8);
   $("graph-limit").textContent =
     list.length > 8
-      ? `显示 ${shown.length}/${list.length} 个 agent；运行中的 session 优先`
-      : "连线来自实际公共板记录；闪动表示新 session 活动";
+      ? t("graph.5cd2dcf0e1", { p0: shown.length, p1: list.length })
+      : t("graph.49f0499185");
   if (!shown.length) {
-    root.append(el("div", "当前筛选下暂无 agent。", "empty"));
+    root.append(el("div", t("graph.2af9ef0999"), "empty"));
     return;
   }
   const canvas = svg("svg", {
       viewBox: "0 0 800 490",
       role: "group",
-      "aria-label": "以水晶球公共板为中心的实时协作图",
+      "aria-label": t("graph.9d6d143aaa"),
     }),
     defs = svg("defs");
   const glow = svg("radialGradient", {
@@ -125,7 +128,7 @@ export function graph(list?: any): any {
     class: "board",
     tabindex: 0,
     role: "button",
-    "aria-label": "打开水晶球公共板",
+    "aria-label": t("graph.27a0a36784"),
   });
   orb.append(
     svg("circle", {
@@ -145,12 +148,19 @@ export function graph(list?: any): any {
       opacity: 0.45,
       transform: "rotate(-25 382 205)",
     }),
-    svg("text", { x: 400, y: 225 }, "水晶球"),
-    svg("text", { x: 400, y: 247 }, "消息中心"),
+    svg("text", { x: 400, y: 225 }, t("graph.a1208633c3")),
+    svg("text", { x: 400, y: 247 }, t("graph.18b7db5492")),
     svg(
       "text",
       { x: 400, y: 269, class: "board-sub" },
-      `${allMessages.filter((m?: any) => !(m.message.proposal.recipients || []).length).length} 条公共 / ${allMessages.filter((m?: any) => (m.message.proposal.recipients || []).length).length} 条定向`,
+      t("graph.2a1d5edd7a", {
+        p0: allMessages.filter(
+          (m?: any) => !(m.message.proposal.recipients || []).length,
+        ).length,
+        p1: allMessages.filter(
+          (m?: any) => (m.message.proposal.recipients || []).length,
+        ).length,
+      }),
     ),
   );
   const open = () => {
@@ -203,7 +213,9 @@ export function graph(list?: any): any {
         "text",
         { x: 12, y: 52, class: "node-activity" },
         event?.title ||
-          (j.state === "ready" ? "等待建立 session" : "暂无 session 活动"),
+          (j.state === ExecutionState.Ready
+            ? t("graph.2436c2bf8c")
+            : t("graph.cafc1c5ce1")),
       ),
     );
     const inspect = () => {

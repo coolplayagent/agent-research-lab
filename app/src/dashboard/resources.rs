@@ -31,6 +31,10 @@ pub(super) fn get(path: &str, web: &Web) -> Response {
             "text/javascript; charset=utf-8",
             include_bytes!("web/dist/graph.js").as_slice(),
         )),
+        "/apps/research/assets/i18n.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/i18n.js").as_slice(),
+        )),
         "/apps/research/assets/identity.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("web/dist/identity.js").as_slice(),
@@ -42,6 +46,10 @@ pub(super) fn get(path: &str, web: &Web) -> Response {
         "/apps/research/assets/lineage.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("web/dist/lineage.js").as_slice(),
+        )),
+        "/apps/research/assets/locales/zh-CN.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/locales/zh-CN.js").as_slice(),
         )),
         "/apps/research/assets/navigation.js" => Some((
             "text/javascript; charset=utf-8",
@@ -108,7 +116,7 @@ pub(super) fn get(path: &str, web: &Web) -> Response {
             let file = c.state_dir.join("evolution/lineage.json");
             if !file.exists() {
                 return Ok(
-                    json!({"available":false,"notice":"尚未导入开发集谱系证据。策略归档与正式评估保持独立。"}),
+                    json!({"available":false,"notice":contracts::ApiNotice::LineageUnavailable.notice(json!({}))}),
                 );
             }
             let receipt: evolution_cli::LineageReceipt = storage::read(&file)?;
@@ -136,9 +144,9 @@ pub(super) fn get(path: &str, web: &Web) -> Response {
                 .and_then(|jobs| jobs.iter().find(|j| j["run_id"] == run))
                 .cloned()
                 .or_else(|| {
-                    personas::historical_job(&c.state_dir, run)
-                        .ok()
-                        .map(|j| project(&j, &json!({"state":"historical"})))
+                    personas::historical_job(&c.state_dir, run).ok().map(|j| {
+                        project(&j, &json!({"state":contracts::ExecutionState::Historical}))
+                    })
                 })
                 .context("unknown profile")?;
             return Ok(profiles::read(&c.state_dir, &c.workspace, &job));

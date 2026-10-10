@@ -1,5 +1,6 @@
 //! Goals share the conversation writer and its transactional authority.
 use crate::*;
+use contracts::GoalEventKind;
 use rusqlite::{Connection, OptionalExtension, params};
 pub(crate) enum GoalCommand {
     Change(GoalChange),
@@ -83,7 +84,12 @@ pub(crate) fn read(connection: &Connection, id: &str) -> Result<Goal> {
         connection.query_row("SELECT value FROM goals WHERE id=?1", [id], |r| r.get(0))?;
     Ok(serde_json::from_str(&value)?)
 }
-pub(crate) fn save(connection: &rusqlite::Transaction<'_>, goal: &Goal, note: &str) -> Result<()> {
+pub(crate) fn save(
+    connection: &rusqlite::Transaction<'_>,
+    goal: &Goal,
+    kind: GoalEventKind,
+    work: Option<&WorkItem>,
+) -> Result<()> {
     connection.execute(
         "UPDATE goals SET value=?2,active=?3 WHERE id=?1",
         params![
@@ -99,20 +105,29 @@ pub(crate) fn save(connection: &rusqlite::Transaction<'_>, goal: &Goal, note: &s
             &storage::digest(goal.input.id.as_bytes())[..20],
             goal.revision
         ),
-        text: format!(
-            "目标「{}」：{}",
-            goal.input.title,
-            note.chars().take(800).collect::<String>()
-        ),
+        text: kind.as_str().into(),
         reply_to: None,
     };
     let count: u64 = connection.query_row("SELECT COUNT(*) FROM messages", [], |r| r.get(0))?;
-    store::append(
+    let receipt = store::append(
         connection,
         "operator",
         &input,
         &mut MAX_MESSAGES.saturating_sub(count),
         true,
+    )?;
+    ensure!(!receipt.duplicate, "audit request ID collision");
+    let event = GoalEvent {
+        kind,
+        goal_id: goal.input.id.clone(),
+        title: goal.input.title.clone(),
+        person_id: work.map(|w| w.person_id.clone()),
+        work_id: work.map(|w| w.id.clone()),
+        attempt: work.map(|w| w.attempt),
+    };
+    connection.execute(
+        "UPDATE messages SET event=?2 WHERE sequence=?1",
+        params![receipt.message.sequence, serde_json::to_string(&event)?],
     )?;
     Ok(())
 }
@@ -232,7 +247,7 @@ impl Store {
                     params![goal.input.id, work.person_id],
                 )?;
             }
-            save(&tx, &goal, "已创建并分配任务，等待 Agent 领取")?;
+            save(&tx, &goal, GoalEventKind::Created, None)?;
             tx.commit()?;
             return Ok(json!(goal));
         }
@@ -250,14 +265,15 @@ impl Store {
             "goal changed; refresh before editing"
         );
         available(&tx, &goal.input.group_id)?;
-        let note = match change {
+        let mut changed_work = None;
+        let kind = match change {
             GoalChange::Accept { .. } => {
                 ensure!(
                     goal.work.iter().all(|w| w.state == WorkState::Submitted),
                     "every assignment needs a successful submission before acceptance"
                 );
                 goal.state = GoalState::Completed;
-                "主持人已验收目标".to_owned()
+                GoalEventKind::Accepted
             }
             GoalChange::Cancel { .. } => {
                 ensure!(
@@ -266,7 +282,7 @@ impl Store {
                     "wait for running assignments to finish or reach their execution limit before cancelling"
                 );
                 goal.state = GoalState::Cancelled;
-                "主持人已取消目标".to_owned()
+                GoalEventKind::Cancelled
             }
             GoalChange::Retry { work_id, .. } => {
                 let work = goal
@@ -288,15 +304,13 @@ impl Store {
                 work.claim_id = None;
                 work.deadline_ms = None;
                 work.result = None;
-                format!(
-                    "{} 的任务已退回重做（第 {} 次）",
-                    work.person_id, work.attempt
-                )
+                changed_work = Some(work.clone());
+                GoalEventKind::Retried
             }
             _ => unreachable!(),
         };
         goal.revision += 1;
-        save(&tx, &goal, &note)?;
+        save(&tx, &goal, kind, changed_work.as_ref())?;
         tx.commit()?;
         Ok(json!(goal))
     }

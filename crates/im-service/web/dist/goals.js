@@ -1,3 +1,6 @@
+import { GoalState, GroupKind, WorkState } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
+import { label } from "./i18n.js";
 import { api, query } from "./api.js";
 import { button, el, get, notice } from "./dom.js";
 import { display } from "./people.js";
@@ -5,19 +8,10 @@ let selected = null;
 let generation = 0;
 let next = null;
 let expiryTimer;
-const states = {
-    active: "协作中",
-    completed: "已验收",
-    cancelled: "已取消",
-    ready: "等待领取",
-    running: "执行中",
-    submitted: "已提交 · 待验收",
-    failed: "执行失败",
-};
 export function selectGoals(group) {
     window.clearTimeout(expiryTimer);
     selected = group;
-    get("goal-section").hidden = group.kind === "board";
+    get("goal-section").hidden = group.kind === GroupKind.Board;
     get("new-goal").disabled = group.archived;
     void loadGoals();
 }
@@ -36,7 +30,7 @@ async function mutate(goal, operation, work_id) {
     }
 }
 function expired(work) {
-    return (work.state === "running" &&
+    return (work.state === WorkState.Running &&
         work.deadline_ms !== null &&
         work.deadline_ms <= Date.now());
 }
@@ -44,39 +38,49 @@ function card(goal) {
     const details = el("details", undefined, "goal-card");
     details.dataset.goalId = goal.input.id;
     const summary = el("summary");
-    summary.append(el("strong", goal.input.title), el("span", states[goal.state], "badge"));
-    details.append(summary, el("p", goal.input.objective), el("p", "验收标准：" + goal.input.acceptance), el("small", `${goal.input.scenario === "research" ? "CLI 研究" : "通用协作"} · 每项任务限时 ${goal.input.max_seconds} 秒`));
+    summary.append(el("strong", goal.input.title), el("span", label("GoalState", goal.state), "badge"));
+    details.append(summary, el("p", goal.input.objective), el("p", t("goals.1459c102bb") + goal.input.acceptance), el("small", t("goals.6ea45dffbd", {
+        p0: goal.input.scenario === "research"
+            ? t("goals.70596ea10b")
+            : t("goals.0ad442f5f7"),
+        p1: goal.input.max_seconds,
+    })));
     for (const work of goal.work) {
         const row = el("section", undefined, "work-item");
         row.append(el("strong", display(work.person_id)), el("span", expired(work)
-            ? "执行时限已到 · 可重试"
-            : goal.state === "completed" && work.state === "submitted"
-                ? "结果已验收"
-                : states[work.state], "badge"), el("p", work.instruction));
+            ? t("goals.58ada57084")
+            : goal.state === GoalState.Completed &&
+                work.state === WorkState.Submitted
+                ? t("goals.788add54b2")
+                : label("WorkState", work.state), "badge"), el("p", work.instruction));
         if (work.result) {
-            row.append(el("p", work.result.summary));
+            row.append(el("p", goal.input.scenario === "research" && work.result.code
+                ? label("WorkResultCode", work.result.code)
+                : work.result.summary));
             const evidence = el("details");
-            evidence.append(el("summary", "查看结果证据"), el("pre", JSON.stringify(work.result.evidence, null, 2)));
+            evidence.append(el("summary", t("goals.da8098216f")), el("pre", JSON.stringify(work.result.evidence, null, 2)));
             row.append(evidence);
         }
-        if (goal.state === "active" &&
-            (expired(work) || ["submitted", "failed"].includes(work.state)))
-            row.append(button("退回重做", () => void mutate(goal, "retry", work.id)));
+        if (goal.state === GoalState.Active &&
+            (expired(work) ||
+                work.state === WorkState.Submitted ||
+                work.state === WorkState.Failed))
+            row.append(button(t("goals.bd7dd17c34"), () => void mutate(goal, "retry", work.id)));
         details.append(row);
     }
-    if (goal.state === "active") {
+    if (goal.state === GoalState.Active) {
         const actions = el("div", undefined, "actions");
-        const accept = button("验收目标", () => void mutate(goal, "accept"));
-        accept.disabled = goal.work.some((w) => w.state !== "submitted");
-        const cancel = button("取消目标", () => void mutate(goal, "cancel"));
-        cancel.disabled = goal.work.some((w) => w.state === "running" && !expired(w));
+        const accept = button(t("goals.9a341c73e2"), () => void mutate(goal, "accept"));
+        accept.disabled = goal.work.some((w) => w.state !== WorkState.Submitted);
+        const cancel = button(t("goals.a53a4e7bca"), () => void mutate(goal, "cancel"));
+        cancel.disabled = goal.work.some((w) => w.state === WorkState.Running && !expired(w));
         actions.append(accept, cancel);
         details.append(actions);
     }
     return details;
 }
 export async function loadGoals(append = false) {
-    if (!selected || selected.kind === "board")
+    if (!selected || selected.kind === GroupKind.Board)
         return;
     const groupId = selected.id, request = ++generation;
     try {
@@ -86,7 +90,7 @@ export async function loadGoals(append = false) {
             return;
         window.clearTimeout(expiryTimer);
         const deadlines = page.goals.flatMap((g) => g.work
-            .filter((w) => w.state === "running" &&
+            .filter((w) => w.state === WorkState.Running &&
             w.deadline_ms !== null &&
             w.deadline_ms > Date.now())
             .map((w) => w.deadline_ms));
@@ -104,7 +108,7 @@ export async function loadGoals(append = false) {
             list.append(node);
         }
         if (!list.childElementCount)
-            list.append(el("p", "为群组设置目标，给成员分工，在这里汇集进度与结果。", "goal-empty"));
+            list.append(el("p", t("goals.1bc752e12f"), "goal-empty"));
         next = page.next_after;
         get("more-goals").hidden = !next;
         get("more-goals").onclick = () => void loadGoals(true);

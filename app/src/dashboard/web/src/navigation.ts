@@ -1,3 +1,5 @@
+import { t } from "./i18n.js";
+import { describe } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { short, $, time, el } from "./ui.js";
 import { closePerson } from "./people-directory.js";
@@ -10,10 +12,10 @@ export function roomName(id?: any): any {
     ),
     topics = [...new Set<any>(members.flatMap((j?: any) => j.topics || []))],
     titles = {
-      sdlc: "可验证自动交付",
-      memory: "跨会话记忆与恢复",
-      collaboration: "多 agent 协作边界",
-      computer: "操作与沙箱恢复",
+      sdlc: t("navigation.ef59116650"),
+      memory: t("navigation.50990d7252"),
+      collaboration: t("navigation.9839ae273c"),
+      computer: t("navigation.f2a536a9a6"),
     };
   return topics.length === 1
     ? titles[topics[0]] || topics[0]
@@ -75,33 +77,38 @@ export function renderSystemMessages(): any {
   if (workspaceState.snapshotError)
     current.set("snapshot-request", workspaceState.snapshotError);
   if (workspaceState.data?.error)
-    current.set("snapshot", String(workspaceState.data.error));
+    current.set("snapshot", describe(workspaceState.data.error));
   for (const j of workspaceState.data?.jobs || []) {
     if (j.postprocessing?.persona_memory_error)
       current.set(
         `persona-memory:${j.run_id}`,
-        `${name(j)} 的记忆写回尚未确认：${j.postprocessing.persona_memory_error}`,
+        t("navigation.24c76134ac", {
+          p0: name(j),
+          p1: j.postprocessing.persona_memory_error,
+        }),
       );
   }
   if (workspaceState.data && !workspaceState.connected)
-    current.set(
-      "connection",
-      "实时连接暂时中断，正在自动重连。页面会继续尝试获取最新快照。",
-    );
+    current.set("connection", t("navigation.cda4876da0"));
   if (workspaceState.data && !control.live)
-    current.set("controller", "研究控制器离线或尚未上报状态。");
+    current.set("controller", t("navigation.a3249dcae4"));
   else if (control.stale)
     current.set(
       "heartbeat",
-      `控制器心跳已延迟 ${control.heartbeat_age_seconds} 秒，正在持续观察。`,
+      t("navigation.80c55d4865", { p0: control.heartbeat_age_seconds }),
     );
   if (control.seed?.error)
     current.set(
       "seed",
-      `新研究准入受阻：${control.seed.error}${control.seed.next_attempt_at ? " · 下次检查 " + time(control.seed.next_attempt_at) : ""}`,
+      t("navigation.ac40308658", {
+        p0: control.seed.error,
+        p1: control.seed.next_attempt_at
+          ? t("navigation.ec3be46099") + time(control.seed.next_attempt_at)
+          : "",
+      }),
     );
   for (const warning of workspaceState.data?.warnings || [])
-    current.set("warning:" + warning, warning);
+    current.set("warning:" + JSON.stringify(warning), describe(warning));
   const visibleCurrent = new Map<any, any>([...current].slice(0, 100));
   const now = Date.now();
   for (const [key, entry] of workspaceState.systemEntries) {
@@ -134,8 +141,11 @@ export function renderSystemMessages(): any {
   $("system-unread").hidden = !active;
   $("system-unread").textContent = active;
   $("system-message-count").textContent = active
-    ? `${active} 条待关注${active > 100 ? " · 显示前 100 条" : ""}`
-    : "当前无告警";
+    ? t("navigation.60c9e3b2cc", {
+        p0: active,
+        p1: active > 100 ? t("navigation.6d144ceaa3") : "",
+      })
+    : t("navigation.12648f55b2");
   const key = JSON.stringify(entries.slice(0, 100));
   if (workspaceState.systemKey === key) return;
   workspaceState.systemKey = key;
@@ -149,11 +159,15 @@ export function renderSystemMessages(): any {
       ),
       heading = el("div", undefined, "system-message-heading");
     heading.append(
-      el("strong", entry.active ? "需要关注" : "已恢复"),
+      el(
+        "strong",
+        entry.active ? t("navigation.f121ab742c") : t("navigation.3617f737f4"),
+      ),
       el("time", new Date(entry.changedAt).toLocaleString("zh-CN")),
     );
     card.append(heading, el("p", entry.text));
     root.append(card);
   }
-  if (!entries.length) root.append(el("div", "当前没有系统告警。", "empty"));
+  if (!entries.length)
+    root.append(el("div", t("navigation.7e3a9fe2c5"), "empty"));
 }

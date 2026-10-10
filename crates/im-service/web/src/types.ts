@@ -1,4 +1,9 @@
-export type Kind = "conversation" | "temporary" | "board";
+import type {
+  GroupKind,
+  Presence,
+  GoalEventKind,
+} from "/assets/shared/contracts.js";
+export type Kind = GroupKind;
 export interface Group {
   id: string;
   title: string;
@@ -16,15 +21,23 @@ export interface Person {
   id: string;
   name: string;
   application_id: string | null;
-  presence: string;
+  presence: Presence;
   connections: number;
 }
 export interface Member {
   person_id: string;
-  presence: string;
+  presence: Presence;
   connections: number;
 }
 export interface Message {
+  event?: {
+    kind: GoalEventKind;
+    goal_id: string;
+    title: string;
+    person_id: string | null;
+    work_id: string | null;
+    attempt: number | null;
+  };
   sequence: number;
   group_id: string;
   sender_id: string;

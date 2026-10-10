@@ -1,3 +1,6 @@
+import { GroupKind } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
+import { label } from "./i18n.js";
 import { api, query } from "./api.js";
 import { current } from "./conversation.js";
 import { close, el, get, notice, open, value } from "./dom.js";
@@ -11,15 +14,20 @@ let groupId = "",
   next: string | null = null;
 let selectedMembers = new Map<
   string,
-  { check: HTMLInputElement; instruction: HTMLTextAreaElement }
+  {
+    check: HTMLInputElement;
+    instruction: HTMLTextAreaElement;
+  }
 >();
 function parameters(): void {
   const scenario = scenarios.find((s) => s.id === value("goal-scenario"));
   const root = get("goal-parameters");
   root.replaceChildren();
-  get("goal-scenario-note").textContent = scenario?.description || "";
+  get("goal-scenario-note").textContent = scenario
+    ? label("ScenarioDescription", scenario.id)
+    : "";
   for (const field of scenario?.fields || []) {
-    const label = el("label", field.label),
+    const fieldLabel = el("label", label("ScenarioField", field.id)),
       select = el("select");
     select.dataset.parameter = field.id;
     for (const choice of field.options) {
@@ -27,14 +35,17 @@ function parameters(): void {
       option.value = choice;
       select.append(option);
     }
-    label.append(select);
-    root.append(label);
+    fieldLabel.append(select);
+    root.append(fieldLabel);
   }
 }
 async function members(append = false): Promise<void> {
   const selected = groupId;
   const page = await api<{
-    members: { members: Member[]; next_after: string | null };
+    members: {
+      members: Member[];
+      next_after: string | null;
+    };
   }>(
     "/api/crystal/view?" +
       query({ group_id: selected, after: append ? next || "" : "" }),
@@ -52,9 +63,15 @@ async function members(append = false): Promise<void> {
       check = el("input"),
       instruction = el("textarea");
     check.type = "checkbox";
-    check.setAttribute("aria-label", `指派 ${person.person_id}`);
-    instruction.placeholder = "这位 Agent 的具体分工";
-    instruction.setAttribute("aria-label", `${person.person_id} 的分工`);
+    check.setAttribute(
+      "aria-label",
+      t("goal-form.26b6e8ba95", { p0: person.person_id }),
+    );
+    instruction.placeholder = t("goal-form.4fa35368ad");
+    instruction.setAttribute(
+      "aria-label",
+      t("goal-form.ff10e73735", { p0: person.person_id }),
+    );
     instruction.maxLength = 1200;
     instruction.rows = 2;
     instruction.disabled = true;
@@ -70,19 +87,21 @@ async function members(append = false): Promise<void> {
   get("more-goal-members").hidden = !next;
 }
 export async function openGoal(scenarioId = "collaboration"): Promise<void> {
-  if (!current || current.kind === "board" || current.archived) return;
+  if (!current || current.kind === GroupKind.Board || current.archived) return;
   groupId = current.id;
   goalId = "goal-" + crypto.randomUUID();
   get<HTMLFormElement>("goal-form").reset();
   get("goal-group-name").textContent = current.title;
   notice("", "goal-status");
   try {
-    const result = await api<{ scenarios: Scenario[] }>("/api/im/scenarios");
+    const result = await api<{
+      scenarios: Scenario[];
+    }>("/api/im/scenarios");
     scenarios = result.scenarios;
     const select = get<HTMLSelectElement>("goal-scenario");
     select.replaceChildren();
     for (const scenario of scenarios) {
-      const option = el("option", scenario.name);
+      const option = el("option", label("Scenario", scenario.id));
       option.value = scenario.id;
       select.append(option);
     }
@@ -113,8 +132,7 @@ export function initGoals(): void {
           person_id,
           instruction: m.instruction.value.trim(),
         }));
-      if (!assignments.length)
-        throw new Error("至少选择一位群成员并填写分工。");
+      if (!assignments.length) throw new Error(t("goal-form.cf73f0c9c7"));
       const parameters = Object.fromEntries(
         [
           ...get("goal-parameters").querySelectorAll<HTMLSelectElement>(
@@ -138,7 +156,7 @@ export function initGoals(): void {
       });
       close("goal-dialog");
       await loadGoals();
-      notice("目标已分配；Agent 提交结果后可在群内验收。");
+      notice(t("goal-form.ed2c6ba6a6"));
     } catch (error) {
       notice(error, "goal-status");
     } finally {

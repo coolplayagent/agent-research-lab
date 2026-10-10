@@ -1,3 +1,5 @@
+import { GroupKind } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
 import { api, query } from "./api.js";
 import { button, el, get, notice, value } from "./dom.js";
 let section = "groups", next = null, rows = [], selected = "", generation = 0;
@@ -12,10 +14,10 @@ export function setSelected(id) {
 }
 function belongs(group) {
     return section === "boards"
-        ? group.kind === "board"
+        ? group.kind === GroupKind.Board
         : section === "direct"
-            ? group.private || group.kind === "temporary"
-            : group.kind === "conversation" && !group.private;
+            ? group.private || group.kind === GroupKind.Temporary
+            : group.kind === GroupKind.Conversation && !group.private;
 }
 function render() {
     const root = get("group-list");
@@ -23,26 +25,29 @@ function render() {
     for (const group of rows.filter(belongs)) {
         const item = button("", () => choose(group));
         item.className = "group-item" + (group.id === selected ? " selected" : "");
-        item.append(el("strong", `${group.pinned ? "★ " : ""}${group.title}`), el("small", `${group.archived ? "已归档 · " : ""}${group.member_count} 位成员`));
+        item.append(el("strong", `${group.pinned ? "★ " : ""}${group.title}`), el("small", t("directory.c04a113aca", {
+            p0: group.archived ? t("directory.bafe86d881") : "",
+            p1: group.member_count,
+        })));
         root.append(item);
     }
     if (!root.childElementCount)
-        root.append(el("p", "暂无会话，点击“发起会话”开始。", "empty"));
+        root.append(el("p", t("directory.49ff4c1834"), "empty"));
 }
 export function metrics(data) {
     const root = get("metrics");
     root.replaceChildren();
     for (const [label, key] of [
         ["Agent", "actors"],
-        ["群组与会话", "groups"],
-        ["持久消息", "stored_messages"],
-        ["实时连接", "subscriptions"],
-        ["待写入消息", "queue_depth"],
-        ["重放消息", "replayed"],
-        ["背压拒绝", "rejected"],
+        [t("directory.0a29c2ff50"), "groups"],
+        [t("directory.4cc404a451"), "stored_messages"],
+        [t("directory.a1b56411cc"), "subscriptions"],
+        [t("directory.e1fa4a08fc"), "queue_depth"],
+        [t("directory.56eb5b282c"), "replayed"],
+        [t("directory.1e55edfca7"), "rejected"],
     ])
         root.append(el("dt", label), el("dd", String(data[key] ?? "—")));
-    root.append(el("dt", "存储状态"), el("dd", data.healthy ? "正常" : "等待恢复"));
+    root.append(el("dt", t("directory.f0f4fa0c46")), el("dd", data.healthy ? t("directory.296de0e31f") : t("directory.20f8e5ca6d")));
 }
 export async function loadGroups(append = false) {
     const request = ++generation;

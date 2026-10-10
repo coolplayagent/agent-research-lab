@@ -1,0 +1,22 @@
+[package]
+name = "ai-im-service-workers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[lib]
+name = "service_workers"
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+clap.workspace = true
+contracts.workspace = true
+service_protocol.workspace = true
+service_api.workspace = true
+process.workspace = true
+storage.workspace = true
+tempfile.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

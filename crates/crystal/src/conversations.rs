@@ -61,7 +61,7 @@ impl Store {
         }
         if let Some(from) = history_from {
             ensure!(from <= i64::MAX as u64, "invalid history cursor");
-            let mut query = tx.prepare("SELECT sequence,sender_id,text,reply_to,accepted_ms FROM messages WHERE group_id=?1 AND sequence>=?2 ORDER BY sequence LIMIT 10001")?;
+            let mut query = tx.prepare("SELECT sequence,sender_id,text,reply_to,accepted_ms,event FROM messages WHERE group_id=?1 AND sequence>=?2 ORDER BY sequence LIMIT 10001")?;
             let messages = query
                 .query_map(params![source, from], |r| {
                     Ok((
@@ -70,6 +70,7 @@ impl Store {
                         r.get::<_, String>(2)?,
                         r.get::<_, Option<u64>>(3)?,
                         r.get::<_, u64>(4)?,
+                        r.get::<_, Option<String>>(5)?,
                     ))
                 })?
                 .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -85,9 +86,9 @@ impl Store {
             );
             let mut sequences = BTreeMap::new();
             let mut last = 0;
-            for (sequence, sender, content, reply, accepted) in messages {
+            for (sequence, sender, content, reply, accepted, event) in messages {
                 let parent = reply.and_then(|id| sequences.get(&id).copied());
-                tx.execute("INSERT INTO messages(group_id,sender_id,request_id,text,reply_to,accepted_ms) VALUES(?1,?2,?3,?4,?5,?6)", params![group.id, sender, format!("forward-{sequence}"), content, parent, accepted])?;
+                tx.execute("INSERT INTO messages(group_id,sender_id,request_id,text,reply_to,accepted_ms,event) VALUES(?1,?2,?3,?4,?5,?6,?7)", params![group.id, sender, format!("forward-{sequence}"), content, parent, accepted, event])?;
                 last = tx.last_insert_rowid() as u64;
                 sequences.insert(sequence, last);
             }

@@ -1,3 +1,4 @@
+import { t } from "./i18n.js";
 export async function api<T>(
   path: string,
   body?: unknown,
@@ -14,7 +15,7 @@ export async function api<T>(
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const value = await response.json();
-  if (!response.ok) throw new Error(value.error || "请求失败，请重试。");
+  if (!response.ok) throw new Error(value.error || t("api.a472d51792"));
   return value as T;
 }
 export const change = <T = unknown>(body: unknown): Promise<T> =>

@@ -8,6 +8,7 @@ license.workspace = true
 name = "workflow"
 
 [dependencies]
+contracts.workspace = true
 anyhow.workspace = true
 process.workspace = true
 serde.workspace = true

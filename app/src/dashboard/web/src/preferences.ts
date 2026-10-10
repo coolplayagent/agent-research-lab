@@ -1,3 +1,4 @@
+import { t } from "./i18n.js";
 import { workspaceState } from "./state.js";
 import { $ } from "./ui.js";
 import { maximize } from "./identity.js";
@@ -91,18 +92,24 @@ export function applySidebarLayout(): any {
   for (const side of ["left", "right"]) {
     const open = side === "left" ? leftOpen : rightOpen,
       toggle = $("toggle-" + side + "-sidebar"),
-      label = side === "left" ? "左侧栏" : "右侧栏",
+      label =
+        side === "left"
+          ? t("preferences.37affc5b80")
+          : t("preferences.3d13da7079"),
       handle = $("resize-" + side);
     $(side + "-sidebar").hidden = !open;
     toggle.setAttribute("aria-expanded", String(open));
     toggle.textContent = (side === "left") === open ? "‹" : "›";
-    toggle.title = `${open ? "收起" : "展开"}${label}`;
+    toggle.title = `${open ? t("preferences.afd4b78353") : t("preferences.00bd3960fe")}${label}`;
     toggle.setAttribute("aria-label", toggle.title);
     handle.setAttribute("aria-valuemin", side === "left" ? "180" : "240");
     handle.setAttribute("aria-valuemax", String(widths[side + "Max"]));
     handle.setAttribute("aria-valuenow", String(Math.round(widths[side])));
-    handle.setAttribute("aria-valuetext", `${Math.round(widths[side])} 像素`);
-    handle.title = "拖动调整宽度；方向键微调，双击还原";
+    handle.setAttribute(
+      "aria-valuetext",
+      t("preferences.2f4ff0d062", { p0: Math.round(widths[side]) }),
+    );
+    handle.title = t("preferences.8a33bf4c56");
   }
 }
 export function dismissProfile(collapse: any = false): any {
@@ -119,11 +126,13 @@ export function setChatCollapsed(collapsed?: any): any {
     wasCollapsed = document.body.classList.contains("chat-collapsed");
   workspaceState.preferences.chatCollapsed = collapsed;
   document.body.classList.toggle("chat-collapsed", collapsed);
-  $("collapse-chat").textContent = collapsed ? "⌃ 展开" : "⌄ 收起";
+  $("collapse-chat").textContent = collapsed
+    ? t("preferences.602f981438")
+    : t("preferences.8b82c245e6");
   $("collapse-chat").setAttribute("aria-expanded", String(!collapsed));
   $("collapse-chat").setAttribute(
     "aria-label",
-    collapsed ? "展开协作群聊" : "向下收起协作群聊",
+    collapsed ? t("preferences.0af6b2afe7") : t("preferences.103d6e50a5"),
   );
   if (!collapsed && wasCollapsed)
     requestAnimationFrame(() => {
