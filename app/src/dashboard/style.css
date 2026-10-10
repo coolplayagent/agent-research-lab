@@ -2056,3 +2056,86 @@ body.focus-graph.profile-open .inspector {
     gap: 7px;
   }
 }
+
+/* Open sections share the available height; closed people stay at the bottom. */
+.sidebar-sections {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 8px;
+}
+.sidebar-sections > .sidebar-section {
+  position: relative;
+  display: block;
+  flex: 0 0 34px;
+  min-height: 34px;
+  overflow: hidden;
+}
+.sidebar-sections > .sidebar-section[open] {
+  flex: var(--section-weight, 1) 0 72px;
+  min-height: 72px;
+}
+.sidebar-sections > .sidebar-section > summary {
+  height: 34px;
+  padding: 8px 10px;
+}
+.sidebar-sections .rooms,
+.sidebar-sections .private-chats,
+.sidebar-sections .task-list {
+  position: absolute;
+  top: 34px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  overflow: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+}
+#section-people:not([open]) {
+  margin-top: auto;
+}
+.section-resizer {
+  position: relative;
+  flex: 0 0 6px;
+  cursor: row-resize;
+  touch-action: none;
+}
+.section-resizer::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 10px;
+  right: 10px;
+  height: 1px;
+  background: #dce8e5;
+}
+.section-resizer:hover::after,
+.section-resizer:focus-visible::after {
+  background: #62aa9c;
+  height: 2px;
+}
+.resizing-sections,
+.resizing-sections * {
+  cursor: row-resize !important;
+  user-select: none !important;
+}
+.sidebar-foot,
+.side-title,
+.sidebar > .search,
+.sidebar > .latest-button {
+  flex-shrink: 0;
+}
+@media (max-width: 720px) {
+  .sidebar-sections {
+    flex: none;
+    height: 275px;
+  }
+  .sidebar-sections .task-row,
+  .sidebar-sections .private-chat {
+    width: 100%;
+  }
+}

@@ -49,28 +49,46 @@
             placeholder="搜索 agent / 任务"
             aria-label="搜索 agent 或任务" /></label
         ><button id="latest-room" class="latest-button">◉ 跟随当前研究</button>
-        <details id="section-rooms" class="sidebar-section" open>
-          <summary class="section-label">
-            协作群 <span id="room-count"></span>
-          </summary>
-          <div id="rooms" class="rooms"></div>
-        </details>
-        <details id="section-private" class="sidebar-section" open>
-          <summary class="section-label">
-            定向会话 <span id="private-count"></span>
-          </summary>
-          <div id="private-chats" class="private-chats"></div>
-        </details>
-        <details
-          id="section-people"
-          class="sidebar-section people-section"
-          open
-        >
-          <summary class="section-label">
-            数字人 <span id="task-count"></span>
-          </summary>
-          <div id="tasks" class="task-list"></div>
-        </details>
+        <div id="sidebar-sections" class="sidebar-sections">
+          <details id="section-rooms" class="sidebar-section" open>
+            <summary class="section-label">
+              协作群 <span id="room-count"></span>
+            </summary>
+            <div id="rooms" class="rooms"></div>
+          </details>
+          <div
+            id="resize-section-rooms"
+            class="section-resizer"
+            role="separator"
+            tabindex="0"
+            aria-label="调整协作群高度"
+            aria-orientation="horizontal"
+          ></div>
+          <details id="section-private" class="sidebar-section" open>
+            <summary class="section-label">
+              定向会话 <span id="private-count"></span>
+            </summary>
+            <div id="private-chats" class="private-chats"></div>
+          </details>
+          <div
+            id="resize-section-private"
+            class="section-resizer"
+            role="separator"
+            tabindex="0"
+            aria-label="调整定向会话和数字人高度"
+            aria-orientation="horizontal"
+          ></div>
+          <details
+            id="section-people"
+            class="sidebar-section people-section"
+            open
+          >
+            <summary class="section-label">
+              数字人 <span id="task-count"></span>
+            </summary>
+            <div id="tasks" class="task-list"></div>
+          </details>
+        </div>
         <div class="sidebar-foot">
           <span class="dot knowledge"></span> 公共知识库
           <strong>SuperPOD</strong><small id="history-count"></small>

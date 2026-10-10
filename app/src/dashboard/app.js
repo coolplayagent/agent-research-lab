@@ -99,6 +99,19 @@ function readPreferences() {
       leftCollapsed: value.leftCollapsed === true,
       rightCollapsed: value.rightCollapsed === true,
       chatCollapsed: value.chatCollapsed === true,
+      sectionWeights: Object.fromEntries(
+        Object.entries({ rooms: 45, private: 20, people: 35 }).map(
+          ([id, fallback]) => {
+            const weight = value.sectionWeights?.[id];
+            return [
+              id,
+              Number.isFinite(weight) && weight > 0
+                ? Math.min(weight, 1000)
+                : fallback,
+            ];
+          },
+        ),
+      ),
       pinnedRooms: Array.isArray(value.pinnedRooms)
         ? value.pinnedRooms.filter((x) => typeof x === "string").slice(-1000)
         : [],
@@ -280,6 +293,114 @@ function initSidebarControls() {
   );
   applySidebarLayout();
   setChatCollapsed(preferences.chatCollapsed === true);
+}
+function updateSectionSizing() {
+  const ids = ["rooms", "private", "people"];
+  preferences.sectionWeights ||= { rooms: 45, private: 20, people: 35 };
+  for (const id of ids) {
+    const section = $("section-" + id);
+    section.style.setProperty(
+      "--section-weight",
+      preferences.sectionWeights[id],
+    );
+  }
+  for (const id of ids.slice(0, 2)) {
+    const handle = $("resize-section-" + id),
+      section = $("section-" + id),
+      next = ids
+        .slice(ids.indexOf(id) + 1)
+        .find((name) => $("section-" + name).open);
+    handle.hidden = !section.open || !next;
+    if (handle.hidden) continue;
+    handle.dataset.after = next;
+    const height = section.getBoundingClientRect().height,
+      other = $("section-" + next).getBoundingClientRect().height;
+    handle.setAttribute("aria-controls", `section-${id} section-${next}`);
+    handle.setAttribute("aria-valuemin", "72");
+    handle.setAttribute(
+      "aria-valuemax",
+      String(Math.max(72, Math.round(height + other - 72))),
+    );
+    handle.setAttribute(
+      "aria-valuenow",
+      String(Math.max(72, Math.round(height))),
+    );
+    handle.setAttribute("aria-valuetext", `${Math.round(height)} 像素`);
+    handle.title = "上下拖动调整分区高度；方向键微调，双击还原比例";
+  }
+}
+function initSectionSizing() {
+  for (const id of ["rooms", "private"]) {
+    const handle = $("resize-section-" + id);
+    let drag = null;
+    const pair = () => {
+      const after = handle.dataset.after;
+      if (handle.hidden || !after) return null;
+      return {
+        before: id,
+        after,
+        height: $("section-" + id).getBoundingClientRect().height,
+        other: $("section-" + after).getBoundingClientRect().height,
+        weight:
+          preferences.sectionWeights[id] + preferences.sectionWeights[after],
+      };
+    };
+    const resize = (start, delta) => {
+      if (!start || start.height + start.other <= 144) return;
+      const available = start.height + start.other - 144,
+        extra = Math.max(0, Math.min(available, start.height + delta - 72)),
+        before = Math.max(
+          0.001,
+          Math.min(start.weight - 0.001, (start.weight * extra) / available),
+        );
+      preferences.sectionWeights[start.before] = before;
+      preferences.sectionWeights[start.after] = start.weight - before;
+      updateSectionSizing();
+    };
+    const finish = () => {
+      if (!drag) return;
+      drag = null;
+      document.body.classList.remove("resizing-sections");
+      savePreferences();
+    };
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const start = pair();
+      if (!start) return;
+      drag = { ...start, y: e.clientY, pointer: e.pointerId };
+      handle.setPointerCapture(e.pointerId);
+      handle.focus({ preventScroll: true });
+      document.body.classList.add("resizing-sections");
+      e.preventDefault();
+    });
+    handle.addEventListener("pointermove", (e) => {
+      if (drag?.pointer === e.pointerId) resize(drag, e.clientY - drag.y);
+    });
+    for (const event of ["pointerup", "pointercancel", "lostpointercapture"])
+      handle.addEventListener(event, finish);
+    handle.addEventListener("keydown", (e) => {
+      if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) return;
+      e.preventDefault();
+      resize(
+        pair(),
+        e.key === "Home"
+          ? -10000
+          : e.key === "End"
+            ? 10000
+            : (e.key === "ArrowDown" ? 1 : -1) * (e.shiftKey ? 40 : 10),
+      );
+      savePreferences();
+    });
+    handle.addEventListener("dblclick", () => {
+      preferences.sectionWeights = { rooms: 45, private: 20, people: 35 };
+      updateSectionSizing();
+      savePreferences();
+    });
+  }
+  new ResizeObserver(() => requestAnimationFrame(updateSectionSizing)).observe(
+    $("sidebar-sections"),
+  );
+  updateSectionSizing();
 }
 function roomName(id) {
   const members = data.jobs.filter((j) => j.cohort_id === id),
@@ -1627,6 +1748,7 @@ for (const id of ["rooms", "private", "people"]) {
     else collapsed.add(id);
     preferences.collapsed = [...collapsed];
     savePreferences();
+    updateSectionSizing();
   });
 }
 $("setting-follow").checked = following;
@@ -1643,6 +1765,7 @@ $("setting-motion").addEventListener("change", (e) => {
   savePreferences();
 });
 initSidebarControls();
+initSectionSizing();
 showPage(location.hash.slice(1));
 $("state").addEventListener("change", render);
 $("refresh").addEventListener("click", refresh);

@@ -114,6 +114,9 @@ adjust a focused edge; double-click restores its default width). The shared chat
 down to its title bar and preserves its conversation and scroll position when reopened.
 These display preferences persist in the current browser; narrow screens retain a
 stacked left sidebar and a resizable digital-person overlay.
+The three left-hand lists share the remaining sidebar height. Drag their horizontal
+dividers to change the saved proportions; collapsing a list releases space to the
+others, and the collapsed people heading stays at the bottom.
 Identity is stable across retries of one task; separate tasks are separate identities. Soul is
 the role guideline from the task's frozen lab source or explicitly registered prompt
 version, not an invented biography or the private rendered task prompt. Role guidelines
