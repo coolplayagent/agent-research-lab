@@ -71,6 +71,9 @@ enum Commands {
         max_seconds: u64,
         #[arg(long)]
         seed: bool,
+        /// Private JSON array of already enqueued IDs; requires a bounded, non-seeded run.
+        #[arg(long)]
+        task_ids_file: Option<PathBuf>,
     },
     Status,
     Pause,
@@ -181,7 +184,10 @@ fn execute(cli: Cli) -> Result<Value> {
                     continuous,
                     max_seconds,
                     seed,
-                } => runtime::run_seeded(&c, continuous, max_seconds, seed),
+                    task_ids_file,
+                } => {
+                    runtime::run_scoped(&c, continuous, max_seconds, seed, task_ids_file.as_deref())
+                }
                 Commands::Status | Commands::Report => runtime::status(&c),
                 Commands::Pause => runtime::pause(&c, true),
                 Commands::Resume => runtime::pause(&c, false),

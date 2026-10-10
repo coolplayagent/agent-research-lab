@@ -20,12 +20,14 @@ agent-research-lab --config /ABS/pilot.toml collaboration plan examples/collabor
 
 `plan` 联网检查当前来源与已安装技能，冻结全部绑定、视角、问题、主假设和 DAG；注册带父版本的不可变提示词，不选择或晋级它们。重放同一计划是幂等的；来源、配置或请求变化必须使用新实验 ID。每个 task 必须实际读取声明的共同 SuperPOD 文件，引用固定 commit、路径、文件 SHA-256、行段及短原文。缺少可解析的共同知识内容引用属于协议无效，不能当成功结果。
 
-按 manifest 顺序用现有 `enqueue TASK.json` 注册 32 个任务，再由现有控制器执行。第一轮任务必须先注册，依赖才可引用；使用非 continuous 的 `run --max-seconds 3600`，不传 `--seed`，执行完即退出。当前 continuous 模式即使未传 `--seed` 仍会在空闲时补充研究任务，因此不能用于此固定预算 pilot。不得用额外研究调用污染本次预算。任务超时、失败与无效输出保留在计划分母中；不得只挑成功任务，也不得悄悄重试增加某一臂预算。每个计划任务固定 `max_attempts=1`，控制器的自动、恢复及手动重试都遵守此上限；历史未指定任务保留原有三次上限。需要重试时建立新实例并说明原因。任务时间上限由控制器真实 watchdog 执行。
+按 manifest 顺序用现有 `enqueue TASK.json` 注册 32 个任务，再由现有控制器执行。第一轮任务必须先注册，依赖才可引用；从 manifest 的 `tasks[].task.id` 提取 JSON 字符串数组，写入同一 `state_dir/private` 下的普通文件，再使用非 continuous 的 `run --max-seconds 3600 --task-ids-file /ABS/STATE/private/pilot-ids.json`，不传 `--seed`，执行完即退出。范围文件必须含 1..256 个唯一、已入队的 ID，所有依赖必须同时入选，任务配置摘要必须匹配当前运行配置；输入最多 64 KiB 且不能经过符号链接。当前 continuous 模式即使未传 `--seed` 仍会在空闲时补充研究任务，因此不能用于此固定预算 pilot。不得用额外研究调用污染本次预算。任务超时、失败与无效输出保留在计划分母中；不得只挑成功任务，也不得悄悄重试增加某一臂预算。每个计划任务固定 `max_attempts=1`，控制器的自动、恢复及手动重试都遵守此上限；历史未指定任务保留原有三次上限。需要重试时建立新实例并说明原因。任务时间上限由控制器真实 watchdog 执行。
 
 ```sh
 agent-research-lab --config /ABS/pilot.toml collaboration collect /ABS/STATE/private/collaboration/pilot-001/manifest.json --output /ABS/STATE/private/collaboration/pilot-001/collection-001.json
 agent-research-lab --config /ABS/pilot.toml collaboration collect /ABS/STATE/private/collaboration/pilot-001/manifest.json --adjudications /ABS/STATE/private/collaboration/pilot-001/host-grades.json --output /ABS/STATE/private/collaboration/pilot-001/adjudicated-001.json
 ```
+
+显式任务范围同时筛选调度和 post-success 处理，并跳过全局 automation outbox。历史非空续作记录保持待处理；范围内任务若仍提出非空续作，宿主记录 `deferred_task_scope` 诊断并保留 Pending，固定范围正常结束后由无范围控制器继续处理。全局旧进程清理、租约与效果恢复仍执行，不会借范围漏掉旧进程。`run` 返回 `task_scope`（输入摘要、选定 ID 与延期续作 run），全局状态字段仍反映整个状态目录。
 
 每次收集写新的不可变快照；未入队或未终态的任务保持 incomplete。收集器核对本地回执与 workflow 权威结果、task/DAG、配置、模型、提示词、源码、技能和 SuperPOD 绑定。陈旧或伪造的回执不会贡献 claim。历史结果可以收集，但不能因此绕过现有晋级时的最新版本检查。
 

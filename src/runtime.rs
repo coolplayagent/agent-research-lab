@@ -1089,6 +1089,89 @@ struct Active {
     heartbeat: crate::lease_heartbeat::LeaseHeartbeat,
 }
 
+/// Host-selected IDs are frozen once before execution. This is an admission
+/// boundary, not an override for global orphan recovery or effect reconciliation.
+struct TaskScope {
+    ids: BTreeSet<String>,
+    sha256: String,
+}
+impl TaskScope {
+    fn load(c: &Config, path: &Path) -> Result<Self> {
+        use std::{io::Read, os::unix::fs::OpenOptionsExt, path::Component};
+        ensure!(
+            path.is_absolute() && path.starts_with(c.state_dir.join("private")),
+            "task ID file must be under state_dir/private"
+        );
+        let mut ancestor = PathBuf::new();
+        for part in path.components() {
+            ensure!(
+                !matches!(part, Component::CurDir | Component::ParentDir),
+                "noncanonical task ID file path"
+            );
+            ancestor.push(part);
+            ensure!(
+                !fs::symlink_metadata(&ancestor)?.file_type().is_symlink(),
+                "task ID file traverses a symlink"
+            );
+        }
+        let mut file = fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+            .open(path)?;
+        let metadata = file.metadata()?;
+        ensure!(
+            metadata.is_file() && metadata.len() <= 64 * 1024,
+            "task ID file must be a regular file of at most 64 KiB"
+        );
+        let mut bytes = Vec::new();
+        file.by_ref().take(64 * 1024 + 1).read_to_end(&mut bytes)?;
+        ensure!(bytes.len() <= 64 * 1024, "task ID file exceeds 64 KiB");
+        let requested: Vec<String> = serde_json::from_slice(&bytes)
+            .context("task ID file must contain a JSON string array")?;
+        ensure!(
+            !requested.is_empty() && requested.len() <= 256,
+            "task scope requires 1..256 IDs"
+        );
+        let mut ids = BTreeSet::new();
+        for id in requested {
+            safe_id(&id)?;
+            ensure!(ids.insert(id), "duplicate task ID in scope");
+        }
+        let config_digest = storage::digest(&serde_json::to_vec(c)?);
+        for id in &ids {
+            let job: Job = storage::read(&job_path(c, id))
+                .with_context(|| format!("selected task is not enqueued: {id}"))?;
+            ensure!(job.task.id == *id, "selected job identity mismatch: {id}");
+            ensure!(
+                job.config_digest == config_digest,
+                "selected task configuration differs from this run: {id}"
+            );
+            ensure!(
+                job.task
+                    .dependencies
+                    .iter()
+                    .all(|dependency| ids.contains(dependency)),
+                "selected task has an out-of-scope dependency: {id}"
+            );
+        }
+        Ok(Self {
+            ids,
+            sha256: storage::digest(&bytes),
+        })
+    }
+}
+fn scoped_run_status(
+    c: &Config,
+    scope: Option<&TaskScope>,
+    deferred: &BTreeSet<String>,
+) -> Result<Value> {
+    let mut result = status(c)?;
+    if let Some(scope) = scope {
+        result["task_scope"] = json!({"task_ids":scope.ids,"file_sha256":scope.sha256,"deferred_followup_runs":deferred,"automatic_seed":false,"automation_outbox":false});
+    }
+    Ok(result)
+}
+
 /// One controller admits work; workflow-cli remains the authority for each durable job.
 pub fn run(c: &Config, continuous: bool, max_seconds: u64) -> Result<Value> {
     run_seeded(c, continuous, max_seconds, false)
@@ -1100,7 +1183,21 @@ pub fn run_seeded(
     max_seconds: u64,
     seed_requested: bool,
 ) -> Result<Value> {
+    run_scoped(c, continuous, max_seconds, seed_requested, None)
+}
+
+pub fn run_scoped(
+    c: &Config,
+    continuous: bool,
+    max_seconds: u64,
+    seed_requested: bool,
+    task_ids_file: Option<&Path>,
+) -> Result<Value> {
     c.validate()?;
+    ensure!(
+        task_ids_file.is_none() || (!continuous && !seed_requested && max_seconds > 0),
+        "scoped runs require a positive max-seconds, no continuous mode and no seed"
+    );
     let start = now();
     let window = RunWindow {
         started: start,
@@ -1108,12 +1205,16 @@ pub fn run_seeded(
     };
     let _lock = storage::lock(&c.state_dir.join("controller.lock"))?;
     kill_retained_workers(c)?;
+    let scope = task_ids_file
+        .map(|path| TaskScope::load(c, path))
+        .transpose()?;
+    let mut deferred_followups = BTreeSet::new();
     let w = workflow(c);
     let ledger_path = c.state_dir.join("budget.json");
     let mut ledger = load_ledger(c)?;
     while window.remaining(c, &ledger) == 0 {
         if !continuous || max_seconds > 0 || c.state_dir.join("paused").exists() {
-            return status(c);
+            return scoped_run_status(c, scope.as_ref(), &deferred_followups);
         }
         std::thread::sleep(Duration::from_secs(1));
         ledger.budget.tick(now(), false)?;
@@ -1132,7 +1233,7 @@ pub fn run_seeded(
     })?
     .is_none()
     {
-        return status(c);
+        return scoped_run_status(c, scope.as_ref(), &deferred_followups);
     }
     let exploration_path = c.state_dir.join("evolution").join("exploration.json");
     if exploration_path.exists() {
@@ -1262,7 +1363,9 @@ pub fn run_seeded(
         }
         let mut host_progress = false;
         if active.is_empty() && jobs(c)?.iter().all(|job| job.launch.is_none()) {
-            match idle_host(c, &mut ledger, window, || drain_followups(c, &w)) {
+            match idle_host(c, &mut ledger, window, || {
+                drain_followups_scoped(c, &w, scope.as_ref(), &mut deferred_followups)
+            }) {
                 Ok(Some(progress)) => host_progress |= progress,
                 Ok(None) => continue,
                 Err(error) => storage::write(
@@ -1273,7 +1376,8 @@ pub fn run_seeded(
             last = now();
         }
         let outbox = c.state_dir.join("outbox");
-        if active.is_empty()
+        if scope.is_none()
+            && active.is_empty()
             && outbox.exists()
             && time >= next_host_tick
             && jobs(c)?.iter().all(|job| job.launch.is_none())
@@ -1305,6 +1409,11 @@ pub fn run_seeded(
             .map(|a| a.job.task.exploratory)
             .unwrap_or(prefer_exploration);
         let mut pending = jobs(c)?;
+        pending.retain(|job| {
+            scope
+                .as_ref()
+                .is_none_or(|scope| scope.ids.contains(&job.task.id))
+        });
         pending.sort_by_key(|j| j.task.exploratory != track);
         let mut admitted = false;
         let mut retry_waiting = false;
@@ -1575,7 +1684,7 @@ pub fn run_seeded(
             std::thread::sleep(Duration::from_millis(200));
         }
     }
-    status(c)
+    scoped_run_status(c, scope.as_ref(), &deferred_followups)
 }
 
 fn launch(
@@ -2123,7 +2232,16 @@ fn queue_post_success(c: &Config, w: &Workflow, job: &Job) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn drain_followups(c: &Config, w: &Workflow) -> Result<bool> {
+    drain_followups_scoped(c, w, None, &mut BTreeSet::new())
+}
+fn drain_followups_scoped(
+    c: &Config,
+    w: &Workflow,
+    scope: Option<&TaskScope>,
+    deferred: &mut BTreeSet<String>,
+) -> Result<bool> {
     let queue = c.state_dir.join("workflow/host-followups");
     if !queue.exists() {
         return Ok(false);
@@ -2138,6 +2256,11 @@ fn drain_followups(c: &Config, w: &Workflow) -> Result<bool> {
         .filter(|p| p.extension().is_some_and(|s| s == "json"))
     {
         let record: PostSuccess = storage::read(&path)?;
+        if scope.is_some_and(|scope| !scope.ids.contains(&record.task_id))
+            || deferred.contains(&record.run_id)
+        {
+            continue;
+        }
         if matches!(
             record.memory,
             MemoryWriteback::Pending | MemoryWriteback::Running
@@ -2195,6 +2318,22 @@ fn drain_followups(c: &Config, w: &Workflow) -> Result<bool> {
         record.followups,
         FollowupAdmission::Pending | FollowupAdmission::Running
     ) {
+        if let Some(scope) = scope
+            && receipt["agent_report"]["next_tasks"]
+                .as_array()
+                .is_some_and(|tasks| !tasks.is_empty())
+        {
+            // Keep durable admission pending; a later unscoped controller may
+            // handle it. This per-run set reports progress once, then allows exit.
+            deferred.insert(job.run_id.clone());
+            storage::write(
+                &c.state_dir
+                    .join("workflow/host-followups-deferred")
+                    .join(format!("{}.json", job.run_id)),
+                &json!({"status":"deferred_task_scope","run_id":job.run_id,"task_id":job.task.id,"scope_sha256":scope.sha256,"reason":"fixed task scope cannot admit new follow-up tasks"}),
+            )?;
+            return Ok(true);
+        }
         record.followups = FollowupAdmission::Running;
         storage::write(&path, &record)?;
         match admit_followups(c, &job, &dir, &receipt) {
@@ -3170,6 +3309,67 @@ mod tests {
     }
 
     #[test]
+    fn task_scope_rejects_invalid_files_missing_dependencies_and_configuration_drift() {
+        let (temp, mut c, mut job, _) = completion_fixture(false, json!([]));
+        for name in [
+            "workflow-cli",
+            "relay-knowledge",
+            "into-markdown",
+            "qualitygate-cli",
+            "computer-use-cli",
+            "repo-sandbox",
+        ] {
+            c.tools.insert(name.into(), c.tools["relay-memory"].clone());
+        }
+        job.config_digest = storage::digest(&serde_json::to_vec(&c).unwrap());
+        storage::write(&job_path(&c, &job.task.id), &job).unwrap();
+        let path = c.state_dir.join("private/scope.json");
+        storage::write(&path, &vec![job.task.id.clone()]).unwrap();
+        let scope = TaskScope::load(&c, &path).unwrap();
+        assert_eq!(scope.ids, BTreeSet::from([job.task.id.clone()]));
+        for (continuous, seconds, seed) in [(true, 30, false), (false, 30, true), (false, 0, false)]
+        {
+            assert!(
+                run_scoped(&c, continuous, seconds, seed, Some(&path))
+                    .unwrap_err()
+                    .to_string()
+                    .contains("scoped runs")
+            );
+        }
+        for ids in [
+            vec![],
+            vec![job.task.id.clone(), job.task.id.clone()],
+            vec!["missing".into()],
+            vec!["../escape".into()],
+            vec!["x".into(); 257],
+        ] {
+            storage::write(&path, &ids).unwrap();
+            assert!(TaskScope::load(&c, &path).is_err());
+        }
+        storage::write(&path, &vec![job.task.id.clone()]).unwrap();
+        let mut drifted = c.clone();
+        drifted.task_timeout_seconds += 1;
+        assert!(
+            TaskScope::load(&drifted, &path)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("configuration")
+        );
+        job.task.dependencies = vec!["excluded".into()];
+        storage::write(&job_path(&c, &job.task.id), &job).unwrap();
+        assert!(TaskScope::load(&c, &path).is_err());
+        let outside = temp.path().join("outside.json");
+        storage::write(&outside, &vec![job.task.id.clone()]).unwrap();
+        assert!(TaskScope::load(&c, &outside).is_err());
+        let linked = c.state_dir.join("private/linked.json");
+        std::os::unix::fs::symlink(&outside, &linked).unwrap();
+        assert!(TaskScope::load(&c, &linked).is_err());
+        fs::write(&path, vec![b' '; 64 * 1024 + 1]).unwrap();
+        assert!(TaskScope::load(&c, &path).is_err());
+    }
+
+    #[test]
     fn frozen_attempt_limits_preserve_legacy_serialization_and_stop_retries() {
         let (temp, c, mut job, _) = completion_fixture(false, json!([]));
         job.task.write = false;
@@ -3462,6 +3662,116 @@ printf '{"type":"fixture.completed"}\n'
             c.tools.get_mut("relay-memory").unwrap().binary = binary.into();
         }
         (temp, c)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "real workflow and bwrap with explicit fake Codex; set LAB_WORKFLOW_BIN"]
+    fn scoped_run_preserves_historical_followups_and_executes_only_selected_dag() {
+        let (_temp, mut c) = scheduler_fixture();
+        let task = |id: &str, prompt: &str, dependencies: Vec<String>| Task {
+            id: id.into(),
+            role: "research".into(),
+            repository: "superpod".into(),
+            prompt: prompt.into(),
+            prompt_version: None,
+            max_attempts: Some(1),
+            use_memory: false,
+            depth: 0,
+            write: false,
+            exploratory: false,
+            dependencies,
+            required_tools: vec![],
+        };
+        let old = enqueue(&c, task("synthesis-history", "PROPOSE_FOLLOWUP", vec![])).unwrap();
+        let history_scope = c.state_dir.join("private/history.json");
+        storage::write(&history_scope, &vec![old.task.id.clone()]).unwrap();
+        let started = std::time::Instant::now();
+        let historical_result = run_scoped(&c, false, 30, false, Some(&history_scope)).unwrap();
+        assert!(
+            started.elapsed() < Duration::from_secs(25),
+            "pending scope-deferred proposal must not spin until budget exhaustion"
+        );
+        assert_eq!(
+            historical_result["task_scope"]["deferred_followup_runs"],
+            json!([old.run_id])
+        );
+        let original_journal = fs::read(post_success_path(&c, &old)).unwrap();
+        let historical_record: PostSuccess = serde_json::from_slice(&original_journal).unwrap();
+        assert_eq!(historical_record.followups, FollowupAdmission::Pending);
+        assert_eq!(jobs(&c).unwrap().len(), 1);
+        let outside = enqueue(
+            &c,
+            task("outside-pending", "independent excluded task", vec![]),
+        )
+        .unwrap();
+        c.task_timeout_seconds += 1; // A new pilot config must not consume the old cohort's proposals.
+        let first = enqueue(&c, task("selected-first", "bounded evidence", vec![])).unwrap();
+        let second = enqueue(
+            &c,
+            task(
+                "selected-second",
+                "combine supplied evidence",
+                vec![first.task.id.clone()],
+            ),
+        )
+        .unwrap();
+        let proposal = enqueue(&c, task("synthesis-selected", "PROPOSE_FOLLOWUP", vec![])).unwrap();
+        let scope_file = c.state_dir.join("private/selected.json");
+        storage::write(
+            &scope_file,
+            &vec![
+                first.task.id.clone(),
+                second.task.id.clone(),
+                proposal.task.id.clone(),
+            ],
+        )
+        .unwrap();
+        // An unrelated outbox marker must remain untouched by this bounded run.
+        let outbox = c.state_dir.join("outbox/unrelated.json");
+        storage::write(&outbox, &json!({"private_fixture":"do not process"})).unwrap();
+        let outbox_before = fs::read(&outbox).unwrap();
+        let started = std::time::Instant::now();
+        let result = run_scoped(&c, false, 30, false, Some(&scope_file)).unwrap();
+        assert!(started.elapsed() < Duration::from_secs(25));
+        let w = workflow(&c);
+        for job in [&first, &second, &proposal] {
+            assert_eq!(w.status(&job.run_id).unwrap()["status"], "succeeded");
+            w.verify(&job.run_id).unwrap();
+        }
+        assert_eq!(
+            fs::read(post_success_path(&c, &old)).unwrap(),
+            original_journal
+        );
+        assert_eq!(fs::read(outbox).unwrap(), outbox_before);
+        assert!(
+            !c.state_dir.join("outbox/states").exists(),
+            "scope must not initialize or consume unrelated automation"
+        );
+        assert!(!c.state_dir.join("runs").join(&outside.run_id).exists());
+        assert_eq!(w.status(&outside.run_id).unwrap()["status"], "running");
+        assert_eq!(
+            jobs(&c).unwrap().len(),
+            5,
+            "no historical or selected follow-up may be admitted"
+        );
+        let record: PostSuccess = storage::read(&post_success_path(&c, &proposal)).unwrap();
+        assert_eq!(record.followups, FollowupAdmission::Pending);
+        assert_eq!(
+            result["task_scope"]["deferred_followup_runs"],
+            json!([proposal.run_id])
+        );
+        let prompt = fs::read_to_string(
+            c.state_dir
+                .join("runs")
+                .join(&second.run_id)
+                .join("prompt.txt"),
+        )
+        .unwrap();
+        assert!(prompt.contains("Completed dependency reports") && prompt.contains(&first.task.id));
+        // Scope deferral is reversible without repairing or rewriting the journal.
+        assert!(drain_followups(&c, &w).unwrap());
+        assert_eq!(jobs(&c).unwrap().len(), 6);
     }
 
     #[cfg(unix)]
