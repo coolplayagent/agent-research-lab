@@ -2,6 +2,7 @@ pub mod agent_policy;
 pub mod automation;
 pub mod budget;
 pub mod build_cache;
+pub mod collaboration_experiment;
 pub mod config;
 pub mod delivery;
 pub mod evolution;
