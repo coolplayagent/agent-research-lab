@@ -18,6 +18,7 @@ fn proposal(id: &str) -> Proposal {
         topics: vec!["recovery".into()],
         references: vec![],
         reply_to: None,
+        recipients: vec![],
     }
 }
 fn write(endpoint: &Endpoint, slot: usize, p: &Proposal) {
@@ -505,4 +506,183 @@ fn maximum_task_identity_accepts_its_longer_host_attempt_identity() {
     invalid = m;
     invalid.run_id = "../escape".into();
     assert!(board.register(&invalid, 102).is_err());
+}
+
+#[test]
+fn crystal_ball_routes_public_private_and_group_messages_without_audience_leaks() {
+    let temp = tempfile::tempdir().unwrap();
+    let board = Board::new(temp.path()).unwrap();
+    let members: Vec<_> = ["a", "b", "c", "d"]
+        .iter()
+        .map(|id| member(1, id, &format!("{id}-run")))
+        .collect();
+    let endpoints: Vec<_> = members
+        .iter()
+        .map(|m| board.register(m, 100).unwrap())
+        .collect();
+    let public = proposal("public");
+    // A missing optional audience must not change the canonical bytes of old v1 evidence.
+    let old = serde_json::to_value(&public).unwrap();
+    assert!(old.get("recipients").is_none());
+    assert_eq!(
+        serde_json::to_vec(&serde_json::from_value::<Proposal>(old).unwrap()).unwrap(),
+        serde_json::to_vec(&public).unwrap()
+    );
+    write(&endpoints[0], 0, &public);
+    let mut direct = proposal("private-one");
+    direct.text = "PRIVATE_ONE for b only".into();
+    direct.recipients = vec!["b".into()];
+    write(&endpoints[0], 1, &direct);
+    let mut group = proposal("private-group");
+    group.text = "PRIVATE_GROUP for b and c".into();
+    group.recipients = vec!["b".into(), "c".into()];
+    write(&endpoints[0], 2, &group);
+    assert_eq!(board.poll(&members[0].cohort_id, 101).unwrap().accepted, 3);
+    for (index, expected) in [3, 3, 2, 1].iter().enumerate() {
+        let inbox = board.inbox(&members[index], 101).unwrap();
+        assert_eq!(inbox["messages"].as_array().unwrap().len(), *expected);
+        let exported: serde_json::Value =
+            storage::read(&endpoints[index].view.join("board.json")).unwrap();
+        assert_eq!(inbox, exported);
+        assert_eq!(
+            board
+                .context(&members[index], &selection(), 101)
+                .unwrap()
+                .message_ids
+                .len(),
+            *expected
+        );
+    }
+    assert!(
+        !board
+            .inbox(&members[2], 101)
+            .unwrap()
+            .to_string()
+            .contains("PRIVATE_ONE")
+    );
+    assert!(
+        !board
+            .inbox(&members[3], 101)
+            .unwrap()
+            .to_string()
+            .contains("PRIVATE_")
+    );
+    let legacy = temp
+        .path()
+        .join("communication/views")
+        .join(&members[0].cohort_id);
+    assert!(
+        !fs::read_to_string(legacy.join("board.json"))
+            .unwrap()
+            .contains("PRIVATE_")
+    );
+    assert_eq!(
+        fs::read_dir(&legacy).unwrap().count(),
+        1,
+        "private exports cannot sit below an old public mount"
+    );
+    assert_eq!(messages(&board, &members[0], 101).len(), 1);
+    let exact = Selection {
+        topics: vec![],
+        query: "PRIVATE_ONE".into(),
+    };
+    assert!(
+        board
+            .context(&members[3], &exact, 101)
+            .unwrap()
+            .message_ids
+            .is_empty()
+    );
+    assert_eq!(
+        board
+            .context(&members[1], &exact, 101)
+            .unwrap()
+            .message_ids
+            .len(),
+        1
+    );
+    let private_id = board.inbox(&members[0], 101).unwrap()["messages"][1]["message"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut reply = proposal("reply");
+    reply.reply_to = Some(private_id);
+    reply.recipients = vec!["a".into()];
+    write(&endpoints[1], 0, &reply);
+    let mut leaked = reply.clone();
+    leaked.id = "leaked".into();
+    leaked.recipients.clear();
+    write(&endpoints[1], 1, &leaked);
+    let mut widened = reply.clone();
+    widened.id = "widened".into();
+    widened.recipients.push("c".into());
+    write(&endpoints[1], 2, &widened);
+    let mut group_reply = proposal("group-reply");
+    group_reply.reply_to = Some(
+        board.inbox(&members[1], 101).unwrap()["messages"][2]["message"]["id"]
+            .as_str()
+            .unwrap()
+            .to_owned(),
+    );
+    group_reply.recipients = vec!["a".into(), "c".into()];
+    write(&endpoints[1], 3, &group_reply);
+    write(&endpoints[2], 0, &reply); // c cannot reply to a message it cannot read.
+    let mut foreign = proposal("foreign");
+    foreign.recipients = vec!["foreign".into()];
+    write(&endpoints[3], 0, &foreign);
+    let report = board.poll(&members[0].cohort_id, 102).unwrap();
+    // The first poll visited slots 0..7; advance the fair cursor back to the new inputs.
+    let report2 = board.poll(&members[0].cohort_id, 102).unwrap();
+    assert_eq!(report.accepted + report2.accepted, 2);
+    assert_eq!(report.rejected + report2.rejected, 4);
+    let after = board.inbox(&members[1], 102).unwrap();
+    let own = after["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["task_id"] == "b")
+        .unwrap();
+    assert_eq!(
+        own["consumed_slots"]["1"]["outcome"],
+        "reply_audience_mismatch"
+    );
+    assert_eq!(
+        own["consumed_slots"]["2"]["outcome"],
+        "reply_audience_mismatch"
+    );
+    assert_eq!(
+        board.inspect(&members[0].cohort_id, 102).unwrap()["retained_messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        5
+    );
+    let mut impostor = members[1].clone();
+    impostor.authority_sha256 = "f".repeat(64);
+    assert!(board.inbox(&impostor, 102).is_err());
+    assert_eq!(
+        Board::new(temp.path())
+            .unwrap()
+            .inbox(&members[1], 102)
+            .unwrap(),
+        after
+    );
+    for m in &members {
+        board.revoke_run(m, "fixture ended", 103).unwrap();
+    }
+    board.close_cohort(&members[0].cohort_id, 103).unwrap();
+    board
+        .prune(&members[0].cohort_id, 103 + TTL_SECONDS)
+        .unwrap();
+    board
+        .prune(&members[0].cohort_id, 103 + TTL_SECONDS)
+        .unwrap();
+    assert!(!legacy.exists());
+    assert!(
+        !temp
+            .path()
+            .join("communication/inboxes")
+            .join(&members[0].cohort_id)
+            .exists()
+    );
 }

@@ -35,6 +35,10 @@
         ><button id="latest-room" class="latest-button">◉ 跟随当前研究</button>
         <div class="section-label">协作群 <span id="room-count"></span></div>
         <div id="rooms" class="rooms"></div>
+        <div class="section-label">
+          定向会话 <span id="private-count"></span>
+        </div>
+        <div id="private-chats" class="private-chats"></div>
         <div class="section-label">数字人 <span id="task-count"></span></div>
         <div id="tasks" class="task-list"></div>
         <div class="sidebar-foot">
@@ -82,8 +86,8 @@
           <div class="map-heading">
             <span>多 AGENT 实时协作</span
             ><span class="legend"
-              ><i class="publish-line"></i>发布提议
-              <i class="context-line"></i>接收上下文</span
+              ><i class="publish-line"></i>发送消息
+              <i class="context-line"></i>定向投递 / 上下文</span
             >
             <button
               id="maximize-graph"
@@ -105,7 +109,9 @@
         </section>
         <div class="chat-heading">
           <div>
-            <span class="chat-title"># 协作群聊</span>
+            <button id="chat-title" class="chat-title" title="返回公共群聊">
+              # 协作群聊
+            </button>
           </div>
           <span id="message-count"></span
           ><button id="open-profile" class="profile-toggle">数字人看板</button>

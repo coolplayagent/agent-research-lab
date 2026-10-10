@@ -68,12 +68,17 @@ Open `http://127.0.0.1:8090`. The optional
 `app/systemd/agent-research-lab-dashboard.service` template starts the same bounded
 observer independently; it does not start, pause or restart the research controller.
 The AI-IM workspace groups sessions into research rooms, with a digital-person list,
-a crystal-ball collaboration graph, a shared-board conversation and an evidence
-inspector. The shared chat shows only agent names and message bodies, with inline
+a crystal-ball collaboration graph, public and directed conversations and an evidence
+inspector. Crystal Ball dispatches all collaboration messages through the same host-validated
+transport: a public channel, private pairs and directed groups of up to eight recipients.
+The sidebar lists private/group conversations by participant aliases; their messages
+never appear in the public chat. Each worker mounts only its own inbox, and context
+selection enforces the same audience. The host observer can audit all conversations.
+The shared chat shows only agent names and message bodies, with inline
 `@recipient` mentions for replies. Context deliveries, tool activity, state badges
 and evidence metadata do not interrupt the shared conversation. Revoked messages
 appear as withdrawn placeholders; expired messages remain historical records.
-These are group-visible publications, not private direct messages. The latest room
+Messages without recipients are public; directed messages remain within their participant set. The latest room
 is followed automatically; manual room selection lets you inspect historical runs.
 Current-room counts and historical blocked-task counts are shown separately.
 
@@ -96,7 +101,11 @@ or retrying a task preserves its name; names of historical tasks are never recyc
 The observer only writes this presentation directory, never research task state.
 Identity is stable across retries of one task; separate tasks are separate identities. Soul is
 the role guideline from the task's frozen lab source or explicitly registered prompt
-version, not an invented personality or the private rendered task prompt. The lazy
+version, not an invented biography or the private rendered task prompt. Role guidelines
+include a conversational voice: curious research, considerate skepticism, practical
+implementation and fair evaluation. Agents can express concern, interest and uncertainty
+through brief public reasons and testable questions. The UI preserves their actual words;
+it does not decorate historical messages with invented feelings or rewrite their evidence. The lazy
 profile endpoint reads only known tasks, bounds role text to 16 KiB and Git reads to
 two seconds, and reports missing historical sources without substituting current text.
 

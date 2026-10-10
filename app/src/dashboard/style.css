@@ -1601,3 +1601,51 @@ body.focus-graph.profile-open .inspector {
     padding: 11px 13px;
   }
 }
+
+.chat-title {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.private-chats {
+  flex-shrink: 0;
+  max-height: 140px;
+  overflow: auto;
+  padding: 0 10px;
+}
+.private-chat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  color: #527978;
+  font-size: 12px;
+}
+.private-chat:hover,
+.private-chat.selected {
+  background: #e6f2ef;
+}
+.private-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.private-chat small,
+.private-empty {
+  color: #8ba19f;
+  font-size: 10px;
+}
+.private-empty {
+  margin: 4px 10px 14px;
+}
+.chat-bubble > .mention {
+  margin-right: 6px;
+}
