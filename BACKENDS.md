@@ -90,14 +90,14 @@ write mounts, PID namespace, heartbeat and process cancellation apply as for Cod
 This is a filesystem/process boundary, not network isolation or a guarantee that
 a malicious network-capable backend respects external-service policy.
 
-`doctor --models` runs a generic bridge in isolation with a tiny `{"ok":true}`
+`doctor --probe-models` runs a generic bridge in isolation with a tiny `{"ok":true}`
 report schema. It reports a local JSON contract probe and leaves provider
 compatibility unverified. Codex probes retain their model-response behavior.
 `targets agent-check` currently requires Codex command-event evidence and rejects
 a generic review backend explicitly; generic desktop tasks can use the owned
 launcher when declared capable, but need backend-specific validation.
 
-A future host communication module may add a read-only exported cohort directory
+The host communication module may add a read-only exported cohort directory
 under `state/communication/views/<64-hex-id>`. The adapter hook rejects ancestor
 paths and authority directories. Worker-writable output remains its own run logs;
 a backend cannot choose another cohort's mount through its result.

@@ -17,6 +17,21 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Commands {
+    /// Inspect agent adapters and bounded team communication, or simulate logical scale.
+    Agents {
+        #[arg(value_parser = ["backends", "boards", "view", "close", "prune", "simulate"])]
+        action: String,
+        #[arg(long)]
+        cohort: Option<String>,
+        #[arg(long, default_value_t = 0)]
+        shard: u8,
+        #[arg(long)]
+        after: Option<String>,
+        #[arg(long, default_value_t = 32)]
+        limit: usize,
+        #[arg(long, default_value_t = 1000)]
+        agent_count: usize,
+    },
     /// Plan, enqueue or collect one bounded, evidence-bound collaboration pilot.
     Collaboration {
         #[arg(value_parser = ["plan", "enqueue", "collect"])]
@@ -120,6 +135,11 @@ enum Commands {
 }
 fn execute(cli: Cli) -> Result<Value> {
     match cli.command {
+        Commands::Agents {
+            action,
+            agent_count,
+            ..
+        } if action == "simulate" => agent_research_lab::multi_agent::scale::simulate(agent_count),
         Commands::SkillDigest { path } => {
             Ok(json!({"sha256":agent_research_lab::freshness::skill_tree_digest(&path)?}))
         }
@@ -152,6 +172,43 @@ fn execute(cli: Cli) -> Result<Value> {
         command => {
             let c = Config::load(&cli.config)?;
             match command {
+                Commands::Agents {
+                    action,
+                    cohort,
+                    shard,
+                    after,
+                    limit,
+                    agent_count,
+                } => {
+                    if action == "simulate" {
+                        return agent_research_lab::multi_agent::scale::simulate(agent_count);
+                    }
+                    if action == "backends" {
+                        let configured: Vec<_> = c.agent_backends.iter().map(|(id,spec)| json!({"id":id,"declared_capabilities":spec.capabilities(),"compatibility":"requires_adapter_specific_validation"})).collect();
+                        return Ok(
+                            json!({"default":"codex","role_backends":c.role_backends,"models":c.models,"configured":configured,"max_active_workers":c.max_agents}),
+                        );
+                    }
+                    let board = agent_research_lab::communication::Board::new(&c.state_dir)?;
+                    if action == "boards" {
+                        return board.cohorts(shard, after.as_deref(), limit);
+                    }
+                    let id =
+                        cohort.ok_or_else(|| anyhow::anyhow!("this action requires --cohort"))?;
+                    let now = u64::try_from(chrono::Utc::now().timestamp())?;
+                    match action.as_str() {
+                        "view" => board.view(&id, now),
+                        "close" => {
+                            board.close_cohort(&id, now)?;
+                            Ok(json!({"closed":id}))
+                        }
+                        "prune" => {
+                            board.prune(&id, now)?;
+                            Ok(json!({"pruned":id,"identity_retired":true}))
+                        }
+                        _ => unreachable!(),
+                    }
+                }
                 Commands::Targets { action, kind } => match action.as_str() {
                     "prepare" => agent_research_lab::targets::prepare(&c),
                     "status" => agent_research_lab::targets::status(&c),

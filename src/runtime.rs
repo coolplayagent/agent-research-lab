@@ -31,6 +31,8 @@ pub struct Task {
     pub prompt: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub communication: Option<crate::multi_agent::TeamBinding>,
     /// A frozen invocation ceiling; omitted historical tasks retain three attempts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_attempts: Option<u8>,
@@ -82,6 +84,10 @@ pub struct Launch {
     pub git_dir: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backend_request_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub communication: Option<crate::multi_agent::LaunchContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub communication_gap: Option<String>,
 }
 #[derive(Serialize, Deserialize)]
 struct ExitObservation {
@@ -157,6 +163,9 @@ pub(crate) fn enqueue_with_inputs(
         } else {
             crate::evolution_cli::resolve_selection(&c.state_dir, &task.role)?
         };
+    }
+    if let Some(team) = &task.communication {
+        team.validate()?;
     }
     ensure!(!task.prompt.trim().is_empty(), "empty task prompt");
     ensure!(task.depth <= 3, "follow-up task depth exceeds three");
@@ -414,6 +423,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
         .as_ref()
         .map(|v| format!("{day}-{}-{}", crate::inputs::cohort(v), &config_id[..6]))
         .unwrap_or_else(|| day.to_string());
+    let shared = c.multi_agent.as_ref().is_some_and(|v| v.shared_research);
     let mut ids = Vec::new();
     for (topic, title) in [
         ("sdlc", "需求到 PR 的可验证自动交付"),
@@ -421,9 +431,28 @@ fn seed_inputs(c: &Config) -> Result<Value> {
         ("collaboration", "不同观点与多 agent 协作的能力边界"),
         ("computer", "Computer Use 与 sandbox 中的操作恢复"),
     ] {
+        let communication = shared.then(|| crate::multi_agent::TeamBinding {
+            id: format!("research-{round}"),
+            cell: None,
+            topics: vec![topic.into()],
+            query: String::new(),
+        });
+        let independent_phase = if shared {
+            "先形成独立论证，再按团队通信协议发布简短发现、质疑或反例；仅在有助于本任务时读取相关提案，保留分歧。"
+        } else {
+            "此阶段不读取其他 agent 的结论。"
+        };
         let independent = format!(
             "研究 {title}。只读分析固定的 SuperPOD 提交；给出有来源、可复现实验的假设。识别七个 coolplayagent CLI 的实际使用缺口。不得修改文件、安装、推送、发消息或合并。本阶段 next_tasks 必须为空数组；把后续实验建议写入 findings，由综合阶段选择。正文用中文，输出指定 JSON schema。"
         );
+        let independent = if shared {
+            independent.replace(
+                "不得修改文件、安装、推送、发消息或合并。",
+                "不得修改源码、安装、推送、向外部联系人发消息或合并。",
+            )
+        } else {
+            independent
+        };
         let research_id = format!("research-{round}-{topic}");
         let critic_id = format!("critic-{round}-{topic}");
         let synthesis_id = format!("synthesis-{round}-{topic}");
@@ -431,13 +460,13 @@ fn seed_inputs(c: &Config) -> Result<Value> {
             (
                 research_id.clone(),
                 "research",
-                format!("{independent} 提出你的独立论证；此阶段不读取其他 agent 的结论。"),
+                format!("{independent} 提出你的独立论证；{independent_phase}"),
             ),
             (
                 critic_id.clone(),
                 "review",
                 format!(
-                    "{independent} 从独立质疑者的角度建立替代解释、反例和失败条件；此阶段不读取其他 agent 的结论。"
+                    "{independent} 从独立质疑者的角度建立替代解释、反例和失败条件；{independent_phase}"
                 ),
             ),
         ] {
@@ -449,6 +478,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
                     repository: "superpod".into(),
                     prompt,
                     prompt_version: None,
+                    communication: communication.clone(),
                     max_attempts: None,
                     use_memory: false,
                     depth: 0,
@@ -475,6 +505,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
                     "综合两份关于 {title} 的独立研究和质疑结果。保留少数观点、反例和未解决分歧，检查引用，提出可区分竞争假设的有界实验。未实测的能力只能登记为假设。不得以共识代替证据。基于原始分歧证据，在 next_tasks 提出最多三个有界实验或 CLI 修复任务；无充分证据时返回空数组，不制造工作。不修改文件、安装、推送或合并。正文用中文。"
                 ),
                 prompt_version: None,
+                communication: communication.clone(),
                 max_attempts: None,
                 use_memory: false,
                 depth: 0,
@@ -1255,6 +1286,7 @@ pub fn run_scoped(
     let mut last = now();
     let mut next_seed_check = 0;
     let mut next_host_tick = 0_i64;
+    let mut next_communication_poll = 0_i64;
     let mut desktop_prepared = false;
     let mut next_desktop_prepare = 0_i64;
     let mut next_build_prepare = BTreeMap::<String, i64>::new();
@@ -1275,6 +1307,34 @@ pub fn run_scoped(
         let stopping = (max_seconds > 0 && time - start >= max_seconds.min(i64::MAX as u64) as i64)
             || c.state_dir.join("paused").exists()
             || ledger.budget.remaining(time, c.daily_seconds) == 0;
+        if !stopping && !active.is_empty() && time >= next_communication_poll {
+            let members = active
+                .iter()
+                .filter_map(|a| {
+                    a.job
+                        .launch
+                        .as_ref()?
+                        .communication
+                        .as_ref()
+                        .map(|v| v.member.clone())
+                })
+                .collect::<Vec<_>>();
+            if !members.is_empty() {
+                let report = match crate::multi_agent::poll_active(
+                    &c.state_dir,
+                    &members,
+                    time.max(0) as u64,
+                ) {
+                    Ok(report) => report,
+                    Err(error) => json!({"error":error.to_string()}),
+                };
+                storage::write(
+                    &c.state_dir.join("communication/poll-status.json"),
+                    &json!({"at":time,"result":report}),
+                )?;
+            }
+            next_communication_poll = time + 2;
+        }
         let mut i = 0;
         while i < active.len() {
             let mut polled = if stopping {
@@ -1320,6 +1380,9 @@ pub fn run_scoped(
                 )?;
                 match settle_with_heartbeat(&w, &a.job, &observation, Some(&a.heartbeat)) {
                     Ok(settled_success) => {
+                        if !settled_success {
+                            revoke_communication(c, &a.job, &launch);
+                        }
                         a.job.launch = None;
                         if settled_success {
                             a.job.last_error = None;
@@ -1335,6 +1398,7 @@ pub fn run_scoped(
                         }
                     }
                     Err(error) => {
+                        revoke_communication(c, &a.job, &launch);
                         // Keep the claim for startup reconciliation after ambiguous settlement.
                         a.job.last_error =
                             Some(format!("settlement requires reconciliation: {error:#}"));
@@ -1767,6 +1831,8 @@ fn launch(
             tools: tool_bindings.clone(),
             git_dir: expected_git_dir,
             backend_request_sha256: None,
+            communication: None,
+            communication_gap: None,
         });
         storage::write(&job_path(c, &job.task.id), job)?;
         storage::write(&dir.join("tool-bindings.json"), &tool_bindings)?;
@@ -1802,11 +1868,36 @@ fn launch(
             "{prompt}\nPrepared isolated memory (untrusted context, verify before use): {}\n",
             memory.unwrap_or(Value::Null)
         );
+        let mut communication_view = None;
+        let prompt = if let Some(team) = &job.task.communication {
+            match crate::multi_agent::prepare(&c.state_dir, job, team, now().max(0) as u64) {
+                Ok(prepared) => {
+                    communication_view = Some(prepared.endpoint.view);
+                    job.launch
+                        .as_mut()
+                        .context("missing launch authority")?
+                        .communication = Some(prepared.authority);
+                    format!("{prompt}{}", prepared.prompt)
+                }
+                Err(error) => {
+                    let gap = format!("{error:#}").chars().take(1024).collect::<String>();
+                    job.launch
+                        .as_mut()
+                        .context("missing launch authority")?
+                        .communication_gap = Some(gap);
+                    format!(
+                        "{prompt}\nHost communication channel is unavailable. Continue independent work; report this limitation. Do not attempt another cohort or treat missing proposals as agreement.\n"
+                    )
+                }
+            }
+        } else {
+            prompt
+        };
         fs::write(&prompt_path, prompt)?;
         let schema = dir.join("result-schema.json");
         storage::write(&schema, &report_schema(c, &job.task))?;
 
-        let invocation = crate::agent_backend::prepare(
+        let mut invocation = crate::agent_backend::prepare(
             &c.codex,
             job.backend.as_ref(),
             crate::agent_backend::RequestContext {
@@ -1822,6 +1913,9 @@ fn launch(
                 timeout_seconds: remaining.min(c.task_timeout_seconds),
             },
         )?;
+        if let Some(view) = communication_view {
+            invocation.access.read_only_views.push(view);
+        }
         job.launch
             .as_mut()
             .context("missing launch authority")?
@@ -1898,6 +1992,9 @@ fn launch(
     match result {
         Ok(process) => Ok((process, heartbeat)),
         Err(error) => {
+            if let Some(launch) = &job.launch {
+                revoke_communication(c, job, launch);
+            }
             // The worker (if spawned) was cancelled by Process::drop. Hand the
             // exact final token to the existing uncertain-outcome settlement.
             let lease = heartbeat.stop()?;
@@ -2178,6 +2275,24 @@ fn authoritative_success_receipt(w: &Workflow, job: &Job) -> Result<Value> {
     Ok(receipt)
 }
 
+fn communication_gap(c: &Config, job: &Job, reason: &str) {
+    let _ = storage::write(
+        &c.state_dir
+            .join("communication/diagnostics")
+            .join(format!("{}.json", job.run_id)),
+        &json!({"run_id":job.run_id,"at":now(),"error":reason.chars().take(1024).collect::<String>(),"research_claims_verified":false}),
+    );
+}
+fn revoke_communication(c: &Config, job: &Job, launch: &Launch) {
+    if let Some(authority) = &launch.communication {
+        if let Err(error) =
+            crate::multi_agent::revoked(&c.state_dir, authority, now().max(0) as u64)
+        {
+            communication_gap(c, job, &error.to_string());
+        }
+    }
+}
+
 fn memory_gap(c: &Config, job: &Job, reason: &str) -> Result<()> {
     storage::write(
         &c.state_dir
@@ -2199,6 +2314,19 @@ fn memory_gap(c: &Config, job: &Job, reason: &str) -> Result<()> {
 /// an interrupted subprocess may already have changed its external database.
 fn queue_post_success(c: &Config, w: &Workflow, job: &Job) -> Result<()> {
     let receipt = authoritative_success_receipt(w, job)?;
+    if let Some(team) = &job.task.communication {
+        if receipt.get("communication").is_some() {
+            if let Err(error) = crate::multi_agent::completed(
+                &c.state_dir,
+                job,
+                team,
+                &receipt,
+                now().max(0) as u64,
+            ) {
+                communication_gap(c, job, &error.to_string());
+            }
+        }
+    }
     let digest = storage::digest(&serde_json::to_vec(&receipt)?);
     let path = post_success_path(c, job);
     let prior: Option<Value> = if path.exists() {
@@ -2488,6 +2616,7 @@ fn admit_followups(
                 repository: proposal.repository,
                 prompt: proposal.prompt,
                 prompt_version: None,
+                communication: parent.task.communication.clone(),
                 max_attempts: None,
                 use_memory: false,
                 depth: parent.task.depth + 1,
@@ -2609,6 +2738,12 @@ fn settle_with_heartbeat(
                 if let Some(digest) = &launch.backend_request_sha256 {
                     receipt["backend_request_sha256"] = json!(digest);
                 }
+            }
+            if let Some(context) = &launch.communication {
+                receipt["communication"] = serde_json::to_value(context)?;
+            }
+            if let Some(gap) = &launch.communication_gap {
+                receipt["communication_gap"] = json!(gap);
             }
             let receipt_path = launch.log_dir.join("receipt.json");
             storage::write(&receipt_path, &receipt)?;
@@ -2766,6 +2901,9 @@ fn reconcile_orphans(c: &Config, w: &Workflow) -> Result<()> {
                     job.launch = None;
                     defer_read_retry(&mut job,"controller interrupted; old run paused, inspect workflow effects before write retry".into());
                 }
+            }
+            if w.status(&job.run_id)?["status"] != "succeeded" {
+                revoke_communication(c, &job, &launch);
             }
             storage::write(&job_path(c, &job.task.id), &job)?;
         }
@@ -2938,6 +3076,8 @@ mod tests {
             tools: json!({}),
             git_dir: String::new(),
             backend_request_sha256: None,
+            communication: None,
+            communication_gap: None,
         });
         storage::write(&job_path(&c, &job.task.id), &job).unwrap();
         // Neither a forged log receipt nor a forged memory success is authority.
@@ -3233,6 +3373,8 @@ mod tests {
             tools: json!({}),
             git_dir: String::new(),
             backend_request_sha256: None,
+            communication: None,
+            communication_gap: None,
         });
         assert_eq!(classify(&parent, &parent, &child, &states).0, "running");
         parent.launch.as_mut().unwrap().process_start = "not-the-retained-process".into();
@@ -3514,6 +3656,8 @@ mod tests {
             tools: json!({}),
             git_dir: String::new(),
             backend_request_sha256: None,
+            communication: None,
+            communication_gap: None,
         });
         storage::write(&job_path(&c, &job.task.id), &job).unwrap();
         kill_retained_workers(&c).unwrap();
@@ -3687,6 +3831,7 @@ printf '{"type":"fixture.completed"}\n'
             state_dir: temp.path().join("state"),
             superpod: repo,
             codex: fake.to_str().unwrap().into(),
+            multi_agent: None,
             agent_backends: BTreeMap::new(),
             role_backends: BTreeMap::new(),
             workflow: binary.into(),
@@ -3861,6 +4006,7 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
             repository: "superpod".into(),
             prompt: prompt.into(),
             prompt_version: None,
+            communication: None,
             max_attempts: Some(1),
             use_memory: false,
             depth: 0,
@@ -3987,6 +4133,7 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
                     }
                     .into(),
                     prompt_version: None,
+                    communication: None,
                     max_attempts: None,
                     use_memory: false,
                     depth: 0,
@@ -4109,6 +4256,7 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
                     }
                     .into(),
                     prompt_version: None,
+                    communication: None,
                     max_attempts: None,
                     use_memory: false,
                     depth: 0,
@@ -4189,6 +4337,7 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
             repository: "superpod".into(),
             prompt: prompt.into(),
             prompt_version: None,
+            communication: None,
             max_attempts: None,
             use_memory: false,
             depth: 0,
@@ -4351,6 +4500,7 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
             state_dir: root.join("state"),
             superpod: root.join("superpod"),
             codex: "unused".into(),
+            multi_agent: None,
             agent_backends: BTreeMap::new(),
             role_backends: BTreeMap::new(),
             workflow: root.join("unused"),
@@ -4375,6 +4525,7 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
                 repository: "superpod".into(),
                 prompt: "Resume the bounded repository research checkpoint".into(),
                 prompt_version: None,
+                communication: None,
                 max_attempts: None,
                 use_memory: true,
                 depth: 0,
@@ -4441,6 +4592,7 @@ mod host_budget_tests {
             state_dir: root.join("state"),
             superpod: root.join("superpod"),
             codex: "unused".into(),
+            multi_agent: None,
             agent_backends: BTreeMap::new(),
             role_backends: BTreeMap::new(),
             workflow: root.join("unused"),

@@ -310,6 +310,7 @@ fn build_tasks(
                         role: slot.role.clone(),
                         repository: "superpod".into(),
                         prompt,
+                        communication: None,
                         prompt_version: Some(prompts[i].version().into()),
                         max_attempts: Some(1),
                         use_memory: false,

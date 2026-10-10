@@ -173,7 +173,7 @@ pub fn check_capabilities(spec: &BackendSpec, task: &Task) -> Result<()> {
         "backend lacks workspace-write capability"
     );
     ensure!(
-        task.required_tools.is_empty() || caps.tool_execution,
+        (task.required_tools.is_empty() && task.communication.is_none()) || caps.tool_execution,
         "backend lacks tool-execution capability"
     );
     ensure!(

@@ -17,6 +17,8 @@ pub struct Config {
     pub agent_backends: BTreeMap<String, crate::agent_backend::BackendSpec>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub role_backends: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub multi_agent: Option<crate::multi_agent::Settings>,
     pub workflow: PathBuf,
     pub daily_seconds: u64,
     pub max_agents: usize,
@@ -126,6 +128,7 @@ mod tests {
             superpod: "/workspace/superpod".into(),
             codex: "codex".into(),
             agent_backends: Default::default(),
+            multi_agent: None,
             role_backends: Default::default(),
             workflow: "/tools/workflow".into(),
             daily_seconds: 43200,
