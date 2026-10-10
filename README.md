@@ -5,6 +5,13 @@ different Codex models in isolated task worktrees, preserves experimental
 bindings, evaluates prompt variants, and provides durable delivery adapters for
 CLI installations, GitHub PRs and research publication.
 
+Execution backends are modular: Codex remains the default, and a versioned local
+JSON process bridge can connect an independently implemented coding agent or bot.
+Role bindings, capability checks, credential isolation and the request/result
+contract are documented in [BACKENDS.md](BACKENDS.md). External provider
+compatibility must be tested separately; host scheduling and permissions remain
+unchanged by backend selection.
+
 Research knowledge belongs to the existing private
 [SuperPOD repository](https://github.com/stevetdp/superpod). Access to this public
 project does not grant access to SuperPOD. This repository contains the research

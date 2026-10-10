@@ -1,3 +1,4 @@
+pub mod agent_backend;
 pub mod agent_policy;
 pub mod automation;
 pub mod budget;

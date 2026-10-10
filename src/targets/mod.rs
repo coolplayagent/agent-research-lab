@@ -74,16 +74,37 @@ pub fn wrap_desktop_agent(
     write: bool,
     args: &[String],
 ) -> Result<(String, Vec<String>)> {
+    wrap_desktop_backend(
+        c,
+        worktree,
+        logs,
+        write,
+        &c.codex,
+        args,
+        &isolation::AgentAccess::codex(),
+    )
+}
+
+pub fn wrap_desktop_backend(
+    c: &Config,
+    worktree: &Path,
+    logs: &Path,
+    write: bool,
+    program: &str,
+    args: &[String],
+    access: &isolation::AgentAccess,
+) -> Result<(String, Vec<String>)> {
     let launcher = install_launcher(logs)?;
     let worker_args = desktop_arguments(c, &logs.join("desktop"));
-    isolation::wrap_agent_with_launcher(
-        &c.codex,
+    isolation::wrap_agent_with_launcher_access(
+        program,
         args,
         &c.state_dir,
         worktree,
         logs,
         write,
         (&launcher, &worker_args),
+        access,
     )
 }
 
@@ -188,6 +209,18 @@ pub fn verify(c: &Config, kind: &str) -> Result<Value> {
 /// Bounded live model/tool compatibility probe through the production launcher.
 /// This proves tool transport, not independent research quality or model benefit.
 pub fn agent_check(c: &Config) -> Result<Value> {
+    let backend_id = c
+        .role_backends
+        .get("review")
+        .map(String::as_str)
+        .unwrap_or("codex");
+    let program = match c.agent_backends.get(backend_id) {
+        Some(crate::agent_backend::BackendSpec::Codex { program }) => program,
+        Some(crate::agent_backend::BackendSpec::JsonProcess { .. }) => anyhow::bail!(
+            "desktop agent-check requires Codex command-event evidence; JSON bridge desktop compatibility is unverified; use an isolated task for backend-specific validation"
+        ),
+        None => &c.codex,
+    };
     prepare(c)?;
     let id = format!(
         "target-agent-{}-{}",
@@ -198,26 +231,27 @@ pub fn agent_check(c: &Config) -> Result<Value> {
     let worktree = c.state_dir.join("worktrees").join(&id);
     fs::create_dir_all(&logs)?;
     fs::create_dir_all(&worktree)?;
-    let mut args: Vec<String> = [
-        "exec",
-        "--json",
-        "--ephemeral",
-        "--skip-git-repo-check",
-        "-m",
+    let args = crate::agent_backend::codex_desktop_arguments(
         &c.models["review"],
-        "-o",
-    ]
-    .into_iter()
-    .map(str::to_owned)
-    .collect();
-    args.push(logs.join("model-result.txt").display().to_string());
-    args.extend(crate::agent_policy::arguments());
-    args.push(format!("Verify the owned desktop using actual tools. The CLI is {}. Read its installed SKILL.md. Run list-windows and screenshot (global --allow-risk safe before subcommand) on the provided DISPLAY. Save screenshot to $LAB_DESKTOP_TARGET/model.png. Read $LAB_DESKTOP_TARGET/observed.json and report the exact owned window title. Do not change DISPLAY, XAUTHORITY, or write observation/session files. Use only this dedicated target. Report actual command failures honestly; do not claim unavailable tools worked. No Git, installs, external messages or other desktop actions.", c.tools["computer-use-cli"].binary.display()));
+        &logs.join("model-result.txt"),
+        format!(
+            "Verify the owned desktop using actual tools. The CLI is {}. Read its installed SKILL.md. Run list-windows and screenshot (global --allow-risk safe before subcommand) on the provided DISPLAY. Save screenshot to $LAB_DESKTOP_TARGET/model.png. Read $LAB_DESKTOP_TARGET/observed.json and report the exact owned window title. Do not change DISPLAY, XAUTHORITY, or write observation/session files. Use only this dedicated target. Report actual command failures honestly; do not claim unavailable tools worked. No Git, installs, external messages or other desktop actions.",
+            c.tools["computer-use-cli"].binary.display()
+        ),
+    );
     storage::write(
         &logs.join("agent-permissions.json"),
         &crate::agent_policy::description(),
     )?;
-    let (program, args) = wrap_desktop_agent(c, &worktree, &logs, false, &args)?;
+    let (program, args) = wrap_desktop_backend(
+        c,
+        &worktree,
+        &logs,
+        false,
+        program,
+        &args,
+        &isolation::AgentAccess::codex(),
+    )?;
     let mut worker = process::Process::spawn(
         &program,
         &args,

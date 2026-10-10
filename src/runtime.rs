@@ -51,6 +51,8 @@ pub struct Task {
 pub struct Job {
     pub task: Task,
     pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backend: Option<crate::agent_backend::Binding>,
     pub source_commit: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub baseline_commit: Option<String>,
@@ -78,6 +80,8 @@ pub struct Launch {
     pub tools: Value,
     #[serde(default)]
     pub git_dir: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backend_request_sha256: Option<String>,
 }
 #[derive(Serialize, Deserialize)]
 struct ExitObservation {
@@ -173,6 +177,7 @@ pub(crate) fn enqueue_with_inputs(
     for t in &task.required_tools {
         ensure!(c.tools.contains_key(t), "unknown tool {t}");
     }
+    let backend = crate::agent_backend::freeze(c, &task)?;
     let _lock = storage::lock(&c.state_dir.join("enqueue.lock"))?;
     let destination = job_path(c, &task.id);
     if destination.exists() {
@@ -180,6 +185,10 @@ pub(crate) fn enqueue_with_inputs(
         ensure!(
             serde_json::to_value(&prior.task)? == serde_json::to_value(&task)?,
             "task ID already binds different inputs"
+        );
+        ensure!(
+            prior.backend == backend,
+            "task ID already binds a different backend"
         );
         ensure_started(c, &prior)?;
         return Ok(prior);
@@ -269,6 +278,7 @@ pub(crate) fn enqueue_with_inputs(
         storage::digest(rendered_experiment_prompt(c, &task, inputs.as_ref())?.as_bytes());
     let job = Job {
         model: c.models[&task.role].clone(),
+        backend,
         source_commit: commit,
         baseline_commit,
         research_inputs: inputs,
@@ -292,6 +302,9 @@ fn frozen_input(job: &Job) -> Value {
     let mut value = json!({"task":job.task,"model":job.model,"source_commit":job.source_commit,
         "superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,
         "config_digest":job.config_digest,"worktree":job.worktree});
+    if let Some(backend) = &job.backend {
+        value["backend"] = json!(backend);
+    }
     if let Some(base) = &job.baseline_commit {
         value["baseline_commit"] = json!(base);
     }
@@ -788,26 +801,24 @@ pub fn doctor(c: &Config, probe_models: bool) -> Result<Value> {
     let knowledge = git(&c.superpod, &["rev-parse", "HEAD"]);
     let mut models = Vec::new();
     if probe_models {
-        let unique: BTreeSet<_> = c.models.values().collect();
-        for model in unique {
-            let mut args = vec![
-                "exec".into(),
-                "--ephemeral".into(),
-                "--json".into(),
-                "-m".into(),
-                model.clone(),
-            ];
-            args.extend(crate::agent_policy::arguments());
-            args.push("Reply with exactly OK. Do not use tools.".into());
-            let result = process::capture(&c.codex, &args, &c.superpod, Duration::from_secs(90));
-            models.push(match result {
-                Ok(out) => json!({"model":model,"available":out.status.success()}),
-                Err(e) => json!({"model":model,"available":false,"error":e.to_string()}),
+        let mut observed = BTreeSet::new();
+        for (role, model) in &c.models {
+            let backend = c
+                .role_backends
+                .get(role)
+                .map(String::as_str)
+                .unwrap_or("codex");
+            if !observed.insert((backend, model)) {
+                continue;
+            }
+            models.push(match crate::agent_backend::probe(c, role, model) {
+                Ok(probe) => probe,
+                Err(error) => json!({"model":model,"backend":backend,"available":false,"error":error.to_string()}),
             });
         }
     }
     Ok(
-        json!({"agent_permissions":crate::agent_policy::description(),"tools":results,"latest_skills":latest_skills,"superpod":{"path":c.superpod,"commit":knowledge.as_ref().ok(),"error":knowledge.err().map(|e|e.to_string())},"model_probes":models,"daily_seconds":c.daily_seconds,"max_agents":c.max_agents}),
+        json!({"agent_permissions":crate::agent_policy::description(),"configured_backends":crate::agent_backend::inventory(c),"role_backends":c.role_backends,"capability_status":"declared; model probes do not establish research quality or third-party compatibility","tools":results,"latest_skills":latest_skills,"superpod":{"path":c.superpod,"commit":knowledge.as_ref().ok(),"error":knowledge.err().map(|e|e.to_string())},"model_probes":models,"daily_seconds":c.daily_seconds,"max_agents":c.max_agents}),
     )
 }
 
@@ -1712,6 +1723,7 @@ fn launch(
         storage::digest(&serde_json::to_vec(c)?) == job.config_digest,
         "configuration changed after enqueue; enqueue a new experiment instead"
     );
+    crate::agent_backend::verify(c, &job.task, job.backend.as_ref())?;
     let dependencies = completed_dependencies(c, w, job)?;
     let tool_bindings = observed_tools(c, job)?;
     let expected_git_dir = git(&job.worktree, &["rev-parse", "--absolute-git-dir"])?;
@@ -1754,12 +1766,13 @@ fn launch(
             log_dir: dir.clone(),
             tools: tool_bindings.clone(),
             git_dir: expected_git_dir,
+            backend_request_sha256: None,
         });
         storage::write(&job_path(c, &job.task.id), job)?;
         storage::write(&dir.join("tool-bindings.json"), &tool_bindings)?;
         storage::write(
             &dir.join("agent-permissions.json"),
-            &crate::agent_policy::description(),
+            &crate::agent_backend::permission_description(job.backend.as_ref()),
         )?;
         if job
             .task
@@ -1793,24 +1806,28 @@ fn launch(
         let schema = dir.join("result-schema.json");
         storage::write(&schema, &report_schema(c, &job.task))?;
 
-        let mut args = vec![
-            "exec".into(),
-            "--json".into(),
-            "--ephemeral".into(),
-            "-m".into(),
-            job.model.clone(),
-            "-c".into(),
-            "model_reasoning_effort=\"medium\"".into(),
-            "--output-schema".into(),
-            schema.display().to_string(),
-            "-o".into(),
-            dir.join("result.json").display().to_string(),
-            "-".into(),
-        ];
-        // Options precede the stdin prompt marker for all Codex versions.
-        args.pop();
-        args.extend(crate::agent_policy::arguments());
-        args.push("-".into());
+        let invocation = crate::agent_backend::prepare(
+            &c.codex,
+            job.backend.as_ref(),
+            crate::agent_backend::RequestContext {
+                request_id: &job.run_id,
+                model: &job.model,
+                prompt_path: &prompt_path,
+                schema_path: &schema,
+                worktree: &job.worktree,
+                logs: &dir,
+                bindings: binding,
+                write: job.task.write,
+                required_tools: &job.task.required_tools,
+                timeout_seconds: remaining.min(c.task_timeout_seconds),
+            },
+        )?;
+        job.launch
+            .as_mut()
+            .context("missing launch authority")?
+            .backend_request_sha256 = invocation.request_sha256.clone();
+        // The digest is private host authority before any backend process starts.
+        storage::write(&job_path(c, &job.task.id), job)?;
         let env = vec![
             (
                 "RELAY_MEMORY_HOME".into(),
@@ -1827,17 +1844,27 @@ fn launch(
             .iter()
             .any(|name| name == "computer-use-cli")
         {
-            crate::targets::wrap_desktop_agent(c, &job.worktree, &dir, job.task.write, &args)?
+            crate::targets::wrap_desktop_backend(
+                c,
+                &job.worktree,
+                &dir,
+                job.task.write,
+                &invocation.program,
+                &invocation.args,
+                &invocation.access,
+            )?
         } else {
-            crate::isolation::wrap_agent(
-                &c.codex,
-                &args,
+            crate::isolation::wrap_agent_with_access(
+                &invocation.program,
+                &invocation.args,
                 &c.state_dir,
                 &job.worktree,
                 &dir,
                 job.task.write,
+                &invocation.access,
             )?
         };
+        crate::agent_backend::verify(c, &job.task, job.backend.as_ref())?;
         let execution_timeout = Duration::from_secs(remaining)
             .saturating_sub(launch_started.elapsed())
             .min(Duration::from_secs(c.task_timeout_seconds));
@@ -1853,7 +1880,7 @@ fn launch(
             &dir.join("process"),
             execution_timeout,
             &env,
-            Some(&prompt_path),
+            Some(&invocation.stdin),
         )?;
         let launch = job.launch.as_mut().context("missing prepared launch")?;
         launch.pid = process.pid();
@@ -1899,7 +1926,11 @@ fn executable_path(path: &Path) -> Result<PathBuf> {
 fn observed_tools(c: &Config, job: &Job) -> Result<Value> {
     let mut tools = serde_json::Map::new();
     let mut paths = vec![
-        ("codex", PathBuf::from(&c.codex)),
+        job.backend
+            .as_ref()
+            .map_or(("codex", PathBuf::from(&c.codex)), |b| {
+                ("agent-backend", b.executable.clone())
+            }),
         ("workflow-cli", c.workflow.clone()),
     ];
     for (name, tool) in &c.tools {
@@ -2140,7 +2171,8 @@ fn authoritative_success_receipt(w: &Workflow, job: &Job) -> Result<Value> {
             && receipt["superpod_commit"] == job.superpod_commit
             && receipt["prompt_digest"] == job.prompt_digest
             && receipt["model"] == job.model
-            && receipt["research_inputs"] == serde_json::to_value(&job.research_inputs)?,
+            && receipt["research_inputs"] == serde_json::to_value(&job.research_inputs)?
+            && receipt["backend"] == serde_json::to_value(&job.backend)?,
         "committed completion receipt does not bind the frozen experiment"
     );
     Ok(receipt)
@@ -2536,12 +2568,11 @@ fn settle_with_heartbeat(
             observation.reason,
             observation.code
         );
-        let path = launch.log_dir.join("result.json");
-        ensure!(
-            fs::metadata(&path)?.len() <= 1024 * 1024,
-            "agent result exceeds 1 MiB"
-        );
-        let value: Value = storage::read(&path)?;
+        let value = crate::agent_backend::result(
+            job.backend.as_ref(),
+            &launch.log_dir,
+            launch.backend_request_sha256.as_deref(),
+        )?;
         validate_report(&value)?;
         Ok(value)
     })();
@@ -2572,7 +2603,13 @@ fn settle_with_heartbeat(
             } else {
                 None
             };
-            let receipt = json!({"agent_report":value,"source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,"model":job.model,"tools":launch.tools,"research_inputs":job.research_inputs,"candidate":candidate,"post_success_protocol":1,"claim":"process completed; research claims require independent evaluation"});
+            let mut receipt = json!({"agent_report":value,"source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,"model":job.model,"tools":launch.tools,"research_inputs":job.research_inputs,"candidate":candidate,"post_success_protocol":1,"claim":"process completed; research claims require independent evaluation"});
+            if let Some(backend) = &job.backend {
+                receipt["backend"] = json!(backend);
+                if let Some(digest) = &launch.backend_request_sha256 {
+                    receipt["backend_request_sha256"] = json!(digest);
+                }
+            }
             let receipt_path = launch.log_dir.join("receipt.json");
             storage::write(&receipt_path, &receipt)?;
             let outputs = json!({"result":serde_json::to_string(&receipt)?});
@@ -2900,6 +2937,7 @@ mod tests {
             log_dir: c.state_dir.join("runs").join(&job.run_id),
             tools: json!({}),
             git_dir: String::new(),
+            backend_request_sha256: None,
         });
         storage::write(&job_path(&c, &job.task.id), &job).unwrap();
         // Neither a forged log receipt nor a forged memory success is authority.
@@ -3194,6 +3232,7 @@ mod tests {
             log_dir: PathBuf::new(),
             tools: json!({}),
             git_dir: String::new(),
+            backend_request_sha256: None,
         });
         assert_eq!(classify(&parent, &parent, &child, &states).0, "running");
         parent.launch.as_mut().unwrap().process_start = "not-the-retained-process".into();
@@ -3474,6 +3513,7 @@ mod tests {
             log_dir: temp.path().join("sleep-logs"),
             tools: json!({}),
             git_dir: String::new(),
+            backend_request_sha256: None,
         });
         storage::write(&job_path(&c, &job.task.id), &job).unwrap();
         kill_retained_workers(&c).unwrap();
@@ -3647,6 +3687,8 @@ printf '{"type":"fixture.completed"}\n'
             state_dir: temp.path().join("state"),
             superpod: repo,
             codex: fake.to_str().unwrap().into(),
+            agent_backends: BTreeMap::new(),
+            role_backends: BTreeMap::new(),
             workflow: binary.into(),
             daily_seconds: 3600,
             max_agents: 2,
@@ -3662,6 +3704,150 @@ printf '{"type":"fixture.completed"}\n'
             c.tools.get_mut("relay-memory").unwrap().binary = binary.into();
         }
         (temp, c)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "real workflow/bwrap with explicit fake JSON bridge; set LAB_WORKFLOW_BIN"]
+    fn actual_workflow_json_bridge_contract_and_process_lifetime() {
+        use std::os::unix::fs::PermissionsExt;
+        let (temp, mut c) = scheduler_fixture();
+        let bridge = temp.path().join("fake-json-bridge");
+        fs::write(&bridge, r#"#!/usr/bin/python3
+import hashlib, json, os, pathlib, sys, time
+raw = sys.stdin.buffer.read()
+r = json.loads(raw)
+assert r['schema_version'] == 1
+assert 'OPENAI_API_KEY' not in os.environ and 'CODEX_HOME' not in os.environ
+out = pathlib.Path(r['result_path'])
+mode = r['request_id'].split('-attempt-')[0]
+report = {'summary':'explicit fake bridge only','findings':[],'sources':[],'limitations':['protocol fixture, not model research'],'next_tasks':[]}
+if r['permissions']['worktree_write']:
+    pathlib.Path(r['worktree'], 'candidate.txt').write_text('fixture bridge candidate')
+if r.get('bindings', {}).get('probe'): report = {'ok':True}
+if mode in ['timeout', 'pause', 'detached-exit']:
+    if os.fork() == 0:
+        os.setsid()
+        while True:
+            with open(out.parent / 'child-counter', 'a') as f: f.write('x')
+            time.sleep(0.03)
+    while not (out.parent / 'child-counter').exists(): time.sleep(0.01)
+    if mode != 'detached-exit': time.sleep(30)
+if mode == 'malformed-write': out.write_text('{'); sys.exit(0)
+if mode == 'missing': sys.exit(0)
+if mode == 'fifo': os.mkfifo(out); sys.exit(0)
+if mode == 'oversize': out.write_text(' ' * (1024*1024+1)); sys.exit(0)
+digest = hashlib.sha256(raw).hexdigest()
+if mode == 'request-tamper':
+    (out.parent / 'bridge-request.json').write_text('modified')
+    digest = hashlib.sha256(b'modified').hexdigest()
+out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':report}))
+"#).unwrap();
+        fs::set_permissions(&bridge, fs::Permissions::from_mode(0o700)).unwrap();
+        let spec = crate::agent_backend::BackendSpec::JsonProcess {
+            program: bridge,
+            args: vec![],
+            env_allowlist: vec![],
+            capabilities: crate::agent_backend::Capabilities {
+                structured_result: true,
+                read_workspace: true,
+                write_workspace: true,
+                tool_execution: true,
+                desktop: false,
+            },
+        };
+        c.agent_backends.insert("fixture-bridge".into(), spec);
+        for role in ["research", "implement", "review"] {
+            c.role_backends.insert(role.into(), "fixture-bridge".into());
+        }
+        let probe = crate::agent_backend::probe(&c, "review", &c.models["review"]).unwrap();
+        assert_eq!(probe["probe"], "isolated_json_contract");
+        assert_eq!(probe["provider_compatibility"], "unverified");
+        let w = workflow(&c);
+        for mode in [
+            "success",
+            "write-success",
+            "malformed-write",
+            "missing",
+            "fifo",
+            "oversize",
+            "request-tamper",
+            "detached-exit",
+            "timeout",
+            "pause",
+        ] {
+            let write = mode.contains("write");
+            let task:Task=serde_json::from_value(json!({"id":mode,"role":if write {"implement"} else {"research"},"repository":"superpod","prompt":"Run the explicit protocol fixture only.","write":write,"max_attempts":1})).unwrap();
+            let mut job = enqueue(&c, task).unwrap();
+            let (mut worker, mut heartbeat) =
+                launch(&c, &w, &mut job, if mode == "timeout" { 2 } else { 15 }).unwrap();
+            let logs = c.state_dir.join("runs").join(&job.run_id);
+            let frozen: Job = storage::read(&job_path(&c, mode)).unwrap();
+            assert!(
+                frozen.launch.unwrap().backend_request_sha256.is_some(),
+                "host must freeze digest before spawn"
+            );
+            let started = std::time::Instant::now();
+            let observation = loop {
+                assert!(
+                    started.elapsed() < Duration::from_secs(10),
+                    "backend process failed to terminate: {mode}"
+                );
+                if mode == "pause" && logs.join("child-counter").exists() {
+                    fs::write(c.state_dir.join("paused"), "fixture pause").unwrap();
+                }
+                match worker.poll() {
+                    Ok(Some(exit)) => {
+                        break ExitObservation {
+                            success: exit.success(),
+                            code: exit.code(),
+                            reason: None,
+                        };
+                    }
+                    Ok(None) => std::thread::sleep(Duration::from_millis(30)),
+                    Err(error) => {
+                        break ExitObservation {
+                            success: false,
+                            code: None,
+                            reason: Some(error.to_string()),
+                        };
+                    }
+                }
+            };
+            // Resume only this private fixture; production state is never used.
+            let _ = fs::remove_file(c.state_dir.join("paused"));
+            job.launch.as_mut().unwrap().lease = heartbeat.stop().unwrap();
+            let accepted = settle_with_heartbeat(&w, &job, &observation, None).unwrap();
+            let expected = matches!(mode, "success" | "write-success" | "detached-exit");
+            assert_eq!(accepted, expected, "{mode}");
+            assert_eq!(
+                w.status(&job.run_id).unwrap()["status"] == "succeeded",
+                expected,
+                "{mode}"
+            );
+            w.verify(&job.run_id).unwrap();
+            if expected {
+                let receipt = authoritative_success_receipt(&w, &job).unwrap();
+                assert_eq!(
+                    receipt["backend"],
+                    serde_json::to_value(&job.backend).unwrap()
+                );
+                assert_eq!(
+                    receipt["backend_request_sha256"],
+                    json!(job.launch.as_ref().unwrap().backend_request_sha256)
+                );
+            }
+            if logs.join("child-counter").exists() {
+                let before = fs::read(logs.join("child-counter")).unwrap();
+                std::thread::sleep(Duration::from_millis(150));
+                assert_eq!(
+                    before,
+                    fs::read(logs.join("child-counter")).unwrap(),
+                    "detached child survived: {mode}"
+                );
+            }
+            assert_eq!(job.attempt, 1);
+        }
     }
 
     #[cfg(unix)]
@@ -4165,6 +4351,8 @@ printf '{"type":"fixture.completed"}\n'
             state_dir: root.join("state"),
             superpod: root.join("superpod"),
             codex: "unused".into(),
+            agent_backends: BTreeMap::new(),
+            role_backends: BTreeMap::new(),
             workflow: root.join("unused"),
             daily_seconds: 3600,
             max_agents: 1,
@@ -4180,6 +4368,7 @@ printf '{"type":"fixture.completed"}\n'
             )]),
         };
         let mut job = Job {
+            backend: None,
             task: Task {
                 id: "memory-baseline".into(),
                 role: "research".into(),
@@ -4252,6 +4441,8 @@ mod host_budget_tests {
             state_dir: root.join("state"),
             superpod: root.join("superpod"),
             codex: "unused".into(),
+            agent_backends: BTreeMap::new(),
+            role_backends: BTreeMap::new(),
             workflow: root.join("unused"),
             daily_seconds: 43200,
             max_agents: 1,

@@ -24,34 +24,74 @@ pub fn wrap_agent(
     log_dir: &Path,
     write: bool,
 ) -> Result<(String, Vec<String>)> {
+    wrap_agent_with_access(
+        program,
+        args,
+        state_dir,
+        worktree,
+        log_dir,
+        write,
+        &AgentAccess::codex(),
+    )
+}
+
+/// Host-selected access, never supplied by a backend result. Views must be exact
+/// exported cohort directories; controller authority is not mountable here.
+#[derive(Debug, Clone)]
+pub struct AgentAccess {
+    pub codex_credentials: bool,
+    pub env_allowlist: Vec<String>,
+    pub read_only_views: Vec<PathBuf>,
+}
+impl AgentAccess {
+    pub fn codex() -> Self {
+        Self {
+            codex_credentials: true,
+            env_allowlist: vec![],
+            read_only_views: vec![],
+        }
+    }
+}
+
+pub fn wrap_agent_with_access(
+    program: &str,
+    args: &[String],
+    state_dir: &Path,
+    worktree: &Path,
+    log_dir: &Path,
+    write: bool,
+    access: &AgentAccess,
+) -> Result<(String, Vec<String>)> {
+    let mut keys = vec![
+        "PATH",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+        "no_proxy",
+        "RUSTUP_HOME",
+    ];
+    if access.codex_credentials {
+        keys.extend(["OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_API_BASE"]);
+    }
+    for key in &access.env_allowlist {
+        crate::agent_backend::validate_environment_name(key)?;
+        keys.push(key);
+    }
     let host = HostAccess {
         home: std::env::var_os("HOME").map(PathBuf::from),
         codex_home: codex_configuration_home(),
-        environment: [
-            "PATH",
-            "LANG",
-            "LC_ALL",
-            "LC_CTYPE",
-            "OPENAI_API_KEY",
-            "OPENAI_BASE_URL",
-            "OPENAI_API_BASE",
-            "HTTP_PROXY",
-            "HTTPS_PROXY",
-            "ALL_PROXY",
-            "NO_PROXY",
-            "http_proxy",
-            "https_proxy",
-            "all_proxy",
-            "no_proxy",
-            "RUSTUP_HOME",
-        ]
-        .into_iter()
-        .filter_map(|key| {
-            std::env::var(key)
-                .ok()
-                .map(|value| (key.to_string(), value))
-        })
-        .collect(),
+        environment: keys
+            .into_iter()
+            .filter_map(|key| std::env::var(key).ok().map(|v| (key.into(), v)))
+            .collect(),
+        access: access.clone(),
     };
     wrap_with_host(program, args, state_dir, worktree, log_dir, write, host)
 }
@@ -68,13 +108,37 @@ pub fn wrap_agent_with_launcher(
     write: bool,
     launcher: (&Path, &[String]),
 ) -> Result<(String, Vec<String>)> {
+    wrap_agent_with_launcher_access(
+        program,
+        args,
+        state_dir,
+        worktree,
+        log_dir,
+        write,
+        launcher,
+        &AgentAccess::codex(),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn wrap_agent_with_launcher_access(
+    program: &str,
+    args: &[String],
+    state_dir: &Path,
+    worktree: &Path,
+    log_dir: &Path,
+    write: bool,
+    launcher: (&Path, &[String]),
+    access: &AgentAccess,
+) -> Result<(String, Vec<String>)> {
     let launcher_path = executable(launcher.0.to_str().context("launcher path is not UTF-8")?)?;
     let logs = checked_directory(log_dir)?;
     ensure!(
         launcher_path.starts_with(&logs),
         "target launcher must belong to this task"
     );
-    let (bwrap, mut wrapped) = wrap_agent(program, args, state_dir, worktree, log_dir, write)?;
+    let (bwrap, mut wrapped) =
+        wrap_agent_with_access(program, args, state_dir, worktree, log_dir, write, access)?;
     let command_start = wrapped.len() - args.len() - 1;
     let command = wrapped.split_off(command_start);
     wrapped.push(utf8(&launcher_path)?);
@@ -88,6 +152,7 @@ struct HostAccess {
     home: Option<PathBuf>,
     codex_home: Option<PathBuf>,
     environment: Vec<(String, String)>,
+    access: AgentAccess,
 }
 
 fn wrap_with_host(
@@ -142,7 +207,9 @@ fn wrap_with_host(
         fs::set_permissions(directory, fs::Permissions::from_mode(0o700))?;
     }
     let host_codex_home = host.codex_home;
-    if let Some(host) = &host_codex_home {
+    if host.access.codex_credentials
+        && let Some(host) = &host_codex_home
+    {
         // Preserve provider settings and authentication without allowing the
         // child to modify a shared Codex installation or another task's state.
         for filename in ["auth.json", "models_cache.json", "version.json"] {
@@ -197,6 +264,30 @@ fn wrap_with_host(
         "--tmpfs".into(),
         utf8(&state)?,
     ];
+    if !host.access.codex_credentials
+        && let Some(host_home) = &host.home
+    {
+        // Generic adapters receive no ambient home directory: credentials may
+        // live at arbitrary paths, not only in known provider directories.
+        ensure!(
+            !host_home.starts_with(&tools),
+            "host HOME overlaps restored tool directory"
+        );
+        let state_mask = wrapped.split_off(wrapped.len() - 2);
+        mask_credentials(&mut wrapped, host_home)?;
+        wrapped.extend(state_mask);
+        for relative in [".rustup", ".cargo/bin"] {
+            let directory = host_home.join(relative);
+            if directory.is_dir() {
+                let directory = checked_directory(&directory)?;
+                ensure!(
+                    !directory.starts_with(&state),
+                    "host toolchain aliases controller state"
+                );
+                add_mount(&mut wrapped, "--ro-bind", &directory, &directory)?;
+            }
+        }
+    }
     add_mount(
         &mut wrapped,
         if write { "--bind" } else { "--ro-bind" },
@@ -220,6 +311,7 @@ fn wrap_with_host(
     if let Some(host_home) = &host.home {
         for relative in [
             ".ssh",
+            ".codex",
             ".config/gh",
             ".config/git",
             ".git-credentials",
@@ -259,7 +351,7 @@ fn wrap_with_host(
     add_mount(&mut wrapped, "--ro-bind", &program, &program)?;
     // The standalone distribution launches this exact sibling for tool calls.
     // Exposing the main executable alone permits model turns but breaks tools.
-    if program.file_name().is_some_and(|name| name == "codex") {
+    if host.access.codex_credentials && program.file_name().is_some_and(|name| name == "codex") {
         let helper = program
             .parent()
             .context("executable has no parent")?
@@ -288,6 +380,25 @@ fn wrap_with_host(
         );
         add_mount(&mut wrapped, "--ro-bind", &rg, &rg)?;
     }
+    for view in &host.access.read_only_views {
+        let view = checked_directory(view)?;
+        let name = view
+            .file_name()
+            .and_then(|v| v.to_str())
+            .context("invalid cohort view")?;
+        ensure!(
+            view.parent() == Some(state.join("communication/views").as_path())
+                && name.len() == 64
+                && name
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+            "read-only view must be an exact exported cohort directory"
+        );
+        add_mount(&mut wrapped, "--ro-bind", &view, &view)?;
+    }
+    if host.access.codex_credentials {
+        wrapped.extend(["--setenv".into(), "CODEX_HOME".into(), utf8(&codex_home)?]);
+    }
     for (key, value) in host.environment {
         wrapped.extend(["--setenv".into(), key, value]);
     }
@@ -295,7 +406,6 @@ fn wrap_with_host(
         ("HOME", home),
         ("CARGO_HOME", logs.join("home/.cargo")),
         ("CARGO_TARGET_DIR", logs.join("cache/cargo-target")),
-        ("CODEX_HOME", codex_home),
         ("RELAY_MEMORY_HOME", logs.join("memory")),
         ("RELAY_KNOWLEDGE_HOME", logs.join("knowledge-index")),
         ("XDG_CACHE_HOME", logs.join("cache")),
@@ -467,7 +577,7 @@ fn checked_path(path: &Path) -> Result<PathBuf> {
     path.canonicalize().context("sandbox path must exist")
 }
 
-fn executable(program: &str) -> Result<PathBuf> {
+pub(crate) fn executable(program: &str) -> Result<PathBuf> {
     let candidate = if program.contains('/') {
         PathBuf::from(program)
     } else {
@@ -586,6 +696,100 @@ mod tests {
     }
 
     #[test]
+    fn generic_backend_hides_entire_host_home_and_exposes_only_exact_read_only_view() {
+        let (temp, state, worktree, logs) = fixture();
+        let host_home = temp.path().join("host-home");
+        let host_codex = host_home.join(".codex");
+        fs::create_dir_all(host_home.join(".aws")).unwrap();
+        fs::create_dir_all(host_codex.join("skills/example")).unwrap();
+        fs::write(host_home.join(".aws/credentials"), "private-fixture").unwrap();
+        fs::write(host_codex.join("auth.json"), "private-fixture").unwrap();
+        fs::write(host_codex.join("skills/example/SKILL.md"), "public fixture").unwrap();
+        let program = host_home.join("bridge");
+        fs::write(
+            &program,
+            r#"#!/bin/sh
+set -eu
+test -z "${OPENAI_API_KEY+x}"
+test -z "${GH_TOKEN+x}"
+test -z "${CODEX_HOME+x}"
+test "$TEST_MODEL_CREDENTIAL" = explicit-fixture
+test ! -e "$1/.aws/credentials"
+test ! -e "$1/.codex/auth.json"
+test ! -e "$HOME/../codex-home/auth.json"
+test -f "$1/.codex/skills/example/SKILL.md"
+test "$(cat "$2/board.json")" = public-proposal
+! touch "$2/forbidden" 2>/dev/null
+test ! -e "$3/authority/private.json"
+"#,
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o700)).unwrap();
+        let view = state.join("communication/views").join("a".repeat(64));
+        fs::create_dir_all(&view).unwrap();
+        fs::write(view.join("board.json"), "public-proposal").unwrap();
+        fs::create_dir_all(state.join("communication/authority")).unwrap();
+        fs::write(
+            state.join("communication/authority/private.json"),
+            "host-only",
+        )
+        .unwrap();
+        let access = AgentAccess {
+            codex_credentials: false,
+            env_allowlist: vec![],
+            read_only_views: vec![view.clone()],
+        };
+        let host = || HostAccess {
+            home: Some(host_home.clone()),
+            codex_home: Some(host_codex.clone()),
+            environment: vec![
+                ("PATH".into(), "/usr/bin:/bin".into()),
+                ("TEST_MODEL_CREDENTIAL".into(), "explicit-fixture".into()),
+            ],
+            access: access.clone(),
+        };
+        let (binary, args) = wrap_with_host(
+            program.to_str().unwrap(),
+            &[
+                utf8(&host_home).unwrap(),
+                utf8(&view).unwrap(),
+                utf8(&state.join("communication")).unwrap(),
+            ],
+            &state,
+            &worktree,
+            &logs,
+            false,
+            host(),
+        )
+        .unwrap();
+        let output = Command::new(binary)
+            .args(args)
+            .env("OPENAI_API_KEY", "must-not-inherit")
+            .env("GH_TOKEN", "must-not-inherit")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let mut invalid = host();
+        invalid.access.read_only_views = vec![state.join("communication")];
+        assert!(
+            wrap_with_host(
+                program.to_str().unwrap(),
+                &[],
+                &state,
+                &worktree,
+                &logs,
+                false,
+                invalid
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn credentials_and_external_tool_configuration_are_not_inherited() {
         let (_temp, state, worktree, logs) = fixture();
         let host_home = state.join("tools/host-home");
@@ -602,6 +806,7 @@ mod tests {
             home: Some(host_home),
             codex_home: Some(host_codex),
             environment: vec![("PATH".into(), "/usr/bin:/bin".into())],
+            access: AgentAccess::codex(),
         };
         let (program, args) =
             wrap_with_host("/bin/sh", &args, &state, &worktree, &logs, false, access).unwrap();
@@ -677,6 +882,7 @@ mod tests {
             home: Some(host_home),
             codex_home: Some(host_codex),
             environment: vec![("PATH".into(), "/usr/bin:/bin".into())],
+            access: AgentAccess::codex(),
         };
         let (program, args) = wrap_with_host(
             executable.to_str().unwrap(),

@@ -130,7 +130,16 @@ impl Process {
         self.child.id()
     }
     pub fn poll(&mut self) -> Result<Option<ExitStatus>> {
-        if let Some(status) = self.child.try_wait()? {
+        let status = self.child.try_wait()?;
+        // Check even after a fast successful exit; otherwise an oversized final
+        // burst bypasses the same bound applied to a still-running worker.
+        if fs::metadata(&self.stdout)?.len() > MAX_OUTPUT
+            || fs::metadata(&self.stderr)?.len() > MAX_OUTPUT
+        {
+            self.cancel()?;
+            bail!("process output limit exceeded");
+        }
+        if let Some(status) = status {
             self.settled = true;
             self.kill_group();
             return Ok(Some(status));
@@ -138,12 +147,6 @@ impl Process {
         if self.started.elapsed() >= self.timeout {
             self.cancel()?;
             bail!("process timeout; outcome requires reconciliation");
-        }
-        if fs::metadata(&self.stdout)?.len() > MAX_OUTPUT
-            || fs::metadata(&self.stderr)?.len() > MAX_OUTPUT
-        {
-            self.cancel()?;
-            bail!("process output limit exceeded");
         }
         Ok(None)
     }
@@ -249,6 +252,36 @@ mod tests {
                 .unwrap()
                 .status
                 .success()
+        );
+    }
+    #[test]
+    fn fast_successful_exit_does_not_bypass_output_limit() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut process = Process::spawn(
+            "/usr/bin/head",
+            &[
+                "-c".into(),
+                (MAX_OUTPUT + 1).to_string(),
+                "/dev/zero".into(),
+            ],
+            temp.path(),
+            &temp.path().join("logs"),
+            Duration::from_secs(5),
+            &[],
+            None,
+        )
+        .unwrap();
+        let started = Instant::now();
+        while process.child.try_wait().unwrap().is_none() {
+            assert!(started.elapsed() < Duration::from_secs(5));
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(
+            process
+                .poll()
+                .unwrap_err()
+                .to_string()
+                .contains("output limit")
         );
     }
     #[test]

@@ -1306,6 +1306,7 @@ mod tests {
     ) -> (Job, Value, Value) {
         let commit = &plan.inputs.repositories["superpod"].upstream.commit;
         let job = Job {
+            backend: None,
             task: entry.task.clone(),
             model: entry.model.clone(),
             source_commit: commit.clone(),

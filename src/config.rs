@@ -13,6 +13,10 @@ pub struct Config {
     pub state_dir: PathBuf,
     pub superpod: PathBuf,
     pub codex: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub agent_backends: BTreeMap<String, crate::agent_backend::BackendSpec>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub role_backends: BTreeMap<String, String>,
     pub workflow: PathBuf,
     pub daily_seconds: u64,
     pub max_agents: usize,
@@ -42,6 +46,7 @@ impl Config {
         Ok(c)
     }
     pub fn validate(&self) -> Result<()> {
+        crate::agent_backend::validate_config(self)?;
         if self.require_latest
             && self
                 .skills_manifest
@@ -120,6 +125,8 @@ mod tests {
             state_dir: "/workspace/lab/.lab".into(),
             superpod: "/workspace/superpod".into(),
             codex: "codex".into(),
+            agent_backends: Default::default(),
+            role_backends: Default::default(),
             workflow: "/tools/workflow".into(),
             daily_seconds: 43200,
             max_agents: 8,
