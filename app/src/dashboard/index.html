@@ -28,7 +28,16 @@
       </div>
     </header>
     <div id="collaboration-page" class="shell">
-      <aside class="sidebar">
+      <aside id="left-sidebar" class="sidebar">
+        <div
+          id="resize-left"
+          class="sidebar-resizer"
+          role="separator"
+          tabindex="0"
+          aria-label="调整左侧栏宽度"
+          aria-orientation="vertical"
+          aria-controls="left-sidebar"
+        ></div>
         <div class="side-title">
           <h2>协作空间</h2>
           <span class="readonly">只读</span>
@@ -40,28 +49,46 @@
             placeholder="搜索 agent / 任务"
             aria-label="搜索 agent 或任务" /></label
         ><button id="latest-room" class="latest-button">◉ 跟随当前研究</button>
-        <details id="section-rooms" class="sidebar-section" open>
-          <summary class="section-label">
-            协作群 <span id="room-count"></span>
-          </summary>
-          <div id="rooms" class="rooms"></div>
-        </details>
-        <details id="section-private" class="sidebar-section" open>
-          <summary class="section-label">
-            定向会话 <span id="private-count"></span>
-          </summary>
-          <div id="private-chats" class="private-chats"></div>
-        </details>
-        <details
-          id="section-people"
-          class="sidebar-section people-section"
-          open
-        >
-          <summary class="section-label">
-            数字人 <span id="task-count"></span>
-          </summary>
-          <div id="tasks" class="task-list"></div>
-        </details>
+        <div id="sidebar-sections" class="sidebar-sections">
+          <details id="section-rooms" class="sidebar-section" open>
+            <summary class="section-label">
+              协作群 <span id="room-count"></span>
+            </summary>
+            <div id="rooms" class="rooms"></div>
+          </details>
+          <div
+            id="resize-section-rooms"
+            class="section-resizer"
+            role="separator"
+            tabindex="0"
+            aria-label="调整协作群高度"
+            aria-orientation="horizontal"
+          ></div>
+          <details id="section-private" class="sidebar-section" open>
+            <summary class="section-label">
+              定向会话 <span id="private-count"></span>
+            </summary>
+            <div id="private-chats" class="private-chats"></div>
+          </details>
+          <div
+            id="resize-section-private"
+            class="section-resizer"
+            role="separator"
+            tabindex="0"
+            aria-label="调整定向会话和数字人高度"
+            aria-orientation="horizontal"
+          ></div>
+          <details
+            id="section-people"
+            class="sidebar-section people-section"
+            open
+          >
+            <summary class="section-label">
+              数字人 <span id="task-count"></span>
+            </summary>
+            <div id="tasks" class="task-list"></div>
+          </details>
+        </div>
         <div class="sidebar-foot">
           <span class="dot knowledge"></span> 公共知识库
           <strong>SuperPOD</strong><small id="history-count"></small>
@@ -74,9 +101,29 @@
             <h1 id="room-title">研究公共板</h1>
             <p id="room-subtitle">等待运行快照…</p>
           </div>
-          <div class="view-switch">
-            <button id="view-map" class="active">协作图</button
-            ><button id="view-chat">专注对话</button>
+          <div class="room-actions">
+            <div class="sidebar-actions">
+              <button
+                id="toggle-left-sidebar"
+                class="panel-toggle"
+                aria-controls="left-sidebar"
+                aria-expanded="true"
+              >
+                ◧ 左栏
+              </button>
+              <button
+                id="toggle-right-sidebar"
+                class="panel-toggle"
+                aria-controls="right-sidebar"
+                aria-expanded="true"
+              >
+                ◨ 右栏
+              </button>
+            </div>
+            <div class="view-switch">
+              <button id="view-map" class="active">协作图</button
+              ><button id="view-chat">专注对话</button>
+            </div>
           </div>
         </div>
         <div class="scope-stats">
@@ -136,6 +183,14 @@
           <span id="message-count"></span
           ><button id="open-profile" class="profile-toggle">数字人看板</button>
           <button
+            id="collapse-chat"
+            class="panel-toggle"
+            aria-controls="timeline"
+            aria-expanded="true"
+          >
+            ⌄ 收起
+          </button>
+          <button
             id="maximize-chat"
             class="maximize"
             aria-label="放大对话窗口"
@@ -156,7 +211,16 @@
           <span class="readonly">点击数字人查看会话</span>
         </div>
       </main>
-      <aside class="inspector">
+      <aside id="right-sidebar" class="inspector">
+        <div
+          id="resize-right"
+          class="sidebar-resizer"
+          role="separator"
+          tabindex="0"
+          aria-label="调整右侧栏宽度"
+          aria-orientation="vertical"
+          aria-controls="right-sidebar"
+        ></div>
         <div class="inspector-heading">
           <p class="eyebrow">DIGITAL PERSONA</p>
           <h2>数字人看板</h2>

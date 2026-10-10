@@ -111,6 +111,11 @@ header {
   max-width: 2000px;
   margin: auto;
 }
+.sidebar,
+.inspector {
+  position: relative;
+  min-width: 0;
+}
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -1913,4 +1918,224 @@ body.reduced-motion * {
   color: #90aaa7;
   font-size: 10px;
   margin-top: 5px;
+}
+
+/* Resizable sidebars preserve the center conversation's usable width. */
+@media (min-width: 721px) {
+  .shell {
+    grid-template-columns: var(--left-track, 230px) minmax(0, 1fr) var(
+        --right-track,
+        305px
+      );
+  }
+  .shell > .sidebar {
+    grid-column: 1;
+  }
+  .shell > .conversation {
+    grid-column: 2;
+  }
+  .shell > .inspector {
+    grid-column: 3;
+  }
+  .focus-graph .shell > .conversation,
+  .focus-chat .shell > .conversation {
+    grid-column: 1;
+  }
+}
+.room-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 9px;
+}
+.sidebar-actions {
+  display: flex;
+  gap: 6px;
+}
+.panel-toggle {
+  border: 1px solid #d1e2df;
+  border-radius: 5px;
+  background: #fff;
+  color: #527d77;
+  padding: 6px 9px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.panel-toggle[aria-expanded="false"] {
+  background: #e6f3ef;
+}
+.shell > .inspector:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+#right-sidebar .detail {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+#right-sidebar .inspector-heading {
+  flex-shrink: 0;
+  padding-right: 48px;
+}
+#close-profile {
+  display: block;
+}
+.sidebar-resizer {
+  position: absolute;
+  z-index: 25;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  touch-action: none;
+  cursor: col-resize;
+}
+#resize-left {
+  right: -4px;
+}
+#resize-right {
+  left: -4px;
+}
+.sidebar-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+}
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after,
+.resizing-sidebar .sidebar-resizer::after {
+  background: #72b6a9;
+}
+.resizing-sidebar,
+.resizing-sidebar * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+body.focus-chat.profile-open .inspector,
+body.focus-graph.profile-open .inspector {
+  width: var(--right-width, 305px);
+}
+.chat-collapsed .timeline,
+.chat-collapsed .composer {
+  display: none;
+}
+.chat-collapsed .chat-heading {
+  margin-top: auto;
+  background: #f4faf8;
+  border-top: 1px solid var(--line);
+}
+.chat-collapsed .map-panel {
+  flex: 1;
+  min-height: 300px;
+}
+@media (max-width: 1200px) {
+  .profile-open .inspector {
+    width: var(--right-width, 305px);
+  }
+}
+@media (max-width: 720px) {
+  #resize-left {
+    display: none;
+  }
+  .room-actions {
+    gap: 6px;
+  }
+  .sidebar-actions {
+    gap: 4px;
+  }
+  .panel-toggle {
+    padding: 5px 7px;
+  }
+  .chat-heading {
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+}
+
+/* Open sections share the available height; closed people stay at the bottom. */
+.sidebar-sections {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 8px;
+}
+.sidebar-sections > .sidebar-section {
+  position: relative;
+  display: block;
+  flex: 0 0 34px;
+  min-height: 34px;
+  overflow: hidden;
+}
+.sidebar-sections > .sidebar-section[open] {
+  flex: var(--section-weight, 1) 0 72px;
+  min-height: 72px;
+}
+.sidebar-sections > .sidebar-section > summary {
+  height: 34px;
+  padding: 8px 10px;
+}
+.sidebar-sections .rooms,
+.sidebar-sections .private-chats,
+.sidebar-sections .task-list {
+  position: absolute;
+  top: 34px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  overflow: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+}
+#section-people:not([open]) {
+  margin-top: auto;
+}
+.section-resizer {
+  position: relative;
+  flex: 0 0 6px;
+  cursor: row-resize;
+  touch-action: none;
+}
+.section-resizer::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 10px;
+  right: 10px;
+  height: 1px;
+  background: #dce8e5;
+}
+.section-resizer:hover::after,
+.section-resizer:focus-visible::after {
+  background: #62aa9c;
+  height: 2px;
+}
+.resizing-sections,
+.resizing-sections * {
+  cursor: row-resize !important;
+  user-select: none !important;
+}
+.sidebar-foot,
+.side-title,
+.sidebar > .search,
+.sidebar > .latest-button {
+  flex-shrink: 0;
+}
+@media (max-width: 720px) {
+  .sidebar-sections {
+    flex: none;
+    height: 275px;
+  }
+  .sidebar-sections .task-row,
+  .sidebar-sections .private-chat {
+    width: 100%;
+  }
 }
