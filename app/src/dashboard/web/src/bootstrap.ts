@@ -1,0 +1,13 @@
+import { apply } from "./i18n.js";
+import { initialize as events } from "./events.js";
+import { initialize as peopleEvents } from "./people-events.js";
+import { initialize as lineageEvents } from "./lineage-events.js";
+import { loadPeople } from "./people-directory.js";
+import { render } from "./observer.js";
+import { workspaceState } from "./state.js";
+apply();
+events();
+peopleEvents();
+lineageEvents();
+await loadPeople();
+if (workspaceState.data) render();

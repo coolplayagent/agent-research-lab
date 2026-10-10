@@ -1,0 +1,6 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test", "rust_binary")
+exports_files(["Cargo.toml"], visibility = ["//visibility:public"])
+rust_library(name = "service_protocol", crate_name = "service_protocol", srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]), crate_root = "src/lib.rs", edition = "2024", aliases = aliases(), deps = ["//crates/contracts:contracts"] + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])
+rust_test(name = "tests", crate = ":service_protocol", aliases = aliases(normal_dev = True, proc_macro_dev = True), deps = all_crate_deps(normal_dev = True), proc_macro_deps = all_crate_deps(proc_macro_dev = True), visibility = ["//visibility:public"])
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs"]), visibility = ["//visibility:public"])

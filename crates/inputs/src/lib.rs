@@ -394,7 +394,7 @@ mod tests {
 
     #[test]
     fn shared_knowledge_reads_exact_committed_bytes_not_dirty_files() {
-        let content = "# 共同知识\n\nRetain counterexamples.\n";
+        let content = include_str!("fixtures/knowledge.md");
         let (root, input) = knowledge_fixture(content);
         fs::write(
             root.path().join(KNOWLEDGE_ENTRYPOINTS[0]),
@@ -422,7 +422,7 @@ mod tests {
         inputs.shared_knowledge = Some(pack);
         let context = prompt_context(&inputs);
         assert!(context.starts_with(&historical_context));
-        assert!(context.contains("共同知识"));
+        assert!(context.contains(include_str!("fixtures/title.txt")));
         assert!(context.contains("Host knowledge adapters"));
         assert_ne!(cohort(&inputs), historical_cohort);
         inputs.shared_knowledge.as_mut().unwrap().documents[0]
@@ -436,7 +436,7 @@ mod tests {
 
     #[test]
     fn shared_knowledge_bounds_unicode_and_distinguishes_full_source_digest() {
-        let content = "知".repeat(KNOWLEDGE_EXCERPT_LIMIT);
+        let content = include_str!("fixtures/character.txt").repeat(KNOWLEDGE_EXCERPT_LIMIT);
         let (_root, input) = knowledge_fixture(&content);
         let pack = shared_knowledge(&input).unwrap();
         for doc in pack.documents {

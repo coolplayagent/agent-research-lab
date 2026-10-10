@@ -87,7 +87,7 @@ impl Harness {
 async fn actual_async_http_enforces_origin_intent_and_resource_boundaries() {
     let h = Harness::new().await;
     for (path, status, content) in [
-        ("/", "200 OK", "水晶球"),
+        ("/", "200 OK", "AI-IM"),
         ("/api/snapshot", "200 OK", "first"),
         ("/../local.toml", "404 Not Found", "Resource unavailable"),
         (
@@ -180,9 +180,10 @@ async fn network_busy_queue_reconnect_ack_and_revocation_preserve_private_delive
     h.hub
         .create_group(crystal::NewGroup {
             id: "private".into(),
-            title: "私聊".into(),
-            topic: "共同验证".into(),
+            title: "Private chat".into(),
+            topic: "Joint verification".into(),
             private: true,
+            kind: Default::default(),
             members: vec!["a".into(), "b".into()],
         })
         .await
@@ -217,7 +218,7 @@ async fn network_busy_queue_reconnect_ack_and_revocation_preserve_private_delive
     )
     .await
     .unwrap();
-    let message = json!({"group_id":"private","request_id":"one","text":"我有一个不同的猜想，我们一起验证。"});
+    let message = json!({"group_id":"private","request_id":"one","text":"I have an alternative hypothesis. Let us test it together."});
     let receipt = request(h.addr, "/api/crystal/send", Some(&a), Some(&message))
         .await
         .unwrap();

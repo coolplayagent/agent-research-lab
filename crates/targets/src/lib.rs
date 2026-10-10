@@ -352,7 +352,8 @@ pub fn sandbox_verify(c: &Config, logs: &Path) -> Result<Value> {
         "--json",
     ])?;
     ensure!(
-        target["status"] == "ready"
+        contracts::SandboxSessionState::from_value(&target["status"])
+            == Some(contracts::SandboxSessionState::Ready)
             && target["provider"] == "bubblewrap"
             && target["persistent_namespace"] == false,
         "repo-sandbox did not prepare a real local provider"
@@ -372,7 +373,7 @@ pub fn sandbox_verify(c: &Config, logs: &Path) -> Result<Value> {
         "--json",
     ])?;
     let verification = (|| -> Result<Value> {
-        require_session(&up, "ready")?;
+        require_session(&up, contracts::SandboxSessionState::Ready)?;
         let executed = call(&[
             "dev",
             "exec",
@@ -392,7 +393,7 @@ pub fn sandbox_verify(c: &Config, logs: &Path) -> Result<Value> {
             "sandbox operation did not reach its owned workspace"
         );
         let observed = call(&["dev", "status", "--session", "lab-check", "--json"])?;
-        require_session(&observed, "ready")?;
+        require_session(&observed, contracts::SandboxSessionState::Ready)?;
         Ok(
             json!({"target":target,"up":up,"execution":executed,"status":observed,"observed_file_sha256":storage::digest(b"real-local-sandbox")}),
         )
@@ -401,7 +402,7 @@ pub fn sandbox_verify(c: &Config, logs: &Path) -> Result<Value> {
     let down = call(&["dev", "down", "--session", "lab-check", "--json"]);
     let mut proof = verification?;
     let down = down?;
-    require_session(&down, "stopped")?;
+    require_session(&down, contracts::SandboxSessionState::Stopped)?;
     proof["down"] = down;
     proof["verified"] = true.into();
     proof["runtime_sha256"] = storage::digest(&fs::read(&c.tools["repo-sandbox"].binary)?).into();
@@ -413,7 +414,8 @@ fn require_execution(report: &Value) -> Result<()> {
     ensure!(
         report["provider"] == "bubblewrap"
             && report["persistent_namespace"] == false
-            && report["status"] == "completed"
+            && contracts::SandboxExecutionState::from_value(&report["status"])
+                == Some(contracts::SandboxExecutionState::Completed)
             && report["exit_code"] == 0
             && report["timed_out"] == false
             && report["network"] == "none"
@@ -423,12 +425,12 @@ fn require_execution(report: &Value) -> Result<()> {
     Ok(())
 }
 
-fn require_session(report: &Value, status: &str) -> Result<()> {
+fn require_session(report: &Value, status: contracts::SandboxSessionState) -> Result<()> {
     ensure!(
         report["success"] == true
             && report["provider"] == "bubblewrap"
             && report["persistent_namespace"] == false
-            && report["status"] == status
+            && contracts::SandboxSessionState::from_value(&report["status"]) == Some(status)
             && report["network"] == "none"
             && report["active_execution"].is_null(),
         "repo-sandbox session is not {status}: {report}"
@@ -456,10 +458,10 @@ mod tests {
             assert!(require_execution(&bad).is_err(), "{key}");
         }
         let ready = json!({"success":true,"provider":"bubblewrap","persistent_namespace":false,"status":"ready","network":"none","active_execution":null});
-        require_session(&ready, "ready").unwrap();
-        assert!(require_session(&ready, "stopped").is_err());
+        require_session(&ready, contracts::SandboxSessionState::Ready).unwrap();
+        assert!(require_session(&ready, contracts::SandboxSessionState::Stopped).is_err());
         let mut active = ready;
         active["active_execution"] = json!({"pid":12});
-        assert!(require_session(&active, "ready").is_err());
+        assert!(require_session(&active, contracts::SandboxSessionState::Ready).is_err());
     }
 }

@@ -1,0 +1,17 @@
+[Unit]
+Description=AI-IM independent collaboration storage
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/ai-im-storage --state-dir %h/.local/state/ai-im/crystal --socket %t/ai-im/storage.sock --max-seconds 43200
+RuntimeDirectory=ai-im
+RuntimeDirectoryPreserve=yes
+RuntimeDirectoryMode=0700
+Restart=always
+RestartSec=3
+KillMode=control-group
+UMask=0077
+LimitNOFILE=65536
+
+[Install]
+WantedBy=default.target

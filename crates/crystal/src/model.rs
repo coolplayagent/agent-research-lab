@@ -19,7 +19,15 @@ pub fn now_ms() -> u64 {
         .as_millis() as u64
 }
 pub fn id(value: &str) -> Result<()> {
-    config::safe_id(value)
+    ensure!(
+        !value.is_empty()
+            && value.len() <= 100
+            && value
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_'),
+        "identifier must be 1..100 ASCII letters, digits, underscores or hyphens"
+    );
+    Ok(())
 }
 pub fn text(value: &str, max: usize) -> Result<()> {
     ensure!(
@@ -32,28 +40,26 @@ pub fn text(value: &str, max: usize) -> Result<()> {
     );
     Ok(())
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum Presence {
-    Offline,
-    Online,
-    Chatting,
-    Busy,
+pub use contracts::Presence;
+
+pub use contracts::GroupKind;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Person {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub application_id: Option<String>,
 }
-impl Presence {
-    pub fn receives(self) -> bool {
-        matches!(self, Self::Online | Self::Chatting)
-    }
-    pub(crate) fn code(self) -> &'static str {
-        match self {
-            Self::Offline => "offline",
-            Self::Online => "online",
-            Self::Chatting => "chatting",
-            Self::Busy => "busy",
+impl Person {
+    pub fn validate(&self) -> Result<()> {
+        id(&self.id)?;
+        text(&self.name, 256)?;
+        if let Some(application) = &self.application_id {
+            id(application)?;
         }
-    }
-    pub(crate) fn parse(s: &str) -> Result<Self> {
-        Ok(serde_json::from_value(serde_json::Value::String(s.into()))?)
+        Ok(())
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -63,6 +69,8 @@ pub struct Group {
     pub title: String,
     pub topic: String,
     pub private: bool,
+    #[serde(default)]
+    pub kind: GroupKind,
     pub archived: bool,
     pub pinned: bool,
     pub revision: u64,
@@ -78,6 +86,8 @@ pub struct NewGroup {
     pub topic: String,
     #[serde(default)]
     pub private: bool,
+    #[serde(default)]
+    pub kind: GroupKind,
     pub members: Vec<String>,
 }
 impl NewGroup {
@@ -85,6 +95,14 @@ impl NewGroup {
         id(&self.id)?;
         text(&self.title, 256)?;
         text(&self.topic, 2048)?;
+        ensure!(
+            self.kind != GroupKind::Temporary || self.private,
+            "temporary conversations must have a private audience"
+        );
+        ensure!(
+            self.kind != GroupKind::Board || !self.private,
+            "boards use managed group membership"
+        );
         ensure!(
             !self.members.is_empty() && self.members.len() <= MAX_MEMBERS,
             "group requires 1..20000 digital people"
@@ -119,6 +137,8 @@ impl Publish {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<GoalEvent>,
     pub sequence: u64,
     pub group_id: String,
     pub sender_id: String,
@@ -143,9 +163,20 @@ pub struct GroupChange {
     pub archived: bool,
     pub pinned: bool,
 }
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ActorStatus {
     pub person_id: String,
     pub presence: Presence,
     pub connections: usize,
+}
+
+/// Host-authored audit data. Worker publish requests cannot set this field.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GoalEvent {
+    pub kind: contracts::GoalEventKind,
+    pub goal_id: String,
+    pub title: String,
+    pub person_id: Option<String>,
+    pub work_id: Option<String>,
+    pub attempt: Option<u32>,
 }

@@ -3,33 +3,101 @@ use super::*;
 use axum::{http::StatusCode, response::Response};
 pub(super) fn get(path: &str, web: &Web) -> Response {
     let asset = match path {
-        "/" => Some((
+        "/apps/research/" => Some((
             "text/html; charset=utf-8",
             include_bytes!("index.html").as_slice(),
         )),
-        "/operator.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("operator.js").as_slice(),
-        )),
-        "/app.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("app.js").as_slice(),
-        )),
-        "/people.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("people.js").as_slice(),
-        )),
-        "/lineage.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("lineage.js").as_slice(),
-        )),
-        "/crystal.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("crystal.js").as_slice(),
-        )),
-        "/style.css" => Some((
+        "/apps/research/style.css" => Some((
             "text/css; charset=utf-8",
             include_bytes!("style.css").as_slice(),
+        )),
+        "/apps/research/assets/bootstrap.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/bootstrap.js").as_slice(),
+        )),
+        "/apps/research/assets/channels.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/channels.js").as_slice(),
+        )),
+        "/apps/research/assets/events.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/events.js").as_slice(),
+        )),
+        "/apps/research/assets/executors.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/executors.js").as_slice(),
+        )),
+        "/apps/research/assets/graph.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/graph.js").as_slice(),
+        )),
+        "/apps/research/assets/i18n.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/i18n.js").as_slice(),
+        )),
+        "/apps/research/assets/identity.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/identity.js").as_slice(),
+        )),
+        "/apps/research/assets/lineage-events.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/lineage-events.js").as_slice(),
+        )),
+        "/apps/research/assets/lineage.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/lineage.js").as_slice(),
+        )),
+        "/apps/research/assets/locales/zh-CN.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/locales/zh-CN.js").as_slice(),
+        )),
+        "/apps/research/assets/navigation.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/navigation.js").as_slice(),
+        )),
+        "/apps/research/assets/observer.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/observer.js").as_slice(),
+        )),
+        "/apps/research/assets/people-directory.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/people-directory.js").as_slice(),
+        )),
+        "/apps/research/assets/people-events.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/people-events.js").as_slice(),
+        )),
+        "/apps/research/assets/people-profile.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/people-profile.js").as_slice(),
+        )),
+        "/apps/research/assets/preferences.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/preferences.js").as_slice(),
+        )),
+        "/apps/research/assets/process.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/process.js").as_slice(),
+        )),
+        "/apps/research/assets/profile.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/profile.js").as_slice(),
+        )),
+        "/apps/research/assets/sessions.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/sessions.js").as_slice(),
+        )),
+        "/apps/research/assets/sizing.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/sizing.js").as_slice(),
+        )),
+        "/apps/research/assets/state.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/state.js").as_slice(),
+        )),
+        "/apps/research/assets/ui.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("web/dist/ui.js").as_slice(),
         )),
         _ => None,
     };
@@ -48,7 +116,7 @@ pub(super) fn get(path: &str, web: &Web) -> Response {
             let file = c.state_dir.join("evolution/lineage.json");
             if !file.exists() {
                 return Ok(
-                    json!({"available":false,"notice":"尚未导入开发集谱系证据。策略归档与正式评估保持独立。"}),
+                    json!({"available":false,"notice":contracts::ApiNotice::LineageUnavailable.notice(json!({}))}),
                 );
             }
             let receipt: evolution_cli::LineageReceipt = storage::read(&file)?;
@@ -76,9 +144,9 @@ pub(super) fn get(path: &str, web: &Web) -> Response {
                 .and_then(|jobs| jobs.iter().find(|j| j["run_id"] == run))
                 .cloned()
                 .or_else(|| {
-                    personas::historical_job(&c.state_dir, run)
-                        .ok()
-                        .map(|j| project(&j, &json!({"state":"historical"})))
+                    personas::historical_job(&c.state_dir, run).ok().map(|j| {
+                        project(&j, &json!({"state":contracts::ExecutionState::Historical}))
+                    })
                 })
                 .context("unknown profile")?;
             return Ok(profiles::read(&c.state_dir, &c.workspace, &job));

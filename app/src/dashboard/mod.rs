@@ -24,8 +24,8 @@ mod observe;
 mod operator;
 mod personas;
 mod profiles;
+mod research_scenario;
 mod resources;
-mod rooms;
 mod sessions;
 mod transport;
 
@@ -48,7 +48,7 @@ fn read_job(path: &Path) -> Result<Job> {
     Ok(job)
 }
 
-fn selected_jobs(state: &Path) -> Result<(Vec<Job>, Vec<String>)> {
+fn selected_jobs(state: &Path) -> Result<(Vec<Job>, Vec<contracts::Notice>)> {
     let directory = state.join("jobs");
     if !directory.exists() {
         return Ok((vec![], vec![]));
@@ -57,7 +57,7 @@ fn selected_jobs(state: &Path) -> Result<(Vec<Job>, Vec<String>)> {
     let mut paths = vec![];
     for (index, entry) in fs::read_dir(directory)?.enumerate() {
         if index == MAX_ENTRIES {
-            warnings.push("目录超过 8192 项；当前只展示扫描范围内的任务。".into());
+            warnings.push(contracts::ApiNotice::DirectoryLimit.notice(json!({})));
             break;
         }
         let entry = entry?;
@@ -67,18 +67,16 @@ fn selected_jobs(state: &Path) -> Result<(Vec<Job>, Vec<String>)> {
     }
     paths.sort_by(|a, b| b.cmp(a));
     if paths.len() > MAX_JOBS {
-        warnings.push(format!(
-            "仅展示最近更新的 {MAX_JOBS} 个任务；统计与依赖图不包含更早记录。"
-        ));
+        warnings.push(contracts::ApiNotice::JobLimit.notice(json!({"limit":MAX_JOBS})));
     }
     let mut jobs = vec![];
     for (_, path) in paths.into_iter().take(MAX_JOBS) {
         match read_job(&path) {
             Ok(job) => jobs.push(job),
-            Err(_) => warnings.push(format!(
-                "任务记录 {} 无法读取或超出大小限制。",
-                path.file_name().unwrap_or_default().to_string_lossy()
-            )),
+            Err(_) => warnings.push(
+                contracts::ApiNotice::JobUnavailable
+                    .notice(json!({"id":path.file_name().unwrap_or_default().to_string_lossy()})),
+            ),
         }
     }
     Ok((jobs, warnings))
@@ -170,7 +168,7 @@ fn snapshot(c: &Config) -> Result<Value> {
         .collect();
     let roster = personas::assign(c, &jobs, &mut projected)?;
     if projected.iter().any(|j| j["observation_error"] == true) {
-        warnings.push("部分 workflow 状态读取失败或超过采样时限；未知状态不表示任务完成。".into());
+        warnings.push(contracts::ApiNotice::WorkflowObservationIncomplete.notice(json!({})));
     }
     let mut seen = BTreeSet::new();
     let ids: Vec<_> = projected
@@ -179,7 +177,7 @@ fn snapshot(c: &Config) -> Result<Value> {
         .filter(|id| seen.insert(*id))
         .collect();
     if ids.len() > MAX_BOARDS {
-        warnings.push(format!("仅展示最近任务关联的 {MAX_BOARDS} 个协作组。"));
+        warnings.push(contracts::ApiNotice::BoardLimit.notice(json!({"limit":MAX_BOARDS})));
     }
     let now = chrono::Utc::now().timestamp().max(0) as u64;
     let mut boards = vec![];
@@ -190,14 +188,13 @@ fn snapshot(c: &Config) -> Result<Value> {
                     match board.inspect(id, now) {
                         Ok(view) => boards.push(view),
                         // Queued jobs have a derived cohort but no board until launch.
-                        Err(_) => warnings.push(format!(
-                            "协作组 {} 尚未创建、已清理或暂不可读取。",
-                            &id[..12]
-                        )),
+                        Err(_) => warnings.push(
+                            contracts::ApiNotice::GroupUnavailable.notice(json!({"id":&id[..12]})),
+                        ),
                     }
                 }
             }
-            Err(_) => warnings.push("共享板尚未创建或不可读取。".into()),
+            Err(_) => warnings.push(contracts::ApiNotice::BoardUnavailable.notice(json!({}))),
         }
     }
     Ok(
@@ -211,6 +208,7 @@ fn snapshot(c: &Config) -> Result<Value> {
 
 type Shared = Arc<RwLock<Value>>;
 
+#[cfg(test)]
 fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
     ensure!(request.ends_with("\r\n\r\n"), "incomplete headers");
     let mut lines = request.split("\r\n");
@@ -262,12 +260,14 @@ pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<
     let addr = listener.local_addr()?;
     listener.set_nonblocking(true)?;
     let shared = Arc::new(RwLock::new(
-        json!({"revision":0,"sampled_at":null,"jobs":[],"boards":[],"sessions":[],"summary":{},"warnings":[],"error":"正在读取首个运行快照…"}),
+        json!({"revision":0,"sampled_at":null,"jobs":[],"boards":[],"sessions":[],"summary":{},"warnings":[],"error":contracts::ApiNotice::SnapshotLoading.notice(json!({}))}),
     ));
     let stop = AtomicBool::new(false);
     let (updates, _) = tokio::sync::watch::channel(0);
     let (shutdown, _) = tokio::sync::watch::channel(false);
-    let hub = crystal::Hub::open(&c.state_dir.join("crystal"))?;
+    std::fs::create_dir_all(&c.state_dir)?;
+    let services = Arc::new(service_api::Registry::open(&c.state_dir)?);
+    let hub = services.configuration().storage(&c.state_dir)?;
     let mut web = transport::Web::new(
         hub,
         addr,
@@ -276,6 +276,7 @@ pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<
         updates.clone(),
         shutdown.clone(),
     );
+    web.services = Some(services.clone());
     web.operator = Some(Arc::new(operator::Operator::open(&c.state_dir, addr)?));
     eprintln!("Management link is in masked controller state: dashboard/access.json");
     eprintln!("Research dashboard: http://{addr} (event-driven, {max_seconds}s)");
@@ -283,28 +284,48 @@ pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<
         .worker_threads(4)
         .enable_all()
         .build()?;
+    runtime.block_on(async {
+        web.hub.register_operator().await?;
+        research_scenario::sync_people(&web.hub, Arc::new(c.clone())).await
+    })?;
     thread::scope(|scope| -> Result<()> {
         scope.spawn(|| {
             if observe::run(c, &shared, &stop, &updates).is_err() {
                 let mut data = shared.write().unwrap();
-                data["error"] = json!("文件事件服务不可用");
+                data["error"] = json!(contracts::ApiNotice::ObserverUnavailable.notice(json!({})));
                 drop(data);
                 updates.send_modify(|v| *v = v.wrapping_add(1));
             }
         });
         let result = runtime.block_on(async {
+            let execution = tokio::spawn(im_service::execution::run(
+                web.hub.clone(),
+                services.clone(),
+                max_seconds,
+                shutdown.subscribe(),
+            ));
+            let scenario = tokio::spawn(research_scenario::run(
+                web.hub.clone(),
+                Arc::new(c.clone()),
+                max_seconds,
+                shutdown.subscribe(),
+            ));
             let listener = tokio::net::TcpListener::from_std(listener)?;
             let halt = async move {
                 tokio::time::sleep(Duration::from_secs(max_seconds)).await;
                 shutdown.send_replace(true);
             };
-            tokio::time::timeout(
+            let served = tokio::time::timeout(
                 Duration::from_secs(max_seconds + 5),
                 axum::serve(listener, transport::router(web))
                     .with_graceful_shutdown(halt)
                     .into_future(),
             )
-            .await??;
+            .await;
+            execution.abort();
+            let _ = execution.await;
+            let _ = scenario.await;
+            served??;
             Ok::<_, anyhow::Error>(())
         });
         stop.store(true, Ordering::Relaxed);
@@ -320,3 +341,6 @@ mod tests;
 
 #[cfg(test)]
 mod transport_tests;
+
+#[cfg(test)]
+mod research_scenario_tests;

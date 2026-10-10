@@ -1,5 +1,5 @@
 [workspace]
-members = ["app", "crates/*"]
+members = ["app", "crates/*", "web/shared"]
 default-members = ["app"]
 resolver = "3"
 
@@ -9,6 +9,10 @@ edition = "2024"
 license = "MIT"
 
 [workspace.dependencies]
+service_workers = { package = "ai-im-service-workers", path = "crates/service-workers" }
+service_api = { package = "ai-im-service-api", path = "crates/service-api" }
+im_storage = { package = "ai-im-storage", path = "crates/im-storage" }
+service_protocol = { package = "ai-im-service-protocol", path = "crates/service-protocol" }
 anyhow = "1"
 async-stream = "0.3"
 axum = "0.8.9"
@@ -31,6 +35,9 @@ automation = { package = "lab-automation", path = "crates/automation" }
 budget = { package = "lab-budget", path = "crates/budget" }
 build_cache = { package = "lab-build-cache", path = "crates/build-cache" }
 collaboration_experiment = { package = "lab-collaboration-experiment", path = "crates/collaboration-experiment" }
+web_assets = { package = "ai-im-web-assets", path = "web/shared" }
+im_service = { package = "ai-im", path = "crates/im-service" }
+contracts = { package = "lab-contracts", path = "crates/contracts" }
 crystal = { package = "lab-crystal", path = "crates/crystal" }
 communication = { package = "lab-communication", path = "crates/communication" }
 config = { package = "lab-config", path = "crates/config" }

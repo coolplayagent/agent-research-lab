@@ -1,0 +1,19 @@
+[Unit]
+Description=AI-IM agent messaging service
+After=network.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=ai-im
+ExecStart=/usr/local/bin/ai-im serve --state-dir /var/lib/ai-im --listen 127.0.0.1:4877 --max-seconds 43200
+Restart=always
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

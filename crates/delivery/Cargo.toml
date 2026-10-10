@@ -8,6 +8,7 @@ license.workspace = true
 name = "delivery"
 
 [dependencies]
+contracts.workspace = true
 anyhow.workspace = true
 freshness.workspace = true
 process.workspace = true

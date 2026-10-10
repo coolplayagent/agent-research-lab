@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, bail, ensure};
 use budget::Budget;
 use config::{Config, safe_id};
+use contracts::{ControllerPhase, ExecutionState, FollowupState, WorkflowNodeState, WorkflowState};
 use process::{self, Process};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -396,10 +397,22 @@ fn seed_inputs(c: &Config) -> Result<Value> {
     let shared = c.multi_agent.as_ref().is_some_and(|v| v.shared_research);
     let mut ids = Vec::new();
     for (topic, title) in [
-        ("sdlc", "需求到 PR 的可验证自动交付"),
-        ("memory", "跨会话记忆与长程任务恢复"),
-        ("collaboration", "不同观点与多 agent 协作的能力边界"),
-        ("computer", "Computer Use 与 sandbox 中的操作恢复"),
+        (
+            "sdlc",
+            "verifiable automated delivery from requirements to PR",
+        ),
+        (
+            "memory",
+            "cross-session memory and long-running task recovery",
+        ),
+        (
+            "collaboration",
+            "limits of diverse viewpoints and multi-agent collaboration",
+        ),
+        (
+            "computer",
+            "Computer Use and recovery of sandbox operations",
+        ),
     ] {
         let communication = shared.then(|| multi_agent::TeamBinding {
             id: format!("research-{round}"),
@@ -408,17 +421,17 @@ fn seed_inputs(c: &Config) -> Result<Value> {
             query: String::new(),
         });
         let independent_phase = if shared {
-            "群聊围绕本研究议题展开。先形成独立论证，再读同伴的相关消息；有可回应的观点时，先指出对方的具体主张并接话，再给出补充、质疑、反例或追问，用 reply_to 关联原消息。不要各自重复报告而忽略同伴。尚无人发言时，以一个有依据的观察和开放问题开启讨论；独立工作后最多再读一次并回应有价值的新观点，不等待、不自动循环回复。允许发散，但说明新角度与本议题的联系，最后回到待验证的问题。保留分歧，不为达成共识而附和。"
+            "Discuss this research topic. Form an independent argument before reading peers. Respond to a specific claim with supporting evidence, objections, counterexamples or questions; link it with reply_to. Do not post disconnected reports. If no one has spoken, open with a grounded observation and open question. After independent work, read at most once more and respond to valuable new ideas; do not wait or auto-loop. Explain how new angles connect to the topic and return to testable questions. Preserve disagreement instead of seeking consensus."
         } else {
-            "此阶段不读取其他 agent 的结论。"
+            "Do not read other agents conclusions during this phase."
         };
         let independent = format!(
-            "研究 {title}。只读分析固定的 SuperPOD 提交；给出有来源、可复现实验的假设。识别七个 coolplayagent CLI 的实际使用缺口。不得修改文件、安装、推送、发消息或合并。本阶段 next_tasks 必须为空数组；把后续实验建议写入 findings，由综合阶段选择。正文用中文，输出指定 JSON schema。"
+            "Research {title}. Analyze the pinned SuperPOD commit read-only; produce sourced hypotheses with reproducible experiments. Identify actual usage gaps in the seven coolplayagent CLIs. Do not modify files, install, push, send messages or merge. next_tasks must be empty in this phase; put follow-up experiment suggestions in findings for synthesis to select. Return the specified JSON schema."
         );
         let independent = if shared {
             independent.replace(
-                "不得修改文件、安装、推送、发消息或合并。",
-                "不得修改源码、安装、推送、向外部联系人发消息或合并。",
+                "Do not modify files, install, push, send messages or merge.",
+                "Do not modify source, install, push, message external contacts or merge.",
             )
         } else {
             independent
@@ -430,13 +443,13 @@ fn seed_inputs(c: &Config) -> Result<Value> {
             (
                 research_id.clone(),
                 "research",
-                format!("{independent} 提出你的独立论证；{independent_phase}"),
+                format!("{independent} Present an independent argument; {independent_phase}"),
             ),
             (
                 critic_id.clone(),
                 "review",
                 format!(
-                    "{independent} 从独立质疑者的角度建立替代解释、反例和失败条件；{independent_phase}"
+                    "{independent} Develop alternative explanations, counterexamples and failure conditions as an independent critic; {independent_phase}"
                 ),
             ),
         ] {
@@ -474,7 +487,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
                 role: "research".into(),
                 repository: "superpod".into(),
                 prompt: format!(
-                    "综合两份关于 {title} 的独立研究和质疑结果。保留少数观点、反例和未解决分歧，检查引用，提出可区分竞争假设的有界实验。未实测的能力只能登记为假设。不得以共识代替证据。若有团队通信，先回应群里一个具体分歧或未答问题，再连接不同观点，说明哪些发散值得带回本主题；使用 reply_to 指向可回复的原消息，不另起一份与对话脱节的独白，不编造他人的回应。基于原始分歧证据，在 next_tasks 提出最多三个有界实验或 CLI 修复任务；无充分证据时返回空数组，不制造工作。不修改文件、安装、推送或合并。正文用中文。"
+                    "Synthesize the two independent investigations and critiques of {title}. Preserve minority views, counterexamples and unresolved disagreements; verify citations and propose bounded experiments that distinguish competing hypotheses. Untested capabilities remain hypotheses. Consensus cannot replace evidence. With team communication, respond first to a specific disagreement or open question, then connect perspectives and explain which new angles merit further investigation. Use reply_to; do not invent peers responses or post a disconnected monologue. Based on original disagreement evidence, propose at most three bounded experiments or CLI fixes in next_tasks; return an empty array without sufficient evidence. Do not modify files, install, push or merge."
                 ),
                 prompt_version: None,
                 communication: communication.clone(),
@@ -598,7 +611,7 @@ pub fn rendered_job_prompt(c: &Config, job: &Job) -> Result<String> {
 fn committed_receipt(c: &Config, w: &Workflow, job: &Job) -> Result<Value> {
     let state = w.status(&job.run_id)?;
     ensure!(
-        state["status"] == "succeeded",
+        WorkflowState::from_value(&state["status"]) == Some(WorkflowState::Succeeded),
         "dependency has not succeeded"
     );
     let committed = state["frames"]["1"]["nodes"]["task"]["outputs"]["result"]
@@ -752,7 +765,7 @@ fn completed_dependencies(c: &Config, w: &Workflow, job: &Job) -> Result<Value> 
         let dependency: Job = storage::read(&job_path(c, id))?;
         let state = w.status(&dependency.run_id)?;
         ensure!(
-            state["status"] == "succeeded",
+            WorkflowState::from_value(&state["status"]) == Some(WorkflowState::Succeeded),
             "dependency {id} has not succeeded"
         );
         let receipt_path = c
@@ -859,7 +872,7 @@ pub fn status_for_jobs(c: &Config, all_jobs: &[Job]) -> Result<Value> {
     }
     let paused = c.state_dir.join("paused").exists();
     let mut result = Vec::new();
-    let mut summary = BTreeMap::<&str, usize>::new();
+    let mut summary = BTreeMap::<ExecutionState, usize>::new();
     for job in all_jobs {
         let (state, reason) =
             controller_state(job, &indexed, &states, paused, &mut BTreeSet::new());
@@ -899,85 +912,109 @@ fn controller_state(
     states: &BTreeMap<String, Value>,
     paused: bool,
     visiting: &mut BTreeSet<String>,
-) -> (&'static str, Option<String>) {
+) -> (ExecutionState, Option<String>) {
     if !visiting.insert(job.task.id.clone()) {
         return (
-            "blocked",
+            ExecutionState::Blocked,
             Some("dependency cycle requires reconciliation".into()),
         );
     }
     let result = (|| {
         let Some(workflow) = states.get(&job.task.id) else {
             return (
-                "unknown",
+                ExecutionState::Unknown,
                 Some("workflow status unavailable; inspect error".into()),
             );
         };
-        if workflow["status"] == "succeeded" {
-            return ("succeeded", None);
+        if WorkflowState::from_value(&workflow["status"]).is_none() {
+            return (
+                ExecutionState::Unknown,
+                Some("unrecognized workflow state".into()),
+            );
+        }
+        if WorkflowState::from_value(&workflow["status"]) == Some(WorkflowState::Succeeded) {
+            return (ExecutionState::Succeeded, None);
         }
         if let Some(launch) = &job.launch {
             if launch.pid > 0
                 && process_start(launch.pid).ok().as_ref() == Some(&launch.process_start)
             {
-                return ("running", None);
+                return (ExecutionState::Running, None);
             }
             return (
-                "needs_reconciliation",
+                ExecutionState::NeedsReconciliation,
                 Some("retained launch has no matching live process".into()),
             );
         }
         if let Some(due) = job.retry_after {
             return (
-                "retry_wait",
+                ExecutionState::RetryWait,
                 Some(format!("bounded read retry due at {due}")),
             );
         }
         if let Some(error) = &job.last_error {
-            return ("blocked", Some(error.clone()));
+            return (ExecutionState::Blocked, Some(error.clone()));
         }
-        if workflow["status"] == "failed" || workflow["status"] == "cancelled" {
+        if WorkflowState::from_value(&workflow["status"]) == Some(WorkflowState::Failed)
+            || WorkflowState::from_value(&workflow["status"]) == Some(WorkflowState::Cancelled)
+        {
             return (
-                "failed",
+                ExecutionState::Failed,
                 Some("workflow ended without a successful receipt".into()),
             );
         }
         if workflow.get("pause").is_some_and(|v| !v.is_null()) {
-            return ("paused", Some("workflow is paused".into()));
+            return (ExecutionState::Paused, Some("workflow is paused".into()));
         }
         let mut waiting = vec![];
         for id in &job.task.dependencies {
             let Some(dependency) = indexed.get(id) else {
-                return ("blocked", Some(format!("dependency {id} is missing")));
+                return (
+                    ExecutionState::Blocked,
+                    Some(format!("dependency {id} is missing")),
+                );
             };
             let (state, reason) = controller_state(dependency, indexed, states, paused, visiting);
-            if ["blocked", "failed", "needs_reconciliation", "unknown"].contains(&state) {
+            if [
+                ExecutionState::Blocked,
+                ExecutionState::Failed,
+                ExecutionState::NeedsReconciliation,
+                ExecutionState::Unknown,
+            ]
+            .contains(&state)
+            {
                 return (
-                    "blocked",
+                    ExecutionState::Blocked,
                     Some(format!(
                         "dependency {id} is {state}: {}",
                         reason.unwrap_or_default()
                     )),
                 );
             }
-            if state != "succeeded" {
+            if state != ExecutionState::Succeeded {
                 waiting.push(id.as_str());
             }
         }
         if !waiting.is_empty() {
             return (
-                "waiting_dependencies",
+                ExecutionState::WaitingDependencies,
                 Some(format!("awaiting {}", waiting.join(", "))),
             );
         }
         if paused {
-            return ("paused", Some("controller admission is paused".into()));
+            return (
+                ExecutionState::Paused,
+                Some("controller admission is paused".into()),
+            );
         }
-        if workflow["frames"]["1"]["nodes"]["task"]["state"]["state"] == "task_ready" {
-            return ("ready", None);
+        if WorkflowNodeState::from_value(
+            &workflow["frames"]["1"]["nodes"]["task"]["state"]["state"],
+        ) == Some(WorkflowNodeState::TaskReady)
+        {
+            return (ExecutionState::Ready, None);
         }
         (
-            "needs_reconciliation",
+            ExecutionState::NeedsReconciliation,
             Some("workflow has no ready task or matching retained launch".into()),
         )
     })();
@@ -1257,11 +1294,11 @@ pub fn run_scoped(
         w.initialize()?;
         for job in jobs(c)? {
             ensure_started_in_store(c, &w, &job)?;
-            observer.record("recovering", &[])?;
+            observer.record(ControllerPhase::Recovering, &[])?;
         }
         reconcile_orphans(c, &w)?;
         if seed_requested {
-            observer.record("refreshing", &[])?;
+            observer.record(ControllerPhase::Refreshing, &[])?;
             if let Err(error) = watch::seed(c, || seed_inputs(c))
                 && !continuous
             {
@@ -1291,7 +1328,11 @@ pub fn run_scoped(
     loop {
         let time = now();
         observer.record(
-            if active.is_empty() { "idle" } else { "running" },
+            if active.is_empty() {
+                ControllerPhase::Idle
+            } else {
+                ControllerPhase::Running
+            },
             &active
                 .iter()
                 .map(|a| a.job.task.id.clone())
@@ -1533,13 +1574,17 @@ pub fn run_scoped(
                 continue;
             }
             let s = w.status(&job.run_id)?;
-            if s["status"] != "running" || s.get("pause").is_some_and(|v| !v.is_null()) {
+            if WorkflowState::from_value(&s["status"]) != Some(WorkflowState::Running)
+                || s.get("pause").is_some_and(|v| !v.is_null())
+            {
                 continue;
             }
             if job.task.dependencies.iter().any(|id| {
                 storage::read::<Job>(&job_path(c, id))
                     .and_then(|j| w.status(&j.run_id))
-                    .map(|s| s["status"] != "succeeded")
+                    .map(|s| {
+                        WorkflowState::from_value(&s["status"]) != Some(WorkflowState::Succeeded)
+                    })
                     .unwrap_or(true)
             }) {
                 continue;
@@ -1600,7 +1645,7 @@ pub fn run_scoped(
                         next_desktop_prepare = now() + 30;
                         storage::write(
                             &diagnostic,
-                            &json!({"at":now(),"state":"waiting_target",
+                            &json!({"at":now(),"state":ExecutionState::WaitingTarget,
                                 "retry_after":next_desktop_prepare,"error":format!("{error:#}")}),
                         )?;
                         // No workflow attempt has been claimed. The next idle
@@ -1745,7 +1790,7 @@ pub fn run_scoped(
                 break;
             }
             if continuous && now() >= next_seed_check {
-                observer.record("refreshing", &[])?;
+                observer.record(ControllerPhase::Refreshing, &[])?;
                 if let Err(error) =
                     idle_host(c, &mut ledger, window, || watch::seed(c, || seed_inputs(c)))
                 {
@@ -2226,22 +2271,8 @@ struct FollowupReport {
     rejected: Vec<ProposalRejection>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum MemoryWriteback {
-    Pending,
-    Running,
-    Done,
-    Unknown,
-}
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum FollowupAdmission {
-    Pending,
-    Running,
-    Done,
-    Blocked,
-}
+pub use contracts::FollowupAdmission;
+pub use contracts::MemoryWriteback;
 fn memory_done() -> MemoryWriteback {
     MemoryWriteback::Done
 }
@@ -2278,7 +2309,7 @@ fn post_success_path(c: &Config, job: &Job) -> PathBuf {
 fn authoritative_success_receipt(w: &Workflow, job: &Job) -> Result<Value> {
     let state = w.status(&job.run_id)?;
     ensure!(
-        state["status"] == "succeeded",
+        WorkflowState::from_value(&state["status"]) == Some(WorkflowState::Succeeded),
         "completion parent has not succeeded"
     );
     let encoded = state["frames"]["1"]["nodes"]["task"]["outputs"]["result"]
@@ -2300,6 +2331,12 @@ fn authoritative_success_receipt(w: &Workflow, job: &Job) -> Result<Value> {
         "committed completion receipt does not bind the frozen experiment"
     );
     Ok(receipt)
+}
+
+/// Scenario adapters may project only the same validated, workflow-committed result
+/// used by completion processing. Raw worker files are never result authority.
+pub fn completed_result(c: &Config, job: &Job) -> Result<Value> {
+    authoritative_success_receipt(&workflow(c), job)
 }
 
 fn communication_gap(c: &Config, job: &Job, reason: &str) {
@@ -2328,7 +2365,7 @@ fn memory_gap(c: &Config, job: &Job, reason: &str) -> Result<()> {
             .join("runs")
             .join(&job.run_id)
             .join("memory-gap.json"),
-        &json!({"error":reason,"worker_completed":true,"status":"unknown","automatic_retry":false}),
+        &json!({"error":reason,"worker_completed":true,"status":WorkflowState::Unknown,"automatic_retry":false}),
     )?;
     let mut current: Job = storage::read(&job_path(c, &job.task.id))?;
     ensure!(
@@ -2524,7 +2561,11 @@ fn drain_followups_scoped(
             Err(error) => {
                 record.persona_memory = MemoryWriteback::Unknown;
                 record.persona_memory_error = Some(error.to_string());
-                memory_gap(c, &job, &format!("数字人记忆写回未确认：{error}"))?;
+                memory_gap(
+                    c,
+                    &job,
+                    &format!("Persona memory writeback unconfirmed: {error}"),
+                )?;
             }
         }
         storage::write(&path, &record)?;
@@ -2545,7 +2586,7 @@ fn drain_followups_scoped(
                 &c.state_dir
                     .join("workflow/host-followups-deferred")
                     .join(format!("{}.json", job.run_id)),
-                &json!({"status":"deferred_task_scope","run_id":job.run_id,"task_id":job.task.id,"scope_sha256":scope.sha256,"reason":"fixed task scope cannot admit new follow-up tasks"}),
+                &json!({"status":FollowupState::DeferredTaskScope,"run_id":job.run_id,"task_id":job.task.id,"scope_sha256":scope.sha256,"reason":"fixed task scope cannot admit new follow-up tasks"}),
             )?;
             return Ok(true);
         }
@@ -2564,13 +2605,13 @@ fn drain_followups_scoped(
                     record.followups = FollowupAdmission::Pending;
                     storage::write(
                         &dir.join("followups-deferred.json"),
-                        &json!({"status":"deferred_budget","error":error.to_string()}),
+                        &json!({"status":FollowupState::DeferredBudget,"error":error.to_string()}),
                     )?;
                 } else {
                     record.followups = FollowupAdmission::Blocked;
                     storage::write(
                         &dir.join("blocked-invalid-proposal.json"),
-                        &json!({"status":"followup_blocked","error":error.to_string()}),
+                        &json!({"status":FollowupState::FollowupBlocked,"error":error.to_string()}),
                     )?;
                 }
             }
@@ -2833,7 +2874,7 @@ fn settle_with_heartbeat(
                 let result: Value = if result_path.exists() {
                     storage::read(&result_path)?
                 } else {
-                    let result = json!({"protocol_version":1,"request_digest":launch.attempt["grant"]["request_digest"],"completed_at_unix_ms":workflow::now_ms()?,"outcome":{"status":"succeeded","outputs":outputs,"evidence":[]}});
+                    let result = json!({"protocol_version":1,"request_digest":launch.attempt["grant"]["request_digest"],"completed_at_unix_ms":workflow::now_ms()?,"outcome":{"status":WorkflowState::Succeeded,"outputs":outputs,"evidence":[]}});
                     storage::write(&result_path, &result)?;
                     result
                 };
@@ -2909,12 +2950,16 @@ fn reconcile_orphans(c: &Config, w: &Workflow) -> Result<()> {
                 }
             }
             let state = w.status(&job.run_id)?;
-            if ["succeeded", "failed", "cancelled"]
-                .contains(&state["status"].as_str().unwrap_or(""))
+            if [
+                Some(WorkflowState::Succeeded),
+                Some(WorkflowState::Failed),
+                Some(WorkflowState::Cancelled),
+            ]
+            .contains(&WorkflowState::from_value(&state["status"]))
             {
                 let _ = w.release(&launch.lease);
                 job.launch = None;
-                if state["status"] == "succeeded" {
+                if WorkflowState::from_value(&state["status"]) == Some(WorkflowState::Succeeded) {
                     job.last_error = None;
                     job.retry_after = None;
                 } else {
@@ -2939,7 +2984,9 @@ fn reconcile_orphans(c: &Config, w: &Workflow) -> Result<()> {
                 {
                     let _ = w.release(&launch.lease);
                     job.launch = None;
-                    if w.status(&job.run_id)?["status"] == "succeeded" {
+                    if WorkflowState::from_value(&w.status(&job.run_id)?["status"])
+                        == Some(WorkflowState::Succeeded)
+                    {
                         job.last_error = None;
                         job.retry_after = None;
                     } else {
@@ -2967,14 +3014,19 @@ fn reconcile_orphans(c: &Config, w: &Workflow) -> Result<()> {
                     defer_read_retry(&mut job,"controller interrupted; old run paused, inspect workflow effects before write retry".into());
                 }
             }
-            if w.status(&job.run_id)?["status"] != "succeeded" {
+            if WorkflowState::from_value(&w.status(&job.run_id)?["status"])
+                != Some(WorkflowState::Succeeded)
+            {
                 revoke_communication(c, &job, &launch);
             }
             storage::write(&job_path(c, &job.task.id), &job)?;
         }
         // Include terminal jobs whose launch was already cleared when the
         // controller stopped between durable success and queue publication.
-        if job.launch.is_none() && w.status(&job.run_id)?["status"] == "succeeded" {
+        if job.launch.is_none()
+            && WorkflowState::from_value(&w.status(&job.run_id)?["status"])
+                == Some(WorkflowState::Succeeded)
+        {
             queue_post_success(c, w, &job)?;
         }
     }
@@ -2992,10 +3044,13 @@ pub fn retry(c: &Config, id: &str) -> Result<Value> {
     let w = workflow(c);
     let state = w.status(&job.run_id)?;
     ensure!(
-        state["status"] != "succeeded" && job.launch.is_none(),
+        WorkflowState::from_value(&state["status"]) != Some(WorkflowState::Succeeded)
+            && job.launch.is_none(),
         "cannot retry active/completed task"
     );
-    if state["status"] == "running" && state.get("pause").is_none_or(Value::is_null) {
+    if WorkflowState::from_value(&state["status"]) == Some(WorkflowState::Running)
+        && state.get("pause").is_none_or(Value::is_null)
+    {
         w.pause(
             &job.run_id,
             &format!("retry-{}", workflow::now_ms()?),
@@ -3436,7 +3491,7 @@ mod tests {
         let mut child = parent.clone();
         child.task.id = "waiting-child".into();
         child.task.dependencies = vec![parent.task.id.clone()];
-        let ready = json!({"status":"running","frames":{"1":{"nodes":{"task":{"state":{"state":"task_ready"}}}}}});
+        let ready = json!({"status":ExecutionState::Running,"frames":{"1":{"nodes":{"task":{"state":{"state":"task_ready"}}}}}});
         let mut states = BTreeMap::from([
             (parent.task.id.clone(), ready.clone()),
             (child.task.id.clone(), ready),
@@ -3448,15 +3503,21 @@ mod tests {
             ]);
             controller_state(job, &indexed, states, false, &mut BTreeSet::new())
         };
-        assert_eq!(classify(&parent, &parent, &child, &states).0, "ready");
+        assert_eq!(
+            classify(&parent, &parent, &child, &states).0,
+            ExecutionState::Ready
+        );
         assert_eq!(
             classify(&child, &parent, &child, &states).0,
-            "waiting_dependencies"
+            ExecutionState::WaitingDependencies
         );
         parent.last_error = Some("latest baseline changed; enqueue a new experiment".into());
-        assert_eq!(classify(&parent, &parent, &child, &states).0, "blocked");
+        assert_eq!(
+            classify(&parent, &parent, &child, &states).0,
+            ExecutionState::Blocked
+        );
         let blocked = classify(&child, &parent, &child, &states);
-        assert_eq!(blocked.0, "blocked");
+        assert_eq!(blocked.0, ExecutionState::Blocked);
         assert!(blocked.1.unwrap().contains("latest baseline changed"));
         parent.last_error = None;
         parent.launch = Some(Launch {
@@ -3472,15 +3533,21 @@ mod tests {
             communication_gap: None,
             communication_member: None,
         });
-        assert_eq!(classify(&parent, &parent, &child, &states).0, "running");
+        assert_eq!(
+            classify(&parent, &parent, &child, &states).0,
+            ExecutionState::Running
+        );
         parent.launch.as_mut().unwrap().process_start = "not-the-retained-process".into();
         assert_eq!(
             classify(&parent, &parent, &child, &states).0,
-            "needs_reconciliation"
+            ExecutionState::NeedsReconciliation
         );
         parent.launch = None;
         states.insert(parent.task.id.clone(), json!({"status":"succeeded"}));
-        assert_eq!(classify(&child, &parent, &child, &states).0, "ready");
+        assert_eq!(
+            classify(&child, &parent, &child, &states).0,
+            ExecutionState::Ready
+        );
     }
 
     #[test]
@@ -3541,9 +3608,9 @@ mod tests {
         let (_temp, _c, job, _w) = completion_fixture(false, json!([]));
         let receipt = json!({
             "agent_report": {
-                "summary":"核验\"最新\"源码\\路径\n\u{0001}".repeat(1000),
-                "findings":vec!["需要补充独立反例。".repeat(200); 8],
-                "limitations":vec!["尚未完成外部评估。".repeat(200); 7],
+                "summary":"Verify\"latest\"source\\path\n\u{0001}".repeat(1000),
+                "findings":vec!["Independent counterexamples needed.".repeat(200); 8],
+                "limitations":vec!["External evaluation remains incomplete.".repeat(200); 7],
                 "sources":["source-payload-must-stay-out".repeat(1000)],
                 "next_tasks":[]
             },
@@ -3574,15 +3641,15 @@ mod tests {
         ] {
             assert!(!encoded.contains(marker));
         }
-        let concise = json!({"agent_report":{"summary":"保留完整中文结论。","findings":["有原始证据。"],"sources":[],"limitations":["仍需独立复核。"]}});
+        let concise = json!({"agent_report":{"summary":"Preserve the entire conclusion.","findings":["Original evidence available."],"sources":[],"limitations":["Independent review required."]}});
         let concise: Value =
             serde_json::from_str(&memory_checkpoint(&job, &concise).unwrap()).unwrap();
-        assert_eq!(concise["summary"], "保留完整中文结论。");
+        assert_eq!(concise["summary"], "Preserve the entire conclusion.");
         assert_eq!(concise["truncated"], false);
-        let prompt = remember_prompt(&"继续研究上下文。".repeat(500));
+        let prompt = remember_prompt(&"Continue research context.".repeat(500));
         assert!(prompt.chars().count() <= 512);
         assert!(prompt.ends_with('…'));
-        assert_eq!(remember_prompt("继续研究"), "继续研究");
+        assert_eq!(remember_prompt("Continue research"), "Continue research");
     }
 
     #[test]
@@ -3677,13 +3744,15 @@ mod tests {
         let binary = std::env::var("LAB_MEMORY_BIN").expect("LAB_MEMORY_BIN");
         let (temp, mut c, mut job, _w) = completion_fixture(true, json!([]));
         c.tools.get_mut("relay-memory").unwrap().binary = binary.into();
-        job.task.prompt = "继续 I005 长程研究，核验源码并保留未决问题。".repeat(30);
+        job.task.prompt =
+            "Continue I005 long-running research, verify source and retain open questions."
+                .repeat(30);
         let receipt = json!({
             "agent_report":{
-                "summary":"续研检查点：已核验最新源码，下一轮检验 I005 的反例。",
-                "findings":["研究结论必须引用冻结源码与原始证据。"],
+                "summary":"Research checkpoint: latest source verified; next test I005 counterexamples.",
+                "findings":["Research conclusions must cite frozen source and original evidence."],
                 "sources":["full-source-detail-not-copied"],
-                "limitations":["尚未完成独立评估，不代表能力已改进。"],
+                "limitations":["Independent evaluation incomplete; no capability improvement established."],
                 "next_tasks":[]
             },
             "research_inputs":{"insights":"large-provenance-not-copied".repeat(30000)},
@@ -3706,7 +3775,7 @@ mod tests {
         assert_eq!(remembered["response"], checkpoint);
         assert!(remembered["prompt"].as_str().unwrap().chars().count() <= 512);
         assert!(remembered["prompt"].as_str().unwrap().ends_with('…'));
-        job.task.prompt = "继续 I005 长程研究，恢复最新源码检查点与未决反例。".into();
+        job.task.prompt = "Continue I005 research, restore the latest source checkpoint and open counterexamples.".into();
         let prepared =
             memory_call(&c, &job, &temp.path().join("retrieval"), "prepare", None).unwrap();
         // The CLI intentionally returns only bounded response excerpts. Match
@@ -3717,9 +3786,9 @@ mod tests {
                 .unwrap()
                 .iter()
                 .any(|event| event["id"] == remembered["id"]
-                    && event["response"]
-                        .as_str()
-                        .is_some_and(|text| text.contains("研究结论必须引用冻结源码与原始证据。")))
+                    && event["response"].as_str().is_some_and(|text| text.contains(
+                        "Research conclusions must cite frozen source and original evidence."
+                    )))
         );
         eprintln!(
             "real concise Chinese memory writeback completed in {elapsed:?}; {} bytes",
@@ -4064,7 +4133,8 @@ out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':r
             let expected = matches!(mode, "success" | "write-success" | "detached-exit");
             assert_eq!(accepted, expected, "{mode}");
             assert_eq!(
-                w.status(&job.run_id).unwrap()["status"] == "succeeded",
+                WorkflowState::from_value(&w.status(&job.run_id).unwrap()["status"])
+                    == Some(WorkflowState::Succeeded),
                 expected,
                 "{mode}"
             );
@@ -4113,7 +4183,7 @@ assert 'PERSON_EXECUTION_CONTINUITY_2741' in r['prompt']
 assert not r['permissions']['worktree_write']
 report = {'summary':'explicit executor continuity fixture','findings':['same person across technical executors'],'sources':[],'limitations':['fake provider, not research quality'],'next_tasks':[]}
 pathlib.Path(r['result_path']).write_text(json.dumps({'schema_version':1,'request_sha256':hashlib.sha256(raw).hexdigest(),'report':report}))
-print(json.dumps({'type':'session.activity','kind':'message','text':'同一个数字人继续研究。'}))
+print(json.dumps({'type':'session.activity','kind':'message','text':'The same persona continues research.'}))
 "#).unwrap();
         fs::set_permissions(&bridge, fs::Permissions::from_mode(0o700)).unwrap();
         c.agent_backends.insert(
@@ -4134,11 +4204,11 @@ print(json.dumps({'type':'session.activity','kind':'message','text':'同一个�
         let person = people::change(
             &c,
             people::Change::Create {
-                name: "知行".into(),
+                name: "InsightAction".into(),
                 role: "designer".into(),
                 kind: people::Kind::Fixed,
-                soul: "用好奇与审慎回应同伴。".into(),
-                purpose: "研究执行技术之间的连续性".into(),
+                soul: "Respond to peers with curiosity and care.".into(),
+                purpose: "Research continuity across execution technologies".into(),
             },
         )
         .unwrap();
@@ -4146,11 +4216,11 @@ print(json.dumps({'type':'session.activity','kind':'message','text':'同一个�
             &c,
             &person.id,
             "continuity-note",
-            "PERSON_EXECUTION_CONTINUITY_2741：跨执行器保留身份与记忆。",
+            "PERSON_EXECUTION_CONTINUITY_2741: Preserve identity and memory across executors.",
         )
         .unwrap();
         let task = |id: &str, role: &str| {
-            serde_json::from_value::<Task>(json!({"id":id,"role":role,"repository":"superpod","prompt":"PERSON_EXECUTION_CONTINUITY_2741 继续研究数字人跨技术的记忆连续性。","persona_id":person.id,"max_attempts":1})).unwrap()
+            serde_json::from_value::<Task>(json!({"id":id,"role":role,"repository":"superpod","prompt":"PERSON_EXECUTION_CONTINUITY_2741 Continue researching cross-technology persona memory continuity.","persona_id":person.id,"max_attempts":1})).unwrap()
         };
         let first_task = task("person-first", "research");
         let first = enqueue(&c, first_task.clone()).unwrap();

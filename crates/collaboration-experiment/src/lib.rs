@@ -1026,7 +1026,7 @@ fn collect(
             .join(format!("{}.json", entry.task.id));
         if !job_file.exists() {
             metric.incomplete_calls += 1;
-            tasks.push(json!({"id":entry.task.id,"state":"not_enqueued","usage":{"observed":null,"reason":"no registered run"}}));
+            tasks.push(json!({"id":entry.task.id,"state":contracts::ExperimentTaskState::NotEnqueued,"usage":{"observed":null,"reason":"no registered run"}}));
             continue;
         }
         let job: Job = storage::read(&job_file)?;
@@ -1036,7 +1036,7 @@ fn collect(
         if let Err(error) = check_job(c, plan, entry, &job) {
             metric.invalid_reports += 1;
             tasks.push(
-                json!({"id":entry.task.id,"state":"invalid_binding","error":format!("{error:#}"),"usage":usage}),
+                json!({"id":entry.task.id,"state":contracts::ExperimentTaskState::InvalidBinding,"error":format!("{error:#}"),"usage":usage}),
             );
             continue;
         }
@@ -1099,11 +1099,11 @@ fn collect(
                     known.insert(claim.id.clone());
                 }
                 claims.extend(cards);
-                tasks.push(json!({"id":entry.task.id,"state":"succeeded","attempt":job.attempt,"receipt_sha256":storage::digest(&fs::read(dir.join("receipt.json"))?),"usage":usage}));
+                tasks.push(json!({"id":entry.task.id,"state":contracts::ExperimentTaskState::Succeeded,"attempt":job.attempt,"receipt_sha256":storage::digest(&fs::read(dir.join("receipt.json"))?),"usage":usage}));
             }
             Err(error) => {
                 metric.invalid_reports += 1;
-                tasks.push(json!({"id":entry.task.id,"state":"invalid_report","error":format!("{error:#}"),"usage":usage}));
+                tasks.push(json!({"id":entry.task.id,"state":contracts::ExperimentTaskState::InvalidReport,"error":format!("{error:#}"),"usage":usage}));
             }
         }
     }
@@ -1156,7 +1156,7 @@ fn collect(
         }
     }
     let complete = metrics.values().all(|m| m.incomplete_calls == 0);
-    let knowledge_proposals:Vec<_>=claims.iter().filter_map(|claim|claim.card.knowledge_update.as_ref().map(|update|json!({"status":"pending_host_review","superpod_commit":plan.inputs.repositories["superpod"].upstream.commit,"claim_id":claim.id,"claim_digest":claim.digest,"target_path":update.target_path,"proposal":update.proposal}))).collect();
+    let knowledge_proposals:Vec<_>=claims.iter().filter_map(|claim|claim.card.knowledge_update.as_ref().map(|update|json!({"status":contracts::ProposalState::PendingHostReview,"superpod_commit":plan.inputs.repositories["superpod"].upstream.commit,"claim_id":claim.id,"claim_digest":claim.digest,"target_path":update.target_path,"proposal":update.proposal}))).collect();
     Ok(
         json!({"schema_version":1,"protocol":plan.protocol,"plan_digest":plan.digest,"team_pairs":1,"promotion_eligible":false,"call_unit":"planned_codex_exec_attempt",
         "complete":complete,"fully_adjudicated":complete && !claims.is_empty() && metrics.values().all(|m|m.invalid_reports==0) && claims.iter().all(|c|c.adjudication.is_some()),

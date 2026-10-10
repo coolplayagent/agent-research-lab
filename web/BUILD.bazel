@@ -1,0 +1,3 @@
+exports_files(["defs.bzl"])
+load("//web:defs.bzl", "node_test")
+node_test(name = "locale_tests", script = "verify-locales.cjs", data = ["//:policy_sources", "//:source_inventory", "//web/shared:assets"])

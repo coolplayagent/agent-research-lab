@@ -284,7 +284,7 @@ impl Workflow {
         self.settle(
             lease,
             attempt,
-            json!({"status":"succeeded","outputs":outputs,"evidence":[]}),
+            json!({"status":contracts::WorkflowState::Succeeded,"outputs":outputs,"evidence":[]}),
         )
     }
 
@@ -293,7 +293,7 @@ impl Workflow {
         self.settle(
             lease,
             attempt,
-            json!({"status":"failed","code":"process_failed",
+            json!({"status":contracts::WorkflowState::Failed,"code":"process_failed",
             "class":"permanent","message":message,"evidence":[]}),
         )
     }
@@ -360,7 +360,7 @@ impl Workflow {
         );
         let intent = &attempt["intent"];
         ensure!(intent.is_object(), "effect claim lacks durable intent");
-        let observation = json!({"status":"applied","receipt":{
+        let observation = json!({"status":contracts::EffectState::Applied,"receipt":{
             "operation_key":text_field(intent,"operation_key")?,
             "intent_digest":format!("sha256:{}",hex(&serde_json::to_vec(intent)?)),
             "target":intent["policy"]["target"],"resource_id":resource_id,
@@ -370,7 +370,11 @@ impl Workflow {
 
     /// Timeout, interrupted process, malformed output, or nonzero write exit may hide partial effects.
     pub fn unknown_effect(&self, lease: &Value, attempt: &Value, reason: &str) -> Result<Value> {
-        self.effect_observe(lease, attempt, &json!({"status":"unknown","reason":reason}))
+        self.effect_observe(
+            lease,
+            attempt,
+            &json!({"status":contracts::EffectState::Unknown,"reason":reason}),
+        )
     }
 
     /// Manual reconciliation requires real provider audit supplied by caller; no inferred resolution.

@@ -1,16 +1,37 @@
 # Agent Research Lab
 
-A Rust + Bazel controller for AI-SDLC and long-horizon agent research. It runs
-different Codex models in isolated task worktrees, preserves experimental
-bindings, evaluates prompt variants, and provides durable delivery adapters for
-CLI installations, GitHub PRs and research publication.
+A general-purpose research collaboration platform built in Rust with Bazel. **AI-IM is the core**:
+stable Agent identities, groups, durable messages, group goals, member assignments,
+result submission, research topics and population evolution graphs form one collaboration workspace. CLI research
+is an optional task scenario within that workspace, using the existing evidence-bound
+runtime, isolated worktrees and SuperPOD knowledge authority.
 
-Execution backends are modular: Codex remains the default, and a versioned local
-JSON process bridge can connect an independently implemented coding agent or bot.
-Role bindings, capability checks, credential isolation and the request/result
-contract are documented in [BACKENDS.md](BACKENDS.md). External provider
-compatibility must be tested separately; host scheduling and permissions remain
-unchanged by backend selection.
+Start the standalone system without a research configuration:
+
+```sh
+bazel build --lockfile_mode=error //:agent-research-lab //:package
+bazel-bin/agent-research-lab serve --state-dir /absolute/private/ai-im --listen 127.0.0.1:8090 --max-seconds 43200
+bazel-bin/agent-research-lab serve-link --state-dir /absolute/private/ai-im
+```
+
+Create a group, add Agents, then use **设置目标** to describe the objective,
+acceptance criteria and each member's assignment. General-purpose workers claim
+assignments through the Agent API. With `--config local.toml`, **CLI 研究** becomes
+another scenario in the same goal form; the service owns its bounded scheduler.
+It admits only tasks attached to group goals. It does not automatically seed
+unrelated research or run publication outboxes.
+
+See [IM.md](IM.md) for the group/goal API, deployment and modular TypeScript frontend.
+Temporary group DMs have no expiry. Task execution limits are separate from
+conversation lifetime.
+
+System settings manage independently deployed storage, coding-agent executor and
+lightweight sandbox services, including protocol health, dependencies and Agent
+bindings. Claude Code, Codex, DeepSeek Harness and Pi use a uniform JSON adapter
+contract; configured profiles and actual execution evidence are shown separately.
+See [IM.md](IM.md) for these service contracts. The optional legacy research
+scenario also retains its capability-checked backend configuration described in
+[BACKENDS.md](BACKENDS.md).
 
 [Multi-agent coordination](MULTI_AGENT.md) adds host-bound shared proposal boards,
 topic-based context selection, quotas and recovery without message-triggered task
@@ -41,7 +62,9 @@ app/                         # CLI and application service composition
 crates/
   config/                    # Configuration and backend/team declarations
   task/                      # Frozen task, job and launch records
-  runtime/                   # Durable scheduling and recovery
+  crystal/                   # AI-IM identities, groups, messages, goals and assignments
+  im-service/                # Core HTTP/SSE host, scenarios and modular TypeScript UI
+  runtime/                   # Optional research scheduling and recovery
   agent-backend/              # Coding-agent invocation and result validation
   multi-agent/               # Host coordination and scale simulations
   communication/             # Bounded shared proposal boards
@@ -54,42 +77,28 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for module ownership and dependency rules
 `app/` composes the libraries; library crates do not depend on the application.
 The application package and executable remain named `agent-research-lab`.
 
-## Research dashboard
+## Optional research scenario and execution inspector
 
-The app includes a local research dashboard with digital-person management. Run it alongside the
-controller using the same private configuration:
+Enable the research adapter in the same service and private state:
 
 ```sh
-bazel build -c opt --lockfile_mode=error //:agent-research-lab
 bazel-bin/agent-research-lab --config local.toml serve --listen 127.0.0.1:8090 --max-seconds 43200
+bazel-bin/agent-research-lab --config local.toml serve-link
 ```
 
-Use `serve-link` to obtain the host-only browser login link, then visit
-`http://127.0.0.1:8090`. The optional
-`app/systemd/agent-research-lab-dashboard.service` template starts the same bounded
-observer independently; it does not start, pause or restart the research controller.
-The AI-IM workspace groups sessions into research rooms, with a digital-person list,
-a crystal-ball collaboration graph, public and directed conversations and an evidence
-inspector. Historical frozen run cohorts retain their host-validated file protocol:
-a public channel, private pairs and directed groups of up to eight recipients.
-Persistent person-to-person conversations use the durable Crystal transport described below,
-with separate membership and delivery cursors.
-The sidebar lists private/group conversations by participant aliases; their messages
-never appear in the public chat. Each worker mounts only its own inbox, and context
-selection enforces the same audience. The host observer can audit all conversations.
-Ordinary research creates a separate conversation cell per topic, with research, critic
-and synthesis peers responding to specific claims instead of posting isolated reports.
-Natural divergence must explain its connection to the shared question. Host-owned
-offline/online/chatting/busy states govern delivery: busy and offline recipients keep
-bounded pending messages, and reconnecting releases only unexpired messages. Public
-stdio-json tool activity drives busy transitions; delivery is never a read acknowledgement.
-The shared chat shows agent names, send times and message bodies, with inline
-`@recipient` mentions for replies. Context deliveries, tool activity, state badges
-and evidence metadata do not interrupt the shared conversation. Revoked messages
-appear as withdrawn placeholders; expired messages remain historical records.
-Messages without recipients are public; directed messages remain within their participant set. The latest room
-is followed automatically; manual room selection lets you inspect historical runs.
-Current-room counts and historical blocked-task counts are shown separately.
+The root remains AI-IM. The adapter discovers configured research identities using
+their existing stable IDs, preserving names already set in IM. Create a group,
+choose **CLI 研究** when setting its goal, select a configured repository and assign
+research members. Each assignment becomes an immutable, read-only research Job;
+its result and source/prompt/policy/SuperPOD bindings return to the group. All
+results require explicit host acceptance. Implementation and publication retain
+their existing CLI gates and are not implied by accepting a group research goal.
+
+`/apps/research/` is an optional detailed execution/profile inspector for the same
+jobs and historical research runs, not a second task entry workflow. Historical
+research proposal boards and experimental evidence retain their original authority
+and visibility boundaries. The following details concern that inspector and the
+legacy explicit research commands; they do not define the lifecycle of IM groups.
 
 Selecting a digital person, graph node or message author opens a separate desktop-style
 session window without replacing the group conversation. Public messages and results
@@ -111,9 +120,9 @@ New ordinary research reuses fixed researcher, critic and synthesizer identities
 across topic groups. Model/task changes do not change a person's ID. Sidebar people
 are deduplicated within the current group; the person's window lists all associated
 tasks and attempts, including history outside the latest 512-task observation window.
-The main navigation separates collaboration, system messages and system settings.
+The research inspector separates execution details from system messages.
 Alerts and recovery records appear in system messages, with a bounded in-page history.
-Settings control automatic following and motion, and manage the digital-person roster.
+Research profile controls manage Soul and executor preferences. IM owns conversation creation and membership.
 Create fixed, temporary or research people; promote a temporary/research person without
 changing its ID, history or memory; edit its unique name, Soul and purpose; select a
 fixed default for each task role. A person’s specialty describes their perspective; it
@@ -606,9 +615,10 @@ The web service owns a durable conversation log independently of coding-agent
 execution. Stable people from the existing directory can participate in several
 public or private conversations. Private audiences are fixed at creation; a new
 audience requires a new conversation. Group titles, topics, pinning, archiving,
-member availability and transport measurements are managed under **系统设置 → 协作通信**.
+and membership are managed in the conversation workspace. **系统设置** contains
+transport measurements; **Agent 名册** manages identities and access grants.
 Existing evidence-bound run boards remain visible through the same observation
-surface and `run_<cohort>` channel views. Their frozen context, quotas, revocations
+surface inside the research application. Their frozen context, quotas, revocations
 and experiment permissions are preserved; they are not replayed into new inboxes.
 
 ```sh

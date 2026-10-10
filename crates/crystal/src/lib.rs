@@ -1,10 +1,21 @@
 //! Durable digital-person conversations, independent of model execution.
 //! Host-authorized membership, ordered logs, bounded live delivery and replay.
+mod conversations;
+mod research;
+mod research_model;
+pub use research_model::*;
+mod directory;
+mod goal_model;
+mod goal_work;
+mod goals;
+mod groups;
 mod metrics;
 mod model;
+mod schema;
 mod store;
 mod writer;
 use anyhow::{Context, Result, anyhow, ensure};
+pub use goal_model::*;
 use metrics::Metrics;
 pub use model::*;
 use serde_json::{Value, json};
@@ -23,9 +34,22 @@ use store::{Catalog, Store};
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 pub(crate) enum Control {
+    Research(research::ResearchCommand),
+    Goal(goals::GoalCommand),
     #[cfg(test)]
     ReadOnlyFault,
     Register(Vec<String>),
+    Person(Person),
+    Convert {
+        group: String,
+        revision: u64,
+        title: String,
+    },
+    Fork {
+        source: String,
+        group: NewGroup,
+        history_from: Option<u64>,
+    },
     Create(NewGroup),
     Update(GroupChange),
     Membership {
@@ -197,6 +221,35 @@ impl Hub {
     pub async fn register(&self, actors: Vec<String>) -> Result<()> {
         self.control(Control::Register(actors)).await?;
         Ok(())
+    }
+    pub async fn save_person(&self, person: Person) -> Result<()> {
+        self.control(Control::Person(person)).await?;
+        Ok(())
+    }
+    pub async fn convert(&self, group: &str, revision: u64, title: String) -> Result<Group> {
+        Ok(serde_json::from_value(
+            self.control(Control::Convert {
+                group: group.into(),
+                revision,
+                title,
+            })
+            .await?,
+        )?)
+    }
+    pub async fn fork(
+        &self,
+        source: &str,
+        group: NewGroup,
+        history_from: Option<u64>,
+    ) -> Result<Group> {
+        Ok(serde_json::from_value(
+            self.control(Control::Fork {
+                source: source.into(),
+                group,
+                history_from,
+            })
+            .await?,
+        )?)
     }
     pub async fn create_group(&self, group: NewGroup) -> Result<Group> {
         Ok(serde_json::from_value(
@@ -565,3 +618,12 @@ impl Drop for Subscription {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod im_tests;
+
+#[cfg(test)]
+mod goal_tests;
+
+#[cfg(test)]
+mod research_tests;
