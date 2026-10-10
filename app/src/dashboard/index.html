@@ -28,7 +28,16 @@
       </div>
     </header>
     <div id="collaboration-page" class="shell">
-      <aside class="sidebar">
+      <aside id="left-sidebar" class="sidebar">
+        <div
+          id="resize-left"
+          class="sidebar-resizer"
+          role="separator"
+          tabindex="0"
+          aria-label="调整左侧栏宽度"
+          aria-orientation="vertical"
+          aria-controls="left-sidebar"
+        ></div>
         <div class="side-title">
           <h2>协作空间</h2>
           <span class="readonly">只读</span>
@@ -74,9 +83,29 @@
             <h1 id="room-title">研究公共板</h1>
             <p id="room-subtitle">等待运行快照…</p>
           </div>
-          <div class="view-switch">
-            <button id="view-map" class="active">协作图</button
-            ><button id="view-chat">专注对话</button>
+          <div class="room-actions">
+            <div class="sidebar-actions">
+              <button
+                id="toggle-left-sidebar"
+                class="panel-toggle"
+                aria-controls="left-sidebar"
+                aria-expanded="true"
+              >
+                ◧ 左栏
+              </button>
+              <button
+                id="toggle-right-sidebar"
+                class="panel-toggle"
+                aria-controls="right-sidebar"
+                aria-expanded="true"
+              >
+                ◨ 右栏
+              </button>
+            </div>
+            <div class="view-switch">
+              <button id="view-map" class="active">协作图</button
+              ><button id="view-chat">专注对话</button>
+            </div>
           </div>
         </div>
         <div class="scope-stats">
@@ -136,6 +165,14 @@
           <span id="message-count"></span
           ><button id="open-profile" class="profile-toggle">数字人看板</button>
           <button
+            id="collapse-chat"
+            class="panel-toggle"
+            aria-controls="timeline"
+            aria-expanded="true"
+          >
+            ⌄ 收起
+          </button>
+          <button
             id="maximize-chat"
             class="maximize"
             aria-label="放大对话窗口"
@@ -156,7 +193,16 @@
           <span class="readonly">点击数字人查看会话</span>
         </div>
       </main>
-      <aside class="inspector">
+      <aside id="right-sidebar" class="inspector">
+        <div
+          id="resize-right"
+          class="sidebar-resizer"
+          role="separator"
+          tabindex="0"
+          aria-label="调整右侧栏宽度"
+          aria-orientation="vertical"
+          aria-controls="right-sidebar"
+        ></div>
         <div class="inspector-heading">
           <p class="eyebrow">DIGITAL PERSONA</p>
           <h2>数字人看板</h2>

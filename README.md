@@ -109,7 +109,11 @@ The main navigation separates collaboration, system messages and system settings
 Alerts and recovery records appear in system messages, with a bounded in-page history.
 Settings control automatic following and motion; service parameters are displayed read-only.
 Sidebar groups, directed chats and people can be collapsed; pinned groups sort first.
-These display preferences persist in the current browser.
+Both sidebars can also be hidden or resized by dragging their inner edges (arrow keys
+adjust a focused edge; double-click restores its default width). The shared chat folds
+down to its title bar and preserves its conversation and scroll position when reopened.
+These display preferences persist in the current browser; narrow screens retain a
+stacked left sidebar and a resizable digital-person overlay.
 Identity is stable across retries of one task; separate tasks are separate identities. Soul is
 the role guideline from the task's frozen lab source or explicitly registered prompt
 version, not an invented biography or the private rendered task prompt. Role guidelines

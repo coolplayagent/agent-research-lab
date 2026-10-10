@@ -94,6 +94,11 @@ function readPreferences() {
     return {
       follow: value.follow !== false,
       motion: value.motion !== false,
+      leftWidth: value.leftWidth,
+      rightWidth: value.rightWidth,
+      leftCollapsed: value.leftCollapsed === true,
+      rightCollapsed: value.rightCollapsed === true,
+      chatCollapsed: value.chatCollapsed === true,
       pinnedRooms: Array.isArray(value.pinnedRooms)
         ? value.pinnedRooms.filter((x) => typeof x === "string").slice(-1000)
         : [],
@@ -120,6 +125,162 @@ function setFollowing(value) {
   preferences.follow = value;
   savePreferences();
 }
+function layoutWidths() {
+  const clamp = (value, fallback, min, max) =>
+    Math.max(min, Math.min(max, Number.isFinite(value) ? value : fallback));
+  const width = Math.min(window.innerWidth, 2000),
+    docked = window.innerWidth > 1200 && !focusPanel,
+    rightMinimum = docked && !preferences.rightCollapsed ? 240 : 0,
+    leftMax = Math.min(420, Math.max(180, width - 450 - rightMinimum)),
+    left = clamp(preferences.leftWidth, 230, 180, leftMax),
+    rightMax = docked
+      ? Math.min(520, width - 450 - (preferences.leftCollapsed ? 0 : left))
+      : Math.min(520, Math.max(240, window.innerWidth - 24)),
+    right = clamp(preferences.rightWidth, 305, 240, rightMax);
+  return { left, right, leftMax, rightMax, docked };
+}
+function applySidebarLayout() {
+  const widths = layoutWidths(),
+    leftOpen = !preferences.leftCollapsed && !focusPanel,
+    rightOpen =
+      !preferences.rightCollapsed &&
+      (widths.docked || document.body.classList.contains("profile-open"));
+  const shell = $("collaboration-page");
+  shell.style.setProperty("--left-track", `${leftOpen ? widths.left : 0}px`);
+  shell.style.setProperty(
+    "--right-track",
+    `${rightOpen && widths.docked ? widths.right : 0}px`,
+  );
+  shell.style.setProperty("--right-width", `${widths.right}px`);
+  for (const side of ["left", "right"]) {
+    const open = side === "left" ? leftOpen : rightOpen,
+      toggle = $("toggle-" + side + "-sidebar"),
+      label = side === "left" ? "左侧栏" : "右侧栏",
+      handle = $("resize-" + side);
+    $(side + "-sidebar").hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.title = `${open ? "收起" : "展开"}${label}`;
+    toggle.setAttribute("aria-label", toggle.title);
+    handle.setAttribute("aria-valuemin", side === "left" ? "180" : "240");
+    handle.setAttribute("aria-valuemax", String(widths[side + "Max"]));
+    handle.setAttribute("aria-valuenow", String(Math.round(widths[side])));
+    handle.setAttribute("aria-valuetext", `${Math.round(widths[side])} 像素`);
+    handle.title = "拖动调整宽度；方向键微调，双击还原";
+  }
+}
+function dismissProfile(collapse = false) {
+  document.body.classList.remove("profile-open");
+  if (collapse) {
+    preferences.rightCollapsed = true;
+    savePreferences();
+  }
+  applySidebarLayout();
+}
+function setChatCollapsed(collapsed) {
+  const timeline = $("timeline"),
+    scroll = timeline.scrollTop,
+    wasCollapsed = document.body.classList.contains("chat-collapsed");
+  preferences.chatCollapsed = collapsed;
+  document.body.classList.toggle("chat-collapsed", collapsed);
+  $("collapse-chat").textContent = collapsed ? "⌃ 展开" : "⌄ 收起";
+  $("collapse-chat").setAttribute("aria-expanded", String(!collapsed));
+  $("collapse-chat").setAttribute(
+    "aria-label",
+    collapsed ? "展开协作群聊" : "向下收起协作群聊",
+  );
+  if (!collapsed && wasCollapsed)
+    requestAnimationFrame(() => {
+      timeline.scrollTo({
+        top: Number(timeline.dataset.foldScroll || 0),
+        behavior: "instant",
+      });
+    });
+  else if (collapsed) timeline.dataset.foldScroll = String(scroll);
+  savePreferences();
+}
+function initSidebarControls() {
+  $("toggle-left-sidebar").addEventListener("click", () => {
+    preferences.leftCollapsed = !preferences.leftCollapsed;
+    savePreferences();
+    applySidebarLayout();
+  });
+  $("toggle-right-sidebar").addEventListener("click", () => {
+    if (!$("right-sidebar").hidden) dismissProfile(true);
+    else {
+      preferences.rightCollapsed = false;
+      document.body.classList.add("profile-open");
+      savePreferences();
+      applySidebarLayout();
+    }
+  });
+  for (const side of ["left", "right"]) {
+    const handle = $("resize-" + side),
+      key = side + "Width";
+    let drag = null;
+    const resize = (width) => {
+      const limits = layoutWidths();
+      preferences[key] = Math.round(
+        Math.max(
+          side === "left" ? 180 : 240,
+          Math.min(limits[side + "Max"], width),
+        ),
+      );
+      applySidebarLayout();
+    };
+    const finish = () => {
+      if (!drag) return;
+      drag = null;
+      document.body.classList.remove("resizing-sidebar");
+      savePreferences();
+    };
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      drag = {
+        pointer: e.pointerId,
+        x: e.clientX,
+        width: layoutWidths()[side],
+      };
+      handle.setPointerCapture(e.pointerId);
+      handle.focus({ preventScroll: true });
+      document.body.classList.add("resizing-sidebar");
+      e.preventDefault();
+    });
+    handle.addEventListener("pointermove", (e) => {
+      if (drag?.pointer !== e.pointerId) return;
+      resize(drag.width + (e.clientX - drag.x) * (side === "left" ? 1 : -1));
+    });
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+    handle.addEventListener("lostpointercapture", finish);
+    handle.addEventListener("dblclick", () => {
+      preferences[key] = side === "left" ? 230 : 305;
+      applySidebarLayout();
+      savePreferences();
+    });
+    handle.addEventListener("keydown", (e) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+      e.preventDefault();
+      const limits = layoutWidths(),
+        step = e.shiftKey ? 40 : 10;
+      resize(
+        e.key === "Home"
+          ? 0
+          : e.key === "End"
+            ? limits[side + "Max"]
+            : limits[side] +
+              (e.key === "ArrowRight" ? step : -step) *
+                (side === "left" ? 1 : -1),
+      );
+      savePreferences();
+    });
+  }
+  window.addEventListener("resize", applySidebarLayout);
+  $("collapse-chat").addEventListener("click", () =>
+    setChatCollapsed(!preferences.chatCollapsed),
+  );
+  applySidebarLayout();
+  setChatCollapsed(preferences.chatCollapsed === true);
+}
 function roomName(id) {
   const members = data.jobs.filter((j) => j.cohort_id === id),
     topics = [...new Set(members.flatMap((j) => j.topics || []))],
@@ -143,7 +304,7 @@ function showPage(page, focus = false) {
   }
   if (page !== "collaboration") {
     if ($("session-window").open) closeSession();
-    document.body.classList.remove("profile-open");
+    dismissProfile();
     if (focus) $(page + "-title").focus({ preventScroll: true });
   }
 }
@@ -292,17 +453,22 @@ function mention(j) {
   return button;
 }
 function openProfile(id) {
-  if (!data.jobs.some((j) => j.id === id)) return;
+  if (!data?.jobs.some((j) => j.id === id)) return;
   inspected = id;
+  preferences.rightCollapsed = false;
+  savePreferences();
   document.body.classList.add("profile-open");
+  applySidebarLayout();
   details(data.jobs.find((j) => j.id === id));
   $("close-profile").focus({ preventScroll: true });
 }
 function maximize(panel) {
   const next = focusPanel === panel ? "" : panel;
-  if (next) document.body.classList.remove("profile-open");
+  if (next) dismissProfile();
   if (!focusPanel && next) focusScroll = $("timeline").scrollTop;
   focusPanel = next;
+  if (next === "chat") setChatCollapsed(false);
+  applySidebarLayout();
   document.body.classList.toggle("focus-graph", next === "graph");
   document.body.classList.toggle("focus-chat", next === "chat");
   for (const name of ["graph", "chat"]) {
@@ -409,7 +575,7 @@ function openSession(id) {
     key: "",
     request: 0,
   };
-  document.body.classList.remove("profile-open");
+  dismissProfile();
   if (!$("session-window").open) $("session-window").showModal();
   renderSession(true);
   fetchSession();
@@ -770,7 +936,7 @@ function details(j) {
     );
   const inspect = el("button", "打开会话历史", "inspect-process");
   inspect.addEventListener("click", () => {
-    document.body.classList.remove("profile-open");
+    dismissProfile();
     if (j.cohort_id !== room) {
       room = j.cohort_id || "";
       setFollowing(false);
@@ -1434,13 +1600,12 @@ function connect() {
 }
 $("open-profile").addEventListener("click", () => openProfile(selected));
 $("close-profile").addEventListener("click", () => {
-  document.body.classList.remove("profile-open");
+  dismissProfile(true);
   $("open-profile").focus();
 });
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape" || $("session-window").open) return;
-  if (document.body.classList.contains("profile-open"))
-    document.body.classList.remove("profile-open");
+  if (document.body.classList.contains("profile-open")) dismissProfile(true);
   else if (focusPanel) maximize(focusPanel);
 });
 $("maximize-graph").addEventListener("click", () => maximize("graph"));
@@ -1477,6 +1642,7 @@ $("setting-motion").addEventListener("change", (e) => {
   document.body.classList.toggle("reduced-motion", !preferences.motion);
   savePreferences();
 });
+initSidebarControls();
 showPage(location.hash.slice(1));
 $("state").addEventListener("change", render);
 $("refresh").addEventListener("click", refresh);
@@ -1491,6 +1657,7 @@ $("view-map").addEventListener("click", () => {
   $("view-chat").classList.remove("active");
 });
 $("view-chat").addEventListener("click", () => {
+  setChatCollapsed(false);
   document.body.classList.add("chat-only");
   $("view-chat").classList.add("active");
   $("view-map").classList.remove("active");
