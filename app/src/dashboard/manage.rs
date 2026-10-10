@@ -18,6 +18,7 @@ enum Request {
         note: String,
     },
 }
+#[cfg(test)]
 pub(super) fn content_length(headers: &str, addr: SocketAddr) -> Result<usize> {
     let rest = headers
         .strip_prefix("POST /api/people HTTP/1.1\r\n")
@@ -54,73 +55,19 @@ pub(super) fn content_length(headers: &str, addr: SocketAddr) -> Result<usize> {
     );
     Ok(length)
 }
-pub(super) fn handle(
-    stream: &mut TcpStream,
-    c: &Config,
-    headers: &str,
-    initial: &[u8],
-    addr: SocketAddr,
-) -> Result<()> {
-    let length = match content_length(headers, addr) {
-        Ok(length) => length,
-        Err(_) => {
-            return respond(
-                stream,
-                "403 Forbidden",
-                "application/json",
-                br#"{"error":"Only same-origin profile management is allowed"}"#,
-            );
+pub(super) fn apply(c: &Config, body: &[u8]) -> Result<Value> {
+    let _deadline = process::deadline_scope(Duration::from_secs(22));
+    match serde_json::from_slice::<Request>(body)? {
+        Request::Profile { change } => Ok(json!({"person":runtime::people::change(c,change)?})),
+        Request::Recall { id, query } => {
+            ensure!(query.len() <= 4000, "recall query exceeds bound");
+            personas::memory(c, &id, &query)
         }
-    };
-    let mut body = initial.to_vec();
-    if body.len() > length {
-        return respond(
-            stream,
-            "400 Bad Request",
-            "application/json",
-            br#"{"error":"Invalid body length"}"#,
-        );
-    }
-    let started = Instant::now();
-    while body.len() < length && started.elapsed() < Duration::from_secs(2) {
-        let mut buffer = [0; 1024];
-        let count = stream.read(&mut buffer[..(length - body.len()).min(1024)])?;
-        if count == 0 {
-            break;
-        }
-        body.extend_from_slice(&buffer[..count]);
-    }
-    let result = (|| -> Result<Value> {
-        ensure!(body.len() == length, "incomplete profile request");
-        let _deadline = process::deadline_scope(Duration::from_secs(22));
-        match serde_json::from_slice::<Request>(&body)? {
-            Request::Profile { change } => Ok(json!({"person":runtime::people::change(c,change)?})),
-            Request::Recall { id, query } => {
-                ensure!(query.len() <= 4000, "recall query exceeds bound");
-                personas::memory(c, &id, &query)
-            }
-            Request::Remember {
-                id,
-                request_id,
-                note,
-            } => runtime::people::remember_note(c, &id, &request_id, &note),
-        }
-    })();
-    match result {
-        Ok(value) => respond(
-            stream,
-            "200 OK",
-            "application/json; charset=utf-8",
-            &serde_json::to_vec(&value)?,
-        ),
-        Err(error) => respond(
-            stream,
-            "400 Bad Request",
-            "application/json; charset=utf-8",
-            &serde_json::to_vec(
-                &json!({"error":sessions::text_field(&json!(error.to_string()),1000)}),
-            )?,
-        ),
+        Request::Remember {
+            id,
+            request_id,
+            note,
+        } => runtime::people::remember_note(c, &id, &request_id, &note),
     }
 }
 #[cfg(test)]

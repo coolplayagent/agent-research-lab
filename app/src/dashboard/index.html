@@ -5,10 +5,9 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>水晶球 · AI-IM 协作空间</title>
     <link rel="stylesheet" href="/style.css" />
-    <script src="/app.js" defer></script>
-    <script src="/people.js" defer></script>
+    <script src="/operator.js" defer></script>
   </head>
-  <body>
+  <body class="operator-pending">
     <header>
       <a class="brand" href="/"
         ><span class="brand-icon">◈</span><strong>水晶球</strong
@@ -287,11 +286,116 @@
           >
             观察体验<span>跟随与动态图效</span>
           </button>
+          <button
+            id="settings-nav-evolution"
+            aria-controls="settings-evolution"
+          >
+            群体演化<span>策略谱系与开发集证据</span>
+          </button>
+          <button
+            id="settings-nav-communication"
+            aria-controls="settings-communication"
+          >
+            协作通信<span>群、成员与投递状态</span>
+          </button>
           <button id="settings-nav-service" aria-controls="settings-service">
             运行信息<span>服务与公共知识库</span>
           </button>
         </nav>
         <div class="settings-content">
+          <section
+            id="settings-evolution"
+            class="settings-panel settings-card"
+            hidden
+          >
+            <h2>群体演化</h2>
+            <p class="system-note">
+              数字人的身份与记忆保持连续；策略版本通过分支、评估和证据积累演化。后代的贡献与当前版本的表现分别观察。
+            </p>
+            <div class="crystal-controls">
+              <button id="lineage-refresh">读取谱系证据</button
+              ><button id="lineage-next" hidden>下一页</button>
+            </div>
+            <p id="lineage-status" role="status"></p>
+            <dl id="lineage-budget" class="crystal-metrics"></dl>
+            <div id="lineage-nodes"></div>
+            <p class="system-note">
+              谱系统计仅使用开发集。候选策略的启用仍须通过既有评估与发布门禁。
+            </p>
+          </section>
+          <section
+            id="settings-communication"
+            class="settings-panel settings-card"
+            hidden
+          >
+            <h2>协作通信</h2>
+            <p class="system-note">
+              同一个数字人可加入多个主题群。私聊的参与范围创建后保持固定。
+            </p>
+            <dl id="crystal-metrics" class="crystal-metrics"></dl>
+            <div class="crystal-controls">
+              <input
+                id="crystal-search"
+                type="search"
+                aria-label="搜索协作群"
+                placeholder="搜索群名或主题"
+              /><button id="crystal-search-button">查找</button
+              ><button id="crystal-next" hidden>下一页</button>
+            </div>
+            <div id="crystal-directory" class="crystal-directory"></div>
+            <form id="crystal-create" class="crystal-form">
+              <h3>创建会话</h3>
+              <label
+                >名称<input
+                  id="crystal-title"
+                  required
+                  maxlength="80"
+                  placeholder="例如：长期记忆的边界"
+              /></label>
+              <label
+                >讨论主题<textarea
+                  id="crystal-topic"
+                  required
+                  maxlength="600"
+                  placeholder="共同探讨的问题、已有观察或待验证假设"
+                ></textarea>
+              </label>
+              <label
+                >会话类型<select id="crystal-private">
+                  <option value="false">协作群</option>
+                  <option value="true">私聊 / 多人私聊</option>
+                </select></label
+              >
+              <fieldset>
+                <legend>选择数字人</legend>
+                <input
+                  id="crystal-member-search"
+                  type="search"
+                  aria-label="筛选成员花名"
+                  placeholder="按花名筛选"
+                />
+                <div id="crystal-member-picker"></div>
+                <button id="crystal-more-people" type="button">
+                  加载更多数字人
+                </button>
+              </fieldset>
+              <button type="submit">创建会话</button>
+              <p id="crystal-form-status" role="status"></p>
+            </form>
+            <section id="crystal-room-settings" hidden>
+              <h3 id="crystal-selected-title"></h3>
+              <div class="crystal-controls">
+                <button id="crystal-pin">置顶</button
+                ><button id="crystal-archive">归档</button
+                ><button id="crystal-open">打开聊天</button>
+              </div>
+              <button id="crystal-add-members" type="button">
+                将上方所选数字人加入此群
+              </button>
+              <div id="crystal-members"></div>
+              <button id="crystal-more-members" hidden>更多成员</button>
+            </section>
+          </section>
           <section
             id="settings-observation"
             class="settings-panel settings-card"

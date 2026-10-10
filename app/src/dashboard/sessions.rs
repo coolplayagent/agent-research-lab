@@ -176,44 +176,42 @@ pub(super) fn controller(state: &Path) -> Value {
     current
 }
 
-pub(super) fn collect(c: &Config, shared: &Shared, stop: &AtomicBool) {
-    let mut previous = Value::Null;
-    while !stop.load(Ordering::Relaxed) {
-        let jobs = shared.read().unwrap()["jobs"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
-        let mut chosen = jobs.iter().collect::<Vec<_>>();
-        chosen.sort_by_key(|j| j["state"] != "running");
-        let sessions: Vec<_> = chosen
-            .into_iter()
-            .take(16)
-            .filter_map(|j| read(&c.state_dir, j["run_id"].as_str()?).ok())
-            .collect();
-        let next = json!({"sessions":sessions,"controller":controller(&c.state_dir)});
-        if next != previous {
-            let mut data = shared.write().unwrap();
-            data["sessions"] = next["sessions"].clone();
-            data["controller"] = next["controller"].clone();
-            data["revision"] = data["revision"]
-                .as_u64()
-                .unwrap_or(0)
-                .saturating_add(1)
-                .into();
-            previous = next;
-        }
-        for _ in 0..10 {
-            if stop.load(Ordering::Relaxed) {
-                return;
-            }
-            thread::sleep(Duration::from_millis(100));
-        }
+pub(super) fn update(c: &Config, shared: &Shared) -> bool {
+    let jobs = shared.read().unwrap()["jobs"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let mut chosen = jobs.iter().collect::<Vec<_>>();
+    chosen.sort_by_key(|j| j["state"] != "running");
+    let sessions: Vec<_> = chosen
+        .into_iter()
+        .take(16)
+        .filter_map(|j| read(&c.state_dir, j["run_id"].as_str()?).ok())
+        .collect();
+    let next = json!({"sessions":sessions,"controller":controller(&c.state_dir)});
+    let changed = {
+        let prior = shared.read().unwrap();
+        next["sessions"] != prior["sessions"] || next["controller"] != prior["controller"]
+    };
+    if changed {
+        let mut data = shared.write().unwrap();
+        data["sessions"] = next["sessions"].clone();
+        data["controller"] = next["controller"].clone();
+        data["revision"] = data["revision"]
+            .as_u64()
+            .unwrap_or(0)
+            .saturating_add(1)
+            .into();
+        return true;
     }
+
+    false
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
     #[test]
     fn history_pages_preserve_public_events_across_byte_and_event_limits() {
         let root = std::env::temp_dir().join(format!(

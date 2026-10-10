@@ -6,6 +6,13 @@ license.workspace = true
 description = "Reproducible AI-SDLC and long-horizon agent research with SuperPOD"
 
 [dependencies]
+async-stream.workspace = true
+axum.workspace = true
+crystal.workspace = true
+futures-util.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+libc.workspace = true
 agent_backend.workspace = true
 agent_policy.workspace = true
 anyhow.workspace = true

@@ -18,6 +18,33 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct LineageRequest {
+    pub registry_file: PathBuf,
+    pub study: evolution::lineage::Study,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LineageReceipt {
+    pub schema_version: u32,
+    pub registry: PromptRegistry,
+    pub study: evolution::lineage::Study,
+    pub report: evolution::lineage::Report,
+}
+impl LineageReceipt {
+    pub fn validate(&self) -> Result<()> {
+        ensure!(self.schema_version == 1, "unsupported lineage receipt");
+        let recomputed = evolution::lineage::diagnose(&self.registry, &self.study)?;
+        ensure!(
+            serde_json::to_value(recomputed)? == serde_json::to_value(&self.report)?,
+            "lineage receipt does not match its evidence"
+        );
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PromptRegistration {
     pub definition: PromptDefinition,
 }
@@ -294,6 +321,27 @@ fn execute_with_client(
     let base = input.parent().context("request file has no parent")?;
     let output = output.map(resolve_destination).transpose()?;
     match action {
+        "lineage" => {
+            let request: LineageRequest = read_strict(&input)?;
+            let registry_path = relative_to(base, &request.registry_file).canonicalize()?;
+            let registry: PromptRegistry = read_strict(&registry_path)?;
+            let report = evolution::lineage::diagnose(&registry, &request.study)?;
+            if let Some(destination) = &output {
+                ensure!(
+                    destination != &input && destination != &registry_path,
+                    "lineage report cannot replace its inputs"
+                );
+            }
+            let receipt = LineageReceipt {
+                schema_version: 1,
+                registry,
+                study: request.study,
+                report,
+            };
+            receipt.validate()?;
+            write_optional(output.as_deref(), &receipt)?;
+            Ok(serde_json::to_value(&receipt.report)?)
+        }
         "prompt-register" => {
             let request: PromptRegistration = read_strict(&input)?;
             let destination =
@@ -823,6 +871,47 @@ fn write_optional(path: Option<&Path>, value: &impl Serialize) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lineage_receipt_recomputes_evidence_and_preserves_registry_aliases() {
+        let temp = setup();
+        let input = temp.path().join("host/register.json");
+        let registry = temp.path().join("host/registry.json");
+        storage::write(&input, &example("prompt-register")).unwrap();
+        execute("prompt-register", &input, Some(&registry)).unwrap();
+        let request = temp.path().join("host/lineage.json");
+        let study = evolution::lineage::Study {
+            task_kind: "long_horizon".into(),
+            policy_version: "a".repeat(40),
+            superpod_commit: "b".repeat(40),
+            expected: BTreeMap::new(),
+            observations: vec![],
+            pending_evaluations: BTreeMap::new(),
+            pending_expansions: BTreeMap::new(),
+            evaluation_budget: 10,
+        };
+        let output = temp.path().join("host/report.json");
+        storage::write(
+            &request,
+            &LineageRequest {
+                registry_file: "registry.json".into(),
+                study,
+            },
+        )
+        .unwrap();
+        execute("lineage", &request, Some(&output)).unwrap();
+        let mut receipt: LineageReceipt = storage::read(&output).unwrap();
+        receipt.validate().unwrap();
+        receipt.report.budget_remaining = 0;
+        assert!(receipt.validate().is_err());
+        let alias = temp.path().join("host/alias.json");
+        std::os::unix::fs::symlink(&registry, &alias).unwrap();
+        assert!(execute("lineage", &request, Some(&alias)).is_err());
+        read_strict::<PromptRegistry>(&registry)
+            .unwrap()
+            .validate()
+            .unwrap();
+    }
 
     fn mock_remote(root: &Path) -> RemoteClient {
         use std::os::unix::fs::PermissionsExt;

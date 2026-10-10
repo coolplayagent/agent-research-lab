@@ -14,6 +14,21 @@ pub(crate) struct Cli {
 }
 #[derive(Subcommand)]
 pub(crate) enum Commands {
+    /// Exercise real durable TCP/SSE communication in a new private state directory.
+    CrystalBench {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long, value_parser = ["mixed", "hot"])]
+        mode: String,
+        #[arg(long, default_value_t = 10000)]
+        people: usize,
+        #[arg(long, default_value_t = 10000)]
+        messages: usize,
+        #[arg(long, default_value_t = 1000)]
+        rate: usize,
+    },
+    /// Print the host-only browser bootstrap link from masked controller state.
+    ServeLink,
     /// Serve the local research dashboard and digital-person settings alongside the controller.
     Serve {
         #[arg(long, default_value = "127.0.0.1:8090")]

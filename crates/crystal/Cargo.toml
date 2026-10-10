@@ -1,0 +1,20 @@
+[package]
+name = "lab-crystal"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "crystal"
+
+[dependencies]
+anyhow.workspace = true
+config.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+storage.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -26,6 +26,7 @@ rust_library(
         "//crates/build-cache:build_cache",
         "//crates/collaboration-experiment:collaboration_experiment",
         "//crates/communication:communication",
+        "//crates/crystal:crystal",
         "//crates/config:config",
         "//crates/delivery:delivery",
         "//crates/evolution-cli:evolution_cli",
