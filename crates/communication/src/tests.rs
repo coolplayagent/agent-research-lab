@@ -39,6 +39,46 @@ fn selection() -> Selection {
 }
 
 #[test]
+fn observer_history_does_not_mutate_authority_or_revive_expired_context() {
+    let temp = tempfile::tempdir().unwrap();
+    assert!(Board::open(temp.path()).is_err());
+    assert!(!temp.path().join("communication").exists());
+    let board = Board::new(temp.path()).unwrap();
+    let sender = member(1, "sender", "sender-run");
+    let receiver = member(1, "receiver", "receiver-run");
+    let endpoint = board.register(&sender, 100).unwrap();
+    board.register(&receiver, 100).unwrap();
+    write(&endpoint, 0, &proposal("retained"));
+    board.poll(&sender.cohort_id, 101).unwrap();
+    board.revoke_run(&sender, "unconfirmed", 102).unwrap();
+    // A new worker proposal must stay unconsumed when only the observer reads.
+    write(&endpoint, 1, &proposal("unconsumed"));
+    let before = fs::read(board.state_path(&sender.cohort_id)).unwrap();
+    let observer = Board::open(temp.path()).unwrap();
+    let history = observer
+        .inspect(&sender.cohort_id, 101 + TTL_SECONDS)
+        .unwrap();
+    assert_eq!(history["retained_messages"].as_array().unwrap().len(), 1);
+    assert_eq!(history["retained_messages"][0]["expired"], true);
+    assert_eq!(
+        history["retained_messages"][0]["origin"]["state"],
+        "revoked"
+    );
+    assert!(history["messages"].as_array().unwrap().is_empty());
+    assert!(
+        observer
+            .context(&receiver, &selection(), 101 + TTL_SECONDS)
+            .unwrap()
+            .message_ids
+            .is_empty()
+    );
+    assert_eq!(
+        before,
+        fs::read(board.state_path(&sender.cohort_id)).unwrap()
+    );
+}
+
+#[test]
 fn real_writers_storm_is_bounded_fair_and_does_not_wait_for_readers() {
     let temp = tempfile::tempdir().unwrap();
     let board = Board::new(temp.path()).unwrap();

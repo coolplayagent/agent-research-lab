@@ -7,8 +7,8 @@ Type=simple
 Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
 Environment=RUSTUP_HOME=%h/.rustup
 WorkingDirectory=/opt/workspace/agent-research-lab
-ExecStart=/opt/workspace/agent-research-lab/bazel-bin/agent-research-lab --config /opt/workspace/agent-research-lab/local.toml run --continuous --seed
-Restart=on-failure
+ExecStart=/opt/workspace/agent-research-lab/bazel-bin/agent-research-lab --config /opt/workspace/agent-research-lab/local.toml run --continuous --seed --max-seconds 43200
+Restart=always
 RestartSec=60
 KillMode=control-group
 TimeoutStopSec=30

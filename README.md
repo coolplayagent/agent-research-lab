@@ -54,6 +54,95 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for module ownership and dependency rules
 `app/` composes the libraries; library crates do not depend on the application.
 The application package and executable remain named `agent-research-lab`.
 
+## Research dashboard
+
+The app includes a local, read-only research dashboard. Run it alongside the
+controller using the same private configuration:
+
+```sh
+bazel build -c opt --lockfile_mode=error //:agent-research-lab
+bazel-bin/agent-research-lab --config local.toml serve --listen 127.0.0.1:8090 --max-seconds 43200
+```
+
+Open `http://127.0.0.1:8090`. The optional
+`app/systemd/agent-research-lab-dashboard.service` template starts the same bounded
+observer independently; it does not start, pause or restart the research controller.
+The AI-IM workspace groups sessions into research rooms, with a digital-person list,
+a crystal-ball collaboration graph, a shared-board conversation and an evidence
+inspector. Select an agent to read public messages and results in the central
+conversation. Consecutive tool operations collapse into process cards, with commands,
+output and normalized stdio JSON available inside. Long messages have expandable
+bodies; errors retain a visible summary even when their process details are folded.
+Replies show `sender → @recipient`, broadcasts use `@公共板`, and host context
+deliveries are explicitly labeled as system events. These are group-visible records,
+not private direct messages. Replies link to their referenced proposals. The latest room is
+followed automatically; manual room selection lets you inspect historical runs.
+Current-room counts and historical blocked-task counts are shown separately.
+Both center panels have an enlarge control: focus the collaboration graph or the
+conversation across the workspace, then restore with the same button or Escape.
+Selection and expanded process details survive these view changes and live updates.
+
+Avatars, sender names and mentions open a digital-person board containing the model,
+backend, task, memory setting, required tools, activity and evidence bindings. Identity
+is stable across retries of one task; separate tasks are separate identities. Soul is
+the role guideline from the task's frozen lab source or explicitly registered prompt
+version, not an invented personality or the private rendered task prompt. The lazy
+profile endpoint reads only known tasks, bounds role text to 16 KiB and Git reads to
+two seconds, and reports missing historical sources without substituting current text.
+
+A same-origin SSE stream pushes changes and reconnects automatically. Workflow
+and board snapshots are sampled every five seconds; up to 16 sessions are observed
+every second. Node pulses reflect newly observed session bytes; traffic on board
+links reflects newly observed board records. Links represent actual publications
+or initial-context delivery, not inferred collaboration. The stdio-json adapter
+projects public Codex events (messages, commands, tool results and turn status);
+other JSON bridge backends may emit optional `session.activity` events. Reasoning
+fields, prompts and raw protocol objects are excluded. Events without source
+timestamps remain untimed; the UI identifies the log's modification time instead.
+
+The observer uses the controller's workflow state rules and reads validated board
+authority without polling worker outboxes. Retained expired/revoked proposals are
+labeled as history; they are never reinstated as agent context. Context injection
+does not prove adoption, workflow success does not prove research quality, and a
+candidate commit does not prove gate approval or installation. Long-term knowledge
+remains in the existing SuperPOD repository.
+
+Sampling is bounded to the 512 most recently updated jobs within an 8,192-entry
+directory scan, 512 KiB per job, 32 associated boards and a 20-second workflow
+sampling deadline. The graph shows at most eight agents, prioritizing active runs;
+all selected tasks remain accessible in the session list. The conversation shows
+up to 256 board/context records. Each session reads at most the last 256 KiB and
+projects up to 48 public events with stable byte-offset IDs; truncated and partial
+lines are omitted. The UI reports truncation and observation errors. Samples are
+sequential observations, not atomic database snapshots. A failed sample retains
+the preceding data with an error and timestamp. At most 16 HTTP clients are served
+concurrently; SSE connections rotate after 45 seconds. Shutdown can take up to one
+in-progress sample beyond the configured lifetime.
+
+The controller reports its heartbeat, active tasks and latest-input refresh status
+in host-owned `controller-status.json` and `seed-status.json` inside private state.
+Startup initializes the workflow store once before recovering jobs. In continuous
+mode a failed freshness refresh remains fail-closed and retries after 30 seconds,
+backing off to five minutes; success returns to the normal fifteen-minute cadence.
+The dashboard shows refresh failures and delayed heartbeats independently of its
+own connection status. Systemd templates restart bounded twelve-hour processes;
+controller daily budgets and pause state continue to apply across restarts.
+
+For long-running service installations, pin verified skill trees and manifests in
+private state under `tools/skills`, and bind the controller's tools and optional
+private Codex profile to those copies. Keep per-task memories isolated. Updating a
+global skill installation must not mutate a running experiment's tool tree. A new
+release still requires verified source/manifest bindings and a new admitted cohort;
+never clear old blockers or alter frozen evidence to make an old run pass.
+
+Only loopback binding and fixed GET routes are accepted. Host/Origin checks,
+no-store responses and a same-origin content policy protect the local UI. Treat it
+as private research data: proposals, public agent output, tool summaries and host
+blockers can contain experiment information. Common credential-shaped fields are
+hidden, but this is not a general secret scanner. Raw logs, leases, task memories
+and arbitrary file downloads are not exposed. No external assets, telemetry or
+separate knowledge store are used.
+
 Linux is the first supported runtime platform. Install Git, Bazelisk/Bazel,
 Bubblewrap (`bwrap` with working user namespaces), Codex CLI and GitHub CLI (`gh`).
 The pinned Bazel and Rust versions are recorded in `.bazelversion` and
