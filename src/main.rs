@@ -17,6 +17,16 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Commands {
+    /// Plan or collect one bounded, evidence-bound collaboration pilot.
+    Collaboration {
+        #[arg(value_parser = ["plan", "collect"])]
+        action: String,
+        input: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long)]
+        adjudications: Option<PathBuf>,
+    },
     /// Prepare and exercise disposable real local CLI targets.
     Targets {
         #[arg(value_parser = ["prepare", "status", "verify", "agent-check"])]
@@ -146,6 +156,18 @@ fn execute(cli: Cli) -> Result<Value> {
                     "agent-check" => agent_research_lab::targets::agent_check(&c),
                     _ => unreachable!(),
                 },
+                Commands::Collaboration {
+                    action,
+                    input,
+                    output,
+                    adjudications,
+                } => agent_research_lab::collaboration_experiment::execute(
+                    &c,
+                    &action,
+                    &input,
+                    &output,
+                    adjudications.as_deref(),
+                ),
                 Commands::Doctor { probe_models } => runtime::doctor(&c, probe_models),
                 Commands::Enqueue { input } => Ok(serde_json::to_value(runtime::enqueue(
                     &c,

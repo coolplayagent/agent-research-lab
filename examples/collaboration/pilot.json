@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "experiment_id": "recovery-pilot-001",
+  "task_family": "long-horizon-recovery",
+  "trial_id": "recovery-instance-001",
+  "question": "基于共同SuperPOD来源与固定源码，设计AI-SDLC长程任务在外部动作超时后的恢复验收。区分可观察事实、竞争解释与下一步最小实验；没有执行的实验不可声称成功。",
+  "primary_hypothesis": "在逐slot模型和视角不变时，交换已提交证据并质疑后修订，可能增加团队去重后可独立核验的正确结论与有效纠错，同时也可能增加误引、重复和成本。",
+  "policy_version": "collaboration-host-rubric-v1",
+  "max_claims": 3,
+  "task_timeout_seconds": 300,
+  "first_arm": "baseline",
+  "knowledge_sources": [
+    "knowledge/index.md"
+  ],
+  "slots": [
+    {
+      "id": "slot-0",
+      "role": "research",
+      "model": "gpt-6-astra",
+      "perspective": "需求与验收：哪些可观察条件足以确认长程任务完成？",
+      "parent_prompt_version": null
+    },
+    {
+      "id": "slot-1",
+      "role": "review",
+      "model": "gpt-6-sol",
+      "perspective": "分布式失败：写入超时、租约与重复副作用的反例。",
+      "parent_prompt_version": null
+    },
+    {
+      "id": "slot-2",
+      "role": "evaluate",
+      "model": "gpt-6.1-sol",
+      "perspective": "实验设计：区分基础设施失败、实现缺陷与模型能力。",
+      "parent_prompt_version": null
+    },
+    {
+      "id": "slot-3",
+      "role": "research",
+      "model": "gpt-6-astra",
+      "perspective": "记忆连续性：恢复需要哪些最小检查点，哪些内容可能污染续作？",
+      "parent_prompt_version": null
+    },
+    {
+      "id": "slot-4",
+      "role": "review",
+      "model": "gpt-6-sol",
+      "perspective": "工具边界：CLI回执、实际目标状态与权限之间的差异。",
+      "parent_prompt_version": null
+    },
+    {
+      "id": "slot-5",
+      "role": "evaluate",
+      "model": "gpt-6.1-sol",
+      "perspective": "知识溯源：如何把有效发现写回既有SuperPOD而不混入未经核验的结论？",
+      "parent_prompt_version": null
+    },
+    {
+      "id": "slot-6",
+      "role": "research",
+      "model": "gpt-6-astra",
+      "perspective": "成本与上下文：在哪些任务上增加协作可能只增加重复工作？",
+      "parent_prompt_version": null
+    },
+    {
+      "id": "slot-7",
+      "role": "review",
+      "model": "gpt-6-sol",
+      "perspective": "少数观点：为主流恢复方案寻找失败条件和可证伪预测。",
+      "parent_prompt_version": null
+    }
+  ]
+}

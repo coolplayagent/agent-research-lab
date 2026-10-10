@@ -31,6 +31,9 @@ pub struct Task {
     pub prompt: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt_version: Option<String>,
+    /// A frozen invocation ceiling; omitted historical tasks retain three attempts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_attempts: Option<u8>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub use_memory: bool,
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -153,6 +156,11 @@ fn enqueue_with_inputs(
     }
     ensure!(!task.prompt.trim().is_empty(), "empty task prompt");
     ensure!(task.depth <= 3, "follow-up task depth exceeds three");
+    ensure!(
+        task.max_attempts
+            .is_none_or(|limit| (1..=3).contains(&limit)),
+        "task max_attempts must be 1..3"
+    );
     ensure!(c.models.contains_key(&task.role), "unknown model role");
     ensure!(
         !task.dependencies.contains(&task.id),
@@ -359,9 +367,13 @@ mod restart_start_tests {
     }
 }
 
+fn attempt_limit(task: &Task) -> u32 {
+    // Admission validates explicit limits; clamp retained malformed data fail closed.
+    u32::from(task.max_attempts.unwrap_or(3).min(3))
+}
 fn defer_read_retry(job: &mut Job, reason: String) {
     job.last_error = Some(reason);
-    job.retry_after = if !job.task.write && job.attempt < 3 {
+    job.retry_after = if !job.task.write && job.attempt < attempt_limit(&job.task) {
         Some(now() + 5 * (1_i64 << (job.attempt - 1)))
     } else {
         None
@@ -369,7 +381,7 @@ fn defer_read_retry(job: &mut Job, reason: String) {
 }
 fn prepare_retry(c: &Config, job: &mut Job) -> Result<()> {
     ensure!(
-        !job.task.write && job.attempt < 3 && job.launch.is_none(),
+        !job.task.write && job.attempt < attempt_limit(&job.task) && job.launch.is_none(),
         "retry is not admissible"
     );
     job.attempt += 1;
@@ -424,6 +436,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
                     repository: "superpod".into(),
                     prompt,
                     prompt_version: None,
+                    max_attempts: None,
                     use_memory: false,
                     depth: 0,
                     write: false,
@@ -449,6 +462,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
                     "综合两份关于 {title} 的独立研究和质疑结果。保留少数观点、反例和未解决分歧，检查引用，提出可区分竞争假设的有界实验。未实测的能力只能登记为假设。不得以共识代替证据。基于原始分歧证据，在 next_tasks 提出最多三个有界实验或 CLI 修复任务；无充分证据时返回空数组，不制造工作。不修改文件、安装、推送或合并。正文用中文。"
                 ),
                 prompt_version: None,
+                max_attempts: None,
                 use_memory: false,
                 depth: 0,
                 write: false,
@@ -2303,6 +2317,7 @@ fn admit_followups(
                 repository: proposal.repository,
                 prompt: proposal.prompt,
                 prompt_version: None,
+                max_attempts: None,
                 use_memory: false,
                 depth: parent.task.depth + 1,
                 write: proposal.write,
@@ -2592,8 +2607,8 @@ pub fn retry(c: &Config, id: &str) -> Result<Value> {
     safe_id(id)?;
     let mut job: Job = storage::read(&job_path(c, id))?;
     ensure!(
-        !job.task.write && job.attempt < 3,
-        "write retry requires reconciliation; read retry maximum is three attempts"
+        !job.task.write && job.attempt < attempt_limit(&job.task),
+        "write retry requires reconciliation; read task attempt limit reached"
     );
     let w = workflow(c);
     let state = w.status(&job.run_id)?;
@@ -3155,6 +3170,31 @@ mod tests {
     }
 
     #[test]
+    fn frozen_attempt_limits_preserve_legacy_serialization_and_stop_retries() {
+        let (temp, c, mut job, _) = completion_fixture(false, json!([]));
+        job.task.write = false;
+        let legacy = serde_json::to_value(&job.task).unwrap();
+        assert!(legacy.get("max_attempts").is_none());
+        assert_eq!(attempt_limit(&job.task), 3);
+        for attempt in 1..=3 {
+            job.attempt = attempt;
+            defer_read_retry(&mut job, "observed failure".into());
+            assert_eq!(job.retry_after.is_some(), attempt < 3);
+        }
+        job.attempt = 1;
+        job.task.max_attempts = Some(1);
+        defer_read_retry(&mut job, "observed failure".into());
+        assert!(job.retry_after.is_none());
+        assert!(prepare_retry(&c, &mut job).is_err());
+        assert_eq!(job.attempt, 1);
+        for limit in [0, 4] {
+            job.task.id = format!("invalid-{limit}");
+            job.task.max_attempts = Some(limit);
+            assert!(enqueue_with_inputs(&c, job.task.clone(), None).is_err());
+        }
+        drop(temp);
+    }
+    #[test]
     #[ignore = "set LAB_MEMORY_BIN for actual bounded Chinese checkpoint writeback and retrieval"]
     fn real_memory_concise_chinese_checkpoint_excludes_provenance() {
         let binary = std::env::var("LAB_MEMORY_BIN").expect("LAB_MEMORY_BIN");
@@ -3366,6 +3406,7 @@ while [ "$#" -gt 0 ]; do
 done
 prompt=$(cat)
 case "$prompt" in *SLOW_PARALLEL*) date +%s%N; sleep 3; date +%s%N ;; esac
+case "$prompt" in *EIGHT_PARALLEL*) date +%s%N; sleep 20; date +%s%N ;; *AFTER_EIGHT*) date +%s%N; date +%s%N ;; esac
 case "$prompt" in *FAIL_READ*) exit 7 ;; esac
 case "$prompt" in *implement\ tested\ candidate*|*MALFORMED*) printf 'actual fixture write' > candidate.txt ;; esac
 case "$prompt" in
@@ -3425,6 +3466,128 @@ printf '{"type":"fixture.completed"}\n'
 
     #[cfg(unix)]
     #[test]
+    #[ignore = "set LAB_WORKFLOW_BIN for real durable workflow and bwrap with explicit fake Codex; optional LAB_PROTOCOL_EVIDENCE_DIR preserves receipts"]
+    fn eight_workers_respect_capacity_and_completed_dependency_barrier() {
+        let (_temp, mut c) = scheduler_fixture();
+        c.max_agents = 8;
+        c.task_timeout_seconds = 45;
+        let independent: Vec<String> = (0..10).map(|n| format!("parallel-{n:02}")).collect();
+        let prerequisites = independent[..8].to_vec();
+        for id in independent
+            .iter()
+            .chain(std::iter::once(&"after-eight".into()))
+        {
+            let dependent = id == "after-eight";
+            enqueue(
+                &c,
+                Task {
+                    id: id.clone(),
+                    role: if dependent { "review" } else { "research" }.into(),
+                    repository: "superpod".into(),
+                    prompt: if dependent {
+                        "AFTER_EIGHT"
+                    } else {
+                        "EIGHT_PARALLEL"
+                    }
+                    .into(),
+                    prompt_version: None,
+                    max_attempts: None,
+                    use_memory: false,
+                    depth: 0,
+                    write: false,
+                    exploratory: false,
+                    dependencies: if dependent {
+                        prerequisites.clone()
+                    } else {
+                        vec![]
+                    },
+                    required_tools: vec![],
+                },
+            )
+            .unwrap();
+        }
+        run(&c, false, 100).unwrap();
+        let evidence = std::env::var_os("LAB_PROTOCOL_EVIDENCE_DIR").map(PathBuf::from);
+        if let Some(path) = &evidence {
+            fs::create_dir_all(path).unwrap();
+        }
+        let w = workflow(&c);
+        let mut intervals = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        for job in jobs(&c).unwrap() {
+            assert_eq!(job.attempt, 1);
+            assert!(job.last_error.is_none() && job.launch.is_none(), "{job:?}");
+            assert_eq!(w.status(&job.run_id).unwrap()["status"], "succeeded");
+            receipts.insert(job.task.id.clone(), w.verify(&job.run_id).unwrap());
+            let dir = c.state_dir.join("runs").join(&job.run_id);
+            let stdout = fs::read_to_string(dir.join("process/stdout.jsonl")).unwrap();
+            let times: Vec<u128> = stdout.lines().filter_map(|s| s.parse().ok()).collect();
+            assert_eq!(times.len(), 2, "{stdout}");
+            intervals.insert(job.task.id.clone(), [times[0], times[1]]);
+            if let Some(path) = &evidence {
+                let task_dir = path.join(&job.task.id);
+                fs::create_dir_all(&task_dir).unwrap();
+                storage::write(&task_dir.join("job.json"), &job).unwrap();
+                for file in [
+                    "prompt.txt",
+                    "result.json",
+                    "agent-permissions.json",
+                    "process/stdout.jsonl",
+                    "process/stderr.log",
+                ] {
+                    let source = dir.join(file);
+                    if source.is_file() {
+                        fs::copy(&source, task_dir.join(source.file_name().unwrap())).unwrap();
+                    }
+                }
+            }
+        }
+        let mut events = Vec::new();
+        for (id, times) in &intervals {
+            events.push((times[0], 1_i32, id));
+            events.push((times[1], -1_i32, id));
+        }
+        events.sort();
+        let mut active = 0;
+        let mut peak = 0;
+        for (_, change, _) in &events {
+            active += change;
+            peak = peak.max(active);
+        }
+        let last_prerequisite = prerequisites
+            .iter()
+            .map(|id| intervals[id][1])
+            .max()
+            .unwrap();
+        let summary = json!({"provider":"explicit fake Codex; real workflow and bwrap", "max_agents":c.max_agents,"measured_peak":peak,"intervals_ns":intervals,"launch_and_finish_events_ns":events,"last_prerequisite_finish_ns":last_prerequisite,"workflow_verification":receipts,"limits":"Protocol concurrency and dependency evidence only; no model quality, token or cost result."});
+        if let Some(path) = &evidence {
+            storage::write(&path.join("protocol.json"), &summary).unwrap();
+        }
+        println!("{summary}");
+        assert_eq!(
+            peak, 8,
+            "must fill all eight slots without admitting a ninth worker"
+        );
+        assert_eq!(active, 0);
+        assert!(intervals["after-eight"][0] >= last_prerequisite);
+        let dependent: Job = storage::read(&job_path(&c, "after-eight")).unwrap();
+        let prompt = fs::read_to_string(
+            c.state_dir
+                .join("runs")
+                .join(dependent.run_id)
+                .join("prompt.txt"),
+        )
+        .unwrap();
+        for id in prerequisites {
+            assert!(
+                prompt.contains(&id),
+                "missing completed dependency report: {id}"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
     #[ignore = "set LAB_WORKFLOW_BIN and LAB_SANDBOX_BIN for real workflow/sandbox with explicit fake Codex"]
     fn sandbox_write_claim_waits_for_idle_without_serializing_ordinary_workers() {
         let (_temp, mut c) = scheduler_fixture();
@@ -3450,6 +3613,7 @@ printf '{"type":"fixture.completed"}\n'
                     }
                     .into(),
                     prompt_version: None,
+                    max_attempts: None,
                     use_memory: false,
                     depth: 0,
                     write,
@@ -3529,6 +3693,7 @@ printf '{"type":"fixture.completed"}\n'
             repository: "superpod".into(),
             prompt: prompt.into(),
             prompt_version: None,
+            max_attempts: None,
             use_memory: false,
             depth: 0,
             write,
@@ -3660,12 +3825,21 @@ printf '{"type":"fixture.completed"}\n'
                 );
             }
         }
+        let mut once = task("failed-once", false, "FAIL_READ", vec![]);
+        once.max_attempts = Some(1);
+        enqueue(&c, once).unwrap();
         enqueue(&c, task("failed-read", false, "FAIL_READ", vec![])).unwrap();
         run(&c, false, 30).unwrap();
         let job: Job = storage::read(&job_path(&c, "failed-read")).unwrap();
         assert_eq!(job.attempt, 3);
         assert!(job.retry_after.is_none());
         assert_eq!(w.status(&job.run_id).unwrap()["status"], "failed");
+        let once: Job = storage::read(&job_path(&c, "failed-once")).unwrap();
+        assert_eq!(once.attempt, 1);
+        assert!(once.retry_after.is_none());
+        assert_eq!(w.status(&once.run_id).unwrap()["status"], "failed");
+        assert!(!c.state_dir.join("runs/failed-once-attempt-2").exists());
+        assert!(retry(&c, "failed-once").is_err());
     }
     #[test]
     #[ignore = "set LAB_MEMORY_BIN for real per-experiment memory continuity"]
@@ -3702,6 +3876,7 @@ printf '{"type":"fixture.completed"}\n'
                 repository: "superpod".into(),
                 prompt: "Resume the bounded repository research checkpoint".into(),
                 prompt_version: None,
+                max_attempts: None,
                 use_memory: true,
                 depth: 0,
                 write: false,

@@ -1,0 +1,23 @@
+{
+  "id": "claim-one",
+  "text": "示例占位：必须替换为实际分析。",
+  "evidence": [
+    {
+      "repository": "superpod",
+      "commit": "REPLACE_WITH_PINNED_COMMIT",
+      "path": "knowledge/index.md",
+      "start_line": 1,
+      "end_line": 1,
+      "sha256": "REPLACE_WITH_FILE_SHA256",
+      "quote": "REPLACE_WITH_EXACT_SHORT_QUOTE"
+    }
+  ],
+  "counterexample_to": [],
+  "revises": [],
+  "change": "new",
+  "rationale": "提供来源与主张之间的论证，不能只列链接。",
+  "knowledge_update": {
+    "target_path": "knowledge/index.md",
+    "proposal": "待宿主核验后整合到现有知识节点的建议。"
+  }
+}

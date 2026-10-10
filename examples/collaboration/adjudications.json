@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "plan_digest": "REPLACE_WITH_PLAN_DIGEST",
+  "entries": [
+    {
+      "claim_id": "REPLACE_WITH_TASK_ID#claim-one",
+      "claim_digest": "REPLACE_WITH_COLLECTED_CLAIM_DIGEST",
+      "supported": false,
+      "effective_counterexample": false,
+      "valid_revision": false,
+      "duplicate_of": null,
+      "rationale": "宿主独立检查后填写；默认值不构成评测。",
+      "evidence": [
+        {
+          "repository": "superpod",
+          "commit": "REPLACE_WITH_PINNED_COMMIT",
+          "path": "knowledge/index.md",
+          "start_line": 1,
+          "end_line": 1,
+          "sha256": "REPLACE_WITH_FILE_SHA256",
+          "quote": "REPLACE_WITH_EXACT_SHORT_QUOTE"
+        }
+      ],
+      "introduced_error": null
+    }
+  ]
+}
