@@ -102,7 +102,7 @@ print(json.dumps({'type':'communication.fixture','task':task,**observation}), fl
 "#;
 
 #[test]
-#[ignore = "real workflow; set LAB_WORKFLOW_BIN; verifies host-seeded topic membership"]
+#[ignore = "real workflow and relay-memory; set LAB_WORKFLOW_BIN and LAB_MEMORY_BIN; verifies topic membership and reusable identities"]
 fn seeded_research_keeps_topic_peers_in_separate_conversation_cells() {
     let (_temp, mut c) = super::tests::scheduler_fixture();
     c.multi_agent = Some(multi_agent::Settings {
@@ -111,6 +111,29 @@ fn seeded_research_keeps_topic_peers_in_separate_conversation_cells() {
     seed_inputs(&c).unwrap();
     let all = jobs(&c).unwrap();
     assert_eq!(all.len(), 12);
+    let people: BTreeSet<_> = all
+        .iter()
+        .map(|j| j.persona.as_ref().unwrap().id.clone())
+        .collect();
+    assert_eq!(
+        people.len(),
+        3,
+        "the same three people must be reused across four topic groups"
+    );
+    for job in &all {
+        assert!(job.persona.as_ref().unwrap().memory.is_some());
+        assert_eq!(
+            storage::digest(rendered_job_prompt(&c, job).unwrap().as_bytes()),
+            job.prompt_digest
+        );
+    }
+    seed_inputs(&c).unwrap();
+    assert_eq!(
+        jobs(&c).unwrap().len(),
+        12,
+        "re-seeding must preserve frozen jobs and memory inputs"
+    );
+
     let mut groups = BTreeMap::<String, Vec<&Job>>::new();
     for job in &all {
         let team = job.task.communication.as_ref().unwrap();
@@ -137,6 +160,26 @@ fn seeded_research_keeps_topic_peers_in_separate_conversation_cells() {
                 .dependencies
                 .iter()
                 .all(|id| ids.contains(id))
+        );
+    }
+    let scope = c.state_dir.join("private/identity-team.json");
+    storage::write(
+        &scope,
+        &all.iter().map(|j| j.task.id.clone()).collect::<Vec<_>>(),
+    )
+    .unwrap();
+    run_scoped(&c, false, 90, false, Some(&scope)).unwrap();
+    for job in &all {
+        let row = workflow(&c).status(&job.run_id).unwrap();
+        assert_eq!(row["status"], "succeeded", "{:?}", row);
+        let record: PostSuccess = storage::read(&post_success_path(&c, job)).unwrap();
+        assert_eq!(record.persona_memory, MemoryWriteback::Done);
+    }
+    for id in people {
+        let view = people::inspect_memory(&c, &id, "fixture output").unwrap();
+        assert_eq!(
+            view["stats"]["event_count"], 4,
+            "one successful checkpoint per group"
         );
     }
 }

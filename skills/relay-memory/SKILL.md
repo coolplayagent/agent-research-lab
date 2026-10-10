@@ -5,7 +5,7 @@ metadata:
   maintainer: coolplayagent/agent-research-lab
   origin: project-maintained-adapter
   runtime_repository: coolplayagent/relay-memory
-  runtime_source_commit: e188a5b2031c336169ffe5488e346c17949e14a4
+  runtime_source_commit: fd151bce0bcefa9fbaefe941200ec08937dfd4b7
 ---
 
 # Relay Memory
@@ -22,7 +22,8 @@ version command; verify identity through provenance and the executable hash.
 
 Use an explicit task-owned `--home` and a stable session ID for each research
 experiment. Keep the same ID across attempts when continuity is intended;
-use a different ID for independent experiments. Select the SQLite backend
+use separate homes for independent experiments. Session IDs within one home
+are continuity labels, not isolation boundaries. Select the SQLite backend
 explicitly for local continuity, so inherited remote settings cannot redirect
 memory unexpectedly:
 
@@ -39,8 +40,8 @@ facts against current sources before acting.
 
 A process success does not prove useful retrieval. For a continuity check,
 remember a task-specific marker and prepare a related query using the same
-home/session; verify it is retrieved. Use an independent session to check
-isolation. Keep test memories in a temporary home so checks do not pollute
+home/session; verify it is retrieved. Use an independent home to check
+isolation; cross-session recall within one home is intentional. Keep test memories in a temporary home so checks do not pollute
 research history. Missing retrieval is a failed check, not an invitation to
 invent a remembered result.
 
@@ -49,3 +50,11 @@ context through the CLI. SQLite data lives at `<home>/memory.sqlite`; use the
 CLI rather than editing that database. Starting `serve` or selecting a remote
 backend changes the operating environment and should be part of the requested
 task, with its host, storage, and authentication configured explicitly.
+
+For a reusable digital person, the host owns its private memory home. Call `prepare`
+once when binding a new task, retain the bounded context and its digest as immutable
+experiment input, and pass only that context to the worker. Do not mount the shared
+person store into agents or replace isolated formal-experiment memory with it.
+Write concise authorized outcomes through `remember` after committed completion;
+record source/prompt/policy/SuperPOD references in metadata. A failed or interrupted
+write has an unknown outcome until reconciled; never blindly replay it.

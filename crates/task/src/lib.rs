@@ -13,6 +13,9 @@ fn is_zero(value: &u8) -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Task {
+    /// Stable digital person chosen by the host; absent legacy tasks remain compatible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persona_id: Option<String>,
     pub id: String,
     pub role: String,
     pub repository: String,
@@ -39,6 +42,9 @@ pub struct Task {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Job {
+    /// Frozen identity and bounded relay-memory context for this experiment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persona: Option<PersonaSnapshot>,
     pub task: Task,
     pub model: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -78,4 +84,24 @@ pub struct Launch {
     pub communication_member: Option<communication::HostMember>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub communication_gap: Option<String>,
+}
+
+/// Host-owned identity inputs, immutable across retries and pinned by the prompt digest.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PersonaSnapshot {
+    pub id: String,
+    pub name: String,
+    pub revision: u64,
+    pub soul: String,
+    pub memory: Option<PersonaMemory>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PersonaMemory {
+    pub context: String,
+    pub sha256: String,
+    pub pack_sha256: String,
+    pub executable_sha256: String,
+    pub captured_at: i64,
 }
