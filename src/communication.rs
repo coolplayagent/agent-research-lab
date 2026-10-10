@@ -1285,3 +1285,7 @@ fn private_directory(path: &Path) -> Result<()> {
 #[cfg(test)]
 #[path = "communication/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "communication/scale_tests.rs"]
+mod scale_tests;
