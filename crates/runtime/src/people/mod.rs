@@ -291,6 +291,12 @@ fn save(c: &Config, directory: &Directory) -> Result<()> {
         serde_json::to_vec_pretty(directory)?.len() <= 16 * 1024 * 1024,
         "identity directory storage bound reached"
     );
+    let bytes = serde_json::to_vec_pretty(directory)?;
+    // Reads and unchanged history registration must not rewrite the directory:
+    // event-driven observers would otherwise feed their own writes back forever.
+    if fs::read(path(c)).ok().as_deref() == Some(bytes.as_slice()) {
+        return Ok(());
+    }
     storage::write(&path(c), directory)
 }
 pub fn directory(c: &Config) -> Result<Directory> {

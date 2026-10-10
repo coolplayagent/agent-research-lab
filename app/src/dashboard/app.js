@@ -81,6 +81,7 @@ let data = null,
   snapshotError = "",
   systemKey = "";
 const systemEntries = new Map();
+const serviceAlerts = new Map();
 const opened = new Set(),
   profiles = new Map(),
   pulses = new Map(),
@@ -421,7 +422,16 @@ function roomName(id) {
 }
 let settingsCategory = "people";
 function showSettingsCategory(category) {
-  if (!["people", "executors", "observation", "service"].includes(category))
+  if (
+    ![
+      "people",
+      "executors",
+      "communication",
+      "evolution",
+      "observation",
+      "service",
+    ].includes(category)
+  )
     category = settingsCategory;
   if (
     category !== "people" &&
@@ -430,7 +440,14 @@ function showSettingsCategory(category) {
   )
     closePerson();
   settingsCategory = category;
-  for (const id of ["people", "executors", "observation", "service"]) {
+  for (const id of [
+    "people",
+    "executors",
+    "communication",
+    "evolution",
+    "observation",
+    "service",
+  ]) {
     $("settings-" + id).hidden = id !== category;
     if (id === category)
       $("settings-nav-" + id).setAttribute("aria-current", "page");
@@ -461,6 +478,7 @@ function showPage(route, focus = false) {
 function renderSystemMessages() {
   const current = new Map(),
     control = data?.controller || {};
+  for (const [key, text] of serviceAlerts) current.set(key, text);
   if (snapshotError) current.set("snapshot-request", snapshotError);
   if (data?.error) current.set("snapshot", String(data.error));
   for (const j of data?.jobs || []) {
@@ -1422,6 +1440,7 @@ function privateChats() {
     );
     button.title = channel.label;
     button.addEventListener("click", () => {
+      window.CrystalRooms?.leave();
       chatRoute = key;
       setFollowing(false);
       render();
@@ -1567,6 +1586,7 @@ function rooms() {
     );
     button.title = label;
     button.addEventListener("click", () => {
+      window.CrystalRooms?.leave();
       room = id;
       inspected = "";
       setFollowing(false);
@@ -1691,23 +1711,34 @@ function render() {
   rows.scrollTop = scroll;
   $("task-count").textContent = listedPeople.size;
   if (typeof renderPeopleSidebar === "function") renderPeopleSidebar(list);
-  graph(list);
-  details(data.jobs.find((j) => j.id === (inspected || selected)));
-  timeline(list);
+  if (!window.CrystalRooms?.isActive()) {
+    graph(list);
+    details(data.jobs.find((j) => j.id === (inspected || selected)));
+    timeline(list);
+  }
   renderSession();
   connection();
+  window.CrystalRooms?.render();
+  window.CrystalLineage?.observe(valueLineageRevision());
+}
+function valueLineageRevision() {
+  return data?.lineage_revision ?? null;
 }
 function accept(value) {
+  snapshotError = "";
   value.jobs = value.jobs || [];
   value.boards = value.boards || [];
   value.sessions = value.sessions || [];
   if (typeof syncPeople === "function") syncPeople(value.roster);
   const knownRuns = new Set(value.jobs.map((j) => j.run_id));
   for (const id of profiles.keys()) if (!knownRuns.has(id)) profiles.delete(id);
+  let sessionChanged = false;
   for (const s of value.sessions) {
     const old = lastBytes.get(s.run_id);
     if (old !== undefined && old !== s.bytes)
       pulses.set(s.run_id, Date.now() + 1600);
+    if (old !== s.bytes && historyState?.run === s.run_id)
+      sessionChanged = true;
     lastBytes.set(s.run_id, s.bytes);
   }
   if (data) {
@@ -1736,21 +1767,23 @@ function accept(value) {
       "";
   }
   render();
+  if (sessionChanged && historyState?.following && $("session-window").open)
+    fetchSession();
 }
 function connection() {
   renderSystemMessages();
   const age = data?.sampled_at
     ? Math.max(0, Math.floor(Date.now() / 1000 - data.sampled_at))
     : null;
-  const healthy = connected && age !== null && age < 40 && !data.error;
+  const healthy = connected && !!data && !data.error;
   $("connection-dot").classList.toggle("live", healthy);
   $("connection").textContent = healthy
     ? "实时连接"
     : connected
-      ? "正在采样"
+      ? "连接已建立"
       : "正在重连";
   $("sample-time").textContent =
-    age === null ? "等待快照" : `任务快照 ${age} 秒前 · session 每秒观察`;
+    age === null ? "等待快照" : `最近变化 ${age} 秒前 · 事件推送`;
 }
 async function refresh() {
   if (fetching) return;
@@ -1814,7 +1847,14 @@ for (const page of ["collaboration", "messages", "settings"]) {
   });
 }
 window.addEventListener("hashchange", () => showPage(location.hash.slice(1)));
-for (const category of ["people", "executors", "observation", "service"]) {
+for (const category of [
+  "people",
+  "executors",
+  "communication",
+  "evolution",
+  "observation",
+  "service",
+]) {
   $("settings-nav-" + category).addEventListener("click", () => {
     location.hash = `settings/${category}`;
     showPage(`settings/${category}`);
@@ -1851,6 +1891,7 @@ showPage(location.hash.slice(1));
 $("state").addEventListener("change", render);
 $("refresh").addEventListener("click", refresh);
 $("latest-room").addEventListener("click", () => {
+  window.CrystalRooms?.leave();
   chatRoute = "";
   setFollowing(true);
   if (data) accept(data);
@@ -1899,12 +1940,6 @@ $("session-latest").addEventListener("click", () => {
   fetchSession();
   $("session-history").scrollTop = $("session-history").scrollHeight;
 });
-setInterval(() => {
-  if (historyState?.following && $("session-window").open) fetchSession();
-}, 3000);
 setInterval(connection, 1000);
-setInterval(() => {
-  if (!connected) refresh();
-}, 10000);
 refresh();
 connect();

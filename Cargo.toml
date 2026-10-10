@@ -10,6 +10,12 @@ license = "MIT"
 
 [workspace.dependencies]
 anyhow = "1"
+async-stream = "0.3"
+axum = "0.8.9"
+futures-util = "0.3"
+rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "time", "macros", "io-util"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 fs2 = "0.4"
@@ -25,6 +31,7 @@ automation = { package = "lab-automation", path = "crates/automation" }
 budget = { package = "lab-budget", path = "crates/budget" }
 build_cache = { package = "lab-build-cache", path = "crates/build-cache" }
 collaboration_experiment = { package = "lab-collaboration-experiment", path = "crates/collaboration-experiment" }
+crystal = { package = "lab-crystal", path = "crates/crystal" }
 communication = { package = "lab-communication", path = "crates/communication" }
 config = { package = "lab-config", path = "crates/config" }
 delivery = { package = "lab-delivery", path = "crates/delivery" }

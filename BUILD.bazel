@@ -53,6 +53,7 @@ test_suite(
         "//crates/build-cache:tests",
         "//crates/collaboration-experiment:tests",
         "//crates/communication:tests",
+        "//crates/crystal:tests",
         "//crates/config:tests",
         "//crates/delivery:tests",
         "//crates/evolution:tests",

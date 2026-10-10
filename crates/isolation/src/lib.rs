@@ -320,6 +320,15 @@ fn wrap_with_host(
             ".netrc",
             ".Xauthority",
             ".ICEauthority",
+            // Browser management cookies and bootstrap history must remain host-only.
+            ".mozilla",
+            ".config/chromium",
+            ".config/google-chrome",
+            ".config/google-chrome-beta",
+            ".config/microsoft-edge",
+            ".config/BraveSoftware",
+            "snap/firefox/common/.mozilla",
+            ".local/share/keyrings",
         ] {
             mask_credentials(&mut wrapped, &host_home.join(relative))?;
         }
@@ -859,13 +868,21 @@ test ! -e "$3/authority/private.json"
         let host_home = state.join("tools/host-home");
         let gh = host_home.join(".config/gh");
         let host_codex = host_home.join(".codex");
+        for relative in [".mozilla", ".config/chromium", ".config/google-chrome"] {
+            fs::create_dir_all(host_home.join(relative)).unwrap();
+            fs::write(
+                host_home.join(relative).join("cookies.sqlite"),
+                "operator-cookie-fixture",
+            )
+            .unwrap();
+        }
         fs::create_dir_all(&gh).unwrap();
         fs::create_dir_all(host_codex.join("skills/example")).unwrap();
         fs::write(gh.join("hosts.yml"), "nonsecret-github-fixture").unwrap();
         fs::write(host_codex.join("auth.json"), "{\"fixture\":true}").unwrap();
         fs::write(host_codex.join("skills/example/SKILL.md"), "test skill").unwrap();
         fs::write(host_codex.join("config.toml"), "model = 'test-model'\nmodel_provider = 'local'\n[mcp_servers.external]\ncommand = 'remote-tool'\n[hooks]\ncommand = 'external-write'\n[model_providers.local]\nname = 'Local'\nbase_url = 'https://example.invalid/v1'\nwire_api = 'responses'\n").unwrap();
-        let args = vec!["-c".into(), "set -eu; test -z \"${GH_TOKEN+x}\"; test -z \"${SSH_AUTH_SOCK+x}\"; test ! -e \"$1/hosts.yml\"; test ! -e \"$2/auth.json\"; test -f \"$CODEX_HOME/auth.json\"; test -f \"$CODEX_HOME/skills/example/SKILL.md\"; test -f \"$2/skills/example/SKILL.md\"".into(), "sandbox-test".into(), utf8(&gh).unwrap(), utf8(&host_codex).unwrap()];
+        let args = vec!["-c".into(), "set -eu; test -z \"${GH_TOKEN+x}\"; test -z \"${SSH_AUTH_SOCK+x}\"; test ! -e \"$1/hosts.yml\"; test ! -e \"$2/auth.json\"; test -f \"$CODEX_HOME/auth.json\"; test -f \"$CODEX_HOME/skills/example/SKILL.md\"; test -f \"$2/skills/example/SKILL.md\"; test ! -e \"$2/../.mozilla/cookies.sqlite\"; test ! -e \"$2/../.config/chromium/cookies.sqlite\"; test ! -e \"$2/../.config/google-chrome/cookies.sqlite\"".into(), "sandbox-test".into(), utf8(&gh).unwrap(), utf8(&host_codex).unwrap()];
         let access = HostAccess {
             home: Some(host_home),
             codex_home: Some(host_codex),

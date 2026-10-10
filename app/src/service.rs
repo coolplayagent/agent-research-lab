@@ -10,6 +10,13 @@ use serde_json::{Value, json};
 
 fn execute(cli: Cli) -> Result<Value> {
     match cli.command {
+        Commands::CrystalBench {
+            state,
+            mode,
+            people,
+            messages,
+            rate,
+        } => crate::dashboard::benchmark::run(&state, &mode, people, messages, rate),
         Commands::Agents {
             action,
             agent_count,
@@ -47,6 +54,7 @@ fn execute(cli: Cli) -> Result<Value> {
         command => {
             let c = Config::load(&cli.config)?;
             match command {
+                Commands::ServeLink => storage::read(&c.state_dir.join("dashboard/access.json")),
                 Commands::Serve {
                     listen,
                     max_seconds,

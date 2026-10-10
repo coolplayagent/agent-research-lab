@@ -40,6 +40,8 @@ function currentPersonJob(id) {
   );
 }
 function personPresence(id) {
+  const transport = window.CrystalRooms?.presence(id);
+  if (transport) return transport;
   const list = (data?.jobs || []).filter((j) => digitalPersonId(j) === id);
   const priority = { offline: 0, online: 1, chatting: 2, busy: 3 };
   return (

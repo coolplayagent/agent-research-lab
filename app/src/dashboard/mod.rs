@@ -3,11 +3,12 @@ use anyhow::{Context, Result, ensure};
 use config::Config;
 use multi_agent::TeamMembership;
 use serde_json::{Value, json};
+use std::future::IntoFuture;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{self, File},
-    io::{Read, Write},
-    net::{SocketAddr, TcpListener, TcpStream},
+    io::Read,
+    net::{SocketAddr, TcpListener},
     path::Path,
     sync::{
         Arc, RwLock,
@@ -17,16 +18,21 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use task::Job;
+pub(crate) mod benchmark;
 mod manage;
+mod observe;
+mod operator;
 mod personas;
 mod profiles;
+mod resources;
+mod rooms;
 mod sessions;
+mod transport;
 
 const MAX_JOBS: usize = 512;
 const MAX_ENTRIES: usize = 8192;
 const MAX_FILE: u64 = 512 * 1024;
 const MAX_BOARDS: usize = 32;
-const REFRESH: Duration = Duration::from_secs(5);
 
 fn read_job(path: &Path) -> Result<Job> {
     let file = File::open(path)?;
@@ -196,48 +202,14 @@ fn snapshot(c: &Config) -> Result<Value> {
     }
     Ok(
         json!({"schema_version":1,"sampled_at":now,"sample_duration_ms":started.elapsed().as_millis(),
-        "refresh_seconds":5,"paused":status["paused"],"summary":status["summary"],
+        "refresh_seconds":null,"observation_mode":"filesystem_events","paused":status["paused"],"summary":status["summary"],
+        "lineage_revision":fs::metadata(c.state_dir.join("evolution/lineage.json")).ok().and_then(|m|m.modified().ok()).and_then(|t|t.duration_since(UNIX_EPOCH).ok()).map(|d|d.as_nanos().to_string()),
         "max_agents":c.max_agents,"jobs":projected,"boards":boards,"warnings":warnings,
         "knowledge":"SuperPOD","read_only":false,"identity_management":true,"roster":roster,"error":null}),
     )
 }
 
 type Shared = Arc<RwLock<Value>>;
-
-fn collect(c: &Config, shared: &Shared, stop: &AtomicBool) {
-    while !stop.load(Ordering::Relaxed) {
-        match snapshot(c) {
-            Ok(mut value) => {
-                let mut data = shared.write().unwrap();
-                for key in ["sessions", "controller"] {
-                    value[key] = data[key].clone();
-                }
-                value["revision"] = data["revision"]
-                    .as_u64()
-                    .unwrap_or(0)
-                    .saturating_add(1)
-                    .into();
-                *data = value;
-            }
-            Err(_) => {
-                // Keep the last good sample, with an explicit failure and its old timestamp.
-                let mut data = shared.write().unwrap();
-                data["error"] = json!("采样失败；保留上次数据。请检查本机任务与 workflow 状态。");
-                data["revision"] = data["revision"]
-                    .as_u64()
-                    .unwrap_or(0)
-                    .saturating_add(1)
-                    .into();
-            }
-        }
-        for _ in 0..REFRESH.as_millis() / 100 {
-            if stop.load(Ordering::Relaxed) {
-                return;
-            }
-            thread::sleep(Duration::from_millis(100));
-        }
-    }
-}
 
 fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
     ensure!(request.ends_with("\r\n\r\n"), "incomplete headers");
@@ -277,241 +249,6 @@ fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
     Ok(first[1])
 }
 
-fn respond(stream: &mut TcpStream, status: &str, mime: &str, body: &[u8]) -> Result<()> {
-    write!(
-        stream,
-        "HTTP/1.1 {status}\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nConnection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'\r\n\r\n",
-        body.len()
-    )?;
-    stream.write_all(body)?;
-    Ok(())
-}
-
-fn handle(
-    mut stream: TcpStream,
-    addr: SocketAddr,
-    shared: &Shared,
-    state: &Path,
-    workspace: &Path,
-    stop: &AtomicBool,
-    config: Option<&Config>,
-) -> Result<()> {
-    stream.set_read_timeout(Some(Duration::from_millis(500)))?;
-    stream.set_write_timeout(Some(Duration::from_secs(2)))?;
-    let started = Instant::now();
-    let mut data = Vec::new();
-    let mut buffer = [0; 1024];
-    while data.len() < 8192 && started.elapsed() < Duration::from_secs(1) {
-        let size = stream.read(&mut buffer)?;
-        if size == 0 {
-            break;
-        }
-        data.extend_from_slice(&buffer[..size]);
-        if data.windows(4).any(|w| w == b"\r\n\r\n") {
-            break;
-        }
-    }
-    if let Some(end) = data.windows(4).position(|w| w == b"\r\n\r\n") {
-        let headers = std::str::from_utf8(&data[..end + 4])?;
-        if headers.starts_with("POST ") {
-            return if let Some(c) = config {
-                manage::handle(&mut stream, c, headers, &data[end + 4..], addr)
-            } else {
-                respond(
-                    &mut stream,
-                    "403 Forbidden",
-                    "text/plain",
-                    b"Management unavailable",
-                )
-            };
-        }
-    }
-    let route = std::str::from_utf8(&data)
-        .ok()
-        .and_then(|r| allowed_request(r, addr).ok());
-    match route {
-        Some("/api/events") => events(&mut stream, shared, stop),
-        Some("/") => respond(
-            &mut stream,
-            "200 OK",
-            "text/html; charset=utf-8",
-            include_bytes!("index.html"),
-        ),
-        Some("/app.js") => respond(
-            &mut stream,
-            "200 OK",
-            "text/javascript; charset=utf-8",
-            include_bytes!("app.js"),
-        ),
-        Some("/people.js") => respond(
-            &mut stream,
-            "200 OK",
-            "text/javascript; charset=utf-8",
-            include_bytes!("people.js"),
-        ),
-        Some("/style.css") => respond(
-            &mut stream,
-            "200 OK",
-            "text/css; charset=utf-8",
-            include_bytes!("style.css"),
-        ),
-        Some("/api/snapshot") => {
-            let body = serde_json::to_vec(&*shared.read().unwrap())?;
-            respond(
-                &mut stream,
-                "200 OK",
-                "application/json; charset=utf-8",
-                &body,
-            )
-        }
-        Some(path) if path == "/api/people" || path.starts_with("/api/people?after=") => {
-            let c = config.context("identity service unavailable")?;
-            let after = path.strip_prefix("/api/people?after=").unwrap_or("");
-            match personas::list(c, after) {
-                Ok(value) => respond(
-                    &mut stream,
-                    "200 OK",
-                    "application/json; charset=utf-8",
-                    &serde_json::to_vec(&value)?,
-                ),
-                Err(_) => respond(
-                    &mut stream,
-                    "400 Bad Request",
-                    "application/json",
-                    br#"{"error":"Identity directory unavailable"}"#,
-                ),
-            }
-        }
-        Some(path) if path.starts_with("/api/people/") => {
-            let c = config.context("identity service unavailable")?;
-            let (id, after) = path[12..]
-                .split_once("?after=")
-                .unwrap_or((&path[12..], ""));
-            match personas::history(c, id, after, shared) {
-                Ok(value) => respond(
-                    &mut stream,
-                    "200 OK",
-                    "application/json; charset=utf-8",
-                    &serde_json::to_vec(&value)?,
-                ),
-                Err(_) => respond(
-                    &mut stream,
-                    "404 Not Found",
-                    "application/json",
-                    br#"{"error":"Identity history unavailable"}"#,
-                ),
-            }
-        }
-        Some(path) if path.starts_with("/api/profile/") => {
-            let run = &path[13..];
-            let job = shared.read().unwrap()["jobs"]
-                .as_array()
-                .and_then(|jobs| jobs.iter().find(|j| j["run_id"] == run))
-                .cloned()
-                .or_else(|| {
-                    personas::historical_job(state, run)
-                        .ok()
-                        .map(|j| project(&j, &json!({"state":"historical"})))
-                });
-            if let Some(job) = job {
-                respond(
-                    &mut stream,
-                    "200 OK",
-                    "application/json; charset=utf-8",
-                    &serde_json::to_vec(&profiles::read(state, workspace, &job))?,
-                )
-            } else {
-                respond(
-                    &mut stream,
-                    "404 Not Found",
-                    "text/plain",
-                    b"Unknown profile",
-                )
-            }
-        }
-        Some(path) if path.starts_with("/api/session/") => {
-            let (run, query) = path[13..].split_once('?').unwrap_or((&path[13..], ""));
-            let before = if query.is_empty() {
-                None
-            } else if let Some(offset) = query
-                .strip_prefix("before=")
-                .filter(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
-                .and_then(|s| s.parse::<u64>().ok())
-            {
-                Some(offset)
-            } else {
-                return respond(
-                    &mut stream,
-                    "400 Bad Request",
-                    "text/plain",
-                    b"Invalid cursor",
-                );
-            };
-            let known = shared.read().unwrap()["jobs"]
-                .as_array()
-                .is_some_and(|jobs| jobs.iter().any(|j| j["run_id"] == run));
-            if known || personas::historical_job(state, run).is_ok() {
-                match sessions::page(state, run, before) {
-                    Ok(value) => respond(
-                        &mut stream,
-                        "200 OK",
-                        "application/json; charset=utf-8",
-                        &serde_json::to_vec(&value)?,
-                    ),
-                    Err(_) => respond(
-                        &mut stream,
-                        "404 Not Found",
-                        "application/json",
-                        b"{\"error\":\"session log unavailable\"}",
-                    ),
-                }
-            } else {
-                respond(
-                    &mut stream,
-                    "404 Not Found",
-                    "text/plain",
-                    b"Unknown session",
-                )
-            }
-        }
-        Some(_) => respond(&mut stream, "404 Not Found", "text/plain", b"Not found"),
-        None => respond(
-            &mut stream,
-            "403 Forbidden",
-            "text/plain",
-            b"Local GET requests only",
-        ),
-    }
-}
-
-fn events(stream: &mut TcpStream, shared: &Shared, stop: &AtomicBool) -> Result<()> {
-    stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nX-Accel-Buffering: no\r\nX-Content-Type-Options: nosniff\r\n\r\nretry: 1000\n\n")?;
-    let deadline = Instant::now() + Duration::from_secs(45);
-    let mut previous = None;
-    let mut last_write = Instant::now();
-    while Instant::now() < deadline && !stop.load(Ordering::Relaxed) {
-        let update = {
-            let data = shared.read().unwrap();
-            let revision = data["revision"].as_u64().unwrap_or(0);
-            (previous != Some(revision)).then(|| (revision, data.clone()))
-        };
-        if let Some((revision, data)) = update {
-            write!(
-                stream,
-                "id: {revision}\nevent: snapshot\ndata: {}\n\n",
-                serde_json::to_string(&data)?
-            )?;
-            previous = Some(revision);
-            last_write = Instant::now();
-        } else if last_write.elapsed() >= Duration::from_secs(5) {
-            stream.write_all(b": heartbeat\n\n")?;
-            last_write = Instant::now();
-        }
-        thread::sleep(Duration::from_millis(100));
-    }
-    Ok(())
-}
-
 pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<Value> {
     ensure!(
         listen.ip().is_loopback(),
@@ -528,58 +265,51 @@ pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<
         json!({"revision":0,"sampled_at":null,"jobs":[],"boards":[],"sessions":[],"summary":{},"warnings":[],"error":"正在读取首个运行快照…"}),
     ));
     let stop = AtomicBool::new(false);
-    let clients = std::sync::atomic::AtomicUsize::new(0);
-    eprintln!("Research dashboard: http://{addr} (identity management enabled, {max_seconds}s)");
-    let result = thread::scope(|scope| -> Result<()> {
-        scope.spawn(|| collect(c, &shared, &stop));
-        scope.spawn(|| sessions::collect(c, &shared, &stop));
-        let deadline = Instant::now() + Duration::from_secs(max_seconds);
-        let result = (|| -> Result<()> {
-            while Instant::now() < deadline {
-                match listener.accept() {
-                    Ok((stream, peer)) if peer.ip().is_loopback() => {
-                        if clients.load(Ordering::Relaxed) >= 16 {
-                            let mut stream = stream;
-                            let _ = stream.set_write_timeout(Some(Duration::from_millis(100)));
-                            let _ = respond(
-                                &mut stream,
-                                "503 Service Unavailable",
-                                "text/plain",
-                                b"Observer connection limit reached",
-                            );
-                        } else {
-                            clients.fetch_add(1, Ordering::Relaxed);
-                            let clients = &clients;
-                            let shared = &shared;
-                            let stop = &stop;
-                            let state = &c.state_dir;
-                            scope.spawn(move || {
-                                let _ = handle(
-                                    stream,
-                                    addr,
-                                    shared,
-                                    state,
-                                    &c.workspace,
-                                    stop,
-                                    Some(c),
-                                );
-                                clients.fetch_sub(1, Ordering::Relaxed);
-                            });
-                        }
-                    }
-                    Ok(_) => {}
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        thread::sleep(Duration::from_millis(25))
-                    }
-                    Err(e) => return Err(e.into()),
-                }
+    let (updates, _) = tokio::sync::watch::channel(0);
+    let (shutdown, _) = tokio::sync::watch::channel(false);
+    let hub = crystal::Hub::open(&c.state_dir.join("crystal"))?;
+    let mut web = transport::Web::new(
+        hub,
+        addr,
+        Some(Arc::new(c.clone())),
+        shared.clone(),
+        updates.clone(),
+        shutdown.clone(),
+    );
+    web.operator = Some(Arc::new(operator::Operator::open(&c.state_dir, addr)?));
+    eprintln!("Management link is in masked controller state: dashboard/access.json");
+    eprintln!("Research dashboard: http://{addr} (event-driven, {max_seconds}s)");
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()?;
+    thread::scope(|scope| -> Result<()> {
+        scope.spawn(|| {
+            if observe::run(c, &shared, &stop, &updates).is_err() {
+                let mut data = shared.write().unwrap();
+                data["error"] = json!("文件事件服务不可用");
+                drop(data);
+                updates.send_modify(|v| *v = v.wrapping_add(1));
             }
-            Ok(())
-        })();
+        });
+        let result = runtime.block_on(async {
+            let listener = tokio::net::TcpListener::from_std(listener)?;
+            let halt = async move {
+                tokio::time::sleep(Duration::from_secs(max_seconds)).await;
+                shutdown.send_replace(true);
+            };
+            tokio::time::timeout(
+                Duration::from_secs(max_seconds + 5),
+                axum::serve(listener, transport::router(web))
+                    .with_graceful_shutdown(halt)
+                    .into_future(),
+            )
+            .await??;
+            Ok::<_, anyhow::Error>(())
+        });
         stop.store(true, Ordering::Relaxed);
         result
-    });
-    result?;
+    })?;
     Ok(
         json!({"stopped":true,"listen":addr.to_string(),"at":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs()}),
     )
@@ -587,3 +317,6 @@ pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod transport_tests;

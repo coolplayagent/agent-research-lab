@@ -2,6 +2,8 @@
 //! publication, installation and repository gates. Holdout path validation must
 //! be paired with sandbox filesystem permissions when starting an agent.
 
+pub mod lineage;
+
 use anyhow::{Context, Result, bail, ensure};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -1,0 +1,151 @@
+use anyhow::{Result, ensure};
+use serde::{Deserialize, Serialize};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+pub const MAX_ACTORS: usize = 100_000;
+pub const MAX_GROUPS: usize = 100_000;
+pub const MAX_MEMBERSHIPS: usize = 1_000_000;
+pub const MAX_MEMBERS: usize = 20_000;
+pub const MAX_MESSAGES: u64 = 1_000_000;
+pub const MAX_TEXT: usize = 4096;
+pub const PAGE_SIZE: usize = 128;
+pub const LIVE_CAPACITY: usize = 256;
+pub const INGRESS_CAPACITY: usize = 4096;
+
+pub fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+pub fn id(value: &str) -> Result<()> {
+    config::safe_id(value)
+}
+pub fn text(value: &str, max: usize) -> Result<()> {
+    ensure!(
+        !value.trim().is_empty()
+            && value.len() <= max
+            && !value
+                .chars()
+                .any(|c| c.is_control() && c != '\n' && c != '\t'),
+        "invalid text or text exceeds bound"
+    );
+    Ok(())
+}
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Presence {
+    Offline,
+    Online,
+    Chatting,
+    Busy,
+}
+impl Presence {
+    pub fn receives(self) -> bool {
+        matches!(self, Self::Online | Self::Chatting)
+    }
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            Self::Offline => "offline",
+            Self::Online => "online",
+            Self::Chatting => "chatting",
+            Self::Busy => "busy",
+        }
+    }
+    pub(crate) fn parse(s: &str) -> Result<Self> {
+        Ok(serde_json::from_value(serde_json::Value::String(s.into()))?)
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Group {
+    pub id: String,
+    pub title: String,
+    pub topic: String,
+    pub private: bool,
+    pub archived: bool,
+    pub pinned: bool,
+    pub revision: u64,
+    pub created_ms: u64,
+    pub last_sequence: u64,
+    pub member_count: usize,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NewGroup {
+    pub id: String,
+    pub title: String,
+    pub topic: String,
+    #[serde(default)]
+    pub private: bool,
+    pub members: Vec<String>,
+}
+impl NewGroup {
+    pub fn validate(&self) -> Result<()> {
+        id(&self.id)?;
+        text(&self.title, 256)?;
+        text(&self.topic, 2048)?;
+        ensure!(
+            !self.members.is_empty() && self.members.len() <= MAX_MEMBERS,
+            "group requires 1..20000 digital people"
+        );
+        let mut seen = std::collections::BTreeSet::new();
+        for actor in &self.members {
+            id(actor)?;
+            ensure!(seen.insert(actor), "duplicate group member");
+        }
+        Ok(())
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Publish {
+    pub group_id: String,
+    pub request_id: String,
+    pub text: String,
+    #[serde(default)]
+    pub reply_to: Option<u64>,
+}
+impl Publish {
+    pub fn validate(&self) -> Result<()> {
+        id(&self.group_id)?;
+        id(&self.request_id)?;
+        ensure!(
+            self.reply_to.is_none_or(|v| v > 0 && v <= i64::MAX as u64),
+            "invalid reply sequence"
+        );
+        text(&self.text, MAX_TEXT)
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message {
+    pub sequence: u64,
+    pub group_id: String,
+    pub sender_id: String,
+    pub request_id: String,
+    pub text: String,
+    pub reply_to: Option<u64>,
+    pub accepted_ms: u64,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Receipt {
+    pub message: Message,
+    pub duplicate: bool,
+    pub durable: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GroupChange {
+    pub id: String,
+    pub revision: u64,
+    pub title: String,
+    pub topic: String,
+    pub archived: bool,
+    pub pinned: bool,
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct ActorStatus {
+    pub person_id: String,
+    pub presence: Presence,
+    pub connections: usize,
+}

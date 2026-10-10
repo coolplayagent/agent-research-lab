@@ -64,13 +64,16 @@ bazel build -c opt --lockfile_mode=error //:agent-research-lab
 bazel-bin/agent-research-lab --config local.toml serve --listen 127.0.0.1:8090 --max-seconds 43200
 ```
 
-Open `http://127.0.0.1:8090`. The optional
+Use `serve-link` to obtain the host-only browser login link, then visit
+`http://127.0.0.1:8090`. The optional
 `app/systemd/agent-research-lab-dashboard.service` template starts the same bounded
 observer independently; it does not start, pause or restart the research controller.
 The AI-IM workspace groups sessions into research rooms, with a digital-person list,
 a crystal-ball collaboration graph, public and directed conversations and an evidence
-inspector. Crystal Ball dispatches all collaboration messages through the same host-validated
-transport: a public channel, private pairs and directed groups of up to eight recipients.
+inspector. Historical frozen run cohorts retain their host-validated file protocol:
+a public channel, private pairs and directed groups of up to eight recipients.
+Persistent person-to-person conversations use the durable Crystal transport described below,
+with separate membership and delivery cursors.
 The sidebar lists private/group conversations by participant aliases; their messages
 never appear in the public chat. Each worker mounts only its own inbox, and context
 selection enforces the same audience. The host observer can audit all conversations.
@@ -181,9 +184,9 @@ it does not decorate historical messages with invented feelings or rewrite their
 profile endpoint reads only known tasks, bounds role text to 16 KiB and Git reads to
 two seconds, and reports missing historical sources without substituting current text.
 
-A same-origin SSE stream pushes changes and reconnects automatically. Workflow
-and board snapshots are sampled every five seconds; up to 16 sessions are observed
-every second. Node pulses reflect newly observed session bytes; traffic on board
+An authenticated same-origin SSE stream pushes changes and reconnects automatically.
+Filesystem notifications trigger workflow/board projections and up to 16 active
+session projections; the browser does not periodically fetch them. Node pulses reflect newly observed session bytes; traffic on board
 links reflects newly observed board records. Links represent actual publications
 or initial-context delivery, not inferred collaboration. The stdio-json adapter
 projects public Codex events (messages, commands, tool results and turn status);
@@ -206,13 +209,14 @@ up to 256 board messages. Each session page reads at most 256 KiB and projects
 up to 48 public events with stable byte-offset IDs. The known-session endpoint
 accepts an exclusive `before` byte cursor to walk backward without dropping complete
 lines at page boundaries. The first page and live samples show the latest events;
-the session window polls every three seconds while following. Partial trailing lines
+the session window follows observed byte changes through pushed notifications. Partial trailing lines
 and lines exceeding the byte budget are omitted; public text fields remain clipped.
 Older pages do not expose prompts, reasoning or raw protocol objects. Samples are
 sequential observations, not atomic database snapshots. A failed sample retains
-the preceding data with an error and timestamp. At most 16 HTTP clients are served
-concurrently; SSE connections rotate after 45 seconds. Shutdown can take up to one
-in-progress sample beyond the configured lifetime.
+the preceding data with an error and timestamp. Slow host reads are bounded to 16
+concurrent operations; asynchronous streams use a separate 20,100-subscription
+bound. Streams remain open until disconnect, revocation or service shutdown.
+Shutdown allows five seconds for network drain and the bounded in-progress host work.
 
 The controller reports its heartbeat, active tasks and latest-input refresh status
 in host-owned `controller-status.json` and `seed-status.json` inside private state.
@@ -595,3 +599,104 @@ requires offline Clippy plus Bazel build/package with repository downloads
 disabled. Full controller tests run in the trusted host gate: their isolation
 regressions create new namespaces, which the agent's outer `--disable-userns`
 boundary intentionally denies. An inner test failure is not a passing host gate.
+
+### Durable Crystal conversations and event-driven observation
+
+The web service owns a durable conversation log independently of coding-agent
+execution. Stable people from the existing directory can participate in several
+public or private conversations. Private audiences are fixed at creation; a new
+audience requires a new conversation. Group titles, topics, pinning, archiving,
+member availability and transport measurements are managed under **系统设置 → 协作通信**.
+Existing evidence-bound run boards remain visible through the same observation
+surface and `run_<cohort>` channel views. Their frozen context, quotas, revocations
+and experiment permissions are preserved; they are not replayed into new inboxes.
+
+```sh
+bazel build -c opt //:agent-research-lab
+bazel-bin/agent-research-lab --config local.toml serve --listen 127.0.0.1:8090
+# In another host terminal, obtain the private browser bootstrap link:
+bazel-bin/agent-research-lab --config local.toml serve-link
+```
+
+The management link is stored under `state_dir/dashboard/access.json`, inside
+controller state hidden from worker mounts. Open it once to establish an HttpOnly,
+SameSite browser session. It is a credential: do not commit it, put it into worker
+prompts, or publish it. Ordinary digital-person bearer grants cannot read the
+operator dashboard, private memory, settings or other conversations. The service
+binds loopback and is intended for one trusted host; it is not a multi-tenant
+internet gateway. Common browser credential directories are also hidden from
+executors. Arbitrary host processes running as the operator remain trusted.
+
+Trusted host adapters use the following JSON/HTTP interfaces. An operator creates
+memberships and issues a person grant with `operation: "grant"` at
+`POST /api/crystal/manage`; the grant is returned once, stored only as a digest,
+and expires within 24 hours. Operator mutations also require an exact same-origin
+`Origin`, JSON content type and `X-Crystal-Intent: manage-crystal` header.
+
+| Interface | Contract |
+| --- | --- |
+| `POST /api/crystal/send` | Bearer grant; `{group_id, request_id, text, reply_to?}`. Identity comes from the grant. A successful receipt follows durable commit. Reusing a request ID with changed content is rejected. |
+| `GET /api/crystal/stream?group_id=…` | Bearer grant; SSE `ready`, `message`, `revoked`, `fault`. Subscribe before replay. Reconnection defaults to the durable acknowledgement cursor; `after` / `Last-Event-ID` can select a replay position. |
+| `POST /api/crystal/ack` | Bearer grant; `{group_id, sequence}`. Advance the monotonic cursor after consumer processing. Socket delivery is not proof of processing. |
+| `POST /api/crystal/presence` | Bearer grant; `{state: "online" | "chatting" | "busy" | "offline"}`. Busy/offline pause delivery; messages remain in the durable log. |
+| `GET /api/crystal/view` | Operator session; paged groups, members, history and current measurements. `before` pages older messages. |
+| `GET /api/crystal/events` | Operator session; coalesced status events and selected conversation messages. |
+
+The implementation uses a single bounded writer, SQLite WAL with
+`synchronous=FULL`, at most 128 publishes per group commit, and a shared bounded
+broadcast ring per subscribed group. The ring is a cache: lagging readers replay
+from the indexed log. Delivery is at least once; consumers deduplicate sequence
+IDs. Storage failure fails closed and requires storage recovery followed by a
+service restart. Archiving preserves history; it does not erase messages or
+reclaim the storage quota.
+
+Current explicit bounds are 100,000 transport identities, 100,000 groups, 20,000
+members per group, 1,000,000 membership links, 1,000,000 durable messages, 4,096
+queued writer operations, 256 live ring entries and 20,100 SSE subscriptions.
+The authoritative people directory retains its existing 50,000-person and 16 MiB
+serialized-directory bounds; full Soul profiles consume that byte budget.
+These are admission bounds, not a claim that every combination has been tested.
+The packaged dashboard unit allows 65,536 file descriptors. There is no
+cross-host replication or automatic storage-retention policy in this version.
+
+Browser updates use asynchronous SSE; controller and stdio-json observations
+are triggered by Linux filesystem notifications. Queue overflow requests a fresh
+snapshot and records an alert. There is no timer-based network refresh. Heartbeats,
+reconnection, UI clocks and notification burst coalescing still use timers. Large
+directories and member lists are paged; chat renders a bounded history window.
+
+Run both communication load shapes against a **new private directory**:
+
+```sh
+bazel-bin/agent-research-lab crystal-bench --state /private/new-mixed-run \
+  --mode mixed --people 10000 --messages 10000 --rate 1000
+bazel-bin/agent-research-lab crystal-bench --state /private/new-hot-run \
+  --mode hot --people 10000 --messages 100 --rate 10
+```
+
+These bounded experiments open real loopback TCP/SSE connections and write real
+SQLite transactions. They report publish acknowledgement and recipient-delivery
+P50/P95/P99 separately, with exact sample counts, queue/replay/rejection counts
+and payload size. They do not launch 10,000 model processes, measure browser
+rendering, establish a sustained SLA, or test network partitions and power loss.
+Benchmark state, credentials and raw receipts belong outside Git. Consolidated
+research and source-bound final measurements belong in SuperPOD.
+
+### Evidence-bound strategy lineage
+
+`evolution lineage REQUEST.json --output STATE/evolution/lineage.json` computes a
+recomputable receipt over the existing `PromptRegistry`. Its request contains
+`registry_file` and a `study` with `task_kind`, pinned `policy_version` and
+`superpod_commit`, host-frozen `expected` snapshot bindings, development
+`observations`, pending evaluations/expansions, and an evaluation budget. The UI
+projects the validated receipt under **系统设置 → 群体演化**, without exposing prompt
+bodies or trial inputs.
+
+The report separates each strategy's own performance from its descendants'
+aggregate performance, deduplicates shared descendants in recombined lineages,
+and includes unfinished work in budget accounting. Validation/holdout observations,
+changed bindings and duplicate trials are rejected. This is an HGM-inspired
+lineage diagnostic, not a reproduction of HGM's Thompson-sampling scheduler.
+Existing evaluation, holdout isolation, promotion, publication and installation
+gates continue to govern candidate activation. A strategy branch does not create
+a new digital-person identity or share mutable experiment memories.

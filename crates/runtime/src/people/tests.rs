@@ -346,3 +346,18 @@ fn specialty_and_execution_are_independent_of_identity_and_task_roles() {
             .contains_key("independent-model")
     );
 }
+
+#[test]
+fn unchanged_directory_reads_do_not_replace_the_file() {
+    use std::os::unix::fs::MetadataExt;
+    let root = tempfile::tempdir().unwrap();
+    let c = config(root.path(), Path::new("/unused"));
+    directory(&c).unwrap();
+    let before = fs::metadata(path(&c)).unwrap();
+    for _ in 0..3 {
+        directory(&c).unwrap();
+    }
+    let after = fs::metadata(path(&c)).unwrap();
+    assert_eq!(before.ino(), after.ino());
+    assert_eq!(before.modified().unwrap(), after.modified().unwrap());
+}
