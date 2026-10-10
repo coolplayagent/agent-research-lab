@@ -310,6 +310,7 @@ fn build_tasks(
                         role: slot.role.clone(),
                         repository: "superpod".into(),
                         prompt,
+                        communication: None,
                         prompt_version: Some(prompts[i].version().into()),
                         max_attempts: Some(1),
                         use_memory: false,
@@ -1306,6 +1307,7 @@ mod tests {
     ) -> (Job, Value, Value) {
         let commit = &plan.inputs.repositories["superpod"].upstream.commit;
         let job = Job {
+            backend: None,
             task: entry.task.clone(),
             model: entry.model.clone(),
             source_commit: commit.clone(),

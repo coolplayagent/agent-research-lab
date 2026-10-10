@@ -1,8 +1,10 @@
+pub mod agent_backend;
 pub mod agent_policy;
 pub mod automation;
 pub mod budget;
 pub mod build_cache;
 pub mod collaboration_experiment;
+pub mod communication;
 pub mod config;
 pub mod delivery;
 pub mod evolution;
@@ -12,6 +14,7 @@ pub mod inputs;
 pub mod isolation;
 pub mod knowledge;
 pub mod lease_heartbeat;
+pub mod multi_agent;
 pub mod process;
 pub mod runtime;
 pub mod storage;

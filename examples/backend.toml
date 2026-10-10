@@ -1,0 +1,20 @@
+# Merge this fragment into a private local.toml; no credentials belong here.
+# Existing [models] values are model identifiers passed to the selected backend.
+[agent_backends.local-bot]
+kind = "json_process"
+program = "/opt/agent-bridges/local-bot-v1"
+args = [] # literal nonsecret arguments; no shell expansion
+# Optional names only. Secret values remain in the host environment.
+env_allowlist = ["ANTHROPIC_API_KEY"]
+[agent_backends.local-bot.capabilities]
+structured_result = true
+read_workspace = true
+write_workspace = true
+tool_execution = true
+desktop = false
+
+[role_backends]
+research = "local-bot"
+# Omitted roles retain the legacy Codex backend.
+# implement = "local-bot"
+# review = "codex"
