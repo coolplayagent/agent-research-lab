@@ -3406,6 +3406,7 @@ while [ "$#" -gt 0 ]; do
 done
 prompt=$(cat)
 case "$prompt" in *SLOW_PARALLEL*) date +%s%N; sleep 3; date +%s%N ;; esac
+case "$prompt" in *EIGHT_PARALLEL*) date +%s%N; sleep 20; date +%s%N ;; *AFTER_EIGHT*) date +%s%N; date +%s%N ;; esac
 case "$prompt" in *FAIL_READ*) exit 7 ;; esac
 case "$prompt" in *implement\ tested\ candidate*|*MALFORMED*) printf 'actual fixture write' > candidate.txt ;; esac
 case "$prompt" in
@@ -3461,6 +3462,128 @@ printf '{"type":"fixture.completed"}\n'
             c.tools.get_mut("relay-memory").unwrap().binary = binary.into();
         }
         (temp, c)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "set LAB_WORKFLOW_BIN for real durable workflow and bwrap with explicit fake Codex; optional LAB_PROTOCOL_EVIDENCE_DIR preserves receipts"]
+    fn eight_workers_respect_capacity_and_completed_dependency_barrier() {
+        let (_temp, mut c) = scheduler_fixture();
+        c.max_agents = 8;
+        c.task_timeout_seconds = 45;
+        let independent: Vec<String> = (0..10).map(|n| format!("parallel-{n:02}")).collect();
+        let prerequisites = independent[..8].to_vec();
+        for id in independent
+            .iter()
+            .chain(std::iter::once(&"after-eight".into()))
+        {
+            let dependent = id == "after-eight";
+            enqueue(
+                &c,
+                Task {
+                    id: id.clone(),
+                    role: if dependent { "review" } else { "research" }.into(),
+                    repository: "superpod".into(),
+                    prompt: if dependent {
+                        "AFTER_EIGHT"
+                    } else {
+                        "EIGHT_PARALLEL"
+                    }
+                    .into(),
+                    prompt_version: None,
+                    max_attempts: None,
+                    use_memory: false,
+                    depth: 0,
+                    write: false,
+                    exploratory: false,
+                    dependencies: if dependent {
+                        prerequisites.clone()
+                    } else {
+                        vec![]
+                    },
+                    required_tools: vec![],
+                },
+            )
+            .unwrap();
+        }
+        run(&c, false, 100).unwrap();
+        let evidence = std::env::var_os("LAB_PROTOCOL_EVIDENCE_DIR").map(PathBuf::from);
+        if let Some(path) = &evidence {
+            fs::create_dir_all(path).unwrap();
+        }
+        let w = workflow(&c);
+        let mut intervals = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        for job in jobs(&c).unwrap() {
+            assert_eq!(job.attempt, 1);
+            assert!(job.last_error.is_none() && job.launch.is_none(), "{job:?}");
+            assert_eq!(w.status(&job.run_id).unwrap()["status"], "succeeded");
+            receipts.insert(job.task.id.clone(), w.verify(&job.run_id).unwrap());
+            let dir = c.state_dir.join("runs").join(&job.run_id);
+            let stdout = fs::read_to_string(dir.join("process/stdout.jsonl")).unwrap();
+            let times: Vec<u128> = stdout.lines().filter_map(|s| s.parse().ok()).collect();
+            assert_eq!(times.len(), 2, "{stdout}");
+            intervals.insert(job.task.id.clone(), [times[0], times[1]]);
+            if let Some(path) = &evidence {
+                let task_dir = path.join(&job.task.id);
+                fs::create_dir_all(&task_dir).unwrap();
+                storage::write(&task_dir.join("job.json"), &job).unwrap();
+                for file in [
+                    "prompt.txt",
+                    "result.json",
+                    "agent-permissions.json",
+                    "process/stdout.jsonl",
+                    "process/stderr.log",
+                ] {
+                    let source = dir.join(file);
+                    if source.is_file() {
+                        fs::copy(&source, task_dir.join(source.file_name().unwrap())).unwrap();
+                    }
+                }
+            }
+        }
+        let mut events = Vec::new();
+        for (id, times) in &intervals {
+            events.push((times[0], 1_i32, id));
+            events.push((times[1], -1_i32, id));
+        }
+        events.sort();
+        let mut active = 0;
+        let mut peak = 0;
+        for (_, change, _) in &events {
+            active += change;
+            peak = peak.max(active);
+        }
+        let last_prerequisite = prerequisites
+            .iter()
+            .map(|id| intervals[id][1])
+            .max()
+            .unwrap();
+        let summary = json!({"provider":"explicit fake Codex; real workflow and bwrap", "max_agents":c.max_agents,"measured_peak":peak,"intervals_ns":intervals,"launch_and_finish_events_ns":events,"last_prerequisite_finish_ns":last_prerequisite,"workflow_verification":receipts,"limits":"Protocol concurrency and dependency evidence only; no model quality, token or cost result."});
+        if let Some(path) = &evidence {
+            storage::write(&path.join("protocol.json"), &summary).unwrap();
+        }
+        println!("{summary}");
+        assert_eq!(
+            peak, 8,
+            "must fill all eight slots without admitting a ninth worker"
+        );
+        assert_eq!(active, 0);
+        assert!(intervals["after-eight"][0] >= last_prerequisite);
+        let dependent: Job = storage::read(&job_path(&c, "after-eight")).unwrap();
+        let prompt = fs::read_to_string(
+            c.state_dir
+                .join("runs")
+                .join(dependent.run_id)
+                .join("prompt.txt"),
+        )
+        .unwrap();
+        for id in prerequisites {
+            assert!(
+                prompt.contains(&id),
+                "missing completed dependency report: {id}"
+            );
+        }
     }
 
     #[cfg(unix)]
