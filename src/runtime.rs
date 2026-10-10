@@ -87,6 +87,8 @@ pub struct Launch {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub communication: Option<crate::multi_agent::LaunchContext>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub communication_member: Option<crate::communication::HostMember>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub communication_gap: Option<String>,
 }
 #[derive(Serialize, Deserialize)]
@@ -1328,10 +1330,10 @@ pub fn run_scoped(
                     Ok(report) => report,
                     Err(error) => json!({"error":error.to_string()}),
                 };
-                storage::write(
+                let _ = storage::write(
                     &c.state_dir.join("communication/poll-status.json"),
                     &json!({"at":time,"result":report}),
-                )?;
+                );
             }
             next_communication_poll = time + 2;
         }
@@ -1380,7 +1382,7 @@ pub fn run_scoped(
                 )?;
                 match settle_with_heartbeat(&w, &a.job, &observation, Some(&a.heartbeat)) {
                     Ok(settled_success) => {
-                        if !settled_success {
+                        if !settled_success || launch.communication_gap.is_some() {
                             revoke_communication(c, &a.job, &launch);
                         }
                         a.job.launch = None;
@@ -1833,7 +1835,19 @@ fn launch(
             backend_request_sha256: None,
             communication: None,
             communication_gap: None,
+            communication_member: None,
         });
+        // Save communication intent before register can mutate host board state.
+        // Recovery can revoke a partially registered sender even if no view/context returned.
+        job.launch
+            .as_mut()
+            .context("missing launch authority")?
+            .communication_member = job
+            .task
+            .communication
+            .as_ref()
+            .map(|team| team.member(job))
+            .transpose()?;
         storage::write(&job_path(c, &job.task.id), job)?;
         storage::write(&dir.join("tool-bindings.json"), &tool_bindings)?;
         storage::write(
@@ -1880,6 +1894,9 @@ fn launch(
                     format!("{prompt}{}", prepared.prompt)
                 }
                 Err(error) => {
+                    if let Some(launch) = &job.launch {
+                        revoke_communication(c, job, launch);
+                    }
                     let gap = format!("{error:#}").chars().take(1024).collect::<String>();
                     job.launch
                         .as_mut()
@@ -2284,12 +2301,15 @@ fn communication_gap(c: &Config, job: &Job, reason: &str) {
     );
 }
 fn revoke_communication(c: &Config, job: &Job, launch: &Launch) {
-    if let Some(authority) = &launch.communication {
-        if let Err(error) =
-            crate::multi_agent::revoked(&c.state_dir, authority, now().max(0) as u64)
-        {
-            communication_gap(c, job, &error.to_string());
-        }
+    let member = launch
+        .communication_member
+        .as_ref()
+        .or_else(|| launch.communication.as_ref().map(|v| &v.member));
+    if let Some(member) = member
+        && let Err(error) =
+            crate::multi_agent::revoke_member(&c.state_dir, member, now().max(0) as u64)
+    {
+        communication_gap(c, job, &error.to_string());
     }
 }
 
@@ -2323,6 +2343,15 @@ fn queue_post_success(c: &Config, w: &Workflow, job: &Job) -> Result<()> {
                 &receipt,
                 now().max(0) as u64,
             ) {
+                communication_gap(c, job, &error.to_string());
+            }
+        } else {
+            // A completed task may have continued independently after a partial
+            // channel setup. Recover its membership intent even after launch cleared.
+            let result = team.member(job).and_then(|member| {
+                crate::multi_agent::revoke_member(&c.state_dir, &member, now().max(0) as u64)
+            });
+            if let Err(error) = result {
                 communication_gap(c, job, &error.to_string());
             }
         }
@@ -2950,6 +2979,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn partial_communication_registration_recovers_from_private_launch_intent() {
+        let (_temp, c, mut job, _w) = completion_fixture(false, json!([]));
+        let team = crate::multi_agent::TeamBinding {
+            id: "intent-recovery".into(),
+            cell: None,
+            topics: vec!["sdlc".into()],
+            query: String::new(),
+        };
+        job.task.communication = Some(team.clone());
+        let member = team.member(&job).unwrap();
+        let board = crate::communication::Board::new(&c.state_dir).unwrap();
+        let time = now().max(0) as u64;
+        // The host saved intent, then registered, then crashed before receiving context.
+        job.launch = Some(serde_json::from_value(json!({"pid":0,"process_start":"","lease":{},"attempt":{},"log_dir":c.state_dir.join("runs").join(&job.run_id),"communication_member":member})).unwrap());
+        storage::write(&job_path(&c, &job.task.id), &job).unwrap();
+        board.register(&member, time).unwrap();
+        let recovered: Job = storage::read(&job_path(&c, &job.task.id)).unwrap();
+        assert!(recovered.launch.as_ref().unwrap().communication.is_none());
+        revoke_communication(&c, &recovered, recovered.launch.as_ref().unwrap());
+        let first = board.view(&member.cohort_id, now().max(0) as u64).unwrap();
+        assert_eq!(first["members"][0]["origin"]["state"], "revoked");
+        revoke_communication(&c, &recovered, recovered.launch.as_ref().unwrap());
+        assert_eq!(
+            board.view(&member.cohort_id, now().max(0) as u64).unwrap()["revision"],
+            first["revision"]
+        );
+    }
+
+    #[test]
     fn target_prompt_matches_required_tools() {
         let c: Config = serde_json::from_value(json!({
             "schema_version":1,"workspace":"/workspace","state_dir":"/state",
@@ -3078,6 +3136,7 @@ mod tests {
             backend_request_sha256: None,
             communication: None,
             communication_gap: None,
+            communication_member: None,
         });
         storage::write(&job_path(&c, &job.task.id), &job).unwrap();
         // Neither a forged log receipt nor a forged memory success is authority.
@@ -3375,6 +3434,7 @@ mod tests {
             backend_request_sha256: None,
             communication: None,
             communication_gap: None,
+            communication_member: None,
         });
         assert_eq!(classify(&parent, &parent, &child, &states).0, "running");
         parent.launch.as_mut().unwrap().process_start = "not-the-retained-process".into();
@@ -3658,6 +3718,7 @@ mod tests {
             backend_request_sha256: None,
             communication: None,
             communication_gap: None,
+            communication_member: None,
         });
         storage::write(&job_path(&c, &job.task.id), &job).unwrap();
         kill_retained_workers(&c).unwrap();

@@ -197,12 +197,12 @@ pub fn completed(
     )
 }
 
+pub fn revoke_member(state: &Path, member: &HostMember, now: u64) -> Result<()> {
+    Board::new(state)?.revoke_run(member, "worker_failed_or_outcome_unconfirmed", now)
+}
+
 pub fn revoked(state: &Path, authority: &LaunchContext, now: u64) -> Result<()> {
-    Board::new(state)?.revoke_run(
-        &authority.member,
-        "worker_failed_or_outcome_unconfirmed",
-        now,
-    )
+    revoke_member(state, &authority.member, now)
 }
 
 #[cfg(test)]

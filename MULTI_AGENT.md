@@ -96,6 +96,13 @@ and a fixed number of slots. A noisy cell cannot grow a global queue or force
 delivery to all subscribers. Capacity exhaustion is explicit and never discards
 active records or silently resets quotas.
 
+The run ownership shard still reads and rewrites a bounded map (at most 4,096
+records / 4 MiB); it is not an unbounded constant-time key-value database. Cohort
+indexes retain at most 32 live cohorts and 4,096 known identities per shard.
+Lifetime history therefore has explicit capacity limits. A larger or distributed
+deployment needs an archival policy and a storage adapter with independent
+recovery evidence; increasing counters alone is insufficient.
+
 The scaling module models a separate summary exchange: host-admitted, bounded
 summaries enter topic indexes; readers pull relevant entries under receiver and
 global budgets. Fair scheduling, finite queues, deduplication and TTL provide
