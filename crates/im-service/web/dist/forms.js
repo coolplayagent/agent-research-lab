@@ -1,4 +1,5 @@
 import { allowSettingsLeave, savedSettings } from "./settings-guard.js";
+import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
 export function element(tag, text) {
     const node = document.createElement(tag);
@@ -50,7 +51,10 @@ export function dialog(title) {
         if (!allowSettingsLeave())
             event.preventDefault();
     });
-    header.append(element("h2", title), close);
+    const heading = element("h2", title);
+    heading.id = "dialog-" + crypto.randomUUID();
+    dialog.setAttribute("aria-labelledby", heading.id);
+    header.append(heading, close);
     form.append(header);
     const status = element("p");
     status.setAttribute("role", "status");
@@ -66,7 +70,10 @@ export function finish(box, save) {
     box.form.append(box.status, button);
     box.form.onsubmit = async (event) => {
         event.preventDefault();
-        button.disabled = true;
+        const done = busy(button);
+        if (!done)
+            return;
+        box.status.textContent = "";
         try {
             await save();
             savedSettings(box.form);
@@ -76,7 +83,7 @@ export function finish(box, save) {
             box.status.textContent = String(error);
         }
         finally {
-            button.disabled = false;
+            done();
         }
     };
     box.dialog.showModal();

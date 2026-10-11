@@ -16,6 +16,7 @@ import { loadGroups } from "./directory.js";
 import { display } from "./people.js";
 import { Picker } from "./picker.js";
 import type { Group, GroupView } from "./types.js";
+import { busy } from "./feedback.js";
 let selected: Group | null = null,
   next: string | null = null,
   generation = 0;
@@ -96,7 +97,8 @@ export function initMembers(): void {
   get("more-members").onclick = () => void load(true);
   get("add-members").onclick = async () => {
     if (!selected) return;
-    get<HTMLButtonElement>("add-members").disabled = true;
+    const done = busy(get<HTMLButtonElement>("add-members"));
+    if (!done) return;
     try {
       if (!picker.chosen.size) throw new Error(t("members.d63e7ca19b"));
       const group = selected;
@@ -128,9 +130,9 @@ export function initMembers(): void {
             members: [...existing],
           },
         });
-        close("members-dialog");
         await loadGroups();
         await select(result);
+        close("members-dialog");
       } else {
         for (const person_id of [...picker.chosen.keys()]) {
           await change({
@@ -148,6 +150,7 @@ export function initMembers(): void {
     } catch (error) {
       notice(error, "member-status");
     } finally {
+      done();
       get<HTMLButtonElement>("add-members").disabled =
         selected?.archived ?? true;
     }

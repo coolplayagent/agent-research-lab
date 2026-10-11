@@ -6,6 +6,7 @@ import { button, close, el, get, notice, open, presence, value, } from "./dom.js
 import { loadGroups } from "./directory.js";
 import { display } from "./people.js";
 import { Picker } from "./picker.js";
+import { busy } from "./feedback.js";
 let selected = null, next = null, generation = 0;
 export function initMembers() {
     const picker = new Picker(get("member-picker"));
@@ -78,7 +79,9 @@ export function initMembers() {
     get("add-members").onclick = async () => {
         if (!selected)
             return;
-        get("add-members").disabled = true;
+        const done = busy(get("add-members"));
+        if (!done)
+            return;
         try {
             if (!picker.chosen.size)
                 throw new Error(t("members.d63e7ca19b"));
@@ -105,9 +108,9 @@ export function initMembers() {
                         members: [...existing],
                     },
                 });
-                close("members-dialog");
                 await loadGroups();
                 await select(result);
+                close("members-dialog");
             }
             else {
                 for (const person_id of [...picker.chosen.keys()]) {
@@ -128,6 +131,7 @@ export function initMembers() {
             notice(error, "member-status");
         }
         finally {
+            done();
             get("add-members").disabled =
                 selected?.archived ?? true;
         }

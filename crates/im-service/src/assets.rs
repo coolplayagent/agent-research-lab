@@ -13,6 +13,18 @@ fn asset(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/html; charset=utf-8",
             include_bytes!("../web/index.html").as_slice(),
         )),
+        "/favicon.svg" => Some((
+            "image/svg+xml",
+            include_bytes!("../web/favicon.svg").as_slice(),
+        )),
+        "/assets/experience.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/experience.js").as_slice(),
+        )),
+        "/assets/feedback.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/feedback.js").as_slice(),
+        )),
         "/style.css" => Some((
             "text/css; charset=utf-8",
             include_bytes!("../web/style.css").as_slice(),

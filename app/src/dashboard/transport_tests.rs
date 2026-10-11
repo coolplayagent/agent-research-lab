@@ -87,7 +87,10 @@ impl Harness {
 async fn actual_async_http_enforces_origin_intent_and_resource_boundaries() {
     let h = Harness::new().await;
     for (path, status, content) in [
-        ("/", "200 OK", "AI-IM"),
+        ("/", "200 OK", "id=\"workspace\""),
+        ("/assets/experience.js", "200 OK", "export"),
+        ("/assets/feedback.js", "200 OK", "export"),
+        ("/favicon.svg", "200 OK", "<svg"),
         ("/api/snapshot", "200 OK", "first"),
         ("/../local.toml", "404 Not Found", "Resource unavailable"),
         (

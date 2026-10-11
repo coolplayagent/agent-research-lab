@@ -3,6 +3,7 @@ import { t } from "./i18n.js";
 import { api, query } from "./api.js";
 import { button, el, get, notice, value } from "./dom.js";
 import type { Directory, Group } from "./types.js";
+import { searchKeys } from "./experience.js";
 let next: string | null = null,
   rows: Group[] = [],
   selected = "",
@@ -80,7 +81,18 @@ function render(): void {
     }
     root.append(section);
   }
-  if (!rows.length) root.append(el("p", t("directory.49ff4c1834"), "empty"));
+  get("directory-count").textContent = t("ux.directoryCount", { count: rows.length });
+  if (!rows.length) {
+    const empty = el("div", undefined, "directory-empty");
+    empty.append(el("strong", value("group-search") ? t("ux.noResults") : t("directory.49ff4c1834")));
+    if (value("group-search")) {
+      empty.append(el("p", t("ux.noResultsNote")), button(t("ux.clearSearch"), () => {
+        get<HTMLInputElement>("group-search").value = "";
+        return loadGroups();
+      }));
+    } else empty.append(button(t("ux.createConversation"), () => get("new-conversation").click()));
+    root.append(empty);
+  }
 }
 export function metrics(data: Record<string, unknown>): void {
   const root = get("metrics");
@@ -105,6 +117,8 @@ export function metrics(data: Record<string, unknown>): void {
 }
 export async function loadGroups(append = false): Promise<void> {
   const request = ++generation;
+  get("group-list").setAttribute("aria-busy", "true");
+  if (!rows.length) get("directory-count").textContent = t("ux.loading");
   try {
     const result = await api<Directory>(
       "/api/crystal/view?" +
@@ -138,14 +152,14 @@ export async function loadGroups(append = false): Promise<void> {
       } else if (rows[0]) choose(rows[0]);
     }
   } catch (error) {
-    notice(error);
+    if (generation === request) { notice(error); get("directory-count").textContent = t("ux.searchFailed"); }
+  } finally {
+    if (generation === request) get("group-list").removeAttribute("aria-busy");
   }
 }
 export function initDirectory(select: (group: Group) => void): void {
   choose = select;
-  get("group-search").addEventListener("keydown", (event) => {
-    if (event.key === "Enter") void loadGroups();
-  });
+  searchKeys(get<HTMLInputElement>("group-search"), () => void loadGroups());
   get("search-groups").onclick = () => void loadGroups();
   get("more-groups").onclick = () => void loadGroups(true);
 }

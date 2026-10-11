@@ -2,6 +2,7 @@ import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { api, query } from "./api.js";
 import { button, el, get, notice, value } from "./dom.js";
+import { searchKeys } from "./experience.js";
 let next = null, rows = [], selected = "", generation = 0;
 let choose;
 let restored = false;
@@ -58,8 +59,20 @@ function render() {
         }
         root.append(section);
     }
-    if (!rows.length)
-        root.append(el("p", t("directory.49ff4c1834"), "empty"));
+    get("directory-count").textContent = t("ux.directoryCount", { count: rows.length });
+    if (!rows.length) {
+        const empty = el("div", undefined, "directory-empty");
+        empty.append(el("strong", value("group-search") ? t("ux.noResults") : t("directory.49ff4c1834")));
+        if (value("group-search")) {
+            empty.append(el("p", t("ux.noResultsNote")), button(t("ux.clearSearch"), () => {
+                get("group-search").value = "";
+                return loadGroups();
+            }));
+        }
+        else
+            empty.append(button(t("ux.createConversation"), () => get("new-conversation").click()));
+        root.append(empty);
+    }
 }
 export function metrics(data) {
     const root = get("metrics");
@@ -78,6 +91,9 @@ export function metrics(data) {
 }
 export async function loadGroups(append = false) {
     const request = ++generation;
+    get("group-list").setAttribute("aria-busy", "true");
+    if (!rows.length)
+        get("directory-count").textContent = t("ux.loading");
     try {
         const result = await api("/api/crystal/view?" +
             query({
@@ -115,15 +131,19 @@ export async function loadGroups(append = false) {
         }
     }
     catch (error) {
-        notice(error);
+        if (generation === request) {
+            notice(error);
+            get("directory-count").textContent = t("ux.searchFailed");
+        }
+    }
+    finally {
+        if (generation === request)
+            get("group-list").removeAttribute("aria-busy");
     }
 }
 export function initDirectory(select) {
     choose = select;
-    get("group-search").addEventListener("keydown", (event) => {
-        if (event.key === "Enter")
-            void loadGroups();
-    });
+    searchKeys(get("group-search"), () => void loadGroups());
     get("search-groups").onclick = () => void loadGroups();
     get("more-groups").onclick = () => void loadGroups(true);
 }

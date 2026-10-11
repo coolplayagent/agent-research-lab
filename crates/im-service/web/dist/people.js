@@ -1,10 +1,11 @@
+import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
 import { close, el, get, notice, open, presence, value } from "./dom.js";
 export const people = new Map();
 export const display = (id) => id === "operator" ? t("people.e19796712f") : people.get(id)?.name || id;
 let next = null, generation = 0;
-let creating = false, personId = "";
+let personId = "";
 export async function loadPeople(append = false) {
     const request = ++generation;
     try {
@@ -20,6 +21,8 @@ export async function loadPeople(append = false) {
             root.replaceChildren();
         next = page.next_after;
         get("more-people").hidden = !next;
+        if (!root.childElementCount && !page.people.length)
+            root.append(el("p", t("ux.peopleEmpty"), "empty"));
         for (const person of page.people) {
             people.set(person.id, person);
             const card = el("article", undefined, "card");
@@ -52,11 +55,9 @@ export function initPeople() {
     get("more-people").onclick = () => void loadPeople(true);
     get("person-form").onsubmit = async (event) => {
         event.preventDefault();
-        if (creating)
+        const done = busy(get("person-form").querySelector("button.primary"));
+        if (!done)
             return;
-        creating = true;
-        const submit = get("person-form").querySelector("button.primary");
-        submit.disabled = true;
         try {
             await change({
                 operation: "person",
@@ -72,8 +73,7 @@ export function initPeople() {
             notice(error, "person-status");
         }
         finally {
-            creating = false;
-            submit.disabled = false;
+            done();
         }
     };
 }

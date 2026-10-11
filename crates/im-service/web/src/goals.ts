@@ -132,7 +132,7 @@ function card(goal: Goal): HTMLDetailsElement {
       row.append(
         button(
           t("goals.bd7dd17c34"),
-          () => void mutate(goal, "retry", work.id),
+          () => mutate(goal, "retry", work.id),
         ),
       );
     details.append(row);
@@ -141,12 +141,12 @@ function card(goal: Goal): HTMLDetailsElement {
     const actions = el("div", undefined, "actions");
     const accept = button(
       t("goals.9a341c73e2"),
-      () => void mutate(goal, "accept"),
+      () => mutate(goal, "accept"),
     );
     accept.disabled = goal.work.some((w) => w.state !== WorkState.Submitted);
     const cancel = button(
       t("goals.a53a4e7bca"),
-      () => void mutate(goal, "cancel"),
+      () => mutate(goal, "cancel"),
     );
     cancel.disabled = goal.work.some(
       (w) => w.state === WorkState.Running && !expired(w),

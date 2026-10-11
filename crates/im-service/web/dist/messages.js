@@ -4,6 +4,7 @@ import { api, change, query } from "./api.js";
 import { button, el, get, notice } from "./dom.js";
 import { display } from "./people.js";
 let group = null, generation = 0, browsing = false, reply = null;
+let sendingGeneration = null;
 const messages = new Map();
 const drafts = new Map();
 export function messageSnapshot() {
@@ -39,6 +40,7 @@ export function resetMessages(selected, initial) {
     browsing = false;
     reply = drafts.get(selected.id)?.reply ?? null;
     pending = null;
+    sendingGeneration = null;
     messages.clear();
     initial.forEach((m) => messages.set(m.sequence, m));
     get("message-text").value =
@@ -52,8 +54,13 @@ export function resetMessages(selected, initial) {
 }
 export function updateComposer(selected) {
     group = selected;
-    get("message-text").disabled = selected.archived;
-    get("send-message").disabled = selected.archived;
+    const input = get("message-text"), submit = get("send-message"), sending = sendingGeneration === generation;
+    input.disabled = selected.archived;
+    input.readOnly = sending;
+    submit.disabled = selected.archived || sending || !input.value.trim();
+    submit.textContent = sending ? t("ux.sending") : t("html.edecf0ae6e");
+    submit.setAttribute("aria-busy", String(sending));
+    get("message-count").textContent = t("ux.messageCount", { count: input.value.length });
     get("composer-label").textContent = selected.archived
         ? t("messages.39338dbfe1")
         : selected.kind === GroupKind.Board
@@ -111,6 +118,16 @@ function renderMessages() {
 }
 export function initMessages() {
     get("message-text").addEventListener("input", sizeComposer);
+    const input = get("message-text");
+    input.addEventListener("input", () => { if (group)
+        updateComposer(group); });
+    input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.isComposing) {
+            event.preventDefault();
+            if (!get("send-message").disabled)
+                get("composer").requestSubmit();
+        }
+    });
     get("cancel-reply").onclick = () => {
         reply = null;
         updateReply();
@@ -159,7 +176,7 @@ export function initMessages() {
     };
     get("composer").onsubmit = async (event) => {
         event.preventDefault();
-        if (!group || group.archived)
+        if (!group || group.archived || sendingGeneration === generation)
             return;
         const input = get("message-text"), text = input.value.trim(), id = group.id, request = generation;
         if (!text)
@@ -174,7 +191,8 @@ export function initMessages() {
                 text,
                 reply_to: reply,
             };
-        get("send-message").disabled = true;
+        sendingGeneration = generation;
+        updateComposer(group);
         try {
             const result = await change({
                 operation: "send",
@@ -196,9 +214,12 @@ export function initMessages() {
             notice(error);
         }
         finally {
-            if (request === generation)
-                get("send-message").disabled =
-                    group?.archived ?? true;
+            if (request === generation) {
+                sendingGeneration = null;
+                if (group)
+                    updateComposer(group);
+                input.focus();
+            }
         }
     };
 }

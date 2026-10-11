@@ -34,6 +34,7 @@ class Node extends EventTarget {
     this.children = [];
     this.dataset = {};
     this.style = {};
+    this.attributes = new Map();
     this.value = "";
     this.hidden = false;
     this.isConnected = true;
@@ -53,6 +54,9 @@ class Node extends EventTarget {
   querySelectorAll() {
     return this.children.filter((node) => node.dataset.sequence);
   }
+  setAttribute(key, value) { this.attributes.set(key, value); }
+  getAttribute(key) { return this.attributes.get(key) ?? null; }
+  removeAttribute(key) { this.attributes.delete(key); }
   focus() {}
   scrollIntoView() {}
 }
@@ -138,6 +142,7 @@ const deferred = () => {
   assert.equal(guard.hasUnsavedSettings(), false);
 
   let request = deferred();
+  const sends = [];
   const messages = moduleFrom(
     base + "messages.ts",
     {
@@ -145,13 +150,13 @@ const deferred = () => {
       "./i18n.js": i18n,
       "./api.js": {
         api: () => request.promise,
-        change: () => request.promise,
+        change: (payload) => { sends.push(payload); return request.promise; },
         query: () => "",
       },
       "./dom.js": dom,
       "./people.js": { display: (id) => id },
     },
-    { document: new EventTarget() },
+    { document: new EventTarget(), crypto: require("node:crypto").webcrypto },
   );
   const a = {
       id: "a",
@@ -184,6 +189,27 @@ const deferred = () => {
   );
   messages.incoming(msg(10, "a", null, "a"));
   assert.equal(messages.messageSnapshot().length, 1);
+
+  request = deferred();
+  get("message-text").value = "one submission";
+  const submit = () => get("composer").onsubmit({ preventDefault() {} });
+  const sending = submit();
+  messages.updateComposer(b);
+  assert.equal(get("send-message").disabled, true, "SSE must not re-enable a pending send");
+  await submit();
+  assert.equal(sends.length, 1, "Repeated submissions must share one in-flight operation");
+  request.reject(new Error("network failure"));
+  await sending;
+  assert.equal(get("message-text").value, "one submission");
+  request = deferred();
+  const retry = submit();
+  assert.equal(sends[1].message.request_id, sends[0].message.request_id, "Retry must retain request identity");
+  messages.suspendMessages();
+  messages.resetMessages(a, [msg(1, "a")]);
+  request.resolve({ message: msg(11, "b", null, "b") });
+  await retry;
+  assert.equal(get("message-text").value, "unfinished", "Late send must not clear another group's draft");
+  assert.equal(messages.messageSnapshot()[0].group_id, "a");
 
   const pending = new Map();
   const chosen = [];
@@ -225,6 +251,7 @@ const deferred = () => {
         resetMessages: () => {},
         updateComposer: () => {},
       },
+      "./feedback.js": { busy: () => () => {} },
       "./goals.js": {
         selectGoals: () => {},
         suspendGoals: () => {},

@@ -1,3 +1,4 @@
+import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
 import { close, el, get, notice, open, presence, value } from "./dom.js";
@@ -7,8 +8,7 @@ export const display = (id: string): string =>
   id === "operator" ? t("people.e19796712f") : people.get(id)?.name || id;
 let next: string | null = null,
   generation = 0;
-let creating = false,
-  personId = "";
+let personId = "";
 export async function loadPeople(append = false): Promise<void> {
   const request = ++generation;
   try {
@@ -24,6 +24,7 @@ export async function loadPeople(append = false): Promise<void> {
     if (!append) root.replaceChildren();
     next = page.next_after;
     get("more-people").hidden = !next;
+    if (!root.childElementCount && !page.people.length) root.append(el("p", t("ux.peopleEmpty"), "empty"));
     for (const person of page.people) {
       people.set(person.id, person);
       const card = el("article", undefined, "card");
@@ -64,11 +65,8 @@ export function initPeople(): void {
   get("more-people").onclick = () => void loadPeople(true);
   get<HTMLFormElement>("person-form").onsubmit = async (event) => {
     event.preventDefault();
-    if (creating) return;
-    creating = true;
-    const submit =
-      get("person-form").querySelector<HTMLButtonElement>("button.primary")!;
-    submit.disabled = true;
+    const done = busy(get<HTMLFormElement>("person-form").querySelector<HTMLButtonElement>("button.primary")!);
+    if (!done) return;
     try {
       await change({
         operation: "person",
@@ -82,8 +80,7 @@ export function initPeople(): void {
     } catch (error) {
       notice(error, "person-status");
     } finally {
-      creating = false;
-      submit.disabled = false;
+      done();
     }
   };
 }

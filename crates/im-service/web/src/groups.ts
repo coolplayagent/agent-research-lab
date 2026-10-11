@@ -1,3 +1,4 @@
+import { busy } from "./feedback.js";
 import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { change } from "./api.js";
@@ -35,7 +36,8 @@ export function initGroups(): void {
   };
   get<HTMLFormElement>("group-form").onsubmit = async (event) => {
     event.preventDefault();
-    get<HTMLButtonElement>("create-submit").disabled = true;
+    const done = busy(get<HTMLButtonElement>("create-submit"));
+    if (!done) return;
     try {
       if (!picker.chosen.size) throw new Error(t("groups.64919f14f1"));
       const names = [...picker.chosen.values()].map((p) => p.name).join("、");
@@ -57,7 +59,6 @@ export function initGroups(): void {
           members: [...picker.chosen.keys()],
         },
       });
-      close("group-dialog");
       location.hash =
         kind.value === GroupKind.Board
           ? "#boards"
@@ -66,10 +67,11 @@ export function initGroups(): void {
             : "#groups";
       await loadGroups();
       await select(result);
+      close("group-dialog");
     } catch (error) {
       notice(error, "create-status");
     } finally {
-      get<HTMLButtonElement>("create-submit").disabled = false;
+      done();
     }
   };
 }

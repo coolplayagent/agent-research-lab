@@ -5,6 +5,7 @@
     <meta name="application-name" content="AI-IM" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title data-i18n="html.272791a0a2"></title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/style.css" />
     <script type="module" src="/assets/bootstrap.js"></script>
   </head>
@@ -43,13 +44,14 @@
           <div class="directory">
             <div class="directory-heading">
               <input
-                id="group-search"
+                id="group-search" type="search"
                 aria-label=""
                 placeholder=""
                 data-i18n-placeholder="html.555f4a4f56"
                 data-i18n-aria-label="html.555f4a4f56"
               /><button id="search-groups" data-i18n="html.3003318e72"></button>
             </div>
+            <p id="directory-count" class="directory-count" role="status"></p>
             <div id="group-list"></div>
             <button
               id="more-groups"
@@ -135,7 +137,7 @@
             ></button>
             <h1 id="page-title" data-i18n="html.f3f8bcf3f5"></h1>
           </div>
-          <span id="notice" role="status"></span
+          <div class="notice-wrap"><span id="notice" role="status"></span><button id="dismiss-notice" type="button" hidden data-i18n-aria-label="ux.dismiss">×</button></div
           ><button
             id="toggle-research"
             data-i18n="workspace.research"
@@ -218,6 +220,8 @@
                   data-i18n-placeholder="html.09f02f8e33"
                 ></textarea>
                 <div class="compose-actions">
+                  <small id="message-count"></small>
+                  <small data-i18n="ux.sendHint"></small>
                   <span id="reply-status"></span
                   ><button
                     id="cancel-reply"

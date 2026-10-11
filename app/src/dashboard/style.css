@@ -2675,3 +2675,35 @@ body.operator-pending > :not(#operator-login) {
   width: 100%;
   margin-right: 8px;
 }
+
+/* Consistent controls and readable management surfaces. */
+:root { --muted: #526f75; --line: #d8e5e1; }
+button { min-height: 38px; border-radius: 8px; transition: background .15s, border-color .15s; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+input:not([type="checkbox"]), select, textarea { min-height: 40px; border-radius: 8px; }
+input::placeholder, textarea::placeholder { color: #617b80; }
+.main-nav button { min-height: 42px; }
+.system-page { padding-top: 32px; }
+.settings-nav { padding: 10px; background: #edf4f0; border: 1px solid var(--line); border-radius: 14px; }
+.settings-nav button { min-height: 48px; }
+.settings-nav button[aria-current="page"] { box-shadow: inset 3px 0 #176d65; }
+.settings-nav button span { color: #52716d; line-height: 1.5; }
+.settings-panel > h2 { color: #294d43; }
+.system-message { border-radius: 12px; padding: 20px; }
+.person-form { border-radius: 12px; }
+.room-button.selected { box-shadow: inset 3px 0 #176d65; }
+.history-button, .person-tabs button, .form-actions button { min-height: 40px; }
+.service-bar button { min-width: 40px; }
+@media (max-width: 720px) {
+  body > header { padding: 12px; gap: 10px; }
+  .main-nav { justify-content: start; overflow-x: auto; }
+  .main-nav button, .back-to-im { flex-shrink: 0; min-height: 44px; }
+  .settings-nav { overflow-x: auto; padding: 6px; scroll-padding: 8px; }
+  .settings-nav button { flex: 0 0 auto; min-width: 78px; min-height: 44px; }
+  .settings-nav button[aria-current="page"] { box-shadow: inset 0 -3px #176d65; }
+  input:not([type="checkbox"]), select, textarea { font-size: 16px; }
+  .system-page { padding: 22px 14px; }
+  .person-form { padding: 18px 14px; }
+  .person-tabs { overflow-x: auto; }
+}
+@media (prefers-reduced-motion: reduce) { button { transition: none; } }

@@ -18,7 +18,7 @@ export async function loadTopics(more = false) {
             get("topic-list").replaceChildren();
         for (const row of page.topics) {
             const card = el("article", undefined, "card"), topic = row.topic;
-            card.append(el("h3", topic.title), el("p", topic.objective), el("p", `${label("TopicState", topic.state)} · ${t("research.counts", { p0: row.subject_count, p1: row.goal_count })}`), button(t("research.open"), () => void openTopic(topic)), button(t("research.edit"), () => void topicForm(topic, async () => {
+            card.append(el("h3", topic.title), el("p", topic.objective), el("p", `${label("TopicState", topic.state)} · ${t("research.counts", { p0: row.subject_count, p1: row.goal_count })}`), button(t("research.open"), () => openTopic(topic)), button(t("research.edit"), () => void topicForm(topic, async () => {
                 await loadTopics();
                 if (selected?.id === topic.id) {
                     const updated = (await api("/api/im/topics?" + query({ query: topic.title }))).topics.find((r) => r.topic.id === topic.id)?.topic;
