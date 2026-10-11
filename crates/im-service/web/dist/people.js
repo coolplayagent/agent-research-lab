@@ -2,10 +2,11 @@ import { avatar } from "./avatar.js";
 import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
-import { close, el, get, notice, open, presence, value } from "./dom.js";
+import { actions, button, close, el, get, notice, open, presence, value } from "./dom.js";
 export const people = new Map();
 export const display = (id) => id === "operator" ? t("people.e19796712f") : people.get(id)?.name || id;
 let next = null, generation = 0;
+let editing = null;
 let personId = "";
 export async function loadPeople(append = false) {
     const request = ++generation;
@@ -38,7 +39,8 @@ export async function loadPeople(append = false) {
             if (person.id !== "operator") {
                 const link = el("a", t("workspace.configureExecution"));
                 link.href = "#settings/bindings";
-                card.append(link);
+                link.className = "button-link";
+                card.append(actions(button(t("layout.editPerson"), () => openPerson(person)), link));
             }
             root.append(card);
         }
@@ -47,13 +49,17 @@ export async function loadPeople(append = false) {
         notice(error);
     }
 }
+function openPerson(person) {
+    editing = person;
+    personId = person?.id || "agent-" + crypto.randomUUID();
+    get("person-form").reset();
+    get("person-dialog-title").textContent = person ? t("layout.editPerson") : t("html.a29c23de8c");
+    get("person-name").value = person?.name || "";
+    notice("", "person-status");
+    open("person-dialog");
+}
 export function initPeople() {
-    get("new-person").onclick = () => {
-        personId = "agent-" + crypto.randomUUID();
-        get("person-form").reset();
-        notice("", "person-status");
-        open("person-dialog");
-    };
+    get("new-person").onclick = () => openPerson(null);
     get("search-people").onclick = () => void loadPeople();
     get("more-people").onclick = () => void loadPeople(true);
     get("person-form").onsubmit = async (event) => {
@@ -62,15 +68,24 @@ export function initPeople() {
         if (!done)
             return;
         try {
+            const name = value("person-name");
             await change({
                 operation: "person",
                 person: {
                     id: personId,
-                    name: value("person-name"),
+                    name,
+                    application_id: editing?.application_id || null,
                 },
             });
+            const person = people.get(personId);
+            if (person)
+                people.set(personId, { ...person, name });
+            const search = get("people-search");
+            if (!name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase()) && !personId.includes(search.value))
+                search.value = "";
             close("person-dialog");
             await loadPeople();
+            document.dispatchEvent(new Event("workspace-people"));
         }
         catch (error) {
             notice(error, "person-status");

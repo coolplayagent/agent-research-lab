@@ -212,6 +212,19 @@ separate settings page, whose left navigation selects services, adapters, bindin
 storage and status. Unsaved settings are guarded when navigating away. Conversation
 drafts and the selected group survive navigation within the workspace.
 
+Directory and settings pages share responsive card grids with horizontal action
+rows and aligned card footers. Forms scroll within the viewport and keep submission
+controls reachable on short screens. Notices wrap in a dedicated content region.
+Phone navigation and the research drawer are mutually exclusive; selecting a
+conversation closes the directory and refreshes its accessibility state.
+
+Digital-person names can be edited without changing stable identity or application
+bindings. Topic creation selects an existing group by name; editing retains that
+group association. Saved topic data refreshes the detail view directly, and stale
+search/detail responses cannot replace a newer selection. Archived topics expose
+read-only subjects and version graphs. Removing a member refreshes the picker so
+that the same member can be added again without reopening the dialog.
+
 Search accepts Enter, and Escape clears a query. Ctrl/Cmd+Enter sends a message;
 Enter inserts a newline. Pending forms and sends display progress and prevent repeated
 submissions. Conversation creation and DM expansion keep their dialog open until the

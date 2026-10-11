@@ -172,6 +172,7 @@ export function initCollaboration() {
     }).observe(get("collaboration-graph"));
     document.addEventListener("workspace-messages", render);
     document.addEventListener("workspace-goals", render);
+    document.addEventListener("workspace-people", render);
     void (async () => {
         let cursor = "", count = 0;
         do {

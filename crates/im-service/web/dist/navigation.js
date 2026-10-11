@@ -6,7 +6,7 @@ import { icon } from "./icons.js";
 import { loadPeople } from "./people.js";
 import { loadApplications } from "./applications.js";
 import { allowSettingsLeave, initSettingsGuard } from "./settings-guard.js";
-import { revealResearch } from "./workspace.js";
+import { revealResearch, syncControls } from "./workspace.js";
 const titles = {
     groups: t("navigation.f3f8bcf3f5"),
     direct: t("navigation.484c0ffc97"),
@@ -57,7 +57,7 @@ export function navigate() {
     get("settings-navigation").hidden = !setting;
     get("workspace").classList.toggle("auxiliary", !conversation);
     if (!conversation) {
-        get("workspace").classList.remove("research-expanded");
+        get("workspace").classList.remove("research-expanded", "research-open");
         get("expand-research").setAttribute("aria-pressed", "false");
         get("expand-research").textContent = t("workspace.expand");
     }
@@ -90,6 +90,7 @@ export function navigate() {
         .querySelectorAll("[data-page]")
         .forEach((node) => node.setAttribute("aria-current", node.dataset.page === page ? "page" : "false"));
     previous = location.hash;
+    syncControls();
 }
 export function initNavigation() {
     get("topic-nav-icon").replaceChildren(icon("topic"));

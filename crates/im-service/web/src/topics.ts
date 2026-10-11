@@ -2,7 +2,7 @@ import { revealResearch } from "./workspace.js";
 import { loadEvolution } from "./evolution.js";
 import { TopicState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
-import { get, el, button, notice } from "./dom.js";
+import { get, el, button, notice, actions } from "./dom.js";
 import { t, label } from "./i18n.js";
 import { icon } from "./icons.js";
 import { openGroup as selectConversation } from "./conversation.js";
@@ -11,7 +11,9 @@ import type { Topic, TopicRow, SubjectRow } from "./research-types.js";
 let after: string | null = null,
   selected: Topic | undefined,
   subjectAfter: string | null = null;
+let topicRequest = 0, subjectRequest = 0;
 export async function loadTopics(more = false): Promise<void> {
+  const request = ++topicRequest;
   try {
     const page = await api<{ topics: TopicRow[]; next_after: string | null }>(
       "/api/im/topics?" +
@@ -20,6 +22,7 @@ export async function loadTopics(more = false): Promise<void> {
           query: get<HTMLInputElement>("topic-search").value,
         }),
     );
+    if (request !== topicRequest) return;
     if (!more) get("topic-list").replaceChildren();
     for (const row of page.topics) {
       const card = el("article", undefined, "card"),
@@ -35,22 +38,15 @@ export async function loadTopics(more = false): Promise<void> {
           "p",
           `${label("TopicState", topic.state)} · ${t("research.counts", { p0: row.subject_count, p1: row.goal_count })}`,
         ),
-        button(t("research.open"), () => openTopic(topic)),
+        actions(button(t("research.open"), () => openTopic(topic)),
         button(
           t("research.edit"),
           () =>
-            void topicForm(topic, async () => {
+            topicForm(topic, async (updated) => {
               await loadTopics();
-              if (selected?.id === topic.id) {
-                const updated = (
-                  await api<{ topics: TopicRow[] }>(
-                    "/api/im/topics?" + query({ query: topic.title }),
-                  )
-                ).topics.find((r) => r.topic.id === topic.id)?.topic;
-                if (updated) await openTopic(updated);
-              }
+              if (selected?.id === updated.id) await openTopic(updated);
             }),
-        ),
+        )),
       );
       get("topic-list").append(card);
     }
@@ -58,33 +54,43 @@ export async function loadTopics(more = false): Promise<void> {
       get("topic-list").append(el("p", t("research.noTopics")));
     after = page.next_after;
     get("more-topics").hidden = !after;
+    const current = page.topics.find(row => row.topic.id === selected?.id)?.topic;
+    if (current) await openTopic(current, false);
   } catch (error) {
-    notice(error);
+    if (request === topicRequest) notice(error);
   }
 }
-async function openTopic(topic: Topic): Promise<void> {
+async function openTopic(topic: Topic, reveal = true): Promise<void> {
   selected = topic;
+  get("subject-list").replaceChildren(el("p", t("ux.loading")));
   get("topic-detail").hidden = false;
   get("topic-detail-title").textContent = topic.title;
   get("topic-detail-objective").textContent = topic.objective;
   get<HTMLButtonElement>("new-subject").disabled =
     topic.state === TopicState.Archived;
   await loadSubjects();
+  if (reveal && selected?.id === topic.id) get("topic-detail").scrollIntoView({ block: "nearest" });
 }
 async function loadSubjects(more = false): Promise<void> {
   if (!selected) return;
+  const owner = selected, request = ++subjectRequest;
   try {
     const page = await api<{
       subjects: SubjectRow[];
       next_after: string | null;
     }>(
       "/api/im/subjects?" +
-        query({ topic_id: selected.id, after: more ? subjectAfter || "" : "" }),
+        query({ topic_id: owner.id, after: more ? subjectAfter || "" : "" }),
     );
+    if (request !== subjectRequest || selected?.id !== owner.id) return;
     if (!more) get("subject-list").replaceChildren();
     for (const row of page.subjects) {
       const subject = row.subject,
         card = el("article", undefined, "card");
+      const edit = button(t("research.edit"), () =>
+        subjectForm(owner, subject, async () => { if (selected?.id === owner.id) await loadSubjects(); }));
+      edit.disabled = owner.state === TopicState.Archived;
+      if (edit.disabled) edit.title = t("layout.archivedTopic");
       card.append(
         el("h4", subject.name),
         el(
@@ -92,12 +98,7 @@ async function loadSubjects(more = false): Promise<void> {
           `${label("SubjectKind", subject.kind)} · ${t("research.versions", { p0: row.node_count })}`,
         ),
         el("code", subject.reference),
-        button(t("research.graph"), () => {
-          if (selected) void openGraph(selected, subject.id).catch(notice);
-        }),
-        button(t("research.edit"), () =>
-          subjectForm(selected!, subject, () => loadSubjects()),
-        ),
+        actions(button(t("research.graph"), () => openGraph(owner, subject.id)), edit),
       );
       get("subject-list").append(card);
     }
@@ -106,7 +107,7 @@ async function loadSubjects(more = false): Promise<void> {
     subjectAfter = page.next_after;
     get("more-subjects").hidden = !subjectAfter;
   } catch (error) {
-    notice(error);
+    if (request === subjectRequest) notice(error);
   }
 }
 export function initTopics(): void {
@@ -115,6 +116,10 @@ export function initTopics(): void {
   get("topic-search-button").onclick = () => void loadTopics();
   get("more-topics").onclick = () => void loadTopics(true);
   get("more-subjects").onclick = () => void loadSubjects(true);
+  get("close-topic").onclick = () => {
+    selected = undefined; subjectRequest++;
+    get("topic-detail").hidden = true;
+  };
   get("new-subject").onclick = () => {
     if (selected) subjectForm(selected, undefined, () => loadSubjects());
   };

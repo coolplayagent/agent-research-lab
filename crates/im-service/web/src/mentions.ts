@@ -73,6 +73,7 @@ function renderMentions(): void {
   });
 }
 export function initMentions(): void {
+  document.addEventListener("workspace-people", () => selectMentions(selected));
   const input = get<HTMLTextAreaElement>("message-text");
   input.addEventListener("input", () => { highlighted = 0; renderMentions(); });
   input.addEventListener("keydown", (event) => {

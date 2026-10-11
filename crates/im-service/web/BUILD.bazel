@@ -27,3 +27,8 @@ node_test(
     script = "workspace-tests.cjs",
     data = [":policy_sources", "//web/shared:policy_sources"],
 )
+node_test(
+    name = "layout_tests",
+    script = "layout-tests.cjs",
+    data = [":policy_sources", "//web/shared:policy_sources"],
+)

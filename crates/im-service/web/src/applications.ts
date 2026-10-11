@@ -2,7 +2,7 @@ import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { label } from "./i18n.js";
 import { api } from "./api.js";
-import { button, el, get, notice } from "./dom.js";
+import { button, el, get, notice, actions } from "./dom.js";
 import { current } from "./conversation.js";
 import { openGoal } from "./goal-form.js";
 import type { Scenario } from "./goal-types.js";
@@ -29,12 +29,12 @@ export async function loadApplications(): Promise<void> {
           label("ScenarioStatus", status[scenario.id]?.status || "") ||
             t("applications.dbf6c16b45"),
         ),
-        button(t("applications.eb44dbca1f"), () => {
+        actions(button(t("applications.eb44dbca1f"), async () => {
           location.hash = "#groups";
           if (current && current.kind !== GroupKind.Board && !current.archived)
-            void openGoal(scenario.id);
+            await openGoal(scenario.id);
           else notice(t("applications.4d4a0fe582"));
-        }),
+        })),
       );
       root.append(card);
     }

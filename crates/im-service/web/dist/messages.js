@@ -160,6 +160,7 @@ function renderMessages() {
 export function initMessages() {
     initMentions();
     document.addEventListener("workspace-goals", renderMessages);
+    document.addEventListener("workspace-people", renderMessages);
     get("messages").addEventListener("scroll", () => {
         if (!browsing && atBottom() && unseen) {
             unseen = 0;

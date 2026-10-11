@@ -134,14 +134,14 @@
             ></button>
             <h1 id="page-title" data-i18n="html.f3f8bcf3f5"></h1>
           </div>
-          <div class="notice-wrap"><span id="notice" role="status"></span><button id="dismiss-notice" type="button" hidden data-i18n-aria-label="ux.dismiss">×</button></div
-          ><button
+          <button
             id="toggle-research"
             data-i18n="workspace.research"
             aria-controls="research-panel"
             aria-expanded="true"
           ></button>
         </header>
+        <div class="notice-wrap"><span id="notice" role="status"></span><button id="dismiss-notice" type="button" hidden data-i18n-aria-label="ux.dismiss">×</button></div>
         <section id="conversations" class="conversation-layout">
           <div class="conversation">
             <div id="empty-conversation" class="empty">
@@ -156,7 +156,7 @@
                   <p id="group-topic"></p>
                   <small id="group-summary"></small>
                 </div>
-                <details class="group-menu">
+                <details id="conversation-menu" class="group-menu">
                   <summary data-i18n="workspace.more"></summary>
                   <div class="actions">
                     <button
@@ -267,23 +267,22 @@
           ></button>
         </section>
         <section id="applications-page" class="content-page" hidden="">
-          <h2 data-i18n="html.28f6b6e645"></h2>
-          <p data-i18n="html.6771a427f6"></p>
+          <header><div><h2 data-i18n="html.28f6b6e645"></h2>
+          <p data-i18n="html.6771a427f6"></p></div></header>
           <div id="application-list" class="cards"></div>
         </section>
         <section id="topics-page" class="content-page" hidden>
-          <div class="toolbar">
-            <h2 data-i18n="research.topics"></h2>
+          <header>
+            <div><h2 data-i18n="research.topics"></h2><p data-i18n="research.topicsNote"></p></div>
             <button
               id="new-topic"
               class="primary"
               data-i18n="research.newTopic"
             ></button>
-          </div>
-          <p data-i18n="research.topicsNote"></p>
-          <div class="toolbar">
+          </header>
+          <div class="search-row">
             <input
-              id="topic-search"
+              id="topic-search" type="search"
               data-i18n-placeholder="research.search"
               data-i18n-aria-label="research.search"
             /><button
@@ -294,7 +293,7 @@
           <div id="topic-list" class="cards"></div>
           <button id="more-topics" hidden data-i18n="research.more"></button>
           <section id="topic-detail" hidden class="research-detail">
-            <h3 id="topic-detail-title"></h3>
+            <header><h3 id="topic-detail-title"></h3><button id="close-topic" data-i18n="layout.closeDetail"></button></header>
             <p id="topic-detail-objective"></p>
             <div class="toolbar">
               <button
@@ -327,7 +326,7 @@
                   data-i18n="services.refresh"
                 ></button
                 ><button
-                  id="add-service"
+                  id="add-service" class="primary"
                   data-i18n="services.addService"
                 ></button>
               </div>
@@ -337,7 +336,7 @@
           <section data-settings-panel="adapters" hidden>
             <header>
               <h2 data-i18n="workspace.adapters"></h2>
-              <button id="add-adapter" data-i18n="services.addAdapter"></button>
+              <button id="add-adapter" class="primary" data-i18n="services.addAdapter"></button>
             </header>
             <p data-i18n="services.adapterNote"></p>
             <div id="adapter-list" class="cards"></div>
@@ -554,11 +553,13 @@
           data-i18n="html.4013d4a77c"
         ></button>
         <p id="goal-status" role="status"></p>
+        <footer class="form-actions">
         <button
           id="goal-submit"
           class="primary"
           data-i18n="html.6e5dd5cdce"
         ></button>
+        </footer>
       </form>
     </dialog>
     <dialog id="group-dialog">
@@ -590,11 +591,13 @@
         <p id="group-kind-note"></p>
         <div id="create-picker"></div>
         <p id="create-status" role="status"></p>
+        <footer class="form-actions">
         <button
           class="primary"
           id="create-submit"
           data-i18n="html.795e7905dc"
         ></button>
+        </footer>
       </form>
     </dialog>
     <dialog id="members-dialog">
@@ -625,7 +628,7 @@
     <dialog id="person-dialog">
       <form id="person-form">
         <header>
-          <h2 data-i18n="html.a29c23de8c"></h2>
+          <h2 id="person-dialog-title" data-i18n="html.a29c23de8c"></h2>
           <button
             type="button"
             data-close="person-dialog"
@@ -642,7 +645,7 @@
             data-i18n-placeholder="html.27c00694ec"
         /></label>
         <p id="person-status" role="status"></p>
-        <button class="primary" data-i18n="html.a3030bf8f1"></button>
+        <footer class="form-actions"><button class="primary" data-i18n="html.a3030bf8f1"></button></footer>
       </form>
     </dialog>
 
@@ -665,7 +668,7 @@
         </label>
         <p id="edit-note"></p>
         <p id="edit-status" role="status"></p>
-        <button class="primary" data-i18n="html.a3030bf8f1"></button>
+        <footer class="form-actions"><button class="primary" data-i18n="html.a3030bf8f1"></button></footer>
       </form>
     </dialog>
   </body>

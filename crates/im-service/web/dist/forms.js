@@ -36,6 +36,8 @@ export function area(value) {
 }
 export function field(title, node) {
     const label = element("label");
+    if (node.getAttribute("type") === "checkbox")
+        label.className = "checkbox-field";
     node.setAttribute("aria-label", title);
     label.append(element("span", title), node);
     return label;
@@ -67,7 +69,10 @@ export function finish(box, save) {
     const button = element("button", t("services.save"));
     button.type = "submit";
     button.className = "primary";
-    box.form.append(box.status, button);
+    const footer = element("footer");
+    footer.className = "form-actions";
+    footer.append(button);
+    box.form.append(box.status, footer);
     box.form.onsubmit = async (event) => {
         event.preventDefault();
         const done = busy(button);

@@ -1,4 +1,4 @@
-import { EvolutionState } from "/assets/shared/contracts.js";
+import { EvolutionState, TopicState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
 import { get, notice } from "./dom.js";
 import { t } from "./i18n.js";
@@ -50,6 +50,12 @@ let rows: EvolutionRow[] = [],
   topic = "",
   subject = "",
   zoom = 1;
+function updateCreate(): void {
+  const owner = topics.find(row => row.topic.id === topic)?.topic;
+  const button = get<HTMLButtonElement>("new-evolution-node");
+  button.disabled = !subject || !owner || owner.state !== TopicState.Active;
+  button.title = owner?.state === TopicState.Archived ? t("layout.archivedTopic") : "";
+}
 export async function loadEvolution(more = false): Promise<void> {
   const request = ++requestSequence,
     group = groupId;
@@ -147,7 +153,7 @@ async function filters(request: number, group: string): Promise<boolean> {
     subject = subjectPicker.value;
     void graph(false).catch(notice);
   };
-  get<HTMLButtonElement>("new-evolution-node").disabled = !subject;
+  updateCreate();
   return true;
 }
 async function graph(more: boolean): Promise<void> {
@@ -174,7 +180,7 @@ async function graph(more: boolean): Promise<void> {
     p2: rows.filter((r) => r.status === EvolutionState.Accepted).length,
     p3: rows.filter((r) => r.status === EvolutionState.Failed).length,
   });
-  get<HTMLButtonElement>("new-evolution-node").disabled = !subject;
+  updateCreate();
   get("evolution-detail").hidden = true;
   renderGraph(rows, showNode);
   const current = rows.find((row) => row.node.input.id === selected);
@@ -210,7 +216,7 @@ export function initEvolution(): void {
   get("new-evolution-node").onclick = () => {
     const target = subjects.find((r) => r.subject.id === subject)?.subject,
       owner = topics.find((r) => r.topic.id === target?.topic_id)?.topic;
-    if (target && owner)
+    if (target && owner?.state === TopicState.Active)
       void nodeForm(target, owner.group_id, rows, () => graph(false)).catch(
         notice,
       );

@@ -52,6 +52,10 @@ export function editService(
     field(t("services.enabled"), enabled),
     field(t("services.sandbox"), sandbox),
   );
+  const dependency = sandbox.closest("label")!;
+  const updateDependency = () => { dependency.hidden = kind.value !== ServiceKind.Executor; };
+  kind.onchange = updateDependency;
+  updateDependency();
   trackSettings(box.form);
   finish(box, async () => {
     const value: Service = {
@@ -96,6 +100,7 @@ export function editAdapter(
     seconds = input(String(old?.max_seconds || 1800), "number");
   id.required = true;
   id.readOnly = !!old;
+  executor.required = true;
   seconds.min = "1";
   seconds.max = "3600";
   seconds.required = true;

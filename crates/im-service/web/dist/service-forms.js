@@ -17,6 +17,10 @@ export function editService(config, old, save) {
     endpoint.required = true;
     endpoint.placeholder = "/absolute/private/service.sock";
     box.form.append(field(t("services.id"), id), field(t("services.kind"), kind), field(t("services.endpoint"), endpoint), field(t("services.enabled"), enabled), field(t("services.sandbox"), sandbox));
+    const dependency = sandbox.closest("label");
+    const updateDependency = () => { dependency.hidden = kind.value !== ServiceKind.Executor; };
+    kind.onchange = updateDependency;
+    updateDependency();
     trackSettings(box.form);
     finish(box, async () => {
         const value = {
@@ -41,6 +45,7 @@ export function editAdapter(config, old, save) {
         .map((s) => [s.id, s.id]), old?.executor_id || "executor"), command = area(JSON.stringify(old?.command || [], null, 2)), env = area((old?.env_names || []).join("\n")), mounts = area((old?.read_only_paths || []).join("\n")), enabled = check(old?.enabled ?? false), network = check(old?.network ?? true), seconds = input(String(old?.max_seconds || 1800), "number");
     id.required = true;
     id.readOnly = !!old;
+    executor.required = true;
     seconds.min = "1";
     seconds.max = "3600";
     seconds.required = true;

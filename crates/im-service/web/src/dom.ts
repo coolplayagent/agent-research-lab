@@ -25,6 +25,11 @@ export function button(text: string, action: () => void | Promise<void>): HTMLBu
   };
   return node;
 }
+export function actions(...controls: HTMLElement[]): HTMLDivElement {
+  const row = el("div", undefined, "card-actions");
+  row.append(...controls);
+  return row;
+}
 export const value = (id: string): string =>
   get<HTMLInputElement>(id).value.trim();
 export function notice(error: unknown, id = "notice"): void {

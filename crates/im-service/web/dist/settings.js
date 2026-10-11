@@ -1,7 +1,7 @@
 import { trackSettings, savedSettings, allowSettingsLeave, hasUnsavedSettings, } from "./settings-guard.js";
 import { ServiceKind } from "/assets/shared/contracts.js";
 import { api } from "./api.js";
-import { get } from "./dom.js";
+import { get, actions } from "./dom.js";
 import { t, label } from "./i18n.js";
 import { editAdapter, editService } from "./service-forms.js";
 import { element, select, field } from "./forms.js";
@@ -55,15 +55,17 @@ function render(view) {
             card.append(element("p", health.info.capabilities.join(" · ")));
         if (health?.error)
             card.append(element("p", health.error));
-        card.append(button(t("services.edit"), () => editService(config, service, save)), button(t("services.remove"), async () => {
+        card.append(actions(button(t("services.edit"), () => editService(config, service, save)), button(t("services.remove"), async () => {
             if (!confirm(t("ux.confirmRemove", { title: service.id })))
                 return;
             const next = structuredClone(config);
             next.services = next.services.filter((s) => s.id !== service.id);
             await save(next);
-        }));
+        })));
         list.append(card);
     }
+    if (!config.services.length)
+        list.append(element("p", t("layout.noServices")));
     const adapters = get("adapter-list");
     adapters.replaceChildren();
     for (const adapter of config.adapters) {
@@ -71,15 +73,17 @@ function render(view) {
         card.className = "card";
         card.append(element("h3", `${adapter.id} · ${label("CodingAgent", adapter.agent)}`), element("p", adapter.enabled
             ? t("services.adapterEnabled")
-            : t("services.adapterDisabled")), element("p", `${label("AgentProtocol", adapter.protocol)} · ${adapter.executor_id}`), button(t("services.edit"), () => editAdapter(config, adapter, save)), button(t("services.remove"), async () => {
+            : t("services.adapterDisabled")), element("p", `${label("AgentProtocol", adapter.protocol)} · ${adapter.executor_id}`), actions(button(t("services.edit"), () => editAdapter(config, adapter, save)), button(t("services.remove"), async () => {
             if (!confirm(t("ux.confirmRemove", { title: adapter.id })))
                 return;
             const next = structuredClone(config);
             next.adapters = next.adapters.filter((a) => a.id !== adapter.id);
             await save(next);
-        }));
+        })));
         adapters.append(card);
     }
+    if (!config.adapters.length)
+        adapters.append(element("p", t("layout.noAdapters")));
     const storage = get("storage-selection");
     storage.replaceChildren();
     const selected = select([
@@ -92,9 +96,11 @@ function render(view) {
     trackSettings(storageForm);
     storage.append(storageForm);
     storageForm.append(field(t("services.storage"), selected), element("p", t("services.storageNote")));
+    storageForm.className = "settings-form";
     const storeButton = element("button", t("services.saveStorage"));
     storeButton.type = "submit";
-    storageForm.append(storeButton);
+    storeButton.className = "primary";
+    storageForm.append(actions(storeButton));
     storageForm.onsubmit = async (event) => {
         event.preventDefault();
         storeButton.disabled = true;
@@ -113,9 +119,11 @@ function render(view) {
     };
     const bindings = get("binding-list");
     bindings.replaceChildren();
+    if (!Object.keys(config.bindings).length)
+        bindings.append(element("p", t("layout.noBindings")));
     for (const [person, id] of Object.entries(config.bindings)) {
         const row = element("div");
-        row.className = "toolbar";
+        row.className = "binding-row";
         row.append(element("span", `${directory.find((p) => p.id === person)?.name || person} → ${id}`), button(t("services.unbind"), async () => {
             const next = structuredClone(config);
             delete next.bindings[person];
@@ -125,11 +133,21 @@ function render(view) {
     }
     const form = element("form"), person = select(directory.filter((p) => p.id !== "operator").map((p) => [p.id, p.name]), directory.find((p) => p.id !== "operator")?.id || ""), adapter = select(config.adapters.map((a) => [a.id, a.id]), config.adapters[0]?.id || "");
     person.required = true;
+    adapter.required = true;
+    form.className = "settings-form binding-form";
     trackSettings(form);
     const submit = element("button", t("services.bind"));
     submit.type = "submit";
+    submit.className = "primary";
     submit.disabled = !person.value || !adapter.value;
-    form.append(field(t("services.person"), person), field(t("services.adapter"), adapter), submit);
+    form.append(field(t("services.person"), person), field(t("services.adapter"), adapter), actions(submit));
+    if (!person.value || !adapter.value) {
+        const note = element("p", t("layout.bindingPrerequisite"));
+        const link = element("a", !person.value ? t("workspace.people") : t("workspace.adapters"));
+        link.href = !person.value ? "#people" : "#settings/adapters";
+        note.append(link);
+        form.append(note);
+    }
     form.onsubmit = async (event) => {
         event.preventDefault();
         const done = busy(submit);

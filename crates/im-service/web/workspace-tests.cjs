@@ -38,6 +38,7 @@ class Node extends EventTarget {
     this.classes = new Set();
     this.classList = {
       add: (name) => this.classes.add(name),
+      remove: (...names) => names.forEach(name => this.classes.delete(name)),
       toggle: (name, enabled) => enabled ? this.classes.add(name) : this.classes.delete(name),
     };
     this.value = "";
@@ -397,6 +398,7 @@ const deferred = () => {
   const conversation = moduleFrom(
     base + "conversation.ts",
     {
+      "./workspace.js": { syncControls() {} },
       "/assets/shared/contracts.js": contracts,
       "./i18n.js": i18n,
       "./api.js": {
