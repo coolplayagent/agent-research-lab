@@ -189,6 +189,7 @@ export const ExecutionState = {
 export type ExecutionState = (typeof ExecutionState)[keyof typeof ExecutionState];
 export const WorkflowState = {
   Running: "running",
+  Cancelling: "cancelling",
   Succeeded: "succeeded",
   Failed: "failed",
   Cancelled: "cancelled",
@@ -196,9 +197,27 @@ export const WorkflowState = {
 } as const;
 export type WorkflowState = (typeof WorkflowState)[keyof typeof WorkflowState];
 export const WorkflowNodeState = {
+  Pending: "pending",
   TaskReady: "task_ready",
+  CheckingGate: "checking_gate",
+  CancelRequested: "cancel_requested",
+  Reconciling: "reconciling",
+  Waiting: "waiting",
+  Child: "child",
+  Succeeded: "succeeded",
+  Failed: "failed",
+  Cancelled: "cancelled",
+  Skipped: "skipped",
 } as const;
 export type WorkflowNodeState = (typeof WorkflowNodeState)[keyof typeof WorkflowNodeState];
+export const WorkflowFrameState = {
+  Active: "active",
+  Cancelling: "cancelling",
+  Succeeded: "succeeded",
+  Failed: "failed",
+  Cancelled: "cancelled",
+} as const;
+export type WorkflowFrameState = (typeof WorkflowFrameState)[keyof typeof WorkflowFrameState];
 export const EffectState = {
   Applied: "applied",
   Unknown: "unknown",
@@ -261,6 +280,59 @@ export const ProposalState = {
   PendingHostReview: "pending_host_review",
 } as const;
 export type ProposalState = (typeof ProposalState)[keyof typeof ProposalState];
+export const BatchPromptSelection = {
+  Builtin: "builtin",
+  Registered: "registered",
+} as const;
+export type BatchPromptSelection = (typeof BatchPromptSelection)[keyof typeof BatchPromptSelection];
+export const BatchRegistrationState = {
+  Complete: "complete",
+  Incomplete: "incomplete",
+  Rejected: "rejected",
+} as const;
+export type BatchRegistrationState = (typeof BatchRegistrationState)[keyof typeof BatchRegistrationState];
+export const BatchEntryRegistrationState = {
+  Pending: "pending",
+  JobRecorded: "job_recorded",
+  WorkflowConfirmed: "workflow_confirmed",
+  AdvancedExistingConfirmed: "advanced_existing_confirmed",
+  Unknown: "unknown",
+} as const;
+export type BatchEntryRegistrationState = (typeof BatchEntryRegistrationState)[keyof typeof BatchEntryRegistrationState];
+export const BatchRegistrationPhase = {
+  Preflight: "preflight",
+  Collect: "collect",
+  Prepare: "prepare",
+  PersistPlan: "persist_plan",
+  RegisterJob: "register_job",
+  BindPersona: "bind_persona",
+  ConfirmWorkflow: "confirm_workflow",
+  PersistReceipt: "persist_receipt",
+} as const;
+export type BatchRegistrationPhase = (typeof BatchRegistrationPhase)[keyof typeof BatchRegistrationPhase];
+export const BatchRegistrationErrorCode = {
+  InvalidRequest: "invalid_request",
+  RequestConflict: "request_conflict",
+  FrozenBindingConflict: "frozen_binding_conflict",
+  FreshnessFailure: "freshness_failure",
+  FreshnessDrift: "freshness_drift",
+  OwnerProofUnavailable: "owner_proof_unavailable",
+  OwnerProofMismatch: "owner_proof_mismatch",
+  CurrentAttemptChanged: "current_attempt_changed",
+  DeadlineExceeded: "deadline_exceeded",
+  RegistrationFailure: "registration_failure",
+  ReceiptPersistenceFailure: "receipt_persistence_failure",
+} as const;
+export type BatchRegistrationErrorCode = (typeof BatchRegistrationErrorCode)[keyof typeof BatchRegistrationErrorCode];
+export const WorkflowLookupErrorCode = {
+  NotFound: "not_found",
+} as const;
+export type WorkflowLookupErrorCode = (typeof WorkflowLookupErrorCode)[keyof typeof WorkflowLookupErrorCode];
+export const WorkflowObservationErrorCode = {
+  Unavailable: "unavailable",
+  Mismatch: "mismatch",
+} as const;
+export type WorkflowObservationErrorCode = (typeof WorkflowObservationErrorCode)[keyof typeof WorkflowObservationErrorCode];
 export const GoalEventKind = {
   Created: "goal_created",
   Accepted: "goal_accepted",

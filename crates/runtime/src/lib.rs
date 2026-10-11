@@ -12,7 +12,9 @@ use std::{
     time::Duration,
 };
 use workflow::Workflow;
+pub mod batch;
 pub mod people;
+mod registration;
 mod watch;
 
 use multi_agent::TeamMembership;
@@ -131,136 +133,8 @@ pub fn enqueue_with_inputs(
         ensure_started(c, &prior)?;
         return Ok(prior);
     }
-    let persona = people::freeze(c, &task)?;
-    let preference = persona.as_ref().and_then(|p| p.execution.as_ref());
-    let backend =
-        agent_backend::freeze_selected(c, &task, preference.and_then(|p| p.backend.as_deref()))?;
-    let model = preference
-        .and_then(|p| p.model.clone())
-        .unwrap_or_else(|| c.models[&task.role].clone());
-    agent_backend::validate_model(
-        c,
-        backend.as_ref().map_or("codex", |b| b.id.as_str()),
-        &model,
-    )?;
-    let repository = if task.repository == "superpod" {
-        c.superpod.clone()
-    } else if task.repository == "agent-research-lab" {
-        c.workspace.join("agent-research-lab")
-    } else {
-        c.tools
-            .get(&task.repository)
-            .context("repository not allowlisted")?
-            .repository
-            .clone()
-    };
-    let mut commit = if let Some(inputs) = &inputs {
-        inputs
-            .repositories
-            .get(&task.repository)
-            .context("missing latest repository snapshot")?
-            .upstream
-            .commit
-            .clone()
-    } else {
-        git(&repository, &["rev-parse", "HEAD"])?
-    };
-    let mut baseline_commit = None;
-    if task.role == "review" {
-        for id in &task.dependencies {
-            let parent: Job = storage::read(&job_path(c, id))?;
-            if parent.task.write && parent.task.repository == task.repository {
-                ensure!(
-                    !persona
-                        .as_ref()
-                        .zip(parent.persona.as_ref())
-                        .is_some_and(|(reviewer, author)| reviewer.id == author.id),
-                    "independent review requires a different digital person from the implementation author"
-                );
-                if let Some(inputs) = &inputs {
-                    ensure!(
-                        parent.source_commit
-                            == inputs.repositories[&task.repository].upstream.commit,
-                        "candidate baseline is no longer the latest default branch; rerun implementation"
-                    );
-                }
-                let receipt = committed_receipt(c, &workflow(c), &parent)?;
-                let candidate = receipt["candidate"]["candidate_commit"]
-                    .as_str()
-                    .context("implementation has no frozen candidate commit")?;
-                ensure!(
-                    candidate.len() == 40 && candidate.bytes().all(|b| b.is_ascii_hexdigit()),
-                    "invalid candidate commit"
-                );
-                if baseline_commit.is_some() {
-                    ensure!(
-                        commit == candidate,
-                        "review cannot combine different candidate commits"
-                    );
-                }
-                git(
-                    &repository,
-                    &["cat-file", "-e", &format!("{candidate}^{{commit}}")],
-                )?;
-                commit = candidate.into();
-                baseline_commit = Some(parent.source_commit.clone());
-            }
-        }
-    }
-    let superpod_commit = if let Some(inputs) = &inputs {
-        inputs.repositories["superpod"].upstream.commit.clone()
-    } else {
-        git(&c.superpod, &["rev-parse", "HEAD"])?
-    };
-    let worktree = c.state_dir.join("worktrees").join(&task.id);
-    fs::create_dir_all(worktree.parent().unwrap())?;
-    if worktree.exists() {
-        ensure!(
-            git(&worktree, &["rev-parse", "HEAD"])? == commit,
-            "interrupted worktree has different base"
-        );
-    } else {
-        git(
-            &repository,
-            &[
-                "worktree",
-                "add",
-                "--detach",
-                worktree.to_str().context("UTF8 path")?,
-                &commit,
-            ],
-        )?;
-    }
-    let prompt_digest = storage::digest(
-        format!(
-            "{}{}",
-            rendered_experiment_prompt(c, &task, inputs.as_ref())?,
-            people::prompt(persona.as_ref())?
-        )
-        .as_bytes(),
-    );
-    let job = Job {
-        persona,
-        model,
-        backend,
-        source_commit: commit,
-        baseline_commit,
-        research_inputs: inputs,
-        superpod_commit,
-        prompt_digest,
-        config_digest: storage::digest(&serde_json::to_vec(c)?),
-        worktree,
-        run_id: format!("{}-attempt-1", task.id),
-        attempt: 1,
-        last_error: None,
-        launch: None,
-        retry_after: None,
-        task,
-    };
-    storage::write(&destination, &job)?;
-    people::bind(c, &job)?;
-    ensure_started(c, &job)?;
-    Ok(job)
+    let prepared = registration::prepare(c, task, inputs.as_ref())?;
+    registration::register(c, &prepared, inputs, |_, _| Ok(()))
 }
 
 fn frozen_input(job: &Job) -> Value {
@@ -506,7 +380,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
     Ok(json!({"queued":ids}))
 }
 
-fn rendered_task_prompt(c: &Config, task: &Task) -> Result<String> {
+fn role_prompt(c: &Config, task: &Task) -> Result<String> {
     let role = if let Some(version) = &task.prompt_version {
         let prompt = evolution_cli::resolve_registered_prompt(
             &c.state_dir.join("evolution/prompts.json"),
@@ -523,6 +397,11 @@ fn rendered_task_prompt(c: &Config, task: &Task) -> Result<String> {
         }
         .to_owned()
     };
+    Ok(role)
+}
+
+fn rendered_task_prompt(c: &Config, task: &Task) -> Result<String> {
+    let role = role_prompt(c, task)?;
     let mut prompt = format!(
         "{role}\n{}\n\n{}\n",
         task.prompt,

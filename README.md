@@ -335,3 +335,48 @@ bazel-bin/agent-research-lab crystal-bench --state /private/new-hot-run \
 报告区分策略自身表现和后代汇总表现，对重组谱系共享后代去重，未完成工作也计入预算。验证/保留集观测、变化绑定和重复试验会被拒绝。这是受 HGM 启发的谱系诊断，不是 HGM Thompson sampling 调度器复现。候选激活继续受评估、保留集隔离、晋级、发布和安装门禁约束；策略分支不会创建新数字人身份或共享可变实验记忆。
 
 聊天沿用数字人笑脸头像，群聊、成员列表与水晶球使用一致的身份标识。消息展示昵称、时间、气泡和可定位的引用回复；正文不会重复显示发言者自称，历史原文与研究证据保持完整。
+
+## Bounded batch registration
+
+`agent-research-lab --config local.toml enqueue-batch request.json --max-seconds 300`
+registers an ordered batch of 1..32 ordinary native Tasks. The request is
+`{"schema_version":1,"batch_id":"owned-batch","tasks":[...]}` and must be a
+regular JSON file at most 1 MiB. Dependencies must already exist or precede the
+Task in the batch. Latest-baseline mode is required.
+
+Each invocation collects fresh inputs once. A private immutable plan under
+`state_dir/private/enqueue-batches/<batch_id>/plan.json` freezes Task selections,
+persona memory, configuration and complete source/skill/knowledge inputs before
+registration effects. Replay uses the same canonical request and frozen choices;
+it still performs one fresh collection and rejects real binding drift. Only
+repository/skill acquisition timestamps are excluded from identity comparison.
+The actual serialized plan is limited to 16 MiB.
+
+Registration holds the batch lock and one native enqueue lock. All existing
+bindings and interrupted worktrees are checked before the first new registration.
+A failure retains partial native state and returns a nonzero structured response
+with `code` and `registration`; the private receipt distinguishes a recorded Job
+from confirmed workflow registration. If receipt persistence fails, the returned
+observation has `receipt_persisted:false`. Retry the same request after diagnosing
+the failure; no automatic retry, rollback or Job overwrite is performed.
+New workflow bundles are submitted during registration, so an owner rejection
+can leave a registered prefix even after native Task and binding preflight passes.
+
+Existing current attempts are confirmed through owner `verify`, `history-at` and
+pure `kernel check`. Confirmation never repairs an advanced/live attempt, resets
+it to attempt 1, acquires a lease or starts a worker. A missing or unsupported
+owner proof remains incomplete. Complete registration does not mean Task success;
+a confirmed owner run may still be running, failed or cancelled. Concurrent
+controllers may observe the registered prefix; this is not atomic cohort admission.
+
+The 1..600 second allowance is shared across acquisition, preparation and native
+calls. Checkpoints stop later effects, while synchronous hashing/filesystem sync
+cannot be preempted by the in-process deadline. Ordinary `enqueue`, collaboration,
+seed and run admission retain their existing behavior.
+
+The real-owner regressions are explicit opt-in Bazel tests. Set `LAB_WORKFLOW_BIN`
+to the tested CLI 0.2.0 runtime and run `//crates/runtime:tests` with
+`--test_arg=batch::tests --test_arg=--ignored`. The separate
+`//app:enqueue_batch_cli_tests` also requires `LAB_CLI_BIN`; it exercises the real
+CLI and freshness collector using isolated GitHub/fetch acquisition fixtures.
+These tests create only owned temporary stores and never run models.

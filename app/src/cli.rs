@@ -96,6 +96,12 @@ pub(crate) enum Commands {
     Enqueue {
         input: PathBuf,
     },
+    /// Register 1..32 native Tasks with one fresh snapshot and a durable private plan.
+    EnqueueBatch {
+        input: PathBuf,
+        #[arg(long, default_value_t = 300, value_parser = clap::value_parser!(u64).range(1..=600))]
+        max_seconds: u64,
+    },
     Seed,
     /// Fetch current upstream baselines and verify installed latest skills before research.
     Refresh,

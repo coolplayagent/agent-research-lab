@@ -78,8 +78,9 @@ states! {
         NeedsReconciliation => "needs_reconciliation", WaitingDependencies => "waiting_dependencies",
         WaitingTarget => "waiting_target", Historical => "historical"
     }
-    WorkflowState { Running => "running", Succeeded => "succeeded", Failed => "failed", Cancelled => "cancelled", Unknown => "unknown" }
-    WorkflowNodeState { TaskReady => "task_ready" }
+    WorkflowState { Running => "running", Cancelling => "cancelling", Succeeded => "succeeded", Failed => "failed", Cancelled => "cancelled", Unknown => "unknown" }
+    WorkflowNodeState { Pending => "pending", TaskReady => "task_ready", CheckingGate => "checking_gate", CancelRequested => "cancel_requested", Reconciling => "reconciling", Waiting => "waiting", Child => "child", Succeeded => "succeeded", Failed => "failed", Cancelled => "cancelled", Skipped => "skipped" }
+    WorkflowFrameState { Active => "active", Cancelling => "cancelling", Succeeded => "succeeded", Failed => "failed", Cancelled => "cancelled" }
     EffectState { Applied => "applied", Unknown => "unknown" }
     ControllerPhase { Unknown => "unknown", Idle => "idle", Running => "running", Error => "error", Stopped => "stopped", Starting => "starting", Recovering => "recovering", Refreshing => "refreshing" }
     MemoryWriteback { Pending => "pending", Running => "running", Done => "done", Unknown => "unknown", NotEnabled => "not_enabled" }
@@ -89,6 +90,14 @@ states! {
     DeliveryState { Delivered => "delivered", Expired => "expired", Pending => "pending" }
     ExperimentTaskState { NotEnqueued => "not_enqueued", InvalidBinding => "invalid_binding", Succeeded => "succeeded", InvalidReport => "invalid_report" }
     ProposalState { PendingHostReview => "pending_host_review" }
+    BatchPromptSelection { Builtin => "builtin", Registered => "registered" }
+    BatchRegistrationState { Complete => "complete", Incomplete => "incomplete", Rejected => "rejected" }
+    BatchEntryRegistrationState { Pending => "pending", JobRecorded => "job_recorded", WorkflowConfirmed => "workflow_confirmed", AdvancedExistingConfirmed => "advanced_existing_confirmed", Unknown => "unknown" }
+    BatchRegistrationPhase { Preflight => "preflight", Collect => "collect", Prepare => "prepare", PersistPlan => "persist_plan", RegisterJob => "register_job", BindPersona => "bind_persona", ConfirmWorkflow => "confirm_workflow", PersistReceipt => "persist_receipt" }
+    BatchRegistrationErrorCode { InvalidRequest => "invalid_request", RequestConflict => "request_conflict", FrozenBindingConflict => "frozen_binding_conflict", FreshnessFailure => "freshness_failure", FreshnessDrift => "freshness_drift", OwnerProofUnavailable => "owner_proof_unavailable", OwnerProofMismatch => "owner_proof_mismatch", CurrentAttemptChanged => "current_attempt_changed", DeadlineExceeded => "deadline_exceeded", RegistrationFailure => "registration_failure", ReceiptPersistenceFailure => "receipt_persistence_failure" }
+    WorkflowLookupErrorCode { NotFound => "not_found" }
+    WorkflowObservationErrorCode { Unavailable => "unavailable", Mismatch => "mismatch" }
+
     GoalEventKind { Created => "goal_created", Accepted => "goal_accepted", Cancelled => "goal_cancelled", Retried => "work_retried", Claimed => "work_claimed", Submitted => "work_submitted", Failed => "work_failed" }
     ScenarioStatus { Ready => "scenario_ready", Unavailable => "scenario_unavailable", BatchComplete => "scenario_batch_complete" }
     #[derive(Default)]
