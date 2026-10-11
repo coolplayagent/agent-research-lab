@@ -146,7 +146,7 @@ function render(): void {
     : t("workspace.selectGroup");
   if (!view) return;
   renderCrystal(host, view.group, members, messageSnapshot(), goalSnapshot(), detail,
-    new Set([...pulses].filter(([, until]) => until > Date.now()).map(([id]) => id)),
+    new Map([...pulses].filter(([, until]) => until > Date.now())),
     () => { get("workspace").classList.remove("research-expanded", "research-open"); get("message-text").focus(); });
   for (const member of members) {
     const row = el("div", undefined, "member");
@@ -174,10 +174,10 @@ export function initCollaboration(): void {
   document.addEventListener("workspace-message", (event) => {
     const message = (event as CustomEvent<Message>).detail;
     if (message.group_id !== view?.group.id || (message.event && message.event.person_id !== message.sender_id)) return;
-    pulses.set(message.sender_id, Date.now() + 1600);
+    pulses.set(message.sender_id, Date.now() + 2200);
     clearTimeout(pulseTimer);
     render();
-    pulseTimer = setTimeout(() => { pulses.clear(); render(); }, 1650);
+    pulseTimer = setTimeout(() => { pulses.clear(); render(); }, 2250);
   });
   let width = 0;
   new ResizeObserver(([entry]) => {

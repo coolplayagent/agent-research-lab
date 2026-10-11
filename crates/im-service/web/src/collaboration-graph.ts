@@ -13,11 +13,18 @@ function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string,
   if (text !== undefined) node.textContent = text;
   return node;
 }
-export function renderCrystal(host: HTMLElement, group: Group, members: Member[], messages: Message[], goals: Goal[], select: (id: string) => void, pulses: Set<string>, openConversation: () => void): void {
+export function renderCrystal(host: HTMLElement, group: Group, members: Member[], messages: Message[], goals: Goal[], select: (id: string) => void, pulses: Map<string, number>, openConversation: () => void): void {
   const wide = host.clientWidth > 550;
   const width = wide ? 800 : 360, height = wide ? 490 : 440;
   const cx = width / 2, cy = height / 2, radius = wide ? 82 : 57;
   const shown = members.slice(0, 8);
+  const now = Date.now(), elapsed = pulses.size ? 2200 - (Math.max(...pulses.values()) - now) : 0;
+  const flow = svg("g", { class: "crystal-message-flow", "aria-hidden": "true" });
+  const traffic = (path: string, direction: string, age: number, delay: number): void => {
+    const line = svg("path", { d: path, class: `crystal-traffic ${direction}`, pathLength: 100, "data-flow": direction });
+    line.style.animationDelay = `${delay - age}ms`;
+    flow.append(line);
+  };
   if (members.length > shown.length) host.append(el("p", t("workspace.graphLimit", { count: shown.length })));
   const canvas = svg("svg", { viewBox: `0 0 ${width} ${height}`, role: "group", "aria-label": t("workspace.crystal"), class: "crystal-canvas" });
   const defs = svg("defs");
@@ -30,37 +37,44 @@ export function renderCrystal(host: HTMLElement, group: Group, members: Member[]
     defs.append(marker);
   }
   canvas.append(defs, svg("ellipse", { cx, cy, rx: wide ? 287 : 138, ry: wide ? 179 : 167, class: "crystal-orbit" }), svg("circle", { cx, cy, r: radius + 18, class: "crystal-halo" }));
-  const positions = new Map<string, { x: number; y: number }>();
+  const positions = new Map<string, { x: number; y: number; portX: number; portY: number }>();
   shown.forEach((member, index) => {
     const angle = -Math.PI / 2 + index * Math.PI * 2 / shown.length;
     const x = cx + Math.cos(angle) * (wide ? 282 : 121), y = cy + Math.sin(angle) * (wide ? 177 : 166);
-    positions.set(member.person_id, { x, y });
     const endX = cx + Math.cos(angle) * (radius + 5), endY = cy + Math.sin(angle) * (radius + 5);
-    const startX = x - Math.cos(angle) * (wide ? 75 : 40), startY = y - Math.sin(angle) * 29;
+    const dx = cx - x, dy = cy - y;
+    const edge = Math.min((wide ? 85 : 58) / Math.abs(dx), 31 / Math.abs(dy));
+    const startX = x + dx * edge, startY = y + dy * edge;
+    positions.set(member.person_id, { x, y, portX: startX, portY: startY });
     const path = `M${startX},${startY} L${endX},${endY}`;
     canvas.append(svg("path", { d: path, class: "collaboration-edge" }));
-    if (pulses.has(member.person_id)) canvas.append(svg("path", { d: path, class: "crystal-traffic" }));
+    if (pulses.has(member.person_id)) traffic(path, "to-crystal", 2200 - (pulses.get(member.person_id)! - now), 0);
+    if (pulses.size && (!pulses.has(member.person_id) || pulses.size > 1))
+      traffic(`M${endX},${endY} L${startX},${startY}`, "from-crystal", elapsed, 780);
     if (messages.some((message) => message.sender_id === member.person_id && (!message.event || message.event.person_id === member.person_id)))
       canvas.append(svg("path", { d: path, class: "crystal-publish", "marker-end": "url(#crystal-publish)" }));
   });
   for (const edge of replyEdges(messages)) {
     const from = positions.get(edge.from), to = positions.get(edge.to);
     if (!from || !to) continue;
-    const path = svg("path", { d: `M${from.x},${from.y} Q${cx},${cy - radius - 20} ${to.x},${to.y}`, class: "reply-edge" + (pulses.has(edge.from) ? " crystal-traffic" : ""), "marker-end": "url(#crystal-reply)" });
+    const path = svg("path", { d: `M${from.portX},${from.portY} L${cx},${cy} L${to.portX},${to.portY}`, class: "reply-edge", "marker-end": "url(#crystal-reply)" });
     path.append(svg("title", {}, t("workspace.replyEdge", { from: display(edge.from), to: display(edge.to) })));
     canvas.append(path);
   }
+  canvas.append(flow);
   const orb = svg("g", { class: "crystal-center" + (pulses.size ? " receiving" : ""), role: "button", tabindex: 0, "aria-label": t("workspace.openConversation") });
+  orb.style.setProperty("--flow-delay", `${650 - elapsed}ms`);
   orb.onclick = openConversation;
   orb.onkeydown = (event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); openConversation(); } };
-  orb.append(svg("circle", { cx, cy, r: radius, fill: "url(#crystal-fill)" }), svg("ellipse", { cx: cx - radius * .2, cy: cy - radius * .4, rx: radius * .46, ry: radius * .23, fill: "#fff", opacity: .6, transform: `rotate(-25 ${cx} ${cy})` }), svg("text", { x: cx, y: cy - 6, class: "crystal-title" }, t("workspace.crystal")), svg("text", { x: cx, y: cy + 15, class: "crystal-sub" }, t("workspace.crystalMessages", { count: messages.filter((m) => !m.event || m.sender_id === m.event.person_id).length })));
+  orb.append(svg("circle", { cx, cy, r: radius, fill: "url(#crystal-fill)" }), svg("ellipse", { cx: cx - radius * .2, cy: cy - radius * .4, rx: radius * .46, ry: radius * .23, fill: "#fff", opacity: .6, transform: `rotate(-25 ${cx} ${cy})` }), svg("text", { x: cx, y: cy - 6, class: "crystal-title" }, t("workspace.crystal")), svg("text", { x: cx, y: cy + 15, class: "crystal-sub" }, pulses.size ? t("workspace.crystalDistributing") : t("workspace.crystalMessages", { count: messages.filter((m) => !m.event || m.sender_id === m.event.person_id).length })));
   orb.append(svg("title", {}, group.title));
   canvas.append(orb);
   shown.forEach((member) => {
     const { x, y } = positions.get(member.person_id)!;
     const w = wide ? 166 : 112;
     const work = goals.flatMap((goal) => goal.work).find((work) => work.person_id === member.person_id && work.state === WorkState.Running);
-    const node = svg("g", { class: `agent-node${work ? " working" : ""}${pulses.has(member.person_id) ? " speaking" : ""}`, transform: `translate(${x - w / 2},${y - 29})`, role: "button", tabindex: 0, "aria-label": `@${display(member.person_id)} · ${presence(member.presence)}` });
+    const node = svg("g", { class: `agent-node${work ? " working" : ""}${pulses.has(member.person_id) ? " speaking" : pulses.size ? " receiving" : ""}`, transform: `translate(${x - w / 2},${y - 29})`, role: "button", tabindex: 0, "aria-label": `@${display(member.person_id)} · ${presence(member.presence)}` });
+    node.style.setProperty("--flow-delay", `${pulses.has(member.person_id) ? -elapsed : 1500 - elapsed}ms`);
     node.append(svg("rect", { width: w, height: 58, rx: 10 }), svg("circle", { cx: 31, cy: 43, r: 3, class: "agent-presence" }), svg("text", { x: 45, y: 25, class: "agent-name" }, `@${display(member.person_id).slice(0, wide ? 12 : 4)}`), svg("text", { x: 45, y: 43, class: "agent-activity" }, work ? label("WorkState", work.state) : presence(member.presence)), svg("title", {}, display(member.person_id)));
     const face = avatarSvg(member.person_id);
     face.setAttribute("x", "7"); face.setAttribute("y", "12"); face.setAttribute("width", "32"); face.setAttribute("height", "32");

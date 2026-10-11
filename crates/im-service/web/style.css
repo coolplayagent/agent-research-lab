@@ -708,14 +708,15 @@ dialog p {
 .crystal-center circle, .agent-node > rect { transition: stroke .18s, fill .18s, filter .18s; }
 .crystal-center:hover circle, .crystal-center:focus circle { stroke: #34a891; filter: drop-shadow(0 0 9px #52b8a766); }
 .crystal-center:hover ellipse { animation: crystal-shine 1.5s ease-in-out infinite alternate; }
-.crystal-traffic { fill: none; stroke: #159f8c; stroke-width: 3; stroke-dasharray: 7 20; animation: crystal-traffic 1.6s linear forwards; }
-.agent-node.speaking > rect, .crystal-center.receiving circle { animation: crystal-activity 1.6s ease-out; }
+.crystal-traffic { fill: none; stroke: #159f8c; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 8 100; animation: crystal-traffic .75s ease-in-out both; filter: drop-shadow(0 0 3px #25a89188); }
+.crystal-traffic.from-crystal { stroke: #639dc1; }
+.agent-node.speaking > rect, .agent-node.receiving > rect, .crystal-center.receiving circle { animation: crystal-activity .65s ease-out forwards; animation-delay: var(--flow-delay, 0ms); }
 .agent-node.working > rect { animation: crystal-working 1.8s ease-in-out infinite alternate; }
-@keyframes crystal-traffic { from { stroke-dashoffset: 90; opacity: 1; } to { stroke-dashoffset: 0; opacity: .1; } }
+@keyframes crystal-traffic { 0% { stroke-dashoffset: 8; opacity: 0; } 12%, 85% { opacity: 1; } 100% { stroke-dashoffset: -100; opacity: 0; } }
 @keyframes crystal-activity { from { stroke: #20bda5; filter: drop-shadow(0 0 6px #42bda466); } to { filter: none; } }
 @keyframes crystal-working { from { stroke: #ccdcd4; } to { stroke: #c49b55; filter: drop-shadow(0 0 4px #c49b5528); } }
 @keyframes crystal-shine { from { opacity: .35; } to { opacity: .8; } }
-@media (prefers-reduced-motion: reduce) { .crystal-canvas * { animation: none !important; transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .crystal-message-flow { display: none; } .crystal-canvas * { animation: none !important; transition: none !important; } }
 #collaboration-detail {
   border-top: 1px solid var(--line);
   padding-top: 12px;
