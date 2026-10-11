@@ -6,19 +6,21 @@ import { api, change, query } from "./api.js";
 import { button, el, get, notice } from "./dom.js";
 import { display } from "./people.js";
 import type { Group, GroupView, Message } from "./types.js";
+import { MessageDrafts } from "./message-drafts.js";
 let group: Group | null = null,
   generation = 0,
   browsing = false,
   reply: number | null = null;
-let sendingGeneration: number | null = null;
+let historyGeneration = 0, newestSequence = 0, unseen = 0;
 const messages = new Map<number, Message>();
-const drafts = new Map<string, { text: string; reply: number | null }>();
+const liveMessages = new Map<number, Message>();
+const drafts = new MessageDrafts();
 export function messageSnapshot(): Message[] {
   return [...messages.values()];
 }
 export function suspendMessages(): void {
   if (group)
-    drafts.set(group.id, {
+    drafts.save(group.id, {
       text: get<HTMLTextAreaElement>("message-text").value,
       reply,
     });
@@ -40,24 +42,20 @@ export function locateMessage(sequence: number): void {
   }
 }
 
-let pending: {
-  group_id: string;
-  request_id: string;
-  text: string;
-  reply_to: number | null;
-} | null = null;
 export function resetMessages(selected: Group, initial: Message[]): void {
   if (group) suspendMessages();
   generation++;
   group = selected;
   browsing = false;
-  reply = drafts.get(selected.id)?.reply ?? null;
-  pending = null;
-  sendingGeneration = null;
+  reply = drafts.get(selected.id).reply;
+  unseen = 0;
+  newestSequence = Math.max(0, ...initial.map((message) => message.sequence));
+  liveMessages.clear();
+  initial.forEach((m) => liveMessages.set(m.sequence, m));
   messages.clear();
   initial.forEach((m) => messages.set(m.sequence, m));
   get<HTMLTextAreaElement>("message-text").value =
-    drafts.get(selected.id)?.text || "";
+    drafts.get(selected.id).text;
   sizeComposer();
   get<HTMLButtonElement>("send-message").disabled = false;
   get<HTMLButtonElement>("older-messages").disabled = false;
@@ -70,7 +68,7 @@ export function updateComposer(selected: Group): void {
   group = selected;
   const input = get<HTMLTextAreaElement>("message-text"),
     submit = get<HTMLButtonElement>("send-message"),
-    sending = sendingGeneration === generation;
+    sending = drafts.isSending(selected.id);
   input.disabled = selected.archived;
   get<HTMLButtonElement>("discuss-message").disabled = selected.archived || selected.kind === GroupKind.Board;
   input.readOnly = sending;
@@ -85,10 +83,33 @@ export function updateComposer(selected: Group): void {
       : t("messages.f32eb53703");
 }
 export function incoming(message: Message): void {
-  if (message.group_id !== group?.id || browsing) return;
+  if (message.group_id !== group?.id) return;
+  liveMessages.set(message.sequence, message);
+  trimMessages(liveMessages);
+  if (message.sequence > newestSequence) {
+    if (browsing || !atBottom()) unseen++;
+    newestSequence = message.sequence;
+  }
+  updateHistoryStatus();
+  if (browsing) return;
   messages.set(message.sequence, message);
-  while (messages.size > 256) messages.delete(Math.min(...messages.keys()));
+  trimMessages(messages);
   renderMessages();
+}
+function trimMessages(items: Map<number, Message>): void {
+  while (items.size > 256) items.delete(Math.min(...items.keys()));
+}
+function atBottom(): boolean {
+  const root = get("messages");
+  return root.scrollHeight - root.scrollTop - root.clientHeight < 80;
+}
+function updateHistoryStatus(): void {
+  get("history-status").textContent = browsing
+    ? t("messages.f1fcde6deb")
+    : t("messages.2bd1c987a4");
+  const latest = get<HTMLButtonElement>("latest-messages");
+  latest.textContent = unseen ? t("messages.unseen", { count: unseen }) : t("html.1c59875d3a");
+  latest.classList.toggle("has-unseen", unseen > 0);
 }
 function updateReply(): void {
   get("reply-status").textContent = reply
@@ -98,11 +119,9 @@ function updateReply(): void {
 }
 function renderMessages(): void {
   const root = get("messages"),
-    bottom = root.scrollHeight - root.scrollTop - root.clientHeight < 80;
+    bottom = atBottom();
   root.replaceChildren();
-  get("history-status").textContent = browsing
-    ? t("messages.f1fcde6deb")
-    : t("messages.2bd1c987a4");
+  updateHistoryStatus();
   for (const message of [...messages.values()].sort(
     (a, b) => a.sequence - b.sequence,
   )) {
@@ -173,6 +192,9 @@ function renderMessages(): void {
 }
 export function initMessages(): void {
   document.addEventListener("workspace-goals", renderMessages);
+  get("messages").addEventListener("scroll", () => {
+    if (!browsing && atBottom() && unseen) { unseen = 0; updateHistoryStatus(); }
+  });
   get("message-text").addEventListener("input", sizeComposer);
   const input = get<HTMLTextAreaElement>("message-text");
   input.addEventListener("input", () => { if (group) updateComposer(group); });
@@ -188,14 +210,14 @@ export function initMessages(): void {
   };
   get("older-messages").onclick = async () => {
     if (!group || !messages.size) return;
-    const request = generation,
+    const request = generation, history = ++historyGeneration,
       id = group.id;
     try {
       const page = await api<GroupView>(
         "/api/crystal/view?" +
           query({ group_id: id, before: Math.min(...messages.keys()) }),
       );
-      if (request !== generation) return;
+      if (request !== generation || history !== historyGeneration) return;
       if (!page.messages.length) {
         get<HTMLButtonElement>("older-messages").disabled = true;
         return;
@@ -206,48 +228,39 @@ export function initMessages(): void {
       renderMessages();
       get("messages").scrollTop = 0;
     } catch (error) {
-      notice(error);
+      if (request === generation && history === historyGeneration) notice(error);
     }
   };
   get("latest-messages").onclick = async () => {
     if (!group) return;
-    const request = generation;
+    const request = generation, history = ++historyGeneration;
     try {
       const page = await api<GroupView>(
         "/api/crystal/view?" + query({ group_id: group.id }),
       );
-      if (request !== generation) return;
+      if (request !== generation || history !== historyGeneration) return;
       browsing = false;
+      unseen = 0;
       messages.clear();
       page.messages.forEach((m) => messages.set(m.sequence, m));
+      liveMessages.forEach((m) => messages.set(m.sequence, m));
+      trimMessages(messages);
+      newestSequence = Math.max(newestSequence, ...messages.keys());
       get<HTMLButtonElement>("older-messages").disabled = false;
       renderMessages();
       get("messages").scrollTop = get("messages").scrollHeight;
     } catch (error) {
-      notice(error);
+      if (request === generation && history === historyGeneration) notice(error);
     }
   };
   get<HTMLFormElement>("composer").onsubmit = async (event) => {
     event.preventDefault();
-    if (!group || group.archived || sendingGeneration === generation) return;
+    if (!group || group.archived) return;
     const input = get<HTMLTextAreaElement>("message-text"),
       text = input.value.trim(),
-      id = group.id,
-      request = generation;
-    if (!text) return;
-    if (
-      !pending ||
-      pending.text !== text ||
-      pending.reply_to !== reply ||
-      pending.group_id !== id
-    )
-      pending = {
-        group_id: id,
-        request_id: crypto.randomUUID(),
-        text,
-        reply_to: reply,
-      };
-    sendingGeneration = generation;
+      id = group.id;
+    const pending = drafts.begin(id, { text: input.value, reply });
+    if (!pending) return;
     updateComposer(group);
     try {
       const result = await change<{
@@ -256,20 +269,21 @@ export function initMessages(): void {
         operation: "send",
         message: pending,
       });
-      if (request !== generation) return;
-      pending = null;
-      if (input.value.trim() === text) input.value = "";
-      drafts.delete(id);
-      sizeComposer();
-      reply = null;
-      updateReply();
+      drafts.complete(pending);
+      if (group?.id !== id) return;
+      if (input.value.trim() === text && reply === pending.reply_to) {
+        input.value = "";
+        reply = null;
+        sizeComposer();
+        updateReply();
+      }
       incoming(result.message);
       notice(t("messages.60823aaec7"));
     } catch (error) {
-      notice(error);
+      if (group?.id === id) notice(error);
     } finally {
-      if (request === generation) {
-        sendingGeneration = null;
+      drafts.finish(id);
+      if (group?.id === id) {
         if (group) updateComposer(group);
         input.focus();
       }

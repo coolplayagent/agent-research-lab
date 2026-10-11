@@ -35,6 +35,11 @@ class Node extends EventTarget {
     this.dataset = {};
     this.style = {};
     this.attributes = new Map();
+    this.classes = new Set();
+    this.classList = {
+      add: (name) => this.classes.add(name),
+      toggle: (name, enabled) => enabled ? this.classes.add(name) : this.classes.delete(name),
+    };
     this.value = "";
     this.hidden = false;
     this.isConnected = true;
@@ -74,7 +79,7 @@ const dom = {
     Object.assign(new Node("button", text), { onclick: action }),
   notice: () => {},
 };
-const i18n = { t: (key) => key };
+const i18n = { t: (key, params) => key === "messages.unseen" ? `${key}:${params.count}` : key };
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((r, j) => {
@@ -182,6 +187,7 @@ const deferred = () => {
 
   let request = deferred();
   const sends = [];
+  const draftModule = moduleFrom(base + "message-drafts.ts", {}, { crypto: require("node:crypto").webcrypto });
   const messages = moduleFrom(
     base + "messages.ts",
     {
@@ -196,6 +202,7 @@ const deferred = () => {
       "./people.js": { display: (id) => id },
       "./goals.js": { goalSnapshot: () => [], focusGoal: () => {} },
       "./message-results.js": { resultForMessage },
+      "./message-drafts.js": draftModule,
     },
     { document: new EventTarget(), crypto: require("node:crypto").webcrypto },
   );
@@ -242,15 +249,56 @@ const deferred = () => {
   request.reject(new Error("network failure"));
   await sending;
   assert.equal(get("message-text").value, "one submission");
+  messages.suspendMessages();
+  messages.resetMessages(a, [msg(1, "a")]);
+  messages.suspendMessages();
+  messages.resetMessages(b, [msg(8, "b", null, "b")]);
   request = deferred();
   const retry = submit();
-  assert.equal(sends[1].message.request_id, sends[0].message.request_id, "Retry must retain request identity");
+  assert.equal(sends[1].message.request_id, sends[0].message.request_id, "Retry after navigation must retain request identity");
   messages.suspendMessages();
   messages.resetMessages(a, [msg(1, "a")]);
   request.resolve({ message: msg(11, "b", null, "b") });
   await retry;
   assert.equal(get("message-text").value, "unfinished", "Late send must not clear another group's draft");
   assert.equal(messages.messageSnapshot()[0].group_id, "a");
+  messages.suspendMessages();
+  messages.resetMessages(b, [msg(11, "b", null, "b")]);
+  assert.equal(get("message-text").value, "", "Late success must clear its own saved draft");
+
+  request = deferred();
+  get("message-text").value = "in flight across navigation";
+  const returningSend = submit();
+  messages.suspendMessages(); messages.resetMessages(a, [msg(1, "a")]);
+  messages.suspendMessages(); messages.resetMessages(b, [msg(11, "b", null, "b")]);
+  assert.equal(get("send-message").disabled, true, "Returning must retain the in-flight lock");
+  const beforeRepeat = sends.length;
+  await submit();
+  assert.equal(sends.length, beforeRepeat);
+  request.resolve({message:msg(12,"b",null,"b")}); await returningSend;
+  assert.equal(get("message-text").value, "");
+
+  request = deferred();
+  const older = get("older-messages").onclick();
+  request.resolve({messages:[msg(8,"b",null,"b")]}); await older;
+  messages.incoming(msg(13,"b",null,"b"));
+  messages.incoming(msg(13,"b",null,"b"));
+  assert.equal(get("latest-messages").textContent,"messages.unseen:1","Replayed events must not increase the unseen count");
+  assert.deepEqual(messages.messageSnapshot().map(m=>m.sequence),[8],"New arrivals must not replace the history being read");
+  request = deferred();
+  const latest = get("latest-messages").onclick();
+  messages.incoming(msg(14,"b",null,"b"));
+  request.resolve({messages:[msg(12,"b",null,"b")]}); await latest;
+  assert(messages.messageSnapshot().some(m=>m.sequence===14),"Live events during a latest-page request must survive its older snapshot");
+  assert.equal(get("latest-messages").textContent,"html.1c59875d3a");
+  request = deferred();
+  const staleHistory = get("older-messages").onclick();
+  const oldPage = request;
+  request = deferred();
+  const freshLatest = get("latest-messages").onclick();
+  request.resolve({messages:[msg(14,"b",null,"b")]}); await freshLatest;
+  oldPage.resolve({messages:[msg(8,"b",null,"b")]}); await staleHistory;
+  assert(messages.messageSnapshot().some(m=>m.sequence===14),"A late history page must not undo returning to latest");
 
   const pending = new Map();
   const chosen = [];

@@ -694,6 +694,7 @@ dialog p {
   font-size: 11px;
   fill: #27493a;
 }
+.history-nav .has-unseen { color: var(--accent); background: #e2f3ee; font-weight: 600; }
 .crystal-canvas { background: radial-gradient(ellipse at center, #eefaf7 0, #fbfdfc 66%, transparent 80%); }
 .crystal-orbit { fill: none; stroke: #dbece7; stroke-dasharray: 3 7; }
 .crystal-halo { fill: none; stroke: #d8eae5; }

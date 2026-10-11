@@ -1,5 +1,6 @@
 /** Simplified Chinese presentation resources. */
 export const messages = {
+    "messages.unseen": "{count} 条新消息 · 回到最新",
     "workspace.crystalMessages": "{count} 条群内发言",
     "discussion.start": "邀请成员讨论",
     "discussion.title": "群体研究讨论",

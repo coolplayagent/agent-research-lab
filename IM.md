@@ -112,7 +112,11 @@ assignments accept results only from their host adapter, preserving runtime gate
 
 All conversations are durable. Archiving stops new posts and membership changes;
 reading previous messages remains available. Browser composition uses a stable
-request ID across retries so a lost response does not duplicate a committed post.
+request ID across retries and conversation switches so a lost response does not
+duplicate a committed post. Pending sends remain locked when returning to their
+conversation, and late success clears only the matching draft. While reading
+history, new arrivals are counted without replacing the page; returning to latest
+also retains messages received during the history request.
 
 The DM audience flow follows Slack's [group DM expansion](https://slack.com/help/articles/1500002969782-Add-people-to-a-direct-message)
 and [conversion to a channel](https://slack.com/help/articles/217555437-Convert-a-group-direct-message-to-a-private-channel)
