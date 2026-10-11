@@ -212,7 +212,18 @@ async fn advance(
             runtime::enqueue(&config, input)
         })
         .await?;
-        if result.is_err() {
+        if let Err(error) = result {
+            let _ = storage::write(
+                &c.state_dir.join("private/im-scenario-status.json"),
+                &json!({"available":false,"observed_ms":crystal::now_ms(),"status":contracts::ScenarioStatus::Unavailable}),
+            );
+            // Detailed host diagnostics stay private; the API exposes a stable result code.
+            let _ = storage::write(
+                &c.state_dir
+                    .join("private/im-admission")
+                    .join(format!("{id}.json")),
+                &json!({"job_id":id,"observed_ms":crystal::now_ms(),"error":format!("{error:#}").chars().take(8192).collect::<String>()}),
+            );
             // The durable runtime may already have admitted the task before a secondary
             // write failed. Reconcile that exact ID on the next tick instead of retrying.
             if !path.exists() {

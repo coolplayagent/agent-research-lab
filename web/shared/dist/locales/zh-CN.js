@@ -163,7 +163,7 @@ export const messages = {
     "GoalEventKind.work_claimed": "任务已领取",
     "GoalEventKind.work_submitted": "结果已提交",
     "GoalEventKind.work_failed": "任务失败",
-    "ScenarioStatus.scenario_ready": "执行器已就绪，等待领取群组任务",
+    "ScenarioStatus.scenario_ready": "调度待命，实际执行能力以任务结果为准",
     "ScenarioStatus.scenario_unavailable": "执行器暂不可用，请检查配置、预算及工具",
     "ScenarioStatus.scenario_batch_complete": "调度已完成当前批次",
     "WorkResultCode.research_completed": "研究执行完成，请按目标验收标准审阅证据。",
