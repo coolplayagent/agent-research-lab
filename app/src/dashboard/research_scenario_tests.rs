@@ -119,3 +119,108 @@ fn successful_workflow_status_without_a_matching_committed_receipt_cannot_submit
     .unwrap();
     assert!(observe_result(&c, "im-job").unwrap().is_none());
 }
+
+#[tokio::test]
+async fn admission_failure_is_unavailable_with_private_diagnostics_and_no_acceptance() {
+    let temp = Scratch::new();
+    let c: Config = serde_json::from_value(json!({"schema_version":1,"workspace":temp.path(),"state_dir":temp.path().join("state"),"superpod":temp.path(),"codex":"unused","workflow":"unused","daily_seconds":600,"max_agents":1,"task_timeout_seconds":60,"require_latest":true,"models":{"research":"fixture"},"tools":{}})).unwrap();
+    let person = runtime::people::default_id(&c, "research").unwrap();
+    let hub =
+        im_storage::Client::from(crystal::Hub::open(&temp.path().join("collaboration")).unwrap());
+    hub.register_operator().await.unwrap();
+    hub.save_person(crystal::Person {
+        id: person.clone(),
+        name: "Researcher".into(),
+        application_id: Some("research".into()),
+    })
+    .await
+    .unwrap();
+    hub.create_group(crystal::NewGroup {
+        id: "research-test".into(),
+        title: "Research".into(),
+        topic: "Admission feedback".into(),
+        kind: crystal::GroupKind::Conversation,
+        private: false,
+        members: vec!["operator".into(), person.clone()],
+    })
+    .await
+    .unwrap();
+    let input = GoalInput {
+        id: "admission-test".into(),
+        group_id: "research-test".into(),
+        title: "Verify admission".into(),
+        objective: "Check unavailable input evidence".into(),
+        acceptance: "A failed admission must not claim readiness".into(),
+        scenario: "research".into(),
+        parameters: json!({"repository":"superpod"}),
+        assignments: vec![AssignmentInput {
+            person_id: person,
+            instruction: "Read-only research".into(),
+        }],
+        max_seconds: 180,
+    };
+    let initial = hub
+        .change_goal(crystal::GoalChange::Create { goal: input })
+        .await
+        .unwrap();
+    let job = job_id(&initial, &initial.work[0]);
+    let config = Arc::new(c);
+    let (stop, receiver) = tokio::sync::watch::channel(false);
+    let worker = tokio::spawn(run(hub.clone(), config.clone(), 15, receiver));
+    let goal = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let page = hub
+                .goals("research-test", "research", "", true)
+                .await
+                .unwrap();
+            let goal: crystal::Goal = serde_json::from_value(page["goals"][0].clone()).unwrap();
+            if goal.work[0].state == WorkState::Failed {
+                break goal;
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+    })
+    .await
+    .unwrap();
+    stop.send(true).unwrap();
+    worker.await.unwrap();
+    assert_eq!(goal.state, GoalState::Active);
+    let result = goal.work[0].result.as_ref().unwrap();
+    assert_eq!(
+        result.code,
+        Some(contracts::WorkResultCode::AdmissionFailed)
+    );
+    assert!(!result.succeeded);
+    let status = Research(config.clone()).status();
+    assert_eq!(status["available"], false);
+    assert_eq!(
+        status["status"],
+        contracts::ScenarioStatus::Unavailable.as_str()
+    );
+    let diagnostic: Value = storage::read(
+        &config
+            .state_dir
+            .join("private/im-admission")
+            .join(format!("{job}.json")),
+    )
+    .unwrap();
+    assert!(
+        diagnostic["error"]
+            .as_str()
+            .unwrap()
+            .contains("missing skills manifest")
+    );
+    assert!(
+        !serde_json::to_string(&result)
+            .unwrap()
+            .contains("missing skills manifest")
+    );
+    assert!(!status.to_string().contains("missing skills manifest"));
+    assert!(
+        !config
+            .state_dir
+            .join("jobs")
+            .join(format!("{job}.json"))
+            .exists()
+    );
+}

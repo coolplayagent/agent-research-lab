@@ -163,7 +163,7 @@ export declare const messages: {
     readonly "GoalEventKind.work_claimed": "任务已领取";
     readonly "GoalEventKind.work_submitted": "结果已提交";
     readonly "GoalEventKind.work_failed": "任务失败";
-    readonly "ScenarioStatus.scenario_ready": "执行器已就绪，等待领取群组任务";
+    readonly "ScenarioStatus.scenario_ready": "调度待命，实际执行能力以任务结果为准";
     readonly "ScenarioStatus.scenario_unavailable": "执行器暂不可用，请检查配置、预算及工具";
     readonly "ScenarioStatus.scenario_batch_complete": "调度已完成当前批次";
     readonly "WorkResultCode.research_completed": "研究执行完成，请按目标验收标准审阅证据。";
