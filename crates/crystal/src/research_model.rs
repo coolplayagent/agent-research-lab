@@ -45,6 +45,9 @@ pub struct EvolutionNode {
     pub input: EvolutionInput,
     pub generation: u64,
     pub created_ms: u64,
+    /// Frozen assignment attempts. Legacy nodes cannot inherit later acceptance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_attempts: Option<std::collections::BTreeMap<String, u32>>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]

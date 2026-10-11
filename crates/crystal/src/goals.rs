@@ -98,6 +98,17 @@ pub(crate) fn save(
             goal.state == GoalState::Active
         ],
     )?;
+    let contribution = work.filter(|w| {
+        kind == GoalEventKind::Submitted
+            && w.result
+                .as_ref()
+                .is_some_and(|result| result.code.is_none())
+    });
+    let reply_to = if contribution.is_some() {
+        connection.query_row("SELECT sequence FROM messages WHERE group_id=?1 AND json_extract(event,'$.goal_id')=?2 AND json_extract(event,'$.kind')=?3 ORDER BY sequence LIMIT 1",params![goal.input.group_id,goal.input.id,GoalEventKind::Created.as_str()],|row| row.get(0)).optional()?
+    } else {
+        None
+    };
     let input = Publish {
         group_id: goal.input.group_id.clone(),
         request_id: format!(
@@ -105,13 +116,23 @@ pub(crate) fn save(
             &storage::digest(goal.input.id.as_bytes())[..20],
             goal.revision
         ),
-        text: kind.as_str().into(),
-        reply_to: None,
+        text: contribution
+            .map(|w| {
+                w.result
+                    .as_ref()
+                    .unwrap()
+                    .summary
+                    .chars()
+                    .take(1000)
+                    .collect()
+            })
+            .unwrap_or_else(|| kind.as_str().into()),
+        reply_to,
     };
     let count: u64 = connection.query_row("SELECT COUNT(*) FROM messages", [], |r| r.get(0))?;
     let receipt = store::append(
         connection,
-        "operator",
+        contribution.map_or("operator", |work| work.person_id.as_str()),
         &input,
         &mut MAX_MESSAGES.saturating_sub(count),
         true,

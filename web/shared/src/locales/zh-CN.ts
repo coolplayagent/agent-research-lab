@@ -195,6 +195,9 @@ export const messages = {
   "ScenarioDescription.research":
     "围绕群组目标研究 CLI；由已配置的研究 Agent 执行，保留源码、提示词、策略与 SuperPOD 证据绑定。",
   "ScenarioField.repository": "研究仓库",
+  "ScenarioField.interaction": "协作方式",
+  "ResearchInteraction.discussion": "接续讨论 · 阅读前一位成员的发言",
+  "ResearchInteraction.parallel": "并行研究 · 各自提交观点",
   "GoalEvent.goal_created":
     "目标「{title}」：已创建并分配任务，等待 Agent 领取",
   "GoalEvent.goal_accepted": "目标「{title}」：主持人已验收目标",

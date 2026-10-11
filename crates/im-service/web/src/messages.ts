@@ -1,5 +1,7 @@
-import { GroupKind } from "/assets/shared/contracts.js";
-import { t } from "./i18n.js";
+import { GroupKind, GoalEventKind } from "/assets/shared/contracts.js";
+import { t, label } from "./i18n.js";
+import { goalSnapshot, focusGoal } from "./goals.js";
+import { resultForMessage } from "./message-results.js";
 import { api, change, query } from "./api.js";
 import { button, el, get, notice } from "./dom.js";
 import { display } from "./people.js";
@@ -61,6 +63,7 @@ export function resetMessages(selected: Group, initial: Message[]): void {
   get<HTMLButtonElement>("older-messages").disabled = false;
   updateReply();
   renderMessages();
+  get("messages").scrollTop = get("messages").scrollHeight;
   updateComposer(selected);
 }
 export function updateComposer(selected: Group): void {
@@ -69,6 +72,7 @@ export function updateComposer(selected: Group): void {
     submit = get<HTMLButtonElement>("send-message"),
     sending = sendingGeneration === generation;
   input.disabled = selected.archived;
+  get<HTMLButtonElement>("discuss-message").disabled = selected.archived || selected.kind === GroupKind.Board;
   input.readOnly = sending;
   submit.disabled = selected.archived || sending || !input.value.trim();
   submit.textContent = sending ? t("ux.sending") : t("html.edecf0ae6e");
@@ -102,16 +106,19 @@ function renderMessages(): void {
   for (const message of [...messages.values()].sort(
     (a, b) => a.sequence - b.sequence,
   )) {
+    const contribution = message.event?.kind === GoalEventKind.Submitted && message.sender_id === message.event.person_id;
+    const submission = resultForMessage(message, goalSnapshot());
+    const author = submission?.work.person_id || message.sender_id;
     const row = el(
       "article",
       undefined,
-      "message" + (message.sender_id === "operator" ? " own" : ""),
+      "message" + (author === "operator" ? " own" : "") + (message.event && !contribution && !submission ? " system-event" : ""),
     );
     const heading = el("header"),
       stamp = el("time", new Date(message.accepted_ms).toLocaleString("zh-CN"));
     stamp.dateTime = new Date(message.accepted_ms).toISOString();
     heading.append(
-      el("strong", display(message.sender_id)),
+      el("strong", display(author)),
       stamp,
       button(t("messages.cf945e21dd"), () => {
         reply = message.sequence;
@@ -127,7 +134,7 @@ function renderMessages(): void {
       heading,
       el(
         "p",
-        message.event
+        message.event && !contribution
           ? t("GoalEvent." + message.event.kind, {
               title: message.event.title,
               person: display(message.event.person_id || "operator"),
@@ -136,6 +143,18 @@ function renderMessages(): void {
           : message.text,
       ),
     );
+    if (contribution) {
+      row.classList.add("agent-contribution");
+      row.append(button(t("messages.reviewResult"), () => focusGoal(message.event!.goal_id)));
+    } else if (submission) {
+      const result = el("section", undefined, "message-result");
+      result.append(
+        el("strong", t("messages.resultBy", { person: display(submission.work.person_id) })),
+        el("p", submission.result.code ? label("WorkResultCode", submission.result.code) : submission.result.summary),
+        button(t("messages.reviewResult"), () => focusGoal(submission.goal.input.id)),
+      );
+      row.append(result);
+    }
     row.dataset.sequence = String(message.sequence);
     root.append(row);
   }
@@ -153,6 +172,7 @@ function renderMessages(): void {
   document.dispatchEvent(new Event("workspace-messages"));
 }
 export function initMessages(): void {
+  document.addEventListener("workspace-goals", renderMessages);
   get("message-text").addEventListener("input", sizeComposer);
   const input = get<HTMLTextAreaElement>("message-text");
   input.addEventListener("input", () => { if (group) updateComposer(group); });

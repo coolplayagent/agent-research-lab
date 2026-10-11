@@ -37,6 +37,7 @@ function button(
 }
 async function save(config: Configuration): Promise<void> {
   await api("/api/im/services", config, "manage-services");
+  document.dispatchEvent(new Event("workspace-services"));
   await loadServices(true);
 }
 function render(view: ServiceView): void {

@@ -276,6 +276,11 @@ export declare const ScenarioStatus: {
     readonly BatchComplete: "scenario_batch_complete";
 };
 export type ScenarioStatus = (typeof ScenarioStatus)[keyof typeof ScenarioStatus];
+export declare const ResearchInteraction: {
+    readonly Discussion: "discussion";
+    readonly Parallel: "parallel";
+};
+export type ResearchInteraction = (typeof ResearchInteraction)[keyof typeof ResearchInteraction];
 export declare const ApiNotice: {
     readonly BoundPolicyUnavailable: "bound_policy_unavailable";
     readonly BoundPolicyScope: "bound_policy_scope";

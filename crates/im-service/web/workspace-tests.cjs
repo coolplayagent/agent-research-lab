@@ -51,8 +51,10 @@ class Node extends EventTarget {
   get childElementCount() {
     return this.children.length;
   }
-  querySelectorAll() {
-    return this.children.filter((node) => node.dataset.sequence);
+  querySelectorAll(selector) {
+    const key = selector.includes("data-goal-id") ? "goalId" : selector.includes("data-evidence-key") ? "evidenceKey" : "sequence";
+    return this.children.flatMap((node) => [node, ...node.querySelectorAll(selector)])
+      .filter((node) => node.dataset[key] && (!selector.includes("[open]") || node.open));
   }
   setAttribute(key, value) { this.attributes.set(key, value); }
   getAttribute(key) { return this.attributes.get(key) ?? null; }
@@ -82,6 +84,20 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 (async () => {
+  const { resultForMessage } = moduleFrom(base + "message-results.ts", { "/assets/shared/contracts.js": contracts });
+  const submitted = { group_id: "team", event: { kind: contracts.GoalEventKind.Submitted, goal_id: "goal", work_id: "work", person_id: "member", attempt: 2 } };
+  const goalResult = { input: { id: "goal", group_id: "team" }, work: [{ id: "work", person_id: "member", attempt: 2, state: contracts.WorkState.Submitted, result: { succeeded: true, summary: "Recorded result" } }] };
+  assert.equal(resultForMessage(submitted, [goalResult]).result.summary, "Recorded result");
+  for (const patch of [{attempt:1}, {person_id:"other"}, {goal_id:"other"}, {kind:contracts.GoalEventKind.Claimed}]) {
+    assert.equal(resultForMessage({...submitted, event:{...submitted.event, ...patch}}, [goalResult]), null);
+  }
+  assert.equal(resultForMessage({...submitted, group_id:"private-other"}, [goalResult]), null);
+  assert.equal(resultForMessage(submitted, []), null);
+  assert.equal(resultForMessage(submitted, [{...goalResult, work:[{...goalResult.work[0], state:contracts.WorkState.Ready}]}]), null);
+  const failed = { ...submitted, event: { ...submitted.event, kind: contracts.GoalEventKind.Failed } };
+  assert.equal(resultForMessage(failed, [goalResult]), null);
+  assert.equal(resultForMessage(failed, [{...goalResult, work:[{...goalResult.work[0], state:contracts.WorkState.Failed, result:{succeeded:false, summary:"Recorded failure"}}]}]).result.summary, "Recorded failure");
+
   const { replyEdges } = moduleFrom(base + "collaboration-model.ts");
   const msg = (sequence, sender_id, reply_to = null, group_id = "a") => ({
     sequence,
@@ -106,6 +122,29 @@ const deferred = () => {
     [],
     "A missing parent is not proof of collaboration",
   );
+
+  const goalFixture = (id) => ({input:{id, group_id:"a", title:id, objective:"Question", acceptance:"Evidence", scenario:"research", max_seconds:60}, state:contracts.GoalState.Active, revision:1, work:[{id:"work",person_id:"member",attempt:1,state:contracts.WorkState.Submitted,deadline_ms:null,instruction:"Review",result:{succeeded:true,summary:"Result",evidence:{pin:"one"}}}]});
+  const goalPages = {"":{goals:[goalFixture("first")],next_after:"first"}, first:{goals:[goalFixture("second")],next_after:"second"}, second:{goals:[goalFixture("third")],next_after:null}};
+  let holdGoals = null;
+  const goals = moduleFrom(base + "goals.ts", {
+    "/assets/shared/contracts.js":contracts, "./i18n.js":{...i18n,label:(_type,value)=>value}, "./dom.js":dom,
+    "./people.js":{display:id=>id}, "./workspace.js":{revealResearch:()=>{}},
+    "./api.js":{query:p=>new URLSearchParams(p).toString(),api:async url=>holdGoals ? holdGoals.promise : goalPages[new URL(url,"http://local").searchParams.get("after")]},
+  }, {document:new EventTarget(),window:{clearTimeout,setTimeout}});
+  goals.selectGoals({id:"a",kind:contracts.GroupKind.Conversation});
+  await goals.loadGoals(); await goals.loadGoals(true);
+  const secondCard = get("goal-list").children[1]; secondCard.open = true;
+  secondCard.querySelectorAll("[data-evidence-key]")[0].open = true;
+  await goals.loadGoals();
+  assert.equal(goals.goalSnapshot().length,2,"Refresh must retain already loaded pages");
+  assert(get("goal-list").children[1].open);
+  assert(get("goal-list").children[1].querySelectorAll("[data-evidence-key]")[0].open,"Refresh must retain an open evidence disclosure");
+  await goals.focusGoal("third");
+  assert.equal(goals.goalSnapshot().length,3,"Focusing historical evidence must load its goal");
+  assert(get("goal-list").children[2].open);
+  holdGoals = deferred(); const staleGoals = goals.loadGoals(); goals.suspendGoals();
+  holdGoals.resolve(goalPages[""]); await staleGoals;
+  assert.equal(goals.goalSnapshot().length,0,"Old group fetches must not restore results");
 
   const browser = new EventTarget();
   let confirm = false,
@@ -155,6 +194,8 @@ const deferred = () => {
       },
       "./dom.js": dom,
       "./people.js": { display: (id) => id },
+      "./goals.js": { goalSnapshot: () => [], focusGoal: () => {} },
+      "./message-results.js": { resultForMessage },
     },
     { document: new EventTarget(), crypto: require("node:crypto").webcrypto },
   );

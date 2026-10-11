@@ -76,6 +76,21 @@ fn group_objective_becomes_a_read_only_person_bound_research_task() {
     let mut retry = work;
     retry.attempt = 2;
     assert_ne!(task.id, job_id(&goal, &retry));
+    goal.input.parameters["interaction"] = json!(contracts::ResearchInteraction::Discussion);
+    let mut next = goal.work[0].clone();
+    next.id = "work-1".into();
+    goal.work.push(next.clone());
+    assert!(turn_ready(&goal, &goal.work[0]).unwrap());
+    assert!(!turn_ready(&goal, &next).unwrap());
+    goal.work[0].state = WorkState::Submitted;
+    assert!(turn_ready(&goal, &next).unwrap());
+    goal.work[0].state = WorkState::Running;
+    assert!(!turn_ready(&goal, &next).unwrap());
+    goal.input.parameters["interaction"] = json!(contracts::ResearchInteraction::Parallel);
+    assert!(turn_ready(&goal, &next).unwrap());
+    goal.input.parameters["interaction"] = json!("unknown");
+    assert!(turn_ready(&goal, &next).is_err());
+    goal.input.parameters = json!({"repository":"superpod"});
     goal.input.assignments[0].person_id = "no-executor".into();
     assert!(adapter.validate(&goal.input).is_err());
     goal.input.parameters = json!({"repository":"/arbitrary/repo"});
@@ -109,6 +124,36 @@ fn successful_workflow_status_without_a_matching_committed_receipt_cannot_submit
     assert_eq!(result.summary, "Pinned research result");
     assert_eq!(result.evidence["source_commit"], job.source_commit);
     assert!(result.evidence["receipt_sha256"].is_string());
+    assert!(
+        result.evidence["policy_digest"].is_null(),
+        "legacy receipts cannot attest policy"
+    );
+    receipt["receipt_protocol"] = json!(2);
+    receipt["config_digest"] = json!(job.config_digest);
+    persist(&receipt);
+    assert_eq!(
+        observe_result(&c, "im-job").unwrap().unwrap().evidence["policy_digest"],
+        job.config_digest
+    );
+    receipt["config_digest"] = json!("wrong-policy");
+    persist(&receipt);
+    assert!(observe_result(&c, "im-job").is_err());
+    receipt["config_digest"] = json!(job.config_digest);
+    receipt["receipt_protocol"] = json!(999);
+    persist(&receipt);
+    assert!(observe_result(&c, "im-job").is_err());
+    receipt["receipt_protocol"] = json!(2);
+    receipt["agent_report"]["findings"] = json!(vec!["x".repeat(1200); 12]);
+    receipt["agent_report"]["limitations"] = json!(vec!["y".repeat(1200); 8]);
+    persist(&receipt);
+    let bounded = observe_result(&c, "im-job").unwrap().unwrap();
+    assert_eq!(bounded.evidence["report_truncated"], true);
+    assert!(serde_json::to_vec(&bounded.evidence).unwrap().len() <= 16000);
+    assert_eq!(bounded.evidence["policy_digest"], job.config_digest);
+    assert_eq!(
+        bounded.evidence["receipt_sha256"],
+        storage::digest(&serde_json::to_vec(&receipt).unwrap())
+    );
     receipt["source_commit"] = json!("wrong-source");
     persist(&receipt);
     assert!(observe_result(&c, "im-job").is_err());
