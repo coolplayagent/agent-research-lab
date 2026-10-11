@@ -183,8 +183,11 @@ bazel-bin/agent-research-lab --config local.toml serve-link
 bazel-bin/agent-research-lab --config local.toml enqueue examples/task.json
 bazel-bin/agent-research-lab --config local.toml run --max-seconds 900
 bazel-bin/agent-research-lab --config local.toml status
+bazel-bin/agent-research-lab --config local.toml status --summary
 bazel-bin/agent-research-lab --config local.toml report
 ```
+
+`status --summary` 适合重复监控，仅返回 `paused`、`budget`、按同一控制器规则分类的 `summary`、`total_jobs` 和 `details_included: false`，不包含逐任务详情、提示词或工作流回执。观察仍按任务顺序读取，并非原子快照；需要诊断详情时使用 `status` 或 `report`。
 
 `enqueue` 将任务 ID 绑定到输入、源码提交、SuperPOD 提交、提示词和配置；相同 ID 不能绑定不同输入。每个任务使用隔离工作树，依赖接收校验过的完成报告。默认 `write: false`。`required_tools` 声明准入依赖，也适用于后续提案；`use_memory` 启用任务局部 relay-memory，保留有界检查点和不可变回执引用。完整源码/技能快照留在私有回执中。`prompt_version` 显式选择已注册提示词。
 
