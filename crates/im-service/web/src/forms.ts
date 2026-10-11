@@ -1,3 +1,4 @@
+import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
 export function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -54,7 +55,10 @@ export function dialog(title: string): {
     close = element("button", t("services.close"));
   close.type = "button";
   close.onclick = () => dialog.close();
-  header.append(element("h2", title), close);
+  const heading = element("h2", title);
+  heading.id = "dialog-" + crypto.randomUUID();
+  dialog.setAttribute("aria-labelledby", heading.id);
+  header.append(heading, close);
   form.append(header);
   const status = element("p");
   status.setAttribute("role", "status");
@@ -73,14 +77,16 @@ export function finish(
   box.form.append(box.status, button);
   box.form.onsubmit = async (event) => {
     event.preventDefault();
-    button.disabled = true;
+    const done = busy(button);
+    if (!done) return;
+    box.status.textContent = "";
     try {
       await save();
       box.dialog.close();
     } catch (error) {
       box.status.textContent = String(error);
     } finally {
-      button.disabled = false;
+      done();
     }
   };
   box.dialog.showModal();

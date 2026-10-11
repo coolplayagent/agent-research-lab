@@ -65,14 +65,14 @@ function card(goal) {
             (expired(work) ||
                 work.state === WorkState.Submitted ||
                 work.state === WorkState.Failed))
-            row.append(button(t("goals.bd7dd17c34"), () => void mutate(goal, "retry", work.id)));
+            row.append(button(t("goals.bd7dd17c34"), () => mutate(goal, "retry", work.id)));
         details.append(row);
     }
     if (goal.state === GoalState.Active) {
         const actions = el("div", undefined, "actions");
-        const accept = button(t("goals.9a341c73e2"), () => void mutate(goal, "accept"));
+        const accept = button(t("goals.9a341c73e2"), () => mutate(goal, "accept"));
         accept.disabled = goal.work.some((w) => w.state !== WorkState.Submitted);
-        const cancel = button(t("goals.a53a4e7bca"), () => void mutate(goal, "cancel"));
+        const cancel = button(t("goals.a53a4e7bca"), () => mutate(goal, "cancel"));
         cancel.disabled = goal.work.some((w) => w.state === WorkState.Running && !expired(w));
         actions.append(accept, cancel);
         details.append(actions);

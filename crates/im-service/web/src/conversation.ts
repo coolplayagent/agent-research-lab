@@ -6,6 +6,8 @@ import { loadGroups, metrics, setSelected } from "./directory.js";
 import { incoming, resetMessages, updateComposer } from "./messages.js";
 import type { Group, GroupView, Message } from "./types.js";
 import { selectGoals, loadGoals } from "./goals.js";
+import { showConversation } from "./experience.js";
+import { busy } from "./feedback.js";
 export let current: Group | null = null;
 let generation = 0,
   stream: EventSource | null = null,
@@ -42,6 +44,7 @@ export async function select(group: Group): Promise<void> {
   current = null;
   get("active-conversation").hidden = true;
   get("empty-conversation").hidden = false;
+  get("conversations").setAttribute("aria-busy", "true");
   try {
     const page = await api<GroupView>(
       "/api/crystal/view?" + query({ group_id: group.id }),
@@ -54,6 +57,7 @@ export async function select(group: Group): Promise<void> {
     selectGoals(current);
     get("empty-conversation").hidden = true;
     get("active-conversation").hidden = false;
+    showConversation(true);
     stream = new EventSource(
       "/api/crystal/events?" +
         query({
@@ -91,6 +95,8 @@ export async function select(group: Group): Promise<void> {
     );
   } catch (error) {
     if (request === generation) notice(error);
+  } finally {
+    if (request === generation) get("conversations").removeAttribute("aria-busy");
   }
 }
 export async function refreshCurrent(): Promise<void> {
@@ -107,6 +113,9 @@ export function initConversation(): void {
     get(field === "pinned" ? "pin-group" : "archive-group").onclick =
       async () => {
         if (!current) return;
+        if (field === "archived" && !current.archived && !confirm(t("ux.confirmArchive", { title: current.title }))) return;
+        const done = busy(get<HTMLButtonElement>(field === "pinned" ? "pin-group" : "archive-group"));
+        if (!done) return;
         try {
           const { id, revision, title, topic, archived, pinned } = current;
           await change({
@@ -124,6 +133,9 @@ export function initConversation(): void {
           await refreshCurrent();
         } catch (error) {
           notice(error);
+        } finally {
+          done();
+          if (current) renderHeader(current);
         }
       };
   for (const convert of [false, true])
@@ -146,6 +158,8 @@ export function initConversation(): void {
   get<HTMLFormElement>("edit-form").onsubmit = async (event) => {
     event.preventDefault();
     if (!editSnapshot) return;
+    const done = busy(get<HTMLFormElement>("edit-form").querySelector<HTMLButtonElement>("button.primary")!);
+    if (!done) return;
     try {
       const { id, revision, archived, pinned } = editSnapshot;
       if (converting)
@@ -172,6 +186,8 @@ export function initConversation(): void {
       if (converting) location.hash = "#groups";
     } catch (error) {
       notice(error, "edit-status");
+    } finally {
+      done();
     }
   };
 }

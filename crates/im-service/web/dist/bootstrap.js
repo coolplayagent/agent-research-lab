@@ -13,6 +13,8 @@ import { initMessages } from "./messages.js";
 import { initPeople } from "./people.js";
 import { initGoals } from "./goal-form.js";
 import { initNavigation } from "./navigation.js";
+import { initExperience } from "./experience.js";
+import { busy } from "./feedback.js";
 apply();
 let started = false;
 async function start() {
@@ -32,6 +34,7 @@ async function start() {
     initServices();
     initTopics();
     initEvolution();
+    initExperience();
     initNavigation();
     await loadGroups();
     const directory = new EventSource("/api/crystal/events");
@@ -69,11 +72,17 @@ async function login(token) {
 }
 get("login-form").onsubmit = async (event) => {
     event.preventDefault();
+    const done = busy(get("login-form").querySelector("button"));
+    if (!done)
+        return;
     try {
         await login(value("login-token"));
     }
     catch (error) {
         notice(error, "login-status");
+    }
+    finally {
+        done();
     }
 };
 try {

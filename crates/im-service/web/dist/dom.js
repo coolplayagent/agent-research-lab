@@ -1,4 +1,5 @@
 import { label } from "./i18n.js";
+import { busy } from "./feedback.js";
 export function get(id) {
     const node = document.getElementById(id);
     if (!node)
@@ -16,12 +17,27 @@ export function el(tag, text, className) {
 export function button(text, action) {
     const node = el("button", text);
     node.type = "button";
-    node.onclick = action;
+    node.onclick = async () => {
+        const done = busy(node);
+        if (!done)
+            return;
+        try {
+            await action();
+        }
+        catch (error) {
+            notice(error);
+        }
+        finally {
+            done();
+        }
+    };
     return node;
 }
 export const value = (id) => get(id).value.trim();
 export function notice(error, id = "notice") {
     get(id).textContent = error instanceof Error ? error.message : String(error);
+    if (id === "notice")
+        get("dismiss-notice").hidden = !get(id).textContent;
 }
 export function open(id) {
     get(id).showModal();

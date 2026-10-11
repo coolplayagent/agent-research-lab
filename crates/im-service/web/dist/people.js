@@ -1,3 +1,4 @@
+import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
 import { button, close, el, get, notice, open, presence, value, } from "./dom.js";
@@ -19,6 +20,8 @@ export async function loadPeople(append = false) {
             root.replaceChildren();
         next = page.next_after;
         get("more-people").hidden = !next;
+        if (!root.childElementCount && !page.people.length)
+            root.append(el("p", t("ux.peopleEmpty"), "empty"));
         for (const person of page.people) {
             people.set(person.id, person);
             const card = el("article", undefined, "card");
@@ -29,7 +32,7 @@ export async function loadPeople(append = false) {
             if (person.application_id)
                 card.append(el("small", t("people.ad1028ba2a", { p0: person.application_id })));
             if (person.id !== "operator")
-                card.append(button(t("people.529a88ccb5"), () => void grant(person.id)));
+                card.append(button(t("people.529a88ccb5"), () => grant(person.id)));
             root.append(card);
         }
     }
@@ -61,6 +64,9 @@ export function initPeople() {
     get("more-people").onclick = () => void loadPeople(true);
     get("person-form").onsubmit = async (event) => {
         event.preventDefault();
+        const done = busy(get("person-form").querySelector("button.primary"));
+        if (!done)
+            return;
         try {
             await change({
                 operation: "person",
@@ -71,6 +77,9 @@ export function initPeople() {
         }
         catch (error) {
             notice(error, "person-status");
+        }
+        finally {
+            done();
         }
     };
 }

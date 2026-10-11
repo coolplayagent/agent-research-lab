@@ -8,6 +8,7 @@ let group: Group | null = null,
   generation = 0,
   browsing = false,
   reply: number | null = null;
+let sendingGeneration: number | null = null;
 const messages = new Map<number, Message>();
 let pending: {
   group_id: string;
@@ -21,6 +22,7 @@ export function resetMessages(selected: Group, initial: Message[]): void {
   browsing = false;
   reply = null;
   pending = null;
+  sendingGeneration = null;
   messages.clear();
   initial.forEach((m) => messages.set(m.sequence, m));
   get<HTMLTextAreaElement>("message-text").value = "";
@@ -32,8 +34,15 @@ export function resetMessages(selected: Group, initial: Message[]): void {
 }
 export function updateComposer(selected: Group): void {
   group = selected;
-  get<HTMLTextAreaElement>("message-text").disabled = selected.archived;
-  get<HTMLButtonElement>("send-message").disabled = selected.archived;
+  const input = get<HTMLTextAreaElement>("message-text"),
+    submit = get<HTMLButtonElement>("send-message"),
+    sending = sendingGeneration === generation;
+  input.disabled = selected.archived;
+  input.readOnly = sending;
+  submit.disabled = selected.archived || sending || !input.value.trim();
+  submit.textContent = sending ? t("ux.sending") : t("html.edecf0ae6e");
+  submit.setAttribute("aria-busy", String(sending));
+  get("message-count").textContent = t("ux.messageCount", { count: input.value.length });
   get("composer-label").textContent = selected.archived
     ? t("messages.39338dbfe1")
     : selected.kind === GroupKind.Board
@@ -112,6 +121,14 @@ function renderMessages(): void {
   if (bottom) root.scrollTop = root.scrollHeight;
 }
 export function initMessages(): void {
+  const input = get<HTMLTextAreaElement>("message-text");
+  input.addEventListener("input", () => { if (group) updateComposer(group); });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.isComposing) {
+      event.preventDefault();
+      if (!get<HTMLButtonElement>("send-message").disabled) get<HTMLFormElement>("composer").requestSubmit();
+    }
+  });
   get("cancel-reply").onclick = () => {
     reply = null;
     updateReply();
@@ -159,7 +176,7 @@ export function initMessages(): void {
   };
   get<HTMLFormElement>("composer").onsubmit = async (event) => {
     event.preventDefault();
-    if (!group || group.archived) return;
+    if (!group || group.archived || sendingGeneration === generation) return;
     const input = get<HTMLTextAreaElement>("message-text"),
       text = input.value.trim(),
       id = group.id,
@@ -177,7 +194,8 @@ export function initMessages(): void {
         text,
         reply_to: reply,
       };
-    get<HTMLButtonElement>("send-message").disabled = true;
+    sendingGeneration = generation;
+    updateComposer(group);
     try {
       const result = await change<{
         message: Message;
@@ -195,9 +213,11 @@ export function initMessages(): void {
     } catch (error) {
       notice(error);
     } finally {
-      if (request === generation)
-        get<HTMLButtonElement>("send-message").disabled =
-          group?.archived ?? true;
+      if (request === generation) {
+        sendingGeneration = null;
+        if (group) updateComposer(group);
+        input.focus();
+      }
     }
   };
 }

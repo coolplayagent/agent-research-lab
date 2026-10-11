@@ -5,6 +5,7 @@ import { t, label } from "./i18n.js";
 import { editAdapter, editService } from "./service-forms.js";
 import { element, select, field } from "./forms.js";
 import type { Configuration, ServiceView } from "./service-types.js";
+import { busy } from "./feedback.js";
 let current: ServiceView | undefined;
 function button(
   title: string,
@@ -13,13 +14,14 @@ function button(
   const node = element("button", title);
   node.type = "button";
   node.onclick = async () => {
-    node.disabled = true;
+    const done = busy(node);
+    if (!done) return;
     try {
       await action();
     } catch (error) {
       get("services-status").textContent = String(error);
     } finally {
-      node.disabled = false;
+      done();
     }
   };
   return node;
@@ -60,6 +62,7 @@ function render(view: ServiceView): void {
     card.append(
       button(t("services.edit"), () => editService(config, service, save)),
       button(t("services.remove"), async () => {
+        if (!confirm(t("ux.confirmRemove", { title: service.id }))) return;
         const next = structuredClone(config);
         next.services = next.services.filter((s) => s.id !== service.id);
         await save(next);
@@ -86,6 +89,7 @@ function render(view: ServiceView): void {
       ),
       button(t("services.edit"), () => editAdapter(config, adapter, save)),
       button(t("services.remove"), async () => {
+        if (!confirm(t("ux.confirmRemove", { title: adapter.id }))) return;
         const next = structuredClone(config);
         next.adapters = next.adapters.filter((a) => a.id !== adapter.id);
         await save(next);
@@ -145,7 +149,8 @@ function render(view: ServiceView): void {
   );
   form.onsubmit = async (event) => {
     event.preventDefault();
-    submit.disabled = true;
+    const done = busy(submit);
+    if (!done) return;
     try {
       const next = structuredClone(config);
       next.bindings[person.value.trim()] = adapter.value;
@@ -153,7 +158,7 @@ function render(view: ServiceView): void {
     } catch (error) {
       get("services-status").textContent = String(error);
     } finally {
-      submit.disabled = false;
+      done();
     }
   };
   bindings.append(form);
