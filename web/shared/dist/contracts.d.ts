@@ -188,6 +188,7 @@ export declare const ExecutionState: {
 export type ExecutionState = (typeof ExecutionState)[keyof typeof ExecutionState];
 export declare const WorkflowState: {
     readonly Running: "running";
+    readonly Cancelling: "cancelling";
     readonly Succeeded: "succeeded";
     readonly Failed: "failed";
     readonly Cancelled: "cancelled";
@@ -195,9 +196,27 @@ export declare const WorkflowState: {
 };
 export type WorkflowState = (typeof WorkflowState)[keyof typeof WorkflowState];
 export declare const WorkflowNodeState: {
+    readonly Pending: "pending";
     readonly TaskReady: "task_ready";
+    readonly CheckingGate: "checking_gate";
+    readonly CancelRequested: "cancel_requested";
+    readonly Reconciling: "reconciling";
+    readonly Waiting: "waiting";
+    readonly Child: "child";
+    readonly Succeeded: "succeeded";
+    readonly Failed: "failed";
+    readonly Cancelled: "cancelled";
+    readonly Skipped: "skipped";
 };
 export type WorkflowNodeState = (typeof WorkflowNodeState)[keyof typeof WorkflowNodeState];
+export declare const WorkflowFrameState: {
+    readonly Active: "active";
+    readonly Cancelling: "cancelling";
+    readonly Succeeded: "succeeded";
+    readonly Failed: "failed";
+    readonly Cancelled: "cancelled";
+};
+export type WorkflowFrameState = (typeof WorkflowFrameState)[keyof typeof WorkflowFrameState];
 export declare const EffectState: {
     readonly Applied: "applied";
     readonly Unknown: "unknown";
@@ -260,6 +279,59 @@ export declare const ProposalState: {
     readonly PendingHostReview: "pending_host_review";
 };
 export type ProposalState = (typeof ProposalState)[keyof typeof ProposalState];
+export declare const BatchPromptSelection: {
+    readonly Builtin: "builtin";
+    readonly Registered: "registered";
+};
+export type BatchPromptSelection = (typeof BatchPromptSelection)[keyof typeof BatchPromptSelection];
+export declare const BatchRegistrationState: {
+    readonly Complete: "complete";
+    readonly Incomplete: "incomplete";
+    readonly Rejected: "rejected";
+};
+export type BatchRegistrationState = (typeof BatchRegistrationState)[keyof typeof BatchRegistrationState];
+export declare const BatchEntryRegistrationState: {
+    readonly Pending: "pending";
+    readonly JobRecorded: "job_recorded";
+    readonly WorkflowConfirmed: "workflow_confirmed";
+    readonly AdvancedExistingConfirmed: "advanced_existing_confirmed";
+    readonly Unknown: "unknown";
+};
+export type BatchEntryRegistrationState = (typeof BatchEntryRegistrationState)[keyof typeof BatchEntryRegistrationState];
+export declare const BatchRegistrationPhase: {
+    readonly Preflight: "preflight";
+    readonly Collect: "collect";
+    readonly Prepare: "prepare";
+    readonly PersistPlan: "persist_plan";
+    readonly RegisterJob: "register_job";
+    readonly BindPersona: "bind_persona";
+    readonly ConfirmWorkflow: "confirm_workflow";
+    readonly PersistReceipt: "persist_receipt";
+};
+export type BatchRegistrationPhase = (typeof BatchRegistrationPhase)[keyof typeof BatchRegistrationPhase];
+export declare const BatchRegistrationErrorCode: {
+    readonly InvalidRequest: "invalid_request";
+    readonly RequestConflict: "request_conflict";
+    readonly FrozenBindingConflict: "frozen_binding_conflict";
+    readonly FreshnessFailure: "freshness_failure";
+    readonly FreshnessDrift: "freshness_drift";
+    readonly OwnerProofUnavailable: "owner_proof_unavailable";
+    readonly OwnerProofMismatch: "owner_proof_mismatch";
+    readonly CurrentAttemptChanged: "current_attempt_changed";
+    readonly DeadlineExceeded: "deadline_exceeded";
+    readonly RegistrationFailure: "registration_failure";
+    readonly ReceiptPersistenceFailure: "receipt_persistence_failure";
+};
+export type BatchRegistrationErrorCode = (typeof BatchRegistrationErrorCode)[keyof typeof BatchRegistrationErrorCode];
+export declare const WorkflowLookupErrorCode: {
+    readonly NotFound: "not_found";
+};
+export type WorkflowLookupErrorCode = (typeof WorkflowLookupErrorCode)[keyof typeof WorkflowLookupErrorCode];
+export declare const WorkflowObservationErrorCode: {
+    readonly Unavailable: "unavailable";
+    readonly Mismatch: "mismatch";
+};
+export type WorkflowObservationErrorCode = (typeof WorkflowObservationErrorCode)[keyof typeof WorkflowObservationErrorCode];
 export declare const GoalEventKind: {
     readonly Created: "goal_created";
     readonly Accepted: "goal_accepted";
