@@ -19,8 +19,17 @@ export function suspendGoals() {
     get("more-goals").hidden = true;
     get("goal-summary").textContent = t("workspace.goalSummary");
 }
-export function focusGoal(id) {
+export async function focusGoal(id) {
+    const groupId = selected?.id;
     revealResearch("goals");
+    while (selected?.id === groupId && !snapshot.some((goal) => goal.input.id === id) && next) {
+        const cursor = next;
+        await loadGoals(true);
+        if (next === cursor)
+            break;
+    }
+    if (selected?.id !== groupId)
+        return;
     for (const node of get("goal-list").querySelectorAll("[data-goal-id]")) {
         if (node.dataset.goalId === id) {
             node.open = true;
@@ -28,6 +37,7 @@ export function focusGoal(id) {
             return;
         }
     }
+    notice(t("goals.notFound"));
 }
 let generation = 0;
 let next = null;
@@ -82,6 +92,7 @@ function card(goal) {
                 ? label("WorkResultCode", work.result.code)
                 : work.result.summary));
             const evidence = el("details");
+            evidence.dataset.evidenceKey = `${goal.input.id}/${work.id}/${work.attempt}`;
             evidence.append(el("summary", t("goals.da8098216f")), el("pre", JSON.stringify(work.result.evidence, null, 2)));
             row.append(evidence);
         }
@@ -108,19 +119,31 @@ export async function loadGoals(append = false) {
         return;
     const groupId = selected.id, request = ++generation;
     try {
-        const page = await api("/api/im/goals?" +
-            query({ group_id: groupId, after: append ? next || "" : "" }));
-        if (generation !== request || selected.id !== groupId)
-            return;
+        const loaded = [];
+        let cursor = append ? next || "" : "";
+        const target = append ? 0 : snapshot.length;
+        do {
+            const page = await api("/api/im/goals?" +
+                query({ group_id: groupId, after: cursor }));
+            if (generation !== request || selected?.id !== groupId)
+                return;
+            loaded.push(...page.goals);
+            const following = page.next_after || "";
+            if (following === cursor) {
+                cursor = "";
+                break;
+            }
+            cursor = following;
+        } while (!append && cursor && loaded.length < target);
+        snapshot = append ? [...snapshot, ...loaded] : loaded;
         window.clearTimeout(expiryTimer);
-        const deadlines = page.goals.flatMap((g) => g.work
+        const deadlines = snapshot.flatMap((g) => g.work
             .filter((w) => w.state === WorkState.Running &&
             w.deadline_ms !== null &&
             w.deadline_ms > Date.now())
             .map((w) => w.deadline_ms));
         if (deadlines.length)
             expiryTimer = window.setTimeout(() => void loadGoals(), Math.max(1, Math.min(...deadlines) - Date.now() + 50));
-        snapshot = append ? [...snapshot, ...page.goals] : page.goals;
         const active = snapshot.find((goal) => goal.state === GoalState.Active);
         get("goal-summary").textContent = active
             ? t("workspace.currentGoal", { title: active.input.title })
@@ -130,16 +153,20 @@ export async function loadGoals(append = false) {
         const opened = new Set([
             ...list.querySelectorAll("details[open][data-goal-id]"),
         ].map((d) => d.dataset.goalId));
+        const evidenceOpened = new Set([...list.querySelectorAll("details[open][data-evidence-key]")]
+            .map((node) => node.dataset.evidenceKey));
         if (!append)
             list.replaceChildren();
-        for (const goal of page.goals) {
+        for (const goal of loaded) {
             const node = card(goal);
             node.open = opened.has(goal.input.id);
+            for (const evidence of node.querySelectorAll("[data-evidence-key]"))
+                evidence.open = evidenceOpened.has(evidence.dataset.evidenceKey);
             list.append(node);
         }
         if (!list.childElementCount)
             list.append(el("p", t("goals.1bc752e12f"), "goal-empty"));
-        next = page.next_after;
+        next = cursor || null;
         get("more-goals").hidden = !next;
         get("more-goals").onclick = () => void loadGoals(true);
     }

@@ -41,6 +41,10 @@ fn asset(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../web/dist/collaboration.js").as_slice(),
         )),
+        "/assets/collaboration-graph.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/collaboration-graph.js").as_slice(),
+        )),
         "/assets/collaboration-model.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../web/dist/collaboration-model.js").as_slice(),
@@ -96,6 +100,10 @@ fn asset(path: &str) -> Option<(&'static str, &'static [u8])> {
         "/assets/members.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../web/dist/members.js").as_slice(),
+        )),
+        "/assets/message-results.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/message-results.js").as_slice(),
         )),
         "/assets/messages.js" => Some((
             "text/javascript; charset=utf-8",

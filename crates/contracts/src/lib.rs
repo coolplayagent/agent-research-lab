@@ -91,6 +91,8 @@ states! {
     ProposalState { PendingHostReview => "pending_host_review" }
     GoalEventKind { Created => "goal_created", Accepted => "goal_accepted", Cancelled => "goal_cancelled", Retried => "work_retried", Claimed => "work_claimed", Submitted => "work_submitted", Failed => "work_failed" }
     ScenarioStatus { Ready => "scenario_ready", Unavailable => "scenario_unavailable", BatchComplete => "scenario_batch_complete" }
+    #[derive(Default)]
+    ResearchInteraction { Discussion => "discussion", #[default] Parallel => "parallel" }
     ApiNotice { BoundPolicyUnavailable => "bound_policy_unavailable", BoundPolicyScope => "bound_policy_scope", LineageUnavailable => "lineage_unavailable", SnapshotReadFailed => "snapshot_read_failed", ObserverOverflow => "observer_overflow", ObserverInterrupted => "observer_interrupted", PublicEventScope => "public_event_scope", WorkflowObservationIncomplete => "workflow_observation_incomplete", BoardUnavailable => "board_unavailable", SnapshotLoading => "snapshot_loading", ObserverUnavailable => "observer_unavailable", MemoryScope => "memory_scope", DirectoryLimit => "directory_limit", JobLimit => "job_limit", JobUnavailable => "job_unavailable", BoardLimit => "board_limit", GroupUnavailable => "group_unavailable" }
     SessionItemStatus { InProgress => "in_progress", Completed => "completed", Failed => "failed", Error => "error", Unknown => "unknown" }
     SessionEventKind { SessionStarted => "session_started", TurnStarted => "turn_started", TurnCompleted => "turn_completed", ExecutionError => "execution_error", ToolStarted => "tool_started", ToolCompleted => "tool_completed", AgentMessage => "agent_message", FileChange => "file_change", Activity => "activity" }

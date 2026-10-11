@@ -323,3 +323,38 @@ fn expired_and_revoked_claims_cannot_commit_results() {
             .is_ok()
     );
 }
+
+#[tokio::test]
+async fn submitted_contributions_are_durable_person_authored_replies_and_idempotent() {
+    let dir = tempfile::tempdir().unwrap();
+    let hub = Hub::open(dir.path()).unwrap();
+    setup(&hub).await;
+    hub.change_goal(GoalChange::Create { goal: input() })
+        .await
+        .unwrap();
+    hub.work_as("a", claim("work-0", "chat")).await.unwrap();
+    hub.work_as("a", submit("work-0", "chat", true))
+        .await
+        .unwrap();
+    hub.work_as("a", submit("work-0", "chat", true))
+        .await
+        .unwrap();
+    let messages = hub.history("team", 0, 100).await.unwrap();
+    assert_eq!(messages.len(), 3);
+    let reply = messages.last().unwrap();
+    assert_eq!(reply.sender_id, "a");
+    assert_eq!(reply.text, "Findings and limitations recorded");
+    assert_eq!(reply.reply_to, Some(messages[0].sequence));
+    assert_eq!(reply.event.as_ref().unwrap().attempt, Some(1));
+    drop(hub);
+    let hub = Hub::open(dir.path()).unwrap();
+    assert_eq!(
+        hub.history("team", 0, 100)
+            .await
+            .unwrap()
+            .last()
+            .unwrap()
+            .text,
+        reply.text
+    );
+}

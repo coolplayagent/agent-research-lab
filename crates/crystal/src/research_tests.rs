@@ -128,7 +128,25 @@ async fn graph_verdict_comes_from_host_accepted_goal() {
         .unwrap();
     let mut version = input("v1", vec![]);
     version.goal_id = Some("goal".into());
+    version.pins = EvidencePins {
+        source: Some("a".repeat(40)),
+        prompt: Some("b".repeat(64)),
+        policy: Some("c".repeat(64)),
+        superpod: Some("d".repeat(40)),
+    };
+    let mut unpinned = version.clone();
+    unpinned.id = "unpinned".into();
+    unpinned.pins = EvidencePins::default();
+    let mut mismatch = version.clone();
+    mismatch.id = "mismatch".into();
+    mismatch.pins.policy = Some("e".repeat(64));
     hub.research_change(ResearchChange::Node { node: version })
+        .await
+        .unwrap();
+    hub.research_change(ResearchChange::Node { node: unpinned })
+        .await
+        .unwrap();
+    hub.research_change(ResearchChange::Node { node: mismatch })
         .await
         .unwrap();
     let work = &goal.work[0];
@@ -155,7 +173,7 @@ async fn graph_verdict_comes_from_host_accepted_goal() {
                     code: None,
                     summary: "Evidence ready".into(),
                     succeeded: true,
-                    evidence: json!({"artifact":"report"}),
+                    evidence: json!({"receipt_protocol":2,"receipt_sha256":"f".repeat(64),"source_commit":"a".repeat(40),"prompt_digest":"b".repeat(64),"policy_digest":"c".repeat(64),"superpod_commit":"d".repeat(40)}),
                 },
             },
         )
@@ -174,6 +192,41 @@ async fn graph_verdict_comes_from_host_accepted_goal() {
     assert_eq!(
         hub.graph("", "", 0).await.unwrap()["nodes"][0]["status"],
         EvolutionState::Accepted.as_str()
+    );
+    let graph = hub.graph("", "", 0).await.unwrap();
+    for row in &graph["nodes"].as_array().unwrap()[1..] {
+        assert_eq!(row["status"], EvolutionState::Unassessed.as_str());
+    }
+    let node: EvolutionNode = serde_json::from_value(graph["nodes"][0]["node"].clone()).unwrap();
+    let accepted: Goal = serde_json::from_value(graph["nodes"][0]["goal"].clone()).unwrap();
+    let mut retried = accepted.clone();
+    retried.work[0].attempt += 1;
+    assert_eq!(
+        research::assessment(&node, Some(&retried)),
+        EvolutionState::Unassessed
+    );
+    for field in [
+        "source_commit",
+        "prompt_digest",
+        "policy_digest",
+        "superpod_commit",
+        "receipt_protocol",
+        "receipt_sha256",
+    ] {
+        let mut changed = accepted.clone();
+        changed.work[0].result.as_mut().unwrap().evidence[field] = Value::Null;
+        assert_eq!(
+            research::assessment(&node, Some(&changed)),
+            EvolutionState::Unassessed,
+            "{field}"
+        );
+    }
+    let mut historical = serde_json::to_value(&node).unwrap();
+    historical.as_object_mut().unwrap().remove("goal_attempts");
+    let historical: EvolutionNode = serde_json::from_value(historical).unwrap();
+    assert_eq!(
+        research::assessment(&historical, Some(&accepted)),
+        EvolutionState::Unassessed
     );
 }
 #[tokio::test]

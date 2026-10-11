@@ -694,6 +694,24 @@ dialog p {
   font-size: 11px;
   fill: #27493a;
 }
+.crystal-canvas { background: radial-gradient(ellipse at center, #eefaf7 0, #fbfdfc 66%, transparent 80%); }
+.crystal-orbit { fill: none; stroke: #dbece7; stroke-dasharray: 3 7; }
+.crystal-halo { fill: none; stroke: #d8eae5; }
+.crystal-center circle { stroke: #96cbc5; stroke-width: 1; filter: drop-shadow(0 8px 12px #518b7c22); }
+.crystal-center text { text-anchor: middle; fill: #315d56; }
+.crystal-title { font-size: 15px; font-weight: 600; }
+.crystal-sub { font-size: 11px; fill: #668e86; }
+.crystal-publish { stroke: #55a99d; stroke-width: 1.6; fill: none; }
+.agent-node rect { fill: #ffffff; stroke: #cfdfda; filter: drop-shadow(0 3px 5px #294c3f12); }
+.agent-node:hover rect, .agent-node:focus rect { stroke: #4f9e8a; fill: #f6fcf9; }
+.agent-node .agent-name { font-size: 13px; font-weight: 600; }
+.agent-node .agent-activity { font-size: 10px; fill: #70877e; }
+.agent-node .agent-presence { fill: #96aaa1; stroke: none; }
+.agent-node.working .agent-presence { fill: #c99448; }
+.agent-contribution { border-left: 2px solid #7abfae; padding-left: 12px; }
+.message.system-event { margin: 3px 0; padding: 3px 10px; border: 0; color: #82948c; font-size: 11px; }
+.message.system-event header, .message.system-event > small { display: none; }
+.message.system-event p { margin: 0; }
 #collaboration-detail {
   border-top: 1px solid var(--line);
   padding-top: 12px;
@@ -1051,3 +1069,7 @@ dialog p {
 button[aria-busy="true"] { cursor: progress; }
 .compose-actions > small { color: var(--muted); font-size: 10px; }
 @media (max-width: 759px) { .compose-actions > small { display: none; } }
+
+.message-result { margin: 8px 0 0; padding: 10px 12px; border-left: 2px solid #74b69f; background: #f4faf7; border-radius: 4px; }
+.message-result > strong { font-size: 12px; }
+.message-result > p { margin: 6px 0; }

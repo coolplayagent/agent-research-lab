@@ -239,6 +239,10 @@ export const ScenarioStatus = {
     Unavailable: "scenario_unavailable",
     BatchComplete: "scenario_batch_complete",
 };
+export const ResearchInteraction = {
+    Discussion: "discussion",
+    Parallel: "parallel",
+};
 export const ApiNotice = {
     BoundPolicyUnavailable: "bound_policy_unavailable",
     BoundPolicyScope: "bound_policy_scope",

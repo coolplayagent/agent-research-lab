@@ -277,6 +277,11 @@ export const ScenarioStatus = {
   BatchComplete: "scenario_batch_complete",
 } as const;
 export type ScenarioStatus = (typeof ScenarioStatus)[keyof typeof ScenarioStatus];
+export const ResearchInteraction = {
+  Discussion: "discussion",
+  Parallel: "parallel",
+} as const;
+export type ResearchInteraction = (typeof ResearchInteraction)[keyof typeof ResearchInteraction];
 export const ApiNotice = {
   BoundPolicyUnavailable: "bound_policy_unavailable",
   BoundPolicyScope: "bound_policy_scope",

@@ -236,13 +236,22 @@ impl Store {
                         "evidence pin must be a full commit or SHA-256 digest"
                     );
                 }
-                if let Some(goal_id) = &input.goal_id {
+                let goal_attempts = if let Some(goal_id) = &input.goal_id {
                     id(goal_id)?;
+                    let goal = goals::read(&tx, goal_id)?;
                     ensure!(
-                        goals::read(&tx, goal_id)?.input.group_id == topic.group_id,
+                        goal.input.group_id == topic.group_id,
                         "evolution evidence goal belongs to another group"
                     );
-                }
+                    Some(
+                        goal.work
+                            .iter()
+                            .map(|work| (work.id.clone(), work.attempt))
+                            .collect(),
+                    )
+                } else {
+                    None
+                };
                 let mut parents = std::collections::BTreeSet::new();
                 let mut generation = 0;
                 for parent in &input.parents {
@@ -259,6 +268,7 @@ impl Store {
                     input,
                     generation,
                     created_ms: now_ms(),
+                    goal_attempts,
                 };
                 tx.execute(
                     "INSERT INTO research_nodes(id,subject_id,goal_id,value) VALUES(?1,?2,?3,?4)",
@@ -306,24 +316,7 @@ impl Store {
                 .as_ref()
                 .map(|id| goals::read(&self.connection, id))
                 .transpose()?;
-            let status = match &goal {
-                None => EvolutionState::Unassessed,
-                Some(g) => match g.state {
-                    GoalState::Completed => EvolutionState::Accepted,
-                    GoalState::Cancelled => EvolutionState::Cancelled,
-                    GoalState::Active => {
-                        if g.work.iter().any(|w| w.state == WorkState::Failed) {
-                            EvolutionState::Failed
-                        } else if g.work.iter().all(|w| w.state == WorkState::Submitted) {
-                            EvolutionState::Submitted
-                        } else if g.work.iter().any(|w| w.state == WorkState::Running) {
-                            EvolutionState::Running
-                        } else {
-                            EvolutionState::Pending
-                        }
-                    }
-                },
-            };
+            let status = assessment(&node, goal.as_ref());
             let operation = match node.input.parents.len() {
                 0 => EvolutionOperation::Baseline,
                 1 => EvolutionOperation::Mutation,
@@ -334,5 +327,69 @@ impl Store {
         let next = (rows.len() > 128).then(|| rows[127]["sequence"].clone());
         rows.truncate(128);
         Ok(json!({"nodes":rows,"next_after":next}))
+    }
+}
+
+/// Goal acceptance assesses only a version with matching, committed evidence.
+fn evidence_matches(pins: &EvidencePins, goal: &Goal) -> bool {
+    goal.work.iter().any(|work| {
+        let Some(result) = &work.result else {
+            return false;
+        };
+        work.state == WorkState::Submitted
+            && result.succeeded
+            && result.evidence["receipt_protocol"] == 2
+            && result.evidence["receipt_sha256"]
+                .as_str()
+                .is_some_and(|v| v.len() == 64 && v.bytes().all(|b| b.is_ascii_hexdigit()))
+            && [
+                (&pins.source, "source_commit"),
+                (&pins.prompt, "prompt_digest"),
+                (&pins.policy, "policy_digest"),
+                (&pins.superpod, "superpod_commit"),
+            ]
+            .into_iter()
+            .all(|(pin, field)| {
+                pin.as_deref()
+                    .is_some_and(|pin| result.evidence[field].as_str() == Some(pin))
+            })
+    })
+}
+
+pub(super) fn assessment(node: &EvolutionNode, goal: Option<&Goal>) -> EvolutionState {
+    match goal {
+        None => EvolutionState::Unassessed,
+        Some(g)
+            if node.goal_attempts.as_ref().is_none_or(|attempts| {
+                attempts.len() != g.work.len()
+                    || g.work
+                        .iter()
+                        .any(|w| attempts.get(&w.id) != Some(&w.attempt))
+            }) =>
+        {
+            EvolutionState::Unassessed
+        }
+        Some(g) => match g.state {
+            GoalState::Completed if evidence_matches(&node.input.pins, g) => {
+                EvolutionState::Accepted
+            }
+            GoalState::Completed => EvolutionState::Unassessed,
+            GoalState::Cancelled => EvolutionState::Cancelled,
+            GoalState::Active => {
+                if g.work.iter().any(|w| w.state == WorkState::Failed) {
+                    EvolutionState::Failed
+                } else if g.work.iter().all(|w| w.state == WorkState::Submitted) {
+                    if evidence_matches(&node.input.pins, g) {
+                        EvolutionState::Submitted
+                    } else {
+                        EvolutionState::Unassessed
+                    }
+                } else if g.work.iter().any(|w| w.state == WorkState::Running) {
+                    EvolutionState::Running
+                } else {
+                    EvolutionState::Pending
+                }
+            }
+        },
     }
 }

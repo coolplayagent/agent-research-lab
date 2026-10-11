@@ -4,19 +4,32 @@ import { t, label } from "./i18n.js";
 import { display, people } from "./people.js";
 import { goalSnapshot, focusGoal } from "./goals.js";
 import { messageSnapshot, locateMessage } from "./messages.js";
-import { replyEdges } from "./collaboration-model.js";
+import { renderCrystal } from "./collaboration-graph.js";
 import { revealResearch } from "./workspace.js";
 let view = null, selected = "", sequence = 0, epoch = 0;
 let members = [], after = null;
 let bindings = null;
-let timer;
-const ns = "http://www.w3.org/2000/svg";
-function svg(tag, attrs) {
-    const node = document.createElementNS(ns, tag);
-    for (const [key, value] of Object.entries(attrs))
-        node.setAttribute(key, value);
-    return node;
+let bindingRequest = 0;
+async function refreshBindings() {
+    if (!view)
+        return;
+    const context = epoch, request = ++bindingRequest;
+    bindings = null;
+    if (selected)
+        detail(selected);
+    try {
+        const result = await api("/api/im/services");
+        if (context !== epoch || request !== bindingRequest)
+            return;
+        bindings = result.configuration.bindings;
+        if (selected)
+            detail(selected);
+    }
+    catch {
+        /* Availability is unknown after a failed refresh. */
+    }
 }
+let timer;
 export function selectCollaboration(value) {
     sequence++;
     epoch++;
@@ -28,20 +41,8 @@ export function selectCollaboration(value) {
     after = value?.members.next_after || null;
     get("collaboration-detail").replaceChildren();
     render();
-    if (value) {
-        const request = epoch;
-        void api("/api/im/services")
-            .then((result) => {
-            if (request !== epoch)
-                return;
-            bindings = result.configuration.bindings;
-            if (selected)
-                detail(selected);
-        })
-            .catch(() => {
-            /* Messaging and graph remain available without configuration. */
-        });
-    }
+    if (value)
+        void refreshBindings();
 }
 export function refreshCollaboration() {
     if (!view)
@@ -125,109 +126,7 @@ function render() {
         : t("workspace.selectGroup");
     if (!view)
         return;
-    const shown = members.slice(0, 32);
-    if (members.length > shown.length)
-        host.append(el("p", t("workspace.graphLimit", { count: shown.length })));
-    const height = Math.max(330, Math.ceil(shown.length / 8) * 190);
-    const canvas = svg("svg", {
-        viewBox: `0 0 320 ${height}`,
-        role: "group",
-        "aria-label": t("workspace.crystal"),
-    });
-    const defs = svg("defs", {}), gradient = svg("radialGradient", {
-        id: "collaboration-orb",
-        cx: "30%",
-        cy: "25%",
-        r: "75%",
-    });
-    for (const [offset, color] of [
-        ["0%", "#fff"],
-        ["60%", "#d6f4e9"],
-        ["100%", "#9ecfbd"],
-    ])
-        gradient.append(svg("stop", { offset, "stop-color": color }));
-    defs.append(gradient);
-    canvas.append(defs);
-    const positions = new Map();
-    shown.forEach((member, index) => {
-        const ring = Math.floor(index / 8), count = Math.min(8, shown.length - ring * 8);
-        const angle = ((index % 8) / count) * Math.PI * 2 - Math.PI / 2;
-        positions.set(member.person_id, {
-            x: 160 + Math.cos(angle) * 112,
-            y: 165 + ring * 190 + Math.sin(angle) * 112,
-        });
-    });
-    for (const point of positions.values())
-        canvas.append(svg("line", {
-            x1: "160",
-            y1: "165",
-            x2: String(point.x),
-            y2: String(point.y),
-            class: "collaboration-edge",
-        }));
-    for (const edge of replyEdges(messageSnapshot())) {
-        const from = positions.get(edge.from), to = positions.get(edge.to);
-        if (from && to) {
-            const line = svg("path", {
-                d: `M${from.x},${from.y} Q160,145 ${to.x},${to.y}`,
-                class: "reply-edge",
-            });
-            const title = svg("title", {});
-            title.textContent = t("workspace.replyEdge", {
-                from: display(edge.from),
-                to: display(edge.to),
-            });
-            line.append(title);
-            canvas.append(line);
-        }
-    }
-    canvas.append(svg("circle", {
-        cx: "160",
-        cy: "165",
-        r: "37",
-        fill: "url(#collaboration-orb)",
-    }));
-    const title = svg("text", {
-        x: "160",
-        y: "170",
-        "text-anchor": "middle",
-        "font-size": "12",
-    });
-    title.textContent = view.group.title.slice(0, 9);
-    canvas.append(title);
-    shown.forEach((member) => {
-        const point = positions.get(member.person_id);
-        const node = svg("g", {
-            class: "agent-node",
-            role: "button",
-            tabindex: "0",
-            transform: `translate(${point.x},${point.y})`,
-            "aria-label": `${display(member.person_id)} · ${presence(member.presence)}`,
-        });
-        node.append(svg("circle", { r: "24", fill: "url(#collaboration-orb)" }));
-        const name = svg("text", { y: "4", "text-anchor": "middle" });
-        name.textContent = display(member.person_id).slice(0, 5);
-        const state = svg("text", { y: "39", "text-anchor": "middle" });
-        state.textContent = presence(member.presence);
-        node.append(name, state);
-        const tasks = goalSnapshot()
-            .flatMap((goal) => goal.work)
-            .filter((work) => work.person_id === member.person_id).length;
-        if (tasks) {
-            const assignment = svg("text", { y: "54", "text-anchor": "middle" });
-            assignment.textContent = t("workspace.assignments", { count: tasks });
-            node.append(assignment);
-        }
-        node.onclick = () => detail(member.person_id);
-        node.onkeydown = (event) => {
-            if (["Enter", " "].includes(event.key)) {
-                event.preventDefault();
-                detail(member.person_id);
-            }
-        };
-        canvas.append(node);
-    });
-    host.append(canvas);
+    renderCrystal(host, view.group, members, messageSnapshot(), goalSnapshot(), detail);
     for (const member of members) {
         const row = el("div", undefined, "member");
         row.append(button(display(member.person_id), () => {
@@ -243,7 +142,19 @@ function render() {
 }
 export function initCollaboration() {
     get("more-collaboration").onclick = () => void loadMembers(true);
-    get("refresh-collaboration").onclick = () => void loadMembers(false);
+    get("refresh-collaboration").onclick = () => {
+        void loadMembers(false);
+        void refreshBindings();
+    };
+    document.addEventListener("workspace-services", () => void refreshBindings());
+    let width = 0;
+    new ResizeObserver(([entry]) => {
+        const next = Math.round(entry.contentRect.width);
+        if (next && Math.abs(next - width) > 10) {
+            width = next;
+            render();
+        }
+    }).observe(get("collaboration-graph"));
     document.addEventListener("workspace-messages", render);
     document.addEventListener("workspace-goals", render);
     void (async () => {

@@ -2321,6 +2321,13 @@ fn authoritative_success_receipt(w: &Workflow, job: &Job) -> Result<Value> {
     );
     let receipt: Value = serde_json::from_str(encoded)?;
     validate_report(&receipt["agent_report"])?;
+    // Historical receipts remain readable, but only v2 commits the policy pin.
+    if receipt.get("receipt_protocol").is_some() || receipt.get("config_digest").is_some() {
+        ensure!(
+            receipt["receipt_protocol"] == 2 && receipt["config_digest"] == job.config_digest,
+            "committed completion receipt does not bind the frozen policy"
+        );
+    }
     ensure!(
         receipt["source_commit"] == job.source_commit
             && receipt["superpod_commit"] == job.superpod_commit
@@ -2839,7 +2846,7 @@ fn settle_with_heartbeat(
             } else {
                 None
             };
-            let mut receipt = json!({"agent_report":value,"source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,"model":job.model,"tools":launch.tools,"research_inputs":job.research_inputs,"candidate":candidate,"post_success_protocol":1,"claim":"process completed; research claims require independent evaluation"});
+            let mut receipt = json!({"receipt_protocol":2,"config_digest":job.config_digest,"agent_report":value,"source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,"model":job.model,"tools":launch.tools,"research_inputs":job.research_inputs,"candidate":candidate,"post_success_protocol":1,"claim":"process completed; research claims require independent evaluation"});
             if let Some(backend) = &job.backend {
                 receipt["backend"] = json!(backend);
                 if let Some(digest) = &launch.backend_request_sha256 {
