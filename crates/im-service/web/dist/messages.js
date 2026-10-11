@@ -1,10 +1,10 @@
-import { GroupKind, GoalEventKind } from "/assets/shared/contracts.js";
-import { t, label } from "./i18n.js";
+import { GroupKind } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
 import { goalSnapshot, focusGoal } from "./goals.js";
-import { resultForMessage } from "./message-results.js";
+import { initMentions, insertMention, prepareDiscussion } from "./mentions.js";
+import { messageRow } from "./message-view.js";
 import { api, change, query } from "./api.js";
-import { button, el, get, notice } from "./dom.js";
-import { display } from "./people.js";
+import { el, get, notice } from "./dom.js";
 let group = null, generation = 0, browsing = false, reply = null;
 let sendingGeneration = null;
 const messages = new Map();
@@ -33,6 +33,7 @@ export function locateMessage(sequence) {
             row.scrollIntoView({ block: "center" });
     }
 }
+let pendingGoal;
 let pending = null;
 export function resetMessages(selected, initial) {
     if (group)
@@ -42,6 +43,7 @@ export function resetMessages(selected, initial) {
     browsing = false;
     reply = drafts.get(selected.id)?.reply ?? null;
     pending = null;
+    pendingGoal = undefined;
     sendingGeneration = null;
     messages.clear();
     initial.forEach((m) => messages.set(m.sequence, m));
@@ -59,7 +61,6 @@ export function updateComposer(selected) {
     group = selected;
     const input = get("message-text"), submit = get("send-message"), sending = sendingGeneration === generation;
     input.disabled = selected.archived;
-    get("discuss-message").disabled = selected.archived || selected.kind === GroupKind.Board;
     input.readOnly = sending;
     submit.disabled = selected.archived || sending || !input.value.trim();
     submit.textContent = sending ? t("ux.sending") : t("html.edecf0ae6e");
@@ -74,10 +75,13 @@ export function updateComposer(selected) {
 export function incoming(message) {
     if (message.group_id !== group?.id || browsing)
         return;
+    const fresh = !messages.has(message.sequence);
     messages.set(message.sequence, message);
     while (messages.size > 256)
         messages.delete(Math.min(...messages.keys()));
     renderMessages();
+    if (fresh)
+        document.dispatchEvent(new CustomEvent("workspace-message", { detail: message }));
 }
 function updateReply() {
     get("reply-status").textContent = reply
@@ -92,37 +96,19 @@ function renderMessages() {
         ? t("messages.f1fcde6deb")
         : t("messages.2bd1c987a4");
     for (const message of [...messages.values()].sort((a, b) => a.sequence - b.sequence)) {
-        const contribution = message.event?.kind === GoalEventKind.Submitted && message.sender_id === message.event.person_id;
-        const submission = resultForMessage(message, goalSnapshot());
-        const author = submission?.work.person_id || message.sender_id;
-        const row = el("article", undefined, "message" + (author === "operator" ? " own" : "") + (message.event && !contribution && !submission ? " system-event" : ""));
-        const heading = el("header"), stamp = el("time", new Date(message.accepted_ms).toLocaleString("zh-CN"));
-        stamp.dateTime = new Date(message.accepted_ms).toISOString();
-        heading.append(el("strong", display(author)), stamp, button(t("messages.cf945e21dd"), () => {
-            reply = message.sequence;
-            updateReply();
-            get("message-text").focus();
+        root.append(messageRow(message, messages, goalSnapshot(), {
+            mention: insertMention,
+            locate: locateMessage,
+            review: focusGoal,
+            reply: () => {
+                reply = message.sequence;
+                const author = message.event?.person_id || message.sender_id;
+                if (author !== "operator")
+                    insertMention(author);
+                updateReply();
+                get("message-text").focus();
+            },
         }));
-        if (message.reply_to)
-            row.append(el("small", t("messages.a40f9e2d59", { p0: message.reply_to })));
-        row.append(heading, el("p", message.event && !contribution
-            ? t("GoalEvent." + message.event.kind, {
-                title: message.event.title,
-                person: display(message.event.person_id || "operator"),
-                attempt: message.event.attempt,
-            })
-            : message.text));
-        if (contribution) {
-            row.classList.add("agent-contribution");
-            row.append(button(t("messages.reviewResult"), () => focusGoal(message.event.goal_id)));
-        }
-        else if (submission) {
-            const result = el("section", undefined, "message-result");
-            result.append(el("strong", t("messages.resultBy", { person: display(submission.work.person_id) })), el("p", submission.result.code ? label("WorkResultCode", submission.result.code) : submission.result.summary), button(t("messages.reviewResult"), () => focusGoal(submission.goal.input.id)));
-            row.append(result);
-        }
-        row.dataset.sequence = String(message.sequence);
-        root.append(row);
     }
     if (!messages.size)
         root.append(el("p", group?.kind === GroupKind.Board
@@ -133,6 +119,7 @@ function renderMessages() {
     document.dispatchEvent(new Event("workspace-messages"));
 }
 export function initMessages() {
+    initMentions();
     document.addEventListener("workspace-goals", renderMessages);
     get("message-text").addEventListener("input", sizeComposer);
     const input = get("message-text");
@@ -201,23 +188,31 @@ export function initMessages() {
         if (!pending ||
             pending.text !== text ||
             pending.reply_to !== reply ||
-            pending.group_id !== id)
+            pending.group_id !== id) {
+            pendingGoal = undefined;
             pending = {
                 group_id: id,
                 request_id: crypto.randomUUID(),
                 text,
                 reply_to: reply,
             };
+        }
         sendingGeneration = generation;
         updateComposer(group);
         try {
-            const result = await change({
-                operation: "send",
-                message: pending,
-            });
+            if (pendingGoal === undefined) {
+                const goal = await prepareDiscussion(id, text);
+                if (request !== generation)
+                    return;
+                pendingGoal = goal;
+            }
+            const result = pendingGoal
+                ? await api("/api/im/discussion", { message: pending, goal: pendingGoal })
+                : await change({ operation: "send", message: pending });
             if (request !== generation)
                 return;
             pending = null;
+            pendingGoal = undefined;
             if (input.value.trim() === text)
                 input.value = "";
             drafts.delete(id);

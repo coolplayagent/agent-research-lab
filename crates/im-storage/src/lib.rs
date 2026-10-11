@@ -13,6 +13,10 @@ use tokio::net::UnixStream;
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    Discuss {
+        input: GoalInput,
+        message: Publish,
+    },
     ResearchChange {
         change: ResearchChange,
     },
@@ -501,6 +505,19 @@ impl Client {
             }
         }
     }
+    pub async fn discuss(&self, input: GoalInput, message: Publish) -> Result<Value> {
+        match self {
+            Self::Local(hub) => hub.discuss(input, message).await,
+            Self::Remote(path) => {
+                rpc::call(
+                    path,
+                    &Request::Discuss { input, message },
+                    Duration::from_secs(10),
+                )
+                .await
+            }
+        }
+    }
     pub async fn change_goal(&self, change: GoalChange) -> Result<Goal> {
         match self {
             Self::Local(hub) => hub.change_goal(change).await,
@@ -921,6 +938,7 @@ async fn execute(hub: &Hub, request: Request) -> Result<Value> {
             sequence,
         } => Ok(json!(hub.acknowledge(&token, &group, sequence).await?)),
         Request::Cursor { actor, group } => Ok(json!(hub.cursor(&actor, &group).await?)),
+        Request::Discuss { input, message } => hub.discuss(input, message).await,
         Request::ChangeGoal { change } => Ok(json!(hub.change_goal(change).await?)),
         Request::Work { token, change } => Ok(json!(hub.work(&token, change).await?)),
         Request::WorkAs { actor, change } => Ok(json!(hub.work_as(&actor, change).await?)),

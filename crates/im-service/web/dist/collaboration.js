@@ -1,3 +1,4 @@
+import { avatar } from "./avatar.js";
 import { api, query } from "./api.js";
 import { button, el, get, presence } from "./dom.js";
 import { t, label } from "./i18n.js";
@@ -6,6 +7,7 @@ import { goalSnapshot, focusGoal } from "./goals.js";
 import { messageSnapshot, locateMessage } from "./messages.js";
 import { renderCrystal } from "./collaboration-graph.js";
 import { revealResearch } from "./workspace.js";
+import { insertMention } from "./mentions.js";
 let view = null, selected = "", sequence = 0, epoch = 0;
 let members = [], after = null;
 let bindings = null;
@@ -30,10 +32,14 @@ async function refreshBindings() {
     }
 }
 let timer;
+let pulseTimer;
+const pulses = new Map();
 export function selectCollaboration(value) {
     sequence++;
     epoch++;
     clearTimeout(timer);
+    clearTimeout(pulseTimer);
+    pulses.clear();
     view = value;
     selected = "";
     bindings = null;
@@ -88,7 +94,7 @@ function detail(id) {
         return;
     }
     const panel = get("collaboration-detail");
-    panel.replaceChildren(el("h3", display(id)), el("p", presence(member.presence)));
+    panel.replaceChildren(avatar(id), button(`@${display(id)}`, () => insertMention(id)), el("p", presence(member.presence)));
     if (id !== "operator") {
         panel.append(el("p", bindings === null
             ? t("workspace.bindingUnknown")
@@ -126,10 +132,10 @@ function render() {
         : t("workspace.selectGroup");
     if (!view)
         return;
-    renderCrystal(host, view.group, members, messageSnapshot(), goalSnapshot(), detail);
+    renderCrystal(host, view.group, members, messageSnapshot(), goalSnapshot(), detail, new Set([...pulses].filter(([, until]) => until > Date.now()).map(([id]) => id)), () => { get("workspace").classList.remove("research-expanded", "research-open"); get("message-text").focus(); });
     for (const member of members) {
         const row = el("div", undefined, "member");
-        row.append(button(display(member.person_id), () => {
+        row.append(avatar(member.person_id), button(display(member.person_id), () => {
             revealResearch("collaboration");
             detail(member.person_id);
         }), el("small", presence(member.presence)));
@@ -147,6 +153,15 @@ export function initCollaboration() {
         void refreshBindings();
     };
     document.addEventListener("workspace-services", () => void refreshBindings());
+    document.addEventListener("workspace-message", (event) => {
+        const message = event.detail;
+        if (message.group_id !== view?.group.id || (message.event && message.event.person_id !== message.sender_id))
+            return;
+        pulses.set(message.sender_id, Date.now() + 1600);
+        clearTimeout(pulseTimer);
+        render();
+        pulseTimer = setTimeout(() => { pulses.clear(); render(); }, 1650);
+    });
     let width = 0;
     new ResizeObserver(([entry]) => {
         const next = Math.round(entry.contentRect.width);

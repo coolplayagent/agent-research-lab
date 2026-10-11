@@ -1,4 +1,5 @@
 import { revealResearch } from "./workspace.js";
+import { contributionText } from "./contribution-text.js";
 import { GoalState, GroupKind, WorkState } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { label } from "./i18n.js";
@@ -121,7 +122,7 @@ function card(goal: Goal): HTMLDetailsElement {
           "p",
           goal.input.scenario === "research" && work.result.code
             ? label("WorkResultCode", work.result.code)
-            : work.result.summary,
+            : contributionText(work.result.summary, display(work.person_id)),
         ),
       );
       const evidence = el("details");

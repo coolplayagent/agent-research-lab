@@ -86,3 +86,53 @@ async fn group_goal_http_flow_is_independent_of_research_and_enforces_operator_a
     );
     h.close().await;
 }
+
+#[tokio::test]
+async fn mention_dispatch_is_operator_only_and_rejects_unavailable_scenarios_without_sending() {
+    let h = Harness::new().await;
+    h.manage(json!({"operation":"person","person":{"id":"planner","name":"Planner"}}))
+        .await;
+    h.manage(json!({"operation":"create","group":{"id":"team","kind":"conversation","title":"Design","topic":"Discussion","members":["planner"]}})).await;
+    let mut request = json!({"message":{"group_id":"team","request_id":"ask","text":"@Planner Review this","reply_to":null},"goal":{"id":"client-placeholder","group_id":"team","title":"Review","objective":"@Planner Review this","acceptance":"Respond with evidence","scenario":"missing","parameters":{},"max_seconds":60,"assignments":[{"person_id":"planner","instruction":"Reply to the question"}]}});
+    assert_eq!(
+        h.request("/api/im/discussion", Some(request.clone()), false, None)
+            .await
+            .0,
+        401
+    );
+    assert_eq!(
+        h.request("/api/im/discussion", Some(request.clone()), true, None)
+            .await
+            .0,
+        400
+    );
+    request["goal"]["scenario"] = json!("collaboration");
+    let (status, body) = h
+        .request("/api/im/discussion", Some(request.clone()), true, None)
+        .await;
+    assert_eq!(status, 200, "{body}");
+    let first: Value = serde_json::from_str(&body).unwrap();
+    assert!(
+        first["goal"]["input"]["id"]
+            .as_str()
+            .unwrap()
+            .starts_with("mention-")
+    );
+    let (_, body) = h
+        .request("/api/im/discussion", Some(request), true, None)
+        .await;
+    let again: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(first["message"]["sequence"], again["message"]["sequence"]);
+    assert_eq!(again["duplicate"], true);
+    let (_, body) = h
+        .request("/api/crystal/view?group_id=team", None, true, None)
+        .await;
+    assert_eq!(
+        serde_json::from_str::<Value>(&body).unwrap()["messages"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    h.close().await;
+}

@@ -5,6 +5,13 @@ use serde::{Deserialize, Serialize};
 pub struct Scenario {
     pub id: String,
     pub fields: Vec<ScenarioField>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversation: Option<ConversationDefaults>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConversationDefaults {
+    pub parameters: Value,
+    pub max_seconds: u64,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ScenarioField {
@@ -25,6 +32,10 @@ impl ScenarioAdapter for Collaboration {
         Scenario {
             id: "collaboration".into(),
             fields: vec![],
+            conversation: Some(ConversationDefaults {
+                parameters: json!({}),
+                max_seconds: 300,
+            }),
         }
     }
     fn validate(&self, goal: &crystal::GoalInput) -> Result<()> {
