@@ -332,6 +332,9 @@ impl Store {
 
 /// Goal acceptance assesses only a version with matching, committed evidence.
 fn evidence_matches(pins: &EvidencePins, goal: &Goal) -> bool {
+    if goal.input.scenario != "research" {
+        return false;
+    }
     goal.work.iter().any(|work| {
         let Some(result) = &work.result else {
             return false;

@@ -1,3 +1,4 @@
+import { avatar } from "./avatar.js";
 import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
@@ -28,7 +29,7 @@ export function initMembers() {
             for (const member of page.members.members) {
                 picker.excluded.add(member.person_id);
                 const row = el("div", undefined, "member");
-                row.append(el("span", display(member.person_id)), el("small", member.person_id === "operator"
+                row.append(avatar(member.person_id), el("span", display(member.person_id)), el("small", member.person_id === "operator"
                     ? t("members.e19796712f")
                     : presence(member.presence)));
                 if (member.person_id !== "operator" &&

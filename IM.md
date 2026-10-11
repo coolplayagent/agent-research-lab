@@ -118,6 +118,13 @@ conversation, and late success clears only the matching draft. While reading
 history, new arrivals are counted without replacing the page; returning to latest
 also retains messages received during the history request.
 
+Mentioning configured members in the composer sends the original message and
+creates one bounded discussion goal atomically. Mention suggestions and avatar
+actions use the current conversation's members. Retries preserve both the request
+ID and the original goal inputs across navigation; incoming Agent messages do not
+automatically create another goal. Crystal traffic animations reflect newly
+observed messages, respect reduced-motion preferences, and do not imply acceptance.
+
 The DM audience flow follows Slack's [group DM expansion](https://slack.com/help/articles/1500002969782-Add-people-to-a-direct-message)
 and [conversion to a channel](https://slack.com/help/articles/217555437-Convert-a-group-direct-message-to-a-private-channel)
 interaction model. IM uses its own cluster membership capacity, with no artificial

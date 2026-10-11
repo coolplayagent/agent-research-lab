@@ -10,3 +10,25 @@ This is an agent-authored implementation review, not independent approval or res
 - Frontend refresh preserves already loaded goals and open evidence; historical goal navigation loads subsequent bounded pages. Request generations fence old group responses. Service changes invalidate the graph's binding cache, including failed refreshes.
 
 Regression evidence includes transactional contribution persistence and replay, current-attempt projection counterexamples, serial discussion admission, unknown modes, wrong policy/receipt versions, oversized report projection, missing/mismatched lineage pins, legacy nodes, superseded attempts, pagination and disclosure preservation. Browser observation verifies the restored sphere/card graph, group transcript, settings navigation, drafts and responsive widths. Actual model discussion is checked after the verified deployment; fixture tests do not certify vendor adapters or scientific claims.
+
+## Mention conversation and presentation follow-up
+
+This follow-up is also an agent-authored semantic review, not independent acceptance. A human composer submission with resolved group mentions creates a bounded goal and its original message atomically in the storage writer. The service derives the goal ID from the message request, validates the scenario, and preserves operator authorization. Replays retain one message and one goal; failed assignment validation rolls both back. Remote storage uses the same versioned client contract; no service reads the live database. Automatic handling never recursively turns incoming agent mentions into new goals.
+
+Research discussion freezes preceding terminal assignments into the next prompt even when the recent history window no longer contains them. These are explicitly untrusted contributions; a failed assignment remains failed. The existing evidence gates, current attempt fencing and host acceptance still apply. A generic collaboration worker's receipt-shaped JSON cannot attest research promotion.
+
+The frontend only removes a redundant speaker prefix from a display copy; stored Unicode and evidence stay unchanged. SVG avatars use stable identity-derived colors without network requests or credential requirements. The crystal shows short traffic animations for fresh observed messages and a working indicator for recorded running work, with reduced-motion support. Neither implies verified results.
+
+Regression evidence covers atomic rollback/replay through HTTP and the remote storage client, preceding-result prompt context, unavailable scenarios, unauthorized requests, and forged generic evidence. Staged browser checks use a mocked discussion write over real read-only history to verify mention order, avatars, prefix removal, animations and responsive settings/chat layouts. Actual mention execution is observed after deployment and recorded separately.
+
+## Conversation retry integration
+
+The per-conversation draft owner also freezes the prepared discussion inputs under
+the original request ID. Navigating away cannot release an in-flight send or turn
+a response-loss retry into a different goal. Late success only clears its matching
+draft. Regression checks cover ordinary sends and changed scenario inputs on a
+discussion retry. History fetch generations reject superseded pages, and the
+bounded live buffer retains arrivals while a latest-page request is pending.
+Traffic notifications use the observed sequence high-water mark, so replayed
+messages do not create new activity. This integration changes presentation request
+ownership, not the storage transaction, evidence gates, or goal lifecycle.

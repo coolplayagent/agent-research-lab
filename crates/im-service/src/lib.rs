@@ -5,7 +5,9 @@ pub mod execution;
 mod goals;
 mod scenarios;
 mod services;
-pub use scenarios::{Collaboration, Scenario, ScenarioAdapter, ScenarioField};
+pub use scenarios::{
+    Collaboration, ConversationDefaults, Scenario, ScenarioAdapter, ScenarioField,
+};
 mod assets;
 pub mod operator;
 mod research;

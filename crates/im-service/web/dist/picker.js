@@ -1,3 +1,4 @@
+import { avatar } from "./avatar.js";
 import { t } from "./i18n.js";
 import { api, query } from "./api.js";
 import { button, el, notice } from "./dom.js";
@@ -61,7 +62,7 @@ export class Picker {
                         p1: [...this.chosen.values()].map((p) => p.name).join("、"),
                     });
                 };
-                label.append(check, el("span", person.name), el("small", person.id));
+                label.append(check, avatar(person.id), el("span", person.name), el("small", person.id));
                 this.list.append(label);
             }
             if (!this.list.childElementCount)

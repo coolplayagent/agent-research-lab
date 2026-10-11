@@ -6,6 +6,7 @@ import type {
 export interface Scenario {
   id: string;
   fields: { id: string; options: string[] }[];
+  conversation?: { parameters: Record<string, unknown>; max_seconds: number };
 }
 export interface Work {
   id: string;

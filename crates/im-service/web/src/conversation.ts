@@ -1,3 +1,4 @@
+import { selectMentions } from "./mentions.js";
 import { selectEvolution } from "./evolution.js";
 import { selectCollaboration, refreshCollaboration } from "./collaboration.js";
 import { GroupKind } from "/assets/shared/contracts.js";
@@ -51,6 +52,7 @@ export async function select(group: Group): Promise<void> {
   suspendGoals();
   selectEvolution(group.id);
   selectCollaboration(null);
+  selectMentions("");
   const request = ++generation;
   stream?.close();
   stream = null;
@@ -69,6 +71,7 @@ export async function select(group: Group): Promise<void> {
     renderHeader(current);
     selectGoals(current);
     selectCollaboration(page);
+    selectMentions(group.id);
     get("empty-conversation").hidden = true;
     get("active-conversation").hidden = false;
     stream = new EventSource(

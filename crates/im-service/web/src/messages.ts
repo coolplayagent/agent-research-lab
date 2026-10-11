@@ -1,10 +1,10 @@
-import { GroupKind, GoalEventKind } from "/assets/shared/contracts.js";
-import { t, label } from "./i18n.js";
+import { GroupKind } from "/assets/shared/contracts.js";
+import { t } from "./i18n.js";
 import { goalSnapshot, focusGoal } from "./goals.js";
-import { resultForMessage } from "./message-results.js";
+import { initMentions, insertMention, prepareDiscussion } from "./mentions.js";
+import { messageRow } from "./message-view.js";
 import { api, change, query } from "./api.js";
-import { button, el, get, notice } from "./dom.js";
-import { display } from "./people.js";
+import { el, get, notice } from "./dom.js";
 import type { Group, GroupView, Message } from "./types.js";
 import { MessageDrafts } from "./message-drafts.js";
 let group: Group | null = null,
@@ -70,7 +70,6 @@ export function updateComposer(selected: Group): void {
     submit = get<HTMLButtonElement>("send-message"),
     sending = drafts.isSending(selected.id);
   input.disabled = selected.archived;
-  get<HTMLButtonElement>("discuss-message").disabled = selected.archived || selected.kind === GroupKind.Board;
   input.readOnly = sending;
   submit.disabled = selected.archived || sending || !input.value.trim();
   submit.textContent = sending ? t("ux.sending") : t("html.edecf0ae6e");
@@ -84,6 +83,7 @@ export function updateComposer(selected: Group): void {
 }
 export function incoming(message: Message): void {
   if (message.group_id !== group?.id) return;
+  const fresh = message.sequence > newestSequence;
   liveMessages.set(message.sequence, message);
   trimMessages(liveMessages);
   if (message.sequence > newestSequence) {
@@ -91,10 +91,14 @@ export function incoming(message: Message): void {
     newestSequence = message.sequence;
   }
   updateHistoryStatus();
-  if (browsing) return;
+  if (browsing) {
+    if (fresh) document.dispatchEvent(new CustomEvent("workspace-message", { detail: message }));
+    return;
+  }
   messages.set(message.sequence, message);
   trimMessages(messages);
   renderMessages();
+  if (fresh) document.dispatchEvent(new CustomEvent("workspace-message", { detail: message }));
 }
 function trimMessages(items: Map<number, Message>): void {
   while (items.size > 256) items.delete(Math.min(...items.keys()));
@@ -125,57 +129,17 @@ function renderMessages(): void {
   for (const message of [...messages.values()].sort(
     (a, b) => a.sequence - b.sequence,
   )) {
-    const contribution = message.event?.kind === GoalEventKind.Submitted && message.sender_id === message.event.person_id;
-    const submission = resultForMessage(message, goalSnapshot());
-    const author = submission?.work.person_id || message.sender_id;
-    const row = el(
-      "article",
-      undefined,
-      "message" + (author === "operator" ? " own" : "") + (message.event && !contribution && !submission ? " system-event" : ""),
-    );
-    const heading = el("header"),
-      stamp = el("time", new Date(message.accepted_ms).toLocaleString("zh-CN"));
-    stamp.dateTime = new Date(message.accepted_ms).toISOString();
-    heading.append(
-      el("strong", display(author)),
-      stamp,
-      button(t("messages.cf945e21dd"), () => {
+    root.append(messageRow(message, messages, goalSnapshot(), {
+      mention: insertMention,
+      locate: locateMessage,
+      review: focusGoal,
+      reply: () => {
         reply = message.sequence;
-        updateReply();
-        get("message-text").focus();
-      }),
-    );
-    if (message.reply_to)
-      row.append(
-        el("small", t("messages.a40f9e2d59", { p0: message.reply_to })),
-      );
-    row.append(
-      heading,
-      el(
-        "p",
-        message.event && !contribution
-          ? t("GoalEvent." + message.event.kind, {
-              title: message.event.title,
-              person: display(message.event.person_id || "operator"),
-              attempt: message.event.attempt,
-            })
-          : message.text,
-      ),
-    );
-    if (contribution) {
-      row.classList.add("agent-contribution");
-      row.append(button(t("messages.reviewResult"), () => focusGoal(message.event!.goal_id)));
-    } else if (submission) {
-      const result = el("section", undefined, "message-result");
-      result.append(
-        el("strong", t("messages.resultBy", { person: display(submission.work.person_id) })),
-        el("p", submission.result.code ? label("WorkResultCode", submission.result.code) : submission.result.summary),
-        button(t("messages.reviewResult"), () => focusGoal(submission.goal.input.id)),
-      );
-      row.append(result);
-    }
-    row.dataset.sequence = String(message.sequence);
-    root.append(row);
+        const author = message.event?.person_id || message.sender_id;
+        if (author !== "operator") insertMention(author);
+        updateReply(); get("message-text").focus();
+      },
+    }));
   }
   if (!messages.size)
     root.append(
@@ -191,6 +155,7 @@ function renderMessages(): void {
   document.dispatchEvent(new Event("workspace-messages"));
 }
 export function initMessages(): void {
+  initMentions();
   document.addEventListener("workspace-goals", renderMessages);
   get("messages").addEventListener("scroll", () => {
     if (!browsing && atBottom() && unseen) { unseen = 0; updateHistoryStatus(); }
@@ -263,12 +228,12 @@ export function initMessages(): void {
     if (!pending) return;
     updateComposer(group);
     try {
-      const result = await change<{
-        message: Message;
-      }>({
-        operation: "send",
-        message: pending,
-      });
+      if (drafts.discussion(pending) === undefined)
+        drafts.setDiscussion(pending, await prepareDiscussion(id, text));
+      const goal = drafts.discussion(pending);
+      const result = goal
+        ? await api<{ message: Message }>("/api/im/discussion", { message: pending, goal })
+        : await change<{ message: Message }>({ operation: "send", message: pending });
       drafts.complete(pending);
       if (group?.id !== id) return;
       if (input.value.trim() === text && reply === pending.reply_to) {

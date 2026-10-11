@@ -115,7 +115,7 @@ async fn graph_verdict_comes_from_host_accepted_goal() {
                 title: "Evaluate".into(),
                 objective: "Compare tool".into(),
                 acceptance: "Host reviews result".into(),
-                scenario: "collaboration".into(),
+                scenario: "research".into(),
                 parameters: json!({}),
                 assignments: vec![AssignmentInput {
                     person_id: "worker".into(),
@@ -199,6 +199,12 @@ async fn graph_verdict_comes_from_host_accepted_goal() {
     }
     let node: EvolutionNode = serde_json::from_value(graph["nodes"][0]["node"].clone()).unwrap();
     let accepted: Goal = serde_json::from_value(graph["nodes"][0]["goal"].clone()).unwrap();
+    let mut untrusted = accepted.clone();
+    untrusted.input.scenario = "collaboration".into();
+    assert_eq!(
+        research::assessment(&node, Some(&untrusted)),
+        EvolutionState::Unassessed
+    );
     let mut retried = accepted.clone();
     retried.work[0].attempt += 1;
     assert_eq!(

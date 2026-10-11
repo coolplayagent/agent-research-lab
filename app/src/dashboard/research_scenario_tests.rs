@@ -83,6 +83,18 @@ fn group_objective_becomes_a_read_only_person_bound_research_task() {
     assert!(turn_ready(&goal, &goal.work[0]).unwrap());
     assert!(!turn_ready(&goal, &next).unwrap());
     goal.work[0].state = WorkState::Submitted;
+    goal.work[0].result = Some(crystal::WorkResult {
+        code: None,
+        succeeded: true,
+        summary: "Prior recorded contribution outside the recent message window".into(),
+        evidence: json!({}),
+    });
+    assert!(
+        super::research_scenario::task(&goal, &next, &[])
+            .unwrap()
+            .prompt
+            .contains("Prior recorded contribution outside the recent message window")
+    );
     assert!(turn_ready(&goal, &next).unwrap());
     goal.work[0].state = WorkState::Running;
     assert!(!turn_ready(&goal, &next).unwrap());

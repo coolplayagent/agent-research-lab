@@ -207,6 +207,7 @@
                 data-i18n-aria-label="html.5e7ce1f7e5"
               ></div>
               <form id="composer">
+                <div id="mention-menu" class="mention-menu" role="listbox" data-i18n-aria-label="mentions.choose" hidden=""></div>
                 <label
                   for="message-text"
                   id="composer-label"
@@ -222,9 +223,8 @@
                 ></textarea>
                 <div class="compose-actions">
                   <small id="message-count"></small>
-                  <small data-i18n="ux.sendHint"></small>
+                  <small data-i18n="mentions.hint"></small>
                   <span id="reply-status"></span
-                  ><button id="discuss-message" type="button" data-i18n="discussion.start"></button
                   ><button
                     id="cancel-reply"
                     type="button"

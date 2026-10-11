@@ -89,6 +89,11 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 (async () => {
+  const { contributionText } = moduleFrom(base + "contribution-text.ts");
+  assert.equal(contributionText("Analyst: A finding", "Analyst"), "A finding");
+  assert.equal(contributionText("@Analyst: A finding", "Analyst"), "A finding");
+  assert.equal(contributionText("Reviewer: Another view", "Analyst"), "Reviewer: Another view");
+  assert.equal(contributionText("My source is Analyst: example", "Analyst"), "My source is Analyst: example");
   const { resultForMessage } = moduleFrom(base + "message-results.ts", { "/assets/shared/contracts.js": contracts });
   const submitted = { group_id: "team", event: { kind: contracts.GoalEventKind.Submitted, goal_id: "goal", work_id: "work", person_id: "member", attempt: 2 } };
   const goalResult = { input: { id: "goal", group_id: "team" }, work: [{ id: "work", person_id: "member", attempt: 2, state: contracts.WorkState.Submitted, result: { succeeded: true, summary: "Recorded result" } }] };
@@ -102,6 +107,14 @@ const deferred = () => {
   const failed = { ...submitted, event: { ...submitted.event, kind: contracts.GoalEventKind.Failed } };
   assert.equal(resultForMessage(failed, [goalResult]), null);
   assert.equal(resultForMessage(failed, [{...goalResult, work:[{...goalResult.work[0], state:contracts.WorkState.Failed, result:{succeeded:false, summary:"Recorded failure"}}]}]).result.summary, "Recorded failure");
+
+  const { mentionText, mentionNames, resolveMentions } = moduleFrom(base + "mention-model.ts");
+  const participants = [{id:"a",name:"Analyst"},{id:"b",name:"Research Lead"}];
+  assert.deepEqual(mentionNames('mail@example.org @Analyst @"Research Lead"'),["Analyst","Research Lead"]);
+  assert.deepEqual(resolveMentions('@Analyst @Analyst @"Research Lead"', participants).people.map(p=>p.id), ["a","b"]);
+  assert.deepEqual(resolveMentions('@Outsider', participants).unresolved, ["Outsider"]);
+  assert.deepEqual(resolveMentions('@Analyst', [...participants,{id:"c",name:"Analyst"}]).unresolved,["Analyst"]);
+  assert.equal(mentionText(participants[1]), '@"Research Lead"');
 
   const { replyEdges } = moduleFrom(base + "collaboration-model.ts");
   const msg = (sequence, sender_id, reply_to = null, group_id = "a") => ({
@@ -133,7 +146,7 @@ const deferred = () => {
   let holdGoals = null;
   const goals = moduleFrom(base + "goals.ts", {
     "/assets/shared/contracts.js":contracts, "./i18n.js":{...i18n,label:(_type,value)=>value}, "./dom.js":dom,
-    "./people.js":{display:id=>id}, "./workspace.js":{revealResearch:()=>{}},
+    "./people.js":{display:id=>id}, "./workspace.js":{revealResearch:()=>{}}, "./contribution-text.js": { contributionText },
     "./api.js":{query:p=>new URLSearchParams(p).toString(),api:async url=>holdGoals ? holdGoals.promise : goalPages[new URL(url,"http://local").searchParams.get("after")]},
   }, {document:new EventTarget(),window:{clearTimeout,setTimeout}});
   goals.selectGoals({id:"a",kind:contracts.GroupKind.Conversation});
@@ -187,6 +200,8 @@ const deferred = () => {
 
   let request = deferred();
   const sends = [];
+  const discussionSends = [];
+  let discussionInput = null;
   const draftModule = moduleFrom(base + "message-drafts.ts", {}, { crypto: require("node:crypto").webcrypto });
   const messages = moduleFrom(
     base + "messages.ts",
@@ -194,17 +209,18 @@ const deferred = () => {
       "/assets/shared/contracts.js": contracts,
       "./i18n.js": i18n,
       "./api.js": {
-        api: () => request.promise,
+        api: (url, payload) => { if (url === "/api/im/discussion") discussionSends.push(payload); return request.promise; },
         change: (payload) => { sends.push(payload); return request.promise; },
         query: () => "",
       },
       "./dom.js": dom,
       "./people.js": { display: (id) => id },
       "./goals.js": { goalSnapshot: () => [], focusGoal: () => {} },
-      "./message-results.js": { resultForMessage },
       "./message-drafts.js": draftModule,
+      "./message-view.js": { messageRow: () => new Node("article") },
+      "./mentions.js": { initMentions: () => {}, insertMention: () => {}, prepareDiscussion: async () => discussionInput },
     },
-    { document: new EventTarget(), crypto: require("node:crypto").webcrypto },
+    { document: new EventTarget(), CustomEvent: class extends Event { constructor(type, options) { super(type); this.detail = options.detail; } }, crypto: require("node:crypto").webcrypto },
   );
   const a = {
       id: "a",
@@ -269,6 +285,7 @@ const deferred = () => {
   request = deferred();
   get("message-text").value = "in flight across navigation";
   const returningSend = submit();
+  await Promise.resolve();
   messages.suspendMessages(); messages.resetMessages(a, [msg(1, "a")]);
   messages.suspendMessages(); messages.resetMessages(b, [msg(11, "b", null, "b")]);
   assert.equal(get("send-message").disabled, true, "Returning must retain the in-flight lock");
@@ -299,6 +316,20 @@ const deferred = () => {
   request.resolve({messages:[msg(14,"b",null,"b")]}); await freshLatest;
   oldPage.resolve({messages:[msg(8,"b",null,"b")]}); await staleHistory;
   assert(messages.messageSnapshot().some(m=>m.sequence===14),"A late history page must not undo returning to latest");
+
+  discussionInput = {scenario:"research", assignments:[{person_id:"member",instruction:"Initial instruction"}]};
+  get("message-text").value = "@member discuss this";
+  request = deferred();
+  const discussion = submit(); await Promise.resolve();
+  request.reject(new Error("lost discussion response")); await discussion;
+  messages.suspendMessages(); messages.resetMessages(a,[msg(1,"a")]);
+  messages.suspendMessages(); messages.resetMessages(b,[msg(14,"b",null,"b")]);
+  discussionInput = {scenario:"collaboration", assignments:[]};
+  request = deferred(); const repeatDiscussion = submit(); await Promise.resolve();
+  assert.equal(discussionSends.length,2);
+  assert.deepEqual(discussionSends[1],discussionSends[0],"Discussion retries must freeze both the message identity and its original goal input across navigation");
+  request.resolve({message:msg(15,"b",null,"b")}); await repeatDiscussion;
+  discussionInput = null;
 
   const pending = new Map();
   const chosen = [];
@@ -347,6 +378,7 @@ const deferred = () => {
         loadGoals: async () => {},
       },
       "./evolution.js": { selectEvolution: () => {} },
+      "./mentions.js": { selectMentions: () => {} },
       "./collaboration.js": {
         selectCollaboration: () => {},
         refreshCollaboration: () => {},

@@ -1,0 +1,9 @@
+/** Remove only a redundant speaker prefix from the presentation copy. */
+export function contributionText(text, name) {
+    const content = text.trimStart();
+    for (const prefix of [`${name}:`, `${name}：`, `@${name}:`, `@${name}：`]) {
+        if (content.startsWith(prefix))
+            return content.slice(prefix.length).trimStart();
+    }
+    return text;
+}
