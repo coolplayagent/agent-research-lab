@@ -125,6 +125,13 @@ ID and the original goal inputs across navigation; incoming Agent messages do no
 automatically create another goal. Crystal traffic animations reflect newly
 observed messages, respect reduced-motion preferences, and do not imply acceptance.
 
+Structured goal updates share one compact progress card per goal in the loaded
+chat page. Its member states come from the current group-scoped goal snapshot;
+past failures remain in an expandable timeline after a retry starts. A missing
+snapshot is explicitly unconfirmed, and submitted results remain distinct from
+host acceptance. Actual member contributions stay in the conversation. Expanded
+timelines survive live refreshes, and message references can reveal their events.
+
 The DM audience flow follows Slack's [group DM expansion](https://slack.com/help/articles/1500002969782-Add-people-to-a-direct-message)
 and [conversion to a channel](https://slack.com/help/articles/217555437-Convert-a-group-direct-message-to-a-private-channel)
 interaction model. IM uses its own cluster membership capacity, with no artificial

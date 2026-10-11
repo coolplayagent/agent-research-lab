@@ -27,7 +27,9 @@ export async function loadPeople(append = false) {
         for (const person of page.people) {
             people.set(person.id, person);
             const card = el("article", undefined, "card");
-            card.append(avatar(person.id), el("h3", person.name), el("code", person.id), el("p", t("people.63daae1beb", {
+            const heading = el("header", undefined, "identity-heading");
+            heading.append(avatar(person.id), el("h3", person.name));
+            card.append(heading, el("code", person.id), el("p", t("people.63daae1beb", {
                 p0: presence(person.presence),
                 p1: person.connections,
             })));

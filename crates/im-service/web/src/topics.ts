@@ -4,6 +4,7 @@ import { TopicState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
 import { get, el, button, notice } from "./dom.js";
 import { t, label } from "./i18n.js";
+import { icon } from "./icons.js";
 import { openGroup as selectConversation } from "./conversation.js";
 import { topicForm, subjectForm } from "./research-forms.js";
 import type { Topic, TopicRow, SubjectRow } from "./research-types.js";
@@ -23,8 +24,12 @@ export async function loadTopics(more = false): Promise<void> {
     for (const row of page.topics) {
       const card = el("article", undefined, "card"),
         topic = row.topic;
+      const heading = el("header", undefined, "identity-heading");
+      const symbol = el("span", undefined, "topic-symbol");
+      symbol.append(icon("topic"));
+      heading.append(symbol, el("h3", topic.title));
       card.append(
-        el("h3", topic.title),
+        heading,
         el("p", topic.objective),
         el(
           "p",

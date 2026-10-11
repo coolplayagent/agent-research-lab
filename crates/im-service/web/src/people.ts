@@ -29,9 +29,10 @@ export async function loadPeople(append = false): Promise<void> {
     for (const person of page.people) {
       people.set(person.id, person);
       const card = el("article", undefined, "card");
+      const heading = el("header", undefined, "identity-heading");
+      heading.append(avatar(person.id), el("h3", person.name));
       card.append(
-        avatar(person.id),
-        el("h3", person.name),
+        heading,
         el("code", person.id),
         el(
           "p",

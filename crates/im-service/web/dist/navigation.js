@@ -2,6 +2,7 @@ import { loadTopics } from "./topics.js";
 import { loadServices } from "./settings.js";
 import { t } from "./i18n.js";
 import { get } from "./dom.js";
+import { icon } from "./icons.js";
 import { loadPeople } from "./people.js";
 import { loadApplications } from "./applications.js";
 import { allowSettingsLeave, initSettingsGuard } from "./settings-guard.js";
@@ -91,6 +92,9 @@ export function navigate() {
     previous = location.hash;
 }
 export function initNavigation() {
+    get("topic-nav-icon").replaceChildren(icon("topic"));
+    get("people-nav-icon").replaceChildren(icon("people"));
+    get("applications-nav-icon").replaceChildren(icon("applications"));
     initSettingsGuard();
     document.addEventListener("click", (event) => {
         const link = event.target.closest("a[href^='#']");

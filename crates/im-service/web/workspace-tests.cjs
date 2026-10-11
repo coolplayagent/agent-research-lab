@@ -57,7 +57,7 @@ class Node extends EventTarget {
     return this.children.length;
   }
   querySelectorAll(selector) {
-    const key = selector.includes("data-goal-id") ? "goalId" : selector.includes("data-evidence-key") ? "evidenceKey" : "sequence";
+    const key = selector.includes("data-progress-key") ? "progressKey" : selector.includes("data-goal-id") ? "goalId" : selector.includes("data-evidence-key") ? "evidenceKey" : "sequence";
     return this.children.flatMap((node) => [node, ...node.querySelectorAll(selector)])
       .filter((node) => node.dataset[key] && (!selector.includes("[open]") || node.open));
   }
@@ -107,6 +107,49 @@ const deferred = () => {
   const failed = { ...submitted, event: { ...submitted.event, kind: contracts.GoalEventKind.Failed } };
   assert.equal(resultForMessage(failed, [goalResult]), null);
   assert.equal(resultForMessage(failed, [{...goalResult, work:[{...goalResult.work[0], state:contracts.WorkState.Failed, result:{succeeded:false, summary:"Recorded failure"}}]}]).result.summary, "Recorded failure");
+
+  const progressModule = moduleFrom(base + "task-progress.ts", {
+    "/assets/shared/contracts.js": contracts, "./dom.js": dom,
+    "./i18n.js": { ...i18n, label: (type, value) => `${type}.${value}` },
+    "./people.js": { display: id => id }, "./message-results.js": { resultForMessage },
+  });
+  const { taskTimeline, progressSummary, progressCard } = progressModule;
+  const event = (sequence, kind, attempt = 1, person_id = "member") => ({
+    ...submitted, sequence, accepted_ms: 1000, sender_id: "system", text: "Original persisted text",
+    event: { ...submitted.event, kind, attempt, person_id, title: "Research experience" },
+  });
+  const lifecycle = [event(1, contracts.GoalEventKind.Created, null, null), event(2, contracts.GoalEventKind.Claimed), event(3, contracts.GoalEventKind.Failed), event(4, contracts.GoalEventKind.Retried, 2), event(5, contracts.GoalEventKind.Claimed, 2)];
+  const runningGoal = { ...goalResult, state: contracts.GoalState.Active, work: [{ ...goalResult.work[0], state: contracts.WorkState.Running, deadline_ms: null, result: null }] };
+  const original = JSON.stringify(lifecycle);
+  const compact = taskTimeline(lifecycle, [runningGoal]);
+  assert.equal(compact.length, 1, "Repeated lifecycle updates share one progress card");
+  assert.equal(compact[0].progress.events.length, 5);
+  assert.equal(progressSummary(compact[0].progress.goal), "progress.running", "A retried attempt must supersede its historical failure");
+  assert.equal(JSON.stringify(lifecycle), original, "Stored Unicode/user text is never rewritten");
+  const currentFailure = { ...runningGoal, work: [{ ...runningGoal.work[0], state: contracts.WorkState.Failed }] };
+  assert.equal(progressSummary(currentFailure), "progress.attention");
+  assert.equal(progressSummary({ ...runningGoal, work: [{ ...runningGoal.work[0], deadline_ms: 10 }] }, 11), "progress.attention");
+  assert.equal(progressSummary({ ...runningGoal, work: [{ ...runningGoal.work[0], state: contracts.WorkState.Ready }] }), "progress.waiting");
+  assert.equal(progressSummary({ ...goalResult, state: contracts.GoalState.Active }), "progress.review");
+  assert.equal(progressSummary({ ...goalResult, state: contracts.GoalState.Completed }), "GoalState.completed");
+  assert.equal(progressSummary(undefined), "progress.unavailable");
+  assert.equal(progressSummary({ ...runningGoal, work: [] }), "progress.unavailable");
+  assert.equal(progressSummary({ ...runningGoal, work: [{ ...runningGoal.work[0], state: "future-unknown" }] }), "progress.unavailable");
+  const separate = taskTimeline([...lifecycle, { ...lifecycle[0], sequence: 6, group_id: "other" }, { ...lifecycle[0], sequence: 7, event: { ...lifecycle[0].event, goal_id: "other-goal" } }], [runningGoal]);
+  assert.equal(separate.length, 3);
+  assert.equal(separate[1].progress.goal, undefined, "Do not attach another group's goal snapshot");
+  const contribution = { ...event(6, contracts.GoalEventKind.Submitted, 2), sender_id: "member", text: "Actual contribution" };
+  const ordinary = { sequence: 7, group_id: "team", sender_id: "operator", text: "User-owned content" };
+  const withContributions = taskTimeline([...lifecycle, contribution, ordinary], []);
+  assert.equal(withContributions[1].message, contribution, "Actual research stays visible, including older attempts");
+  assert.equal(withContributions[2].message, ordinary);
+  assert.equal(taskTimeline([event(6, contracts.GoalEventKind.Submitted, 2)], [goalResult]).length, 2, "Retain legacy result projections");
+  assert.equal(taskTimeline([event(6, contracts.GoalEventKind.Failed, 2)], [currentFailure]).length, 1, "Failed attempts stay in progress history");
+  let reviewed;
+  const card = progressCard(compact[0].progress, true, id => reviewed = id);
+  assert.equal(card.querySelectorAll("details[open][data-progress-key]").length, 1);
+  assert.equal(card.querySelectorAll("[data-sequence]").length, 5);
+  await card.children.at(-1).onclick(); assert.equal(reviewed, "goal");
 
   const { mentionText, mentionNames, resolveMentions } = moduleFrom(base + "mention-model.ts");
   const participants = [{id:"a",name:"Analyst"},{id:"b",name:"Research Lead"}];
@@ -218,6 +261,7 @@ const deferred = () => {
       "./goals.js": { goalSnapshot: () => [], focusGoal: () => {} },
       "./message-drafts.js": draftModule,
       "./message-view.js": { messageRow: () => new Node("article") },
+      "./task-progress.js": progressModule,
       "./mentions.js": { initMentions: () => {}, insertMention: () => {}, prepareDiscussion: async () => discussionInput },
     },
     { document: new EventTarget(), CustomEvent: class extends Event { constructor(type, options) { super(type); this.detail = options.detail; } }, crypto: require("node:crypto").webcrypto },
@@ -229,6 +273,10 @@ const deferred = () => {
     },
     b = { ...a, id: "b" };
   messages.initMessages();
+  messages.resetMessages({ ...a, id: "team" }, lifecycle);
+  get("messages").querySelectorAll("[data-progress-key]")[0].open = true;
+  messages.incoming(ordinary);
+  assert.equal(get("messages").querySelectorAll("details[open][data-progress-key]").length, 1, "Live arrivals preserve an expanded task history");
   messages.resetMessages(a, [msg(1, "a")]);
   get("message-text").value = "unfinished";
   messages.suspendMessages();

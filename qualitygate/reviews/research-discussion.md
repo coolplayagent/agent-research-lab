@@ -32,3 +32,17 @@ bounded live buffer retains arrivals while a latest-page request is pending.
 Traffic notifications use the observed sequence high-water mark, so replayed
 messages do not create new activity. This integration changes presentation request
 ownership, not the storage transaction, evidence gates, or goal lifecycle.
+
+## Compact progress presentation
+
+This agent-authored review covers the presentation aggregation, not independent
+research acceptance. Group and goal IDs jointly key each card. The current typed
+goal/work snapshot determines its summary; history events do not infer successful
+completion or attach stale attempt results. Running retries supersede historical
+failure styling, active failed/expired work exposes a details action, and unknown
+or missing state never becomes acceptance. Existing shared enums and locale labels
+remain the only state definitions. No backend transition, serialized value,
+stored message, or evidence gate changes. Member submissions and matching legacy
+result projections retain ordinary conversation rows. Regression checks cover
+cross-group isolation, current attempts, expired leases, unknown state, submission
+versus acceptance, retained contributions and disclosure persistence.

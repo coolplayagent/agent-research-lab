@@ -4,6 +4,7 @@ import { TopicState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
 import { get, el, button, notice } from "./dom.js";
 import { t, label } from "./i18n.js";
+import { icon } from "./icons.js";
 import { openGroup as selectConversation } from "./conversation.js";
 import { topicForm, subjectForm } from "./research-forms.js";
 let after = null, selected, subjectAfter = null;
@@ -18,7 +19,11 @@ export async function loadTopics(more = false) {
             get("topic-list").replaceChildren();
         for (const row of page.topics) {
             const card = el("article", undefined, "card"), topic = row.topic;
-            card.append(el("h3", topic.title), el("p", topic.objective), el("p", `${label("TopicState", topic.state)} · ${t("research.counts", { p0: row.subject_count, p1: row.goal_count })}`), button(t("research.open"), () => openTopic(topic)), button(t("research.edit"), () => void topicForm(topic, async () => {
+            const heading = el("header", undefined, "identity-heading");
+            const symbol = el("span", undefined, "topic-symbol");
+            symbol.append(icon("topic"));
+            heading.append(symbol, el("h3", topic.title));
+            card.append(heading, el("p", topic.objective), el("p", `${label("TopicState", topic.state)} · ${t("research.counts", { p0: row.subject_count, p1: row.goal_count })}`), button(t("research.open"), () => openTopic(topic)), button(t("research.edit"), () => void topicForm(topic, async () => {
                 await loadTopics();
                 if (selected?.id === topic.id) {
                     const updated = (await api("/api/im/topics?" + query({ query: topic.title }))).topics.find((r) => r.topic.id === topic.id)?.topic;

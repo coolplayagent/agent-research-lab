@@ -423,6 +423,13 @@ main {
   scrollbar-width: thin;
 }
 .avatar { display: inline-flex; width: 38px; height: 38px; flex: none; vertical-align: middle; }
+.ui-icon { width: 20px; height: 20px; flex: none; vertical-align: middle; }
+.workspace-links a { display: flex; align-items: center; gap: 10px; }
+.nav-icon { display: inline-flex; flex: none; color: #608575; }
+.workspace-links a[aria-current="page"] .nav-icon { color: var(--accent); }
+.identity-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.identity-heading h3 { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.topic-symbol { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 38px; height: 38px; border-radius: 12px; background: #e5efe9; color: #497962; }
 .avatar svg { width: 100%; height: 100%; }
 .message { display: flex; gap: 10px; margin: 0 auto 18px; max-width: 880px; overflow-wrap: anywhere; align-items: flex-start; }
 .message .avatar-button { padding: 0; border: 0; border-radius: 12px; background: transparent; min-height: 0; flex: none; }
@@ -446,6 +453,26 @@ main {
 .message.target .chat-bubble { background: #f3f8df; border-color: #bacb91; }
 .message.system-event { display: block; margin: 5px 48px 12px; padding: 0; color: #8a9b93; font-size: 10px; }
 .message.system-event p { margin: 0; line-height: 1.6; font-size: 10px; }
+.task-progress { max-width: 620px; margin: 6px auto 18px; padding: 13px 16px; border: 1px solid #dce6e0; border-radius: 10px; background: #f5f8f6; color: #516a5f; overflow-wrap: anywhere; }
+.task-progress-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 5px 12px; font-size: 11px; margin-bottom: 7px; }
+.task-progress-label { color: #6a8175; }
+.task-progress-status { font-weight: 600; }
+.task-progress-title { display: block; font-size: 13px; line-height: 1.6; color: #334f43; }
+.task-progress-members { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 0; margin: 9px 0; list-style: none; }
+.task-progress-members li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; font-size: 11px; }
+.task-progress-person { font-weight: 600; }
+.task-progress-work, .task-progress small { color: #728578; font-size: 10px; }
+.task-progress.needs-attention { border-color: #decfb0; }
+.task-progress.needs-attention .task-progress-status, .task-progress-members .needs-attention .task-progress-work { color: #95651e; }
+.task-progress-help { margin: 7px 0; font-size: 11px; color: #95651e; }
+.task-progress-history { margin-top: 8px; font-size: 11px; }
+.task-progress-history summary { cursor: pointer; color: #71877a; width: fit-content; }
+.task-progress-history ol { list-style: none; padding: 2px 0 0; margin: 8px 0; }
+.task-progress-history li { display: flex; align-items: baseline; gap: 12px; padding: 5px 0; }
+.task-progress-history li > span { display: flex; flex-wrap: wrap; gap: 6px; }
+.task-progress-history time { flex: none; font-size: 10px; color: #83958a; font-variant-numeric: tabular-nums; }
+.task-progress-history .target { background: #edf3d9; }
+.task-progress .task-progress-action { background: transparent; border: 0; color: #4e7863; font-size: 11px; min-height: 26px; padding: 3px 0; margin-top: 5px; }
 .member .avatar, .picker-person .avatar, .mention-menu .avatar { width: 28px; height: 28px; }
 .mention-menu button { display: flex !important; align-items: center; gap: 8px; }
 #composer {

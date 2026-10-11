@@ -3,6 +3,7 @@ import { t } from "./i18n.js";
 import { goalSnapshot, focusGoal } from "./goals.js";
 import { initMentions, insertMention, prepareDiscussion } from "./mentions.js";
 import { messageRow } from "./message-view.js";
+import { taskTimeline, progressCard } from "./task-progress.js";
 import { api, change, query } from "./api.js";
 import { el, get, notice } from "./dom.js";
 import type { Group, GroupView, Message } from "./types.js";
@@ -37,8 +38,11 @@ export function locateMessage(sequence: number): void {
     "[data-sequence]",
   )) {
     row.classList.toggle("target", row.dataset.sequence === String(sequence));
-    if (row.dataset.sequence === String(sequence))
+    if (row.dataset.sequence === String(sequence)) {
+      const details = row.closest("details");
+      if (details) details.open = true;
       row.scrollIntoView({ block: "center" });
+    }
   }
 }
 
@@ -124,12 +128,17 @@ function updateReply(): void {
 function renderMessages(): void {
   const root = get("messages"),
     bottom = atBottom();
+  const opened = new Set([...root.querySelectorAll<HTMLDetailsElement>("details[open][data-progress-key]")].map(node => node.dataset.progressKey));
   root.replaceChildren();
   updateHistoryStatus();
-  for (const message of [...messages.values()].sort(
-    (a, b) => a.sequence - b.sequence,
-  )) {
-    root.append(messageRow(message, messages, goalSnapshot(), {
+  const goals = goalSnapshot();
+  for (const item of taskTimeline([...messages.values()], goals)) {
+    if ("progress" in item) {
+      root.append(progressCard(item.progress, opened.has(item.progress.key), focusGoal));
+      continue;
+    }
+    const { message } = item;
+    root.append(messageRow(message, messages, goals, {
       mention: insertMention,
       locate: locateMessage,
       review: focusGoal,
