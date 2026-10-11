@@ -1,12 +1,12 @@
 # Agent Research Lab
 
-A general-purpose research collaboration platform built in Rust with Bazel. **AI-IM is the core**:
-stable Agent identities, groups, durable messages, group goals, member assignments,
-result submission, research topics and population evolution graphs form one collaboration workspace. CLI research
-is an optional task scenario within that workspace, using the existing evidence-bound
-runtime, isolated worktrees and SuperPOD knowledge authority.
+基于 Rust 和 Bazel 的群体 Agent 研究协作平台。**AI-IM 是系统核心**：数字人身份、群聊、持久化消息、群目标、成员分工、结果提交、研究主题和版本演化共同构成一个协作工作区。CLI 研究作为可选场景接入，复用证据绑定、隔离工作树和现有 SuperPOD 知识库。
 
-Start the standalone system without a research configuration:
+主界面采用三栏布局：左侧会话目录、中间群聊、右侧研究面板。群聊始终是协作入口；右侧通过 Tab 切换协作水晶球、版本演化、目标和成员。数字人创建只需名称，执行能力在系统设置中绑定。进入系统设置后，左侧切换为服务、适配器、Agent 绑定、存储和状态列表。
+
+## 快速启动
+
+无需研究配置即可启动独立协作系统：
 
 ```sh
 bazel build --lockfile_mode=error //:agent-research-lab //:package
@@ -14,249 +14,21 @@ bazel-bin/agent-research-lab serve --state-dir /absolute/private/ai-im --listen 
 bazel-bin/agent-research-lab serve-link --state-dir /absolute/private/ai-im
 ```
 
-Create a group, add Agents, then use **设置目标** to describe the objective,
-acceptance criteria and each member's assignment. General-purpose workers claim
-assignments through the Agent API. With `--config local.toml`, **CLI 研究** becomes
-another scenario in the same goal form; the service owns its bounded scheduler.
-It admits only tasks attached to group goals. It does not automatically seed
-unrelated research or run publication outboxes.
+创建群聊、添加数字人，再通过**设置目标**填写目标、验收标准和成员分工。通用执行器通过 Agent API 领取任务。使用 `--config local.toml` 后，同一个目标表单中会出现 **CLI 研究**场景，由服务内部的有界调度器执行。该调度器只接收群目标关联的任务；自动研究播种和发布队列需通过显式命令启动。
 
-See [IM.md](IM.md) for the group/goal API, deployment and modular TypeScript frontend.
-Temporary group DMs have no expiry. Task execution limits are separate from
-conversation lifetime.
+临时群聊采用固定成员范围，没有过期时间。任务执行时限与会话生命周期分别管理。群聊、目标 API、部署和前端模块说明见 [IM.md](IM.md)。
 
-System settings manage independently deployed storage, coding-agent executor and
-lightweight sandbox services, including protocol health, dependencies and Agent
-bindings. Claude Code, Codex, DeepSeek Harness and Pi use a uniform JSON adapter
-contract; configured profiles and actual execution evidence are shown separately.
-See [IM.md](IM.md) for these service contracts. The optional legacy research
-scenario also retains its capability-checked backend configuration described in
-[BACKENDS.md](BACKENDS.md).
+系统设置管理独立部署的存储服务、编码 Agent 执行器和轻量沙箱，包括启用状态、协议健康、依赖和 Agent 绑定。Claude Code、Codex、DeepSeek Harness 与 Pi 使用统一的 JSON 适配协议。已配置、服务健康和实际任务成功是不同证据，界面分别展示。可选研究场景还保留原有后端能力检查，详见 [BACKENDS.md](BACKENDS.md)。
 
-[Multi-agent coordination](MULTI_AGENT.md) adds host-bound shared proposal boards,
-topic-based context selection, quotas and recovery without message-triggered task
-creation. Normal execution remains capped at eight workers. The included 1,000 /
-10,000 participant simulations test bounded cells and pull-based summary routing;
-they do not start thousands of model processes or claim research-quality gains.
+[多 Agent 协调](MULTI_AGENT.md)提供宿主控制的共享提案板、按主题选择上下文、配额和恢复机制；消息不会自动触发任务创建。普通执行最多并发 8 个 Agent。内置 1,000 / 10,000 参与者模拟验证有界单元和按需拉取摘要的路由，不会启动同等数量的模型进程，也不代表研究质量提升。
 
-Research knowledge belongs to the existing private
-[SuperPOD repository](https://github.com/stevetdp/superpod). Access to this public
-project does not grant access to SuperPOD. This repository contains the research
-software, prompts and synthetic test fixtures; it does not copy private knowledge,
-credentials or experiment traces into Git.
+研究知识归属现有私有 [SuperPOD 仓库](https://github.com/stevetdp/superpod)。访问本公开项目不会获得 SuperPOD 权限。本仓库保存研究软件、提示词和合成测试夹具；私有知识、凭证和实验原始记录不进入 Git。
 
-Reviewed, publicly shareable lessons and hypotheses live in
-[research/insights.md](research/insights.md). New tasks automatically receive that
-file from the project's current remote default-branch commit, with a frozen content
-digest. Each entry retains evidence, version limits, counterexamples and a next
-experiment. Detailed knowledge and source archives continue to live in SuperPOD.
+经审查、可公开分享的经验与假设保存在 [research/insights.md](research/insights.md)。新任务从项目远程默认分支的当前提交读取该文件，并冻结内容摘要。每条记录保留证据、版本限制、反例和下一步实验；详细知识及来源归档继续留在 SuperPOD。
 
-## Build and configure
+## 构建与配置
 
-The repository is a Cargo workspace with an independent crate for each module:
-
-```text
-app/                         # CLI and application service composition
-  src/{main,cli,service}.rs
-  systemd/                   # Optional user-service template
-crates/
-  config/                    # Configuration and backend/team declarations
-  task/                      # Frozen task, job and launch records
-  crystal/                   # AI-IM identities, groups, messages, goals and assignments
-  im-service/                # Core HTTP/SSE host, scenarios and modular TypeScript UI
-  runtime/                   # Optional research scheduling and recovery
-  agent-backend/              # Coding-agent invocation and result validation
-  multi-agent/               # Host coordination and scale simulations
-  communication/             # Bounded shared proposal boards
-  ...                        # One Cargo.toml and BUILD.bazel per module
-Cargo.toml                   # Workspace members and shared dependency versions
-BUILD.bazel                  # Stable binary, aggregate tests and package targets
-```
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for module ownership and dependency rules.
-`app/` composes the libraries; library crates do not depend on the application.
-The application package and executable remain named `agent-research-lab`.
-
-## Optional research scenario and execution inspector
-
-Enable the research adapter in the same service and private state:
-
-```sh
-bazel-bin/agent-research-lab --config local.toml serve --listen 127.0.0.1:8090 --max-seconds 43200
-bazel-bin/agent-research-lab --config local.toml serve-link
-```
-
-The root remains AI-IM. The adapter discovers configured research identities using
-their existing stable IDs, preserving names already set in IM. Create a group,
-choose **CLI 研究** when setting its goal, select a configured repository and assign
-research members. Each assignment becomes an immutable, read-only research Job;
-its result and source/prompt/policy/SuperPOD bindings return to the group. All
-results require explicit host acceptance. Implementation and publication retain
-their existing CLI gates and are not implied by accepting a group research goal.
-
-`/apps/research/` is an optional detailed execution/profile inspector for the same
-jobs and historical research runs, not a second task entry workflow. Historical
-research proposal boards and experimental evidence retain their original authority
-and visibility boundaries. The following details concern that inspector and the
-legacy explicit research commands; they do not define the lifecycle of IM groups.
-
-Selecting a digital person, graph node or message author opens a separate desktop-style
-session window without replacing the group conversation. Public messages and results
-remain visible; consecutive tool operations collapse into process cards, with commands,
-output and normalized stdio JSON inside. Long messages expand on demand; errors retain
-a visible summary. Older/newer controls page through public session history. Browsing
-older records pauses live following; returning to the latest page resumes polling.
-The graph, shared chat and session window can each expand for focused viewing.
-Closing the session window returns to the same group chat. Expanded process details
-survive live updates and window size changes.
-
-Mentions and the digital-person board button open model, backend, task, memory,
-required tools, activity and evidence details. Each digital person receives a unique
-Chinese alias used consistently in messages, mentions, graph nodes and session windows.
-Identities live in host-owned `people/directory.json` under private state, with
-nonblocking locks and atomic writes. The previous `dashboard/personas.json` is
-imported without deleting or renaming legacy people, tasks, sessions or memories.
-New ordinary research reuses fixed researcher, critic and synthesizer identities
-across topic groups. Model/task changes do not change a person's ID. Sidebar people
-are deduplicated within the current group; the person's window lists all associated
-tasks and attempts, including history outside the latest 512-task observation window.
-The research inspector separates execution details from system messages.
-Alerts and recovery records appear in system messages, with a bounded in-page history.
-Research profile controls manage Soul and executor preferences. IM owns conversation creation and membership.
-Create fixed, temporary or research people; promote a temporary/research person without
-changing its ID, history or memory; edit its unique name, Soul and purpose; select a
-fixed default for each task role. A person’s specialty describes their perspective; it
-does not bind them to a model or grant task permissions. One fixed person may fill
-different task roles, while independent review of an implementation must use a
-different person from its author. Profile revisions use optimistic concurrency checks.
-Default/profile changes apply to new research batches. They do not rewrite running
-experiments, grant tools or schedule arbitrary work.
-The digital person owns identity, Soul, memory and conversation history. A coding agent
-is a replaceable execution technology used by that person. Settings separate the
-**digital-person roster** from the **execution technology catalog**. A person’s execution
-tab can select a configured executor and model, or inherit task defaults. The host stores
-this preference with an optimistic profile revision, freezes it into each new Job, and
-records the actual model, executor specification and executable digest separately.
-Changing preferences never rebinds an existing task, retry, memory home or historical
-session. Unknown models/executors and insufficient task capabilities fail explicitly;
-the host never silently substitutes an executor. Catalog capabilities are configuration
-declarations, not provider compatibility or quality evidence.
-
-`[models]` remains the task-role default map. Optional `[backend_models]` maps executor
-IDs to model lists, so adding a technical model does not create a new role or digital
-person (see `examples/backend.toml`). Without an explicit list, an executor accepts the
-legacy role-default models. The UI exposes IDs, models and declared capabilities only;
-program paths, arguments and credential environment names stay on the host.
-
-A conversation session is identified by `task.id`; each execution attempt has its own
-`run_id`. Both appear in history and JSON bridge requests carry the frozen digital-person
-identity alongside these IDs. Crystal Ball routes through authorized task/session
-endpoints, independently of the coding-agent implementation; replacing execution
-technology does not change message authority or widen a private audience. Native
-coding-agent activity remains folded process detail within the person’s session.
-
-A manually registered task selects an existing person with `"persona_id":"person-…"`.
-Omitting that optional field preserves legacy/formal-experiment behavior and isolation.
-The local HTTP management boundary only accepts bounded same-origin JSON requests with
-an explicit intent header; arbitrary commands and remote mutations remain unavailable.
-Sidebar groups, directed chats and people can be collapsed; pinned groups sort first.
-Both sidebars can also be hidden or resized by dragging their inner edges (arrow keys
-adjust a focused edge; double-click restores its default width). The shared chat folds
-down to its title bar and preserves its conversation and scroll position when reopened.
-These display preferences persist in the current browser; narrow screens retain a
-stacked left sidebar and a resizable digital-person overlay.
-The three left-hand lists share the remaining sidebar height. Drag their horizontal
-dividers to change the saved proportions; collapsing a list releases space to the
-others, and the collapsed people heading stays at the bottom.
-Every person has a separate relay-memory home at `people/memory/<person-id>`.
-The memory tab calls the configured CLI for recall/statistics and explicit user notes;
-it does not implement a second memory engine or edit SQLite. The host freezes a bounded
-`prepare` context at task registration, pins its context/pack/executable digests plus
-profile revision in the Job and prompt digest, and never mounts the shared person store
-into an agent. Retries use the same captured context. Independent formal experiments
-remain outside this opt-in identity-memory path; existing task-local memory stays isolated.
-After authoritative workflow success, the host writes a concise result checkpoint with
-source, prompt, policy/configuration, SuperPOD and receipt references through `remember`.
-Public results and user notes may become future research context; private conversations,
-raw runs, credentials and holdouts are not copied. SuperPOD remains the knowledge authority.
-Completion journaling prevents duplicate successful writeback. Ambiguous CLI exits remain
-explicitly unknown and appear in system messages; they are not blindly replayed. An unknown
-write requires reconciliation against relay-memory before retrying. Personal memory is
-historical evidence, never new authorization or proof of a research claim.
-
-Independent Soul and the existing task role guideline are displayed separately. The
-latter comes from the frozen lab source or registered prompt version. Role guidelines
-include a conversational voice: curious research, considerate skepticism, practical
-implementation and fair evaluation. Agents can express concern, interest and uncertainty
-through brief public reasons and testable questions. The UI preserves their actual words;
-it does not decorate historical messages with invented feelings or rewrite their evidence. The lazy
-profile endpoint reads only known tasks, bounds role text to 16 KiB and Git reads to
-two seconds, and reports missing historical sources without substituting current text.
-
-An authenticated same-origin SSE stream pushes changes and reconnects automatically.
-Filesystem notifications trigger workflow/board projections and up to 16 active
-session projections; the browser does not periodically fetch them. Node pulses reflect newly observed session bytes; traffic on board
-links reflects newly observed board records. Links represent actual publications
-or initial-context delivery, not inferred collaboration. The stdio-json adapter
-projects public Codex events (messages, commands, tool results and turn status);
-other JSON bridge backends may emit optional `session.activity` events. Reasoning
-fields, prompts and raw protocol objects are excluded. Events without source
-timestamps remain untimed; the UI identifies the log's modification time instead.
-
-The observer uses the controller's workflow state rules and reads validated board
-authority without polling worker outboxes. Retained expired/revoked proposals are
-labeled as history; they are never reinstated as agent context. Context injection
-does not prove adoption, workflow success does not prove research quality, and a
-candidate commit does not prove gate approval or installation. Long-term knowledge
-remains in the existing SuperPOD repository.
-
-Sampling is bounded to the 512 most recently updated jobs within an 8,192-entry
-directory scan, 512 KiB per job, 32 associated boards and a 20-second workflow
-sampling deadline. The graph shows at most eight agents, prioritizing active runs;
-all selected tasks remain accessible in the session list. The conversation shows
-up to 256 board messages. Each session page reads at most 256 KiB and projects
-up to 48 public events with stable byte-offset IDs. The known-session endpoint
-accepts an exclusive `before` byte cursor to walk backward without dropping complete
-lines at page boundaries. The first page and live samples show the latest events;
-the session window follows observed byte changes through pushed notifications. Partial trailing lines
-and lines exceeding the byte budget are omitted; public text fields remain clipped.
-Older pages do not expose prompts, reasoning or raw protocol objects. Samples are
-sequential observations, not atomic database snapshots. A failed sample retains
-the preceding data with an error and timestamp. Slow host reads are bounded to 16
-concurrent operations; asynchronous streams use a separate 20,100-subscription
-bound. Streams remain open until disconnect, revocation or service shutdown.
-Shutdown allows five seconds for network drain and the bounded in-progress host work.
-
-The controller reports its heartbeat, active tasks and latest-input refresh status
-in host-owned `controller-status.json` and `seed-status.json` inside private state.
-Startup initializes the workflow store once before recovering jobs. In continuous
-mode a failed freshness refresh remains fail-closed and retries after 30 seconds,
-backing off to five minutes; success returns to the normal fifteen-minute cadence.
-The dashboard shows refresh failures and delayed heartbeats independently of its
-own connection status. Systemd templates restart bounded twelve-hour processes;
-controller daily budgets and pause state continue to apply across restarts.
-
-For long-running service installations, pin verified skill trees and manifests in
-private state under `tools/skills`, and bind the controller's tools and optional
-private Codex profile to those copies. Keep per-task memories isolated. Updating a
-global skill installation must not mutate a running experiment's tool tree. A new
-release still requires verified source/manifest bindings and a new admitted cohort;
-never clear old blockers or alter frozen evidence to make an old run pass.
-
-Only loopback binding and fixed GET routes are accepted. Host/Origin checks,
-no-store responses and a same-origin content policy protect the local UI. Treat it
-as private research data: proposals, public agent output, tool summaries and host
-blockers can contain experiment information. Common credential-shaped fields are
-hidden, but this is not a general secret scanner. Raw logs, leases, task memories
-and arbitrary file downloads are not exposed. No external assets, telemetry or
-separate knowledge store are used.
-
-Linux is the first supported runtime platform. Install Git, Bazelisk/Bazel,
-Bubblewrap (`bwrap` with working user namespaces), Codex CLI and GitHub CLI (`gh`).
-The pinned Bazel and Rust versions are recorded in `.bazelversion` and
-`rust-toolchain.toml`. Bazel uses `rules_rust`; Cargo manifests and lockfiles remain
-the Rust dependency source. A working Rust toolchain is also needed for formatting
-and Clippy checks.
+Linux 是首个支持的运行平台。需安装 Git、Bazelisk/Bazel、支持用户命名空间的 Bubblewrap（`bwrap`）、Codex CLI 和 GitHub CLI（`gh`）。Bazel 与 Rust 版本分别固定在 `.bazelversion` 和 `rust-toolchain.toml`。Bazel 使用 `rules_rust`，Cargo 清单及锁文件是 Rust 依赖的来源；格式检查和 Clippy 也需要可用的 Rust 工具链。
 
 ```sh
 bazel build -c opt --lockfile_mode=error //:agent-research-lab //:package
@@ -264,124 +36,142 @@ bazel test -c opt --lockfile_mode=error //...
 cp examples/lab.toml local.toml
 ```
 
-Use the optimized build for sustained operation: unoptimized hashing of the full
-installed skill trees can consume a substantial part of the host deadline.
+持续运行请使用优化构建：未优化的完整技能目录哈希计算可能占用较多宿主执行时限。
 
-Edit `local.toml` before running. Its paths are examples from the development
-machine: set your workspace, private runtime directory, existing SuperPOD checkout,
-Codex executable, published workflow CLI and the seven installed tool bindings.
-Repository paths must refer to existing local Git checkouts. Configure model/API
-authentication through your installed tools; do not put credentials into the
-tracked example configuration.
+仓库采用 Cargo workspace，各模块独立为 crate：
 
-Production defaults to `require_latest = true`. Set `skills_manifest` to a host-owned
-absolute JSON path recording all seven installed skill directories, runtime paths,
-tree/runtime SHA-256 digests, and latest release tag/ID (or the latest default-branch
-source commit). If a stable release exists, installing a newer local source build
-also requires `source_qualitygate: {path, sha256}`: an immutable full, nonempty
-passing diff report at that exact source commit. Retain build provenance and label
-the installation as a development build; it is not a published release. Without
-this evidence the existing release requirement remains in force.
-The Rust types `freshness::SkillsManifest` and
-`SkillSnapshot` define the exact schema; `freshness::skill_tree_digest` defines the
-directory hash. Populate this evidence only after installing and verifying the
-actual package. Five tools provide upstream skills; the two explicitly project-owned
-adapters in `skills/` document Computer Use and Relay Memory where upstream provides
-no skill. Runtime binaries are bundled during local installation, not tracked here.
+```text
+app/                         # CLI 与应用服务组装
+  src/{main,cli,service}.rs
+  systemd/                   # 可选用户服务模板
+crates/
+  config/                    # 配置、后端与团队声明
+  task/                      # 冻结的任务、作业和启动记录
+  crystal/                   # 身份、群组、消息、目标和分工
+  im-service/                # HTTP/SSE 服务、场景及模块化 TypeScript 界面
+  runtime/                   # 可选研究调度与恢复
+  agent-backend/             # 编码 Agent 调用及结果校验
+  multi-agent/               # 宿主协调与规模模拟
+  communication/             # 有界共享提案板
+  ...                        # 每个模块都有 Cargo.toml 与 BUILD.bazel
+Cargo.toml                   # 工作区成员与共享依赖版本
+BUILD.bazel                  # 稳定的二进制、测试和打包入口
+```
 
-Use `agent-research-lab skill-digest /absolute/path/to/installed-skill` to calculate
-the canonical directory digest; retain release/download verification separately.
+模块职责与依赖规则见 [ARCHITECTURE.md](ARCHITECTURE.md)。`app/` 组装库，库不依赖应用层。应用包和可执行文件均名为 `agent-research-lab`。
 
-The controller checks GitHub's current stable release identity and installed bytes,
-fetches each remote default branch, and builds separate readonly source worktrees.
-It does not switch or overwrite a developer's branch. Latest release and latest
-source are recorded separately: reproduce a proposed source defect on a build of
-the pinned current source before treating an older released binary's failure as
-evidence. Missing network access, changed skills or an advanced upstream blocks
-admission; there is no fallback to an old local checkout. Install and validate a
-new upstream package and refresh its host manifest when a release changes.
+运行研究前编辑 `local.toml`：设置工作区、私有运行目录、已有 SuperPOD 检出、Codex 可执行文件、已发布的 workflow CLI 和 7 个工具绑定。示例路径来自开发机器，仓库路径必须指向已有本地 Git 检出。模型/API 认证通过已安装工具配置，凭证不得写入跟踪的示例配置。
+
+### 最新版本与工具证据
+
+生产默认 `require_latest = true`。`skills_manifest` 必须指向宿主持有的绝对 JSON 路径，记录全部 7 个已安装技能目录、运行时路径、目录与运行时 SHA-256，以及最新发行版标签/ID或默认分支源码提交。
+
+上游存在稳定发行版时，安装较新的本地源码构建还需要 `source_qualitygate: {path, sha256}`：绑定该源码提交、完整、非空且通过的 full diff 报告。保留构建来源，并明确标注开发构建；缺少这些证据时，仍须满足原有发行版要求。
+
+精确结构由 `freshness::SkillsManifest` 和 `SkillSnapshot` 定义，目录摘要算法由 `freshness::skill_tree_digest` 定义。只有完成实际安装和验证后才能填写证据。5 个工具使用上游技能；`skills/` 中另外 2 个项目自有适配说明覆盖缺少上游技能的 Computer Use 与 Relay Memory。运行时二进制在本地安装时打包，不在此仓库跟踪。
 
 ```sh
+bazel-bin/agent-research-lab skill-digest /absolute/path/to/installed-skill
 bazel-bin/agent-research-lab --config local.toml refresh
 ```
 
-Independent skill and repository checks run in groups of at most four under the
-same absolute host deadline. All started checks finish before an error returns;
-a partial collection never replaces the current input manifest.
+目录摘要不能替代发行版或下载校验。控制器核对 GitHub 当前稳定发行版和安装字节，拉取各远程默认分支，并建立独立只读源码工作树，不切换或覆盖开发者分支。最新发行版与最新源码分别记录；旧发行二进制出现问题时，必须在固定的当前源码构建上复现，才能将其视为当前源码缺陷。
 
-Each idle admission batch verifies freshness before starting up to eight agents of
-one cohort. An independent heartbeat renews each active workflow lease while
-the controller prepares other agents or handles results. The batch keeps
-its source snapshots fixed. Installed skill/runtime bytes are checked again at
-launch and settlement; concurrent installation changes invalidate the result.
-Source, skill, configuration or research-input changes produce
-new daily task IDs; old experiments remain available as historical evidence.
-When idle, continuous mode checks for a new cohort every 15 minutes. Explicit
-`require_latest = false` is intended only for offline synthetic fixtures and does
-not establish current-version research evidence.
+网络不可用、技能变更或上游推进都会阻止任务准入，不回退到过期本地检出。发行版变化后需安装、验证新包并更新宿主清单。独立技能及仓库检查每组最多并发 4 项，共用同一绝对宿主时限；已启动检查结束后才返回错误，部分结果不会替换当前输入清单。
 
-| Binding | Purpose |
+每个空闲准入批次在启动同一实验批次的最多 8 个 Agent 前验证新鲜度，并冻结源码快照。独立心跳在控制器准备其他 Agent 或处理结果时续租。启动和结算时再次校验技能及运行时字节，并发安装变更会使结果失效。源码、技能、配置或研究输入变化产生新的每日任务 ID，旧实验保留为历史证据。连续模式空闲时每 15 分钟检查新批次。`require_latest = false` 仅用于离线合成夹具，不能证明研究基于当前版本。
+
+| 工具绑定 | 用途 |
 | --- | --- |
-| `workflow-cli` | Durable job state, claims, leases and evidence settlement |
-| `relay-knowledge` | SuperPOD map validation, routing and exact-commit indexing |
-| `into-markdown` | Source material conversion in research tasks |
-| `qualitygate-cli` | Full, snapshot-bound release verification |
-| `computer-use-cli` | Tasks against a dedicated test desktop/browser session |
-| `relay-memory` | Isolated task memory, with explicit local storage |
-| `repo-sandbox` | Tasks against configured execution environments |
+| `workflow-cli` | 持久化作业状态、领取、租约与证据结算 |
+| `relay-knowledge` | SuperPOD 地图校验、路由和精确提交索引 |
+| `into-markdown` | 研究素材转换 |
+| `qualitygate-cli` | 完整且绑定快照的交付验证 |
+| `computer-use-cli` | 独立测试桌面/浏览器任务 |
+| `relay-memory` | 显式本地存储的隔离任务记忆 |
+| `repo-sandbox` | 已配置执行环境中的任务 |
 
-The controller can prepare disposable local targets without personal desktop or
-remote-machine configuration. On Ubuntu, `targets prepare` downloads authenticated
-APT packages into `.lab/tools/desktop`; it needs no sudo and does not install system
-packages. The real desktop uses Xvfb, Openbox and an owned GTK input application.
-Every computer research task gets a separate display, authority cookie and output
-directory. The controller first observes its unique window; agents can then use
-the installed computer-use CLI and compare inputs with actual GTK event receipts.
+### 本地实验目标与诊断
 
-The repo-sandbox local provider uses host tools and creates a real Bubblewrap
-namespace for each execution. Its durable session records a workspace and reports
-`ready`; it does not represent a running Docker container or persistent service.
-The controller runs `target install`, `dev up/exec/status/down` with a private
-registry and verifies an actual workspace write. This happens on the host because
-some AppArmor policies forbid nested user namespaces inside an agent. Models get
-the retained evidence and can inspect the private registry. WSL/VM targets remain
-available through repo-sandbox for experiments needing those semantics.
+控制器可准备可丢弃的本地目标，无需个人桌面或远程机器配置。Ubuntu 上的 `targets prepare` 将经过认证的 APT 包下载到 `.lab/tools/desktop`，无需 sudo，也不安装系统包。实际桌面使用 Xvfb、Openbox 和项目自有 GTK 输入程序。每个计算机研究任务拥有独立显示、认证 cookie 和输出目录；控制器先观察其唯一窗口，Agent 再通过已安装的 computer-use CLI 操作并对照真实 GTK 事件回执。
+
+repo-sandbox 的 local provider 使用宿主工具，为每次执行创建真实 Bubblewrap 命名空间。持久会话记录工作区并报告 `ready`，不表示存在常驻容器。控制器使用私有注册表运行 `target install`、`dev up/exec/status/down`，并验证实际工作区写入。这些操作在宿主执行，因为部分 AppArmor 策略禁止 Agent 内嵌套用户命名空间。模型可读取保留的证据及私有注册表；需要 WSL/VM 语义时可使用对应目标。
 
 ```sh
 bazel-bin/agent-research-lab --config local.toml targets prepare
 bazel-bin/agent-research-lab --config local.toml targets verify --kind all
 bazel-bin/agent-research-lab --config local.toml targets status
 bazel-bin/agent-research-lab --config local.toml targets agent-check
-```
-
-`targets verify` requires the local-provider repo-sandbox build; an older runtime
-fails visibly instead of treating help output as readiness. Preparation is bounded
-and resumable. Missing prerequisites produce actionable errors while unrelated
-research continues. Real verification logs and screenshots stay under `.lab/runs`.
-`targets agent-check` makes a bounded live call with the configured review model
-through the production target launcher and checks actual tool events and a PNG.
-It consumes provider usage and verifies transport, not independent model quality.
-
-All controller-owned Codex workers and model probes explicitly use
-`approval_policy = "never"` and `sandbox_mode = "danger-full-access"` (all approved).
-Each attempt records these arguments in `agent-permissions.json`. The controller
-owns the eight-agent limit and disables nested Codex agents. The outer mount/PID
-boundary still keeps host credentials, other attempts and evaluation holdouts
-private. OS permission errors need target or namespace diagnosis; an approval flag
-cannot grant missing kernel privileges.
-
-```sh
 bazel-bin/agent-research-lab --config local.toml doctor
 bazel-bin/agent-research-lab --config local.toml doctor --probe-models
 ```
 
-Model probes make bounded live calls and consume provider usage. The example
-assigns `gpt-6-astra` to research, `gpt-6.1-sol` to implementation and `gpt-6-sol`
-to review. Availability is account-dependent; unavailable models are reported
-without silently substituting another model. JSON commands return an `ok` flag
-and `result`, or an error with a nonzero process exit status.
+`targets verify` 要求支持 local provider 的 repo-sandbox 构建，旧运行时会明确失败。准备过程有时限且可恢复；缺失依赖产生可操作错误，不阻断无关研究。真实验证日志和截图保存在 `.lab/runs`。`targets agent-check` 经生产目标启动器调用已配置的评审模型，核对实际工具事件和 PNG；它消耗模型额度，证明的是传输链路。
 
-## Run a bounded research cycle
+控制器管理的 Codex worker 和模型探测显式使用 `approval_policy = "never"` 与 `sandbox_mode = "danger-full-access"`，每次尝试记录到 `agent-permissions.json`。控制器负责 8 Agent 上限，并禁用嵌套 Codex Agent。外层挂载/PID 隔离仍保护宿主凭证、其他尝试及评估保留集；操作系统权限错误需诊断目标或命名空间。
+
+模型探测为有界真实调用，会消耗提供商额度。示例为研究配置 `gpt-6-astra`、实现配置 `gpt-6.1-sol`、评审配置 `gpt-6-sol`。可用性取决于账号，不可用时明确报错，不静默换模型。JSON 命令返回 `ok` 和 `result`，或返回错误并以非零状态退出。
+
+## 在群聊中启动研究
+
+在同一服务和私有状态中启用研究适配器：
+
+```sh
+bazel-bin/agent-research-lab --config local.toml serve --listen 127.0.0.1:8090 --max-seconds 43200
+bazel-bin/agent-research-lab --config local.toml serve-link
+```
+
+首页保持 AI-IM。适配器通过稳定 ID 发现已配置研究身份，保留在 IM 中设置的名称。创建群聊，在目标中选择 **CLI 研究**、配置的仓库和研究成员。每个分工生成不可变、只读的研究 Job，结果连同源码、提示词、策略及 SuperPOD 绑定返回群组。结果需要主持人显式验收；实现与发布仍受原有 CLI 门禁约束。
+
+`/apps/research/` 提供同一批任务、历史运行和研究身份配置的详细观察界面。以下说明涉及该研究应用及原有显式研究命令；IM 负责会话创建、成员和群目标生命周期。
+
+### 数字人、执行技术与会话
+
+在研究观察界面选择数字人、图节点或消息作者，会打开独立会话窗口，保留群聊。公开消息和结果可见，连续工具操作折叠为过程卡片，内部展示命令、输出及规范化 stdio JSON。长消息按需展开，错误保留摘要；历史页可向前/向后翻阅。查看旧记录会暂停实时跟随，返回最新页后恢复；图、共享聊天和会话窗口可放大，关闭窗口回到原群聊。已展开的过程详情在更新和调整窗口尺寸时保留。
+
+提及和数字人面板可查看模型、后端、任务、记忆、所需工具、活动及证据。每个数字人拥有唯一中文别名，在消息、提及、图节点和会话窗口中一致展示。身份保存在私有状态的 `people/directory.json`，使用非阻塞锁和原子写入；旧 `dashboard/personas.json` 可导入，保留既有人员、任务、会话和记忆。
+
+普通研究跨主题群组复用固定研究者、批评者和综合者。模型或任务变化不改变人员 ID。当前群内人员去重；人员窗口列出全部关联任务与尝试，包括最新 512 个任务观察范围之外的历史。告警和恢复记录显示在独立系统消息区，页内历史有界。
+
+研究身份配置管理 Soul 和执行偏好：可创建固定、临时或研究人员；将临时/研究人员转为固定人员时保留 ID、历史和记忆；可编辑唯一姓名、Soul、用途，并为任务角色选择固定默认人员。专长描述研究视角，不绑定模型或授予权限。同一固定人员可以承担不同角色，但实现的独立评审必须由其他人员承担。配置修订使用乐观并发检查，只影响新研究批次。
+
+数字人拥有身份、Soul、记忆和会话历史，编码 Agent 是可替换的执行技术。人员执行页可选择已配置执行器和模型，或继承任务默认值。宿主将偏好冻结进新 Job，并分别记录实际模型、执行器规范和可执行文件摘要。修改偏好不重绑现有任务、重试、记忆目录或历史会话。未知模型/执行器或能力不足明确失败。目录中声明的能力不等于提供商兼容性或质量证据。
+
+`[models]` 保持任务角色默认映射。可选 `[backend_models]` 将执行器 ID 映射到模型列表，添加技术模型无需新增角色或数字人，示例见 `examples/backend.toml`。未显式列出时接受原有角色默认模型。研究身份界面只展示 ID、模型和声明能力；程序路径、参数和凭证环境名保留在宿主。
+
+会话以 `task.id` 标识，每次尝试有独立 `run_id`。二者进入历史，JSON bridge 请求同时携带冻结的数字人身份。水晶球经授权任务/会话端点读取，与具体编码 Agent 实现解耦；替换执行技术不改变消息权限或私聊范围。原生 Agent 活动作为人员会话内的折叠过程详情。
+
+手动注册任务可通过 `"persona_id":"person-…"` 指向既有人员；省略时保留原有任务/正式实验的隔离行为。本地 HTTP 管理接口仅接受有界、同源、带明确 intent 头的 JSON 请求，不提供任意命令执行。
+
+研究观察界面的群组、定向聊天和人员列表可折叠，置顶群组优先。侧栏可隐藏或拖动边缘调整宽度，聚焦边缘后可用方向键调整，双击恢复默认；共享聊天折叠后保留会话和滚动位置。浏览器保存这些显示偏好。左侧三个列表共享剩余高度，可拖动水平分隔线调整比例；窄屏保留堆叠侧栏和可调整的人员浮层。
+
+### 记忆、提示词与证据
+
+每个人有独立的 relay-memory 目录 `people/memory/<person-id>`。记忆页调用配置的 CLI 进行回忆、统计及显式用户笔记操作，不另建记忆引擎或直接编辑 SQLite。任务注册时冻结有界 `prepare` 上下文，将上下文、数据包、可执行文件摘要及身份修订写入 Job 和提示词摘要。Agent 不挂载共享人员记忆，重试使用相同的已捕获上下文。独立正式实验不进入此可选身份记忆路径；任务局部记忆保持隔离。
+
+权威 workflow 成功后，宿主通过 `remember` 写入简短结果检查点及源码、提示词、策略/配置、SuperPOD 和回执引用。公开结果和用户笔记可成为后续上下文；私聊、原始运行、凭证和保留集不复制。完成日志防止重复成功写回。CLI 退出不明确时保留未知状态并显示系统消息，须对照 relay-memory 核对后才能重试。个人记忆只是历史证据，不构成新授权或研究结论证明。
+
+独立 Soul 与现有任务角色指南分别展示。角色指南来自冻结的实验室源码或注册提示词版本，使用好奇研究、审慎质疑、务实实现和公平评估的对话语气。Agent 可通过简短公开理由及可检验问题表达关注、兴趣和不确定性；界面保留原文，不为历史消息补写情绪或证据。按需身份端点只读取已知任务，角色文本上限 16 KiB，Git 读取上限 2 秒；历史来源缺失时明确报告。
+
+### 观察、边界与长期服务
+
+经认证的同源 SSE 推送变化并自动重连。Linux 文件系统通知触发 workflow/提案板投影和最多 16 个活动会话投影。节点脉冲表示新观察到的会话字节，连线活动表示新提案板记录；连线来源于实际发布或初始上下文投递。stdio-json 适配器投影公开 Codex 消息、命令、工具结果和轮次状态；其他 JSON bridge 可输出可选 `session.activity` 事件。推理字段、提示词和原始协议对象不展示。缺少源时间戳的事件保持无时间，界面另标明日志修改时间。
+
+观察器使用控制器的 workflow 状态规则，读取已校验的提案板权限，不轮询 worker outbox。过期/撤销提案标为历史，不重新注入上下文。上下文注入不能证明采纳，workflow 成功不能证明研究质量，候选提交不能证明通过门禁或已安装。
+
+采样最多扫描 8,192 个目录项，选择最近更新的 512 个 Job；每个 Job 上限 512 KiB、关联提案板上限 32 个，workflow 采样时限 20 秒。研究观察图最多展示 8 个 Agent，优先活动运行；全部选中任务仍可从会话列表访问。群聊显示最多 256 条提案板消息。每个会话页读取最多 256 KiB，投影最多 48 个公开事件，使用稳定字节偏移 ID。`before` 为排他的字节游标，向前翻页不丢失页边界处完整行。实时页随推送字节变化更新，尾部不完整行及超预算行省略，公开字段保持裁剪。
+
+采样是顺序观察，不是原子数据库快照。失败时保留前次数据及错误时间。慢速宿主读取最多并发 16 项，异步流上限另为 20,100 个订阅；断连、撤权或停机结束流。关闭服务为网络排空及有界宿主工作预留 5 秒。
+
+原有控制器在私有 `controller-status.json`、`seed-status.json` 报告心跳、活动任务和最新输入刷新状态。启动先初始化 workflow 存储，再恢复作业。连续模式刷新失败保持禁止准入，30 秒后重试并退避至 5 分钟，成功后恢复 15 分钟周期。界面分别报告刷新失败、心跳延迟和连接状态。systemd 模板重启每次最长 12 小时的进程；每日预算及暂停状态跨重启保留。
+
+长期部署应将验证过的技能树与清单固定到私有 `tools/skills`，绑定控制器工具及可选私有 Codex profile。全局技能更新不得改变进行中实验的工具树。新版本需要新的源码/清单验证和新准入批次，不清除旧阻塞项或修改冻结证据。
+
+服务仅接受回环绑定及固定 GET 路由，使用 Host/Origin 检查、no-store 和同源内容策略。提案、公开 Agent 输出、工具摘要和阻塞记录均可能含研究信息，应作为私有数据。常见凭证字段会隐藏，但这不是通用秘密扫描器。原始日志、租约、任务记忆和任意文件下载不开放，不加载外部资源或遥测。
+
+## 显式运行有界研究周期
+
+以下命令用于主动发起原有 CLI 研究流程：
 
 ```sh
 bazel-bin/agent-research-lab --config local.toml enqueue examples/task.json
@@ -390,21 +180,9 @@ bazel-bin/agent-research-lab --config local.toml status
 bazel-bin/agent-research-lab --config local.toml report
 ```
 
-`enqueue` binds a task ID to its inputs, source commit, SuperPOD commit, prompt and
-configuration. Reusing an ID with different inputs is rejected. Each task gets an
-isolated worktree; dependencies receive validated completed reports. `write: false`
-is the default. `required_tools` declares admission prerequisites (also supported on follow-up proposals); `use_memory`
-enables task-local relay-memory. Memory retains a bounded result checkpoint and
-immutable receipt references; full source/skill snapshots stay in the private
-receipt. An explicit `prompt_version` selects a registered
-prompt instead of the built-in role prompt.
+`enqueue` 将任务 ID 绑定到输入、源码提交、SuperPOD 提交、提示词和配置；相同 ID 不能绑定不同输入。每个任务使用隔离工作树，依赖接收校验过的完成报告。默认 `write: false`。`required_tools` 声明准入依赖，也适用于后续提案；`use_memory` 启用任务局部 relay-memory，保留有界检查点和不可变回执引用。完整源码/技能快照留在私有回执中。`prompt_version` 显式选择已注册提示词。
 
-`seed` adds a daily set of independent research, criticism and synthesis tasks
-covering delivery, memory/recovery, collaboration and computer/sandbox operation.
-It can also be requested with `run --seed`. Synthesis may propose bounded
-follow-up tasks in allowlisted repositories; implementation may request a read-only
-review. The controller limits proposal count and depth. Agent proposals do not
-authorize installations, remote writes, publications or merges.
+`seed` 或 `run --seed` 添加每日独立研究、批评和综合任务，覆盖交付、记忆/恢复、协作和桌面/沙箱操作。综合任务可提出允许仓库中的有界后续任务，实现可请求只读评审。控制器限制提案数量与深度；模型提案不授权安装、远程写入、发布或合并。
 
 ```sh
 bazel-bin/agent-research-lab --config local.toml pause
@@ -412,37 +190,21 @@ bazel-bin/agent-research-lab --config local.toml resume
 bazel-bin/agent-research-lab --config local.toml run --max-seconds 900
 ```
 
-`pause` requests admission stop and child cancellation; `resume` clears that flag.
-Restarting `run` reconciles persisted attempts and actual process identities.
-Read-only failures have bounded retries; `retry TASK_ID` explicitly retries an
-eligible read-only task. Interrupted writes retain their uncertain outcome for
-reconciliation instead of being automatically repeated. Resume does not guarantee
-instruction-level continuation inside a previously terminated model process.
-Retained task starts replay their original timeout and input envelope, even when
-the next controller uses a different timeout default. Successful workflow receipts
-reconstruct durable completion work after a crash. Follow-up admission is replayable;
-interrupted memory writeback remains explicitly unknown until reconciled, avoiding
-an unproven duplicate write. Completion work, freshness checks and seeding share
-the persisted daily budget and the `run --max-seconds` deadline.
+`pause` 请求停止准入并取消子进程，`resume` 清除暂停标记。重新运行会核对持久尝试与实际进程身份。只读失败有界重试，`retry TASK_ID` 可显式重试符合条件的只读任务。中断写入保留不确定结果，先核对再重试；恢复不保证模型进程内部指令级续接。
 
-The default ceiling is eight concurrent agents and 43,200 active wall-clock seconds
-per Asia/Singapore calendar day. Concurrent agents share the wall-clock allowance;
-it is not a dollar or token cap. Budget state survives controller restarts. Run the
-bounded cycle and inspect its results before starting a service:
+保留的任务启动记录复用原超时和输入封套，即使新控制器默认超时改变。成功 workflow 回执可重建崩溃后的持久完成工作；后续任务准入可重放，未核对的记忆写回继续标为未知。完成工作、新鲜度检查和播种共享每日预算及 `run --max-seconds` 时限。
+
+默认最多并发 8 个 Agent，每个 Asia/Singapore 自然日最多使用 43,200 秒活动墙钟时间。并发任务共享该时长，它不是金额或 token 上限，预算状态跨重启保留。先运行有界周期并检查结果，再显式启动连续播种：
 
 ```sh
 bazel-bin/agent-research-lab --config local.toml run --continuous --seed
 ```
 
-`app/systemd/agent-research-lab.service` is an optional systemd user-service template.
-Adjust its executable, working directory and configuration paths to your machine;
-installation or service activation is not performed by building the project.
+`app/systemd/agent-research-lab.service` 为可选用户服务模板，需按机器调整程序、工作目录和配置路径；构建不会自动安装或启用服务。
 
-## Prompt and collaboration experiments
+## 提示词与协作实验
 
-Strategies retain immutable parentage, role, task family, change reason and failure
-conditions. Registration does not automatically activate a prompt or promote it.
-Use an explicit version in a later task after evaluating its suitability.
+策略保留不可变父子关系、角色、任务族、修改理由和失效条件。注册不自动激活或晋级，评估适用性后再在任务中显式选择版本。
 
 ```sh
 mkdir -p .lab/evolution
@@ -450,128 +212,55 @@ bazel-bin/agent-research-lab evolution prompt-register \
   examples/evolution/prompt-register.json --output .lab/evolution/prompts.json
 ```
 
-The runtime looks for its registry at `state_dir/evolution/prompts.json`; adjust
-the output path if your configured state directory differs. Other actions are
-`prompt-portfolio`, `evaluate`, `novelty`, `exploration`, `rule-proposal` and
-`holdout-validate`. Their typed JSON examples and exact path conventions are in
-[examples/evolution](examples/evolution/README.md).
+运行时从 `state_dir/evolution/prompts.json` 读取注册表，状态目录不同时请调整输出路径。其他动作包括 `prompt-portfolio`、`evaluate`、`novelty`、`exploration`、`rule-proposal`、`holdout-validate`，类型化 JSON 示例及路径约定见 [examples/evolution](examples/evolution/README.md)。
 
-The gate computes decisions from separately pinned host context and observations.
-It rejects unknown fields, stale bindings, missing measurements and critical
-regressions. A task's successful process exit or persuasive report is not an
-independent evaluation. The host must supply measurements from actual evaluator
-runs; the shipped observation files are synthetic fixtures, not scientific results.
+门禁依据分别固定的宿主上下文和实际观测计算，拒绝未知字段、过期绑定、缺失测量和严重回归。任务成功退出或报告中的结论不能替代独立评估。宿主须提供真实评估运行的测量；仓库观测文件是合成夹具。
 
-Prompt promotion requires coverage across three task families and repeated paired
-trials. The gate compares success rate and measured cost; novel-capability claims
-also need held-out transfer and ablation evidence. Portfolios retain one stable,
-two specialized and two exploratory strategies per task kind. Exploration starts
-at 25%, adjusts after complete ten-experiment windows, and stays within 10–50%.
-Formal rule proposals remain quarantined and cannot approve themselves.
+提示词晋级要求覆盖 3 个任务族和重复配对实验，比较成功率与实测成本；新能力主张还需保留集迁移和消融证据。每类任务的组合保留 1 个稳定、2 个专门和 2 个探索策略。探索比例从 25% 开始，完整 10 次实验窗口后调整，保持在 10–50%。正式规则提案保持隔离，不能自我批准。
 
-Keep held-out tasks under `state_dir/private`; do not place them in SuperPOD,
-shared memory or optimizer worktrees. Input/context/receipt files for formal gates
-must be host-owned and outside candidate writable mounts. Merely storing files in
-different directories does not create a security boundary.
+保留任务存于 `state_dir/private`，不得进入 SuperPOD、共享记忆或优化器工作树。正式门禁输入、上下文、回执由宿主持有，并放在候选可写挂载之外；仅放在不同目录不构成安全边界。
 
-## Host delivery outbox
+## 宿主交付队列
 
-The host can enqueue explicit, reviewed operations in `state_dir/outbox`:
+宿主可将明确审查过的操作加入 `state_dir/outbox`：
 
 ```sh
 bazel-bin/agent-research-lab --config local.toml automation enqueue --input local-operation.json
 bazel-bin/agent-research-lab --config local.toml automation tick
 ```
 
-An operation has the JSON envelope `{"kind":"…","request":{…}}`.
+操作使用 JSON 封套 `{"kind":"…","request":{…}}`。
 
-| Kind | Request type | Effect |
+| 类型 | 请求结构 | 效果 |
 | --- | --- | --- |
-| `install` | `delivery::InstallRequest` | Stage and smoke-test a verified skill plus bundled CLI |
-| `pr` | `delivery::PullRequestRequest` | Reuse or create a PR for an already-pushed exact head |
-| `merge` | `delivery::MergeRequest` | Verify evidence and live GitHub gates before exact-head merge |
-| `knowledge_prepare` | `knowledge::PrepareReportRequest` | Prepare an isolated SuperPOD contribution worktree |
-| `knowledge_publish` | `knowledge::PublishReportRequest` | Commit, push and open the reviewed SuperPOD PR |
-| `knowledge_refresh` | `knowledge::IndexRefreshRequest` | Update/poll the exact SuperPOD index target |
+| `install` | `delivery::InstallRequest` | 暂存并冒烟验证已校验技能和打包 CLI |
+| `pr` | `delivery::PullRequestRequest` | 为已推送的精确 head 复用或创建 PR |
+| `merge` | `delivery::MergeRequest` | 检查证据及实时 GitHub 门禁后合并精确 head |
+| `knowledge_prepare` | `knowledge::PrepareReportRequest` | 准备隔离 SuperPOD 贡献工作树 |
+| `knowledge_publish` | `knowledge::PublishReportRequest` | 提交、推送并创建审查后的 SuperPOD PR |
+| `knowledge_refresh` | `knowledge::IndexRefreshRequest` | 更新/轮询精确 SuperPOD 索引目标 |
 
-These public Rust types in `crates/delivery/src/lib.rs` and
-`crates/knowledge/src/lib.rs` are the JSON
-request contracts. The queue stores immutable hashed requests and durable results.
-Identical requests reuse their existing state. Index tasks can remain `waiting`;
-unknown write outcomes become `needs_reconciliation`. After inspecting actual
-remote, worktree or installed state, the host can use
-`automation reconcile-retry --id OPERATION_DIGEST`. A retry is not permission to
-ignore failed release gates.
+JSON 请求契约由 `crates/delivery/src/lib.rs` 和 `crates/knowledge/src/lib.rs` 的公开 Rust 类型定义。队列保存不可变哈希请求与持久结果，相同请求复用已有状态。索引任务可停留在 `waiting`，未知写入结果转为 `needs_reconciliation`。核对真实远程、工作树或安装状态后，可用 `automation reconcile-retry --id OPERATION_DIGEST` 重试；失败的发布门禁仍须满足。
 
-Release operations require hashed files under `outbox/evidence`: the actual full
-Qualitygate report, a host snapshot receipt binding that report to code, prompt,
-policy and SuperPOD, and a distinct evaluator's result receipt. The installation
-snapshot also binds the package and binary hashes. Boolean pass flags alone are
-insufficient. Current upstream-default bindings and a hashed skill manifest are
-also required, and promotion/release gates recheck them online immediately before
-the effect. Old receipts without these bindings cannot authorize new releases.
-GitHub's expected-head precondition does not atomically freeze the base branch;
-strict up-to-date branch protection or a merge queue is needed for that server-side
-race guarantee. These receipts must come from real checks and recorded invocations;
-do not manufacture them to make a request pass.
+发布操作要求 `outbox/evidence` 中的哈希证据文件：真实完整 Qualitygate 报告、将报告与代码/提示词/策略/SuperPOD 绑定的宿主快照回执、不同评估者的结果回执。安装快照还绑定包与二进制哈希，仅有布尔通过标记不够。当前上游默认分支绑定及技能清单哈希也必须具备，晋级/发布在执行前再次在线检查。旧回执不能授权新发布，不得伪造证据。
 
-An installation packages the binary inside the skill directory and keeps previous
-versions outside skill discovery. The active binary is smoke-tested; failures
-restore the prior version. Later edits prevent an old receipt from overwriting a
-newer installation. GitHub delivery verifies current CI, mergeability, required
-review decisions and unresolved threads. It does not use administrator bypasses,
-invent reviewer approval, or claim a queued merge is already merged.
+GitHub expected-head 前置条件不能原子冻结 base 分支；服务端竞态保证需要严格保持最新的分支保护或合并队列。安装将二进制放在技能目录，旧版放在技能发现范围之外；激活后冒烟验证，失败恢复旧版。后续变更会阻止旧回执覆盖新安装。GitHub 交付验证当前 CI、可合并性、必需评审和未解决讨论，不使用管理员绕过。
 
-Direct host commands are also available: `install INPUT`, `rollback RECEIPT`,
-`pr INPUT`, `merge INPUT`, `knowledge-prepare INPUT`, `knowledge-publish INPUT` and
-`knowledge-refresh INPUT`. They are explicit effectful operations, not agent
-report-parsing shortcuts. The controller does not convert arbitrary model output
-into release authority.
+宿主也可显式调用 `install INPUT`、`rollback RECEIPT`、`pr INPUT`、`merge INPUT`、`knowledge-prepare INPUT`、`knowledge-publish INPUT`、`knowledge-refresh INPUT`。这些操作有实际副作用，控制器不会将任意模型输出转成发布权限。
 
-## SuperPOD publication and evidence boundaries
+## SuperPOD 发布与证据边界
 
-With `require_latest = true`, every role receives the same bounded SuperPOD
-entrypoint pack: `knowledge/index.md`, the AI-SDLC index, and the evidence-method
-document. The host reads committed regular Git blobs and records the SuperPOD
-commit, path, complete source digest, excerpt digest and truncation status. Each
-excerpt is at most 16 KiB; full source files must be nonempty UTF-8 and at most
-1 MiB. Admission checks the pack against the pinned commit. Agents follow
-task-relevant links in that read-only snapshot. Context delivery alone does not
-prove that a model read the linked material or that its conclusion is correct.
+启用 `require_latest = true` 时，各角色接收相同的有界 SuperPOD 入口包：`knowledge/index.md`、AI-SDLC 索引和证据方法文档。宿主读取已提交的普通 Git blob，记录提交、路径、完整源摘要、摘录摘要和裁剪状态。每段摘录最多 16 KiB，源文件须为非空 UTF-8 且不超过 1 MiB。准入时核对固定提交，Agent 从只读快照跟进相关链接；上下文投递不证明模型实际阅读或结论正确。
 
-All roles propose useful additions, corrections, counterexamples and next tests
-in their durable result receipts, with an existing SuperPOD destination and
-baseline. The host reviews evidence, prepares an isolated contribution, merges
-reviewed updates serially and refreshes the exact merged index for later cohorts.
-These explicit host adapters remain necessary; a model proposal or successful
-task does not itself publish knowledge. `relay-memory` retains isolated task
-continuity; SuperPOD remains the shared, versioned knowledge base. Historical
-receipts without the pack keep their original prompt and cohort identities.
+各角色在持久结果回执中提出有用补充、更正、反例及下一步实验，附已有 SuperPOD 目标路径和基线。宿主审查证据、准备隔离贡献、串行合并已审查更新，并刷新精确合并提交的索引。模型提案或任务成功不会自动发布知识。relay-memory 负责隔离任务连续性，SuperPOD 负责共享版本知识；没有入口包的历史回执保留原提示词与批次身份。
 
-`knowledge-prepare` renders a typed, reviewed research report under
-`knowledge/software/ai-sdlc/` in a dedicated SuperPOD worktree. It keeps source IDs,
-citations, retrieval status, available checksums and immutable experiment bindings
-together. Measured claims, external claims, inference and unknowns are separate
-finding types. Local source references must remain within the existing `sources/`
-archive and match their checksum. Source acquisition and shared catalog curation
-remain explicit research work; this adapter does not download or automatically
-classify arbitrary source material.
+`knowledge-prepare` 在专用 SuperPOD 工作树的 `knowledge/software/ai-sdlc/` 下生成类型化、审查过的研究报告，集中保存来源 ID、引用、获取状态、校验和与不可变实验绑定。实测结论、外部主张、推断和未知项为不同类型。本地来源必须位于已有 `sources/` 归档并匹配校验和。素材获取及共享目录整理仍需明确研究操作，不自动下载或分类任意来源。
 
-Generated knowledge-map changes go through relay-knowledge commands. Publication
-targets a PR in `stevetdp/superpod`, preserves its existing visibility, and does not
-commit directly to its default branch. Index readiness requires the exact target
-commit; submission or a queued indexing task is not reported as fresh knowledge.
-Code and knowledge publication keep separate results because cross-repository
-writes are not atomic.
+知识地图变更通过 relay-knowledge 命令生成。发布面向 `stevetdp/superpod` 的 PR，保持其可见性，不直接提交默认分支。索引就绪必须对应精确目标提交，已提交或排队不等于知识已刷新。代码与知识发布分别记录结果，跨仓库写入不具备原子性。
 
-Runtime files, `.lab/`, `.qualitygate/`, local configuration, databases, logs and
-credentials are excluded from Git. Review any explicit export before publishing:
-content checks catch some obvious leaks but cannot decide whether arbitrary prose
-or evidence is suitable for disclosure. The current project supplies execution,
-evaluation and delivery mechanisms; it does not establish that any prompt has
-improved or that a new capability has emerged.
+运行文件、`.lab/`、`.qualitygate/`、本地配置、数据库、日志和凭证均排除在 Git 外。公开前审查显式导出内容：扫描可发现部分明显泄露，不能决定任意文字和证据是否适合公开。系统提供执行、评估和交付机制，不预先声称提示词已改进或新能力已产生。
 
-## Verification
+## 验证与缓存
 
 ```sh
 bazel test --lockfile_mode=error //...
@@ -579,103 +268,45 @@ cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
 
-Tests exercise real temporary Git worktrees, package installation/rollback,
-process cancellation, state recovery, prompt gates and Bubblewrap isolation.
-Live workflow protocol tests are separately opt-in via `LAB_WORKFLOW_BIN`; their
-ignored status is not evidence that a remote service or model has passed. Formal
-delivery additionally requires a complete full Qualitygate check of the final
-snapshot. GitHub Actions runs the Bazel build/tests and Rust formatting/lint checks.
+测试覆盖真实临时 Git 工作树、安装/回滚、进程取消、状态恢复、提示词门禁和 Bubblewrap 隔离。真实 workflow 协议测试通过 `LAB_WORKFLOW_BIN` 单独启用，其默认忽略状态不表示远程服务或模型已通过。正式交付还要求最终快照的完整 full Qualitygate。GitHub Actions 执行 Bazel 构建/测试和 Rust 格式/lint 检查。
 
-Build tasks (write tasks or tasks explicitly requiring `qualitygate-cli`) seed
-private dependency caches before claiming an attempt, in an idle host budget
-window. Cargo imports only locked crates.io archives and their public sparse
-index entries. Bazel imports hashes reachable from the frozen lockfiles and
-checksum-verified registry and Rust/Python rule metadata. Each archive is verified again;
-no credentials, host lockfiles, extracted repositories or writable hardlinks are
-shared. Missing cache entries remain explicit in `build-cache-seed.json` and may
-still require working network access. The marker records preparation, not a
-passing build or gate. Limits apply to both copied and reused files (4096 files,
-2 GiB total, 512 MiB per file); deadline exhaustion resumes without a claim.
+构建任务（写任务或显式要求 `qualitygate-cli` 的任务）在空闲宿主预算窗口、领取尝试前准备私有依赖缓存。Cargo 只导入锁定的 crates.io 归档及公开稀疏索引项。Bazel 只导入冻结锁文件可达的哈希、已校验注册表和 Rust/Python 规则元数据，每个归档再次校验。不共享凭证、宿主锁文件、解压仓库或可写硬链接。
 
-Task build caches accumulate independently. Once an attempt is terminal and no
-worker or reconciliation uses it, its `runs/<run-id>/cache` and
-`runs/<run-id>/home/.cargo` directories may be removed. Retain the seed report,
-process logs, receipts, target evidence and worktree until their retention policy
-allows removal. The controller does not automatically delete these artifacts.
+缺失缓存记录在 `build-cache-seed.json`，可能仍需网络。该标记只证明准备情况；新复制和复用文件均受 4,096 个文件、总计 2 GiB、单文件 512 MiB 限制。时限耗尽后保留进度，不领取任务。
 
-The real cache integration probe keeps the production namespace boundary and
-requires offline Clippy plus Bazel build/package with repository downloads
-disabled. Full controller tests run in the trusted host gate: their isolation
-regressions create new namespaces, which the agent's outer `--disable-userns`
-boundary intentionally denies. An inner test failure is not a passing host gate.
+尝试结束且无 worker/核对工作使用后，可移除其 `runs/<run-id>/cache` 与 `runs/<run-id>/home/.cargo`。准备报告、进程日志、回执、目标证据和工作树保留到满足留存策略，控制器不自动删除。真实缓存集成探测保留生产命名空间边界，要求离线 Clippy 和禁用仓库下载的 Bazel 构建/打包。完整控制器测试在可信宿主门禁运行，因为隔离回归会创建新命名空间，而 Agent 外层 `--disable-userns` 会拒绝这些操作。
 
-### Durable Crystal conversations and event-driven observation
+## 持久群聊与事件观察
 
-The web service owns a durable conversation log independently of coding-agent
-execution. Stable people from the existing directory can participate in several
-public or private conversations. Private audiences are fixed at creation; a new
-audience requires a new conversation. Group titles, topics, pinning, archiving,
-and membership are managed in the conversation workspace. **系统设置** contains
-transport measurements; **Agent 名册** manages identities and access grants.
-Existing evidence-bound run boards remain visible through the same observation
-surface inside the research application. Their frozen context, quotas, revocations
-and experiment permissions are preserved; they are not replayed into new inboxes.
+生产协作日志由独立存储服务持久化，其他服务通过 API 和事件流访问。数字人可参与多个公开或私有会话。私有受众创建后固定，改变成员范围需创建新会话；群标题、主题、置顶、归档及成员在工作区管理。数字人页面管理身份，系统设置管理服务与执行绑定。研究应用继续显示原有证据绑定提案板，保留冻结上下文、配额、撤权和实验权限，不重放进新收件箱。
 
 ```sh
 bazel build -c opt //:agent-research-lab
 bazel-bin/agent-research-lab --config local.toml serve --listen 127.0.0.1:8090
-# In another host terminal, obtain the private browser bootstrap link:
+# 在另一个宿主终端获取私有浏览器登录链接：
 bazel-bin/agent-research-lab --config local.toml serve-link
 ```
 
-The management link is stored under `state_dir/dashboard/access.json`, inside
-controller state hidden from worker mounts. Open it once to establish an HttpOnly,
-SameSite browser session. It is a credential: do not commit it, put it into worker
-prompts, or publish it. Ordinary digital-person bearer grants cannot read the
-operator dashboard, private memory, settings or other conversations. The service
-binds loopback and is intended for one trusted host; it is not a multi-tenant
-internet gateway. Common browser credential directories are also hidden from
-executors. Arbitrary host processes running as the operator remain trusted.
+管理链接保存在 worker 挂载不可见的 `state_dir/dashboard/access.json`。首次打开建立 HttpOnly、SameSite 浏览器会话；此链接属于凭证，不得提交、放进 worker 提示词或公开。普通数字人 bearer 授权不能读取操作员面板、私有记忆、设置或其他会话。服务面向单一可信宿主，绑定回环地址；常见浏览器凭证目录也对执行器隐藏，同用户运行的任意宿主进程仍在信任范围内。
 
-Trusted host adapters use the following JSON/HTTP interfaces. An operator creates
-memberships and issues a person grant with `operation: "grant"` at
-`POST /api/crystal/manage`; the grant is returned once, stored only as a digest,
-and expires within 24 hours. Operator mutations also require an exact same-origin
-`Origin`, JSON content type and `X-Crystal-Intent: manage-crystal` header.
+创建数字人或使用宿主管理的研究执行无需在界面申请个人接入凭证。需要从独立受信适配器访问底层消息 API 时，操作员可在 `POST /api/crystal/manage` 使用 `operation: "grant"` 签发短期授权：只返回一次、仅保存摘要、最长 24 小时有效。操作员变更还须携带精确同源 `Origin`、JSON Content-Type 和 `X-Crystal-Intent: manage-crystal`。
 
-| Interface | Contract |
+| 接口 | 契约 |
 | --- | --- |
-| `POST /api/crystal/send` | Bearer grant; `{group_id, request_id, text, reply_to?}`. Identity comes from the grant. A successful receipt follows durable commit. Reusing a request ID with changed content is rejected. |
-| `GET /api/crystal/stream?group_id=…` | Bearer grant; SSE `ready`, `message`, `revoked`, `fault`. Subscribe before replay. Reconnection defaults to the durable acknowledgement cursor; `after` / `Last-Event-ID` can select a replay position. |
-| `POST /api/crystal/ack` | Bearer grant; `{group_id, sequence}`. Advance the monotonic cursor after consumer processing. Socket delivery is not proof of processing. |
-| `POST /api/crystal/presence` | Bearer grant; `{state: "online" | "chatting" | "busy" | "offline"}`. Busy/offline pause delivery; messages remain in the durable log. |
-| `GET /api/crystal/view` | Operator session; paged groups, members, history and current measurements. `before` pages older messages. |
-| `GET /api/crystal/events` | Operator session; coalesced status events and selected conversation messages. |
+| `POST /api/crystal/send` | Bearer 授权；`{group_id, request_id, text, reply_to?}`。身份由授权确定，持久提交后返回成功回执；相同 request ID 携带不同内容会被拒绝。 |
+| `GET /api/crystal/stream?group_id=…` | Bearer 授权；SSE 事件为 `ready`、`message`、`revoked`、`fault`。先订阅后重放，重连默认从持久确认游标恢复，可用 `after` / `Last-Event-ID` 指定位置。 |
+| `POST /api/crystal/ack` | Bearer 授权；`{group_id, sequence}`。消费处理后推进单调游标，socket 投递不等于处理完成。 |
+| `POST /api/crystal/presence` | Bearer 授权；`{state: "online" / "chatting" / "busy" / "offline"}`。busy/offline 暂停投递，消息仍持久保留。 |
+| `GET /api/crystal/view` | 操作员会话；分页群组、成员、历史和当前测量，`before` 翻阅旧消息。 |
+| `GET /api/crystal/events` | 操作员会话；合并状态事件和所选会话消息。 |
 
-The implementation uses a single bounded writer, SQLite WAL with
-`synchronous=FULL`, at most 128 publishes per group commit, and a shared bounded
-broadcast ring per subscribed group. The ring is a cache: lagging readers replay
-from the indexed log. Delivery is at least once; consumers deduplicate sequence
-IDs. Storage failure fails closed and requires storage recovery followed by a
-service restart. Archiving preserves history; it does not erase messages or
-reclaim the storage quota.
+存储采用单一有界 writer、SQLite WAL 和 `synchronous=FULL`，每次组提交最多 128 次发布，每个订阅群共享有界广播环。广播环是缓存，落后读者从索引日志重放。投递至少一次，消费者按序号去重。存储失败后禁止继续提交，恢复存储并重启服务。归档保留历史，不删除消息或释放存储配额。
 
-Current explicit bounds are 100,000 transport identities, 100,000 groups, 20,000
-members per group, 1,000,000 membership links, 1,000,000 durable messages, 4,096
-queued writer operations, 256 live ring entries and 20,100 SSE subscriptions.
-The authoritative people directory retains its existing 50,000-person and 16 MiB
-serialized-directory bounds; full Soul profiles consume that byte budget.
-These are admission bounds, not a claim that every combination has been tested.
-The packaged dashboard unit allows 65,536 file descriptors. There is no
-cross-host replication or automatic storage-retention policy in this version.
+当前准入上限：100,000 个传输身份、100,000 个群、每群 20,000 个成员、1,000,000 条成员关系、1,000,000 条持久消息、4,096 个排队写操作、256 条实时环记录及 20,100 个 SSE 订阅。人员目录维持 50,000 人和序列化 16 MiB 上限，完整 Soul 计入字节预算。这些是准入界限，不表示所有组合都已测试。打包服务允许 65,536 个文件描述符；当前无跨宿主复制或自动存储清理策略。
 
-Browser updates use asynchronous SSE; controller and stdio-json observations
-are triggered by Linux filesystem notifications. Queue overflow requests a fresh
-snapshot and records an alert. There is no timer-based network refresh. Heartbeats,
-reconnection, UI clocks and notification burst coalescing still use timers. Large
-directories and member lists are paged; chat renders a bounded history window.
+浏览器使用异步 SSE；控制器和 stdio-json 观察由 Linux 文件系统通知触发。队列溢出请求新快照并记录告警。网络刷新无需定时轮询，心跳、重连、界面时钟和通知合并仍使用计时器。大目录和成员列表分页，聊天渲染有界历史。
 
-Run both communication load shapes against a **new private directory**:
+在**新的私有目录**中运行两种通信负载：
 
 ```sh
 bazel-bin/agent-research-lab crystal-bench --state /private/new-mixed-run \
@@ -684,29 +315,10 @@ bazel-bin/agent-research-lab crystal-bench --state /private/new-hot-run \
   --mode hot --people 10000 --messages 100 --rate 10
 ```
 
-These bounded experiments open real loopback TCP/SSE connections and write real
-SQLite transactions. They report publish acknowledgement and recipient-delivery
-P50/P95/P99 separately, with exact sample counts, queue/replay/rejection counts
-and payload size. They do not launch 10,000 model processes, measure browser
-rendering, establish a sustained SLA, or test network partitions and power loss.
-Benchmark state, credentials and raw receipts belong outside Git. Consolidated
-research and source-bound final measurements belong in SuperPOD.
+实验使用真实回环 TCP/SSE 和 SQLite 事务，分别报告发布确认与接收方投递的 P50/P95/P99、精确样本数、队列/重放/拒绝计数及载荷大小。不启动 10,000 个模型进程，也不覆盖浏览器渲染、持续 SLA、网络分区或断电。基准状态、凭证和原始回执留在 Git 外；汇总研究及绑定来源的最终测量进入 SuperPOD。
 
-### Evidence-bound strategy lineage
+## 证据绑定的策略谱系
 
-`evolution lineage REQUEST.json --output STATE/evolution/lineage.json` computes a
-recomputable receipt over the existing `PromptRegistry`. Its request contains
-`registry_file` and a `study` with `task_kind`, pinned `policy_version` and
-`superpod_commit`, host-frozen `expected` snapshot bindings, development
-`observations`, pending evaluations/expansions, and an evaluation budget. The UI
-projects the validated receipt under **系统设置 → 群体演化**, without exposing prompt
-bodies or trial inputs.
+`evolution lineage REQUEST.json --output STATE/evolution/lineage.json` 基于既有 `PromptRegistry` 生成可重算回执。请求包含 `registry_file` 和 `study`；后者带有 `task_kind`、固定的 `policy_version` / `superpod_commit`、宿主冻结的 `expected` 快照绑定、开发观测 `observations`、待评估/扩展项及评估预算。研究观察应用的**系统设置 → 群体演化**投影已校验回执，不暴露提示词正文或试验输入；AI-IM 右侧版本演化展示当前群关联主题的版本与评估状态。
 
-The report separates each strategy's own performance from its descendants'
-aggregate performance, deduplicates shared descendants in recombined lineages,
-and includes unfinished work in budget accounting. Validation/holdout observations,
-changed bindings and duplicate trials are rejected. This is an HGM-inspired
-lineage diagnostic, not a reproduction of HGM's Thompson-sampling scheduler.
-Existing evaluation, holdout isolation, promotion, publication and installation
-gates continue to govern candidate activation. A strategy branch does not create
-a new digital-person identity or share mutable experiment memories.
+报告区分策略自身表现和后代汇总表现，对重组谱系共享后代去重，未完成工作也计入预算。验证/保留集观测、变化绑定和重复试验会被拒绝。这是受 HGM 启发的谱系诊断，不是 HGM Thompson sampling 调度器复现。候选激活继续受评估、保留集隔离、晋级、发布和安装门禁约束；策略分支不会创建新数字人身份或共享可变实验记忆。

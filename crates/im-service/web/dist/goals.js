@@ -1,3 +1,4 @@
+import { revealResearch } from "./workspace.js";
 import { GoalState, GroupKind, WorkState } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { label } from "./i18n.js";
@@ -5,11 +6,34 @@ import { api, query } from "./api.js";
 import { button, el, get, notice } from "./dom.js";
 import { display } from "./people.js";
 let selected = null;
+let snapshot = [];
+export function goalSnapshot() {
+    return snapshot;
+}
+export function suspendGoals() {
+    selected = null;
+    generation++;
+    window.clearTimeout(expiryTimer);
+    snapshot = [];
+    get("goal-list").replaceChildren();
+    get("more-goals").hidden = true;
+    get("goal-summary").textContent = t("workspace.goalSummary");
+}
+export function focusGoal(id) {
+    revealResearch("goals");
+    for (const node of get("goal-list").querySelectorAll("[data-goal-id]")) {
+        if (node.dataset.goalId === id) {
+            node.open = true;
+            node.scrollIntoView({ block: "nearest" });
+            return;
+        }
+    }
+}
 let generation = 0;
 let next = null;
 let expiryTimer;
 export function selectGoals(group) {
-    window.clearTimeout(expiryTimer);
+    suspendGoals();
     selected = group;
     get("goal-section").hidden = group.kind === GroupKind.Board;
     get("new-goal").disabled = group.archived;
@@ -96,6 +120,12 @@ export async function loadGoals(append = false) {
             .map((w) => w.deadline_ms));
         if (deadlines.length)
             expiryTimer = window.setTimeout(() => void loadGoals(), Math.max(1, Math.min(...deadlines) - Date.now() + 50));
+        snapshot = append ? [...snapshot, ...page.goals] : page.goals;
+        const active = snapshot.find((goal) => goal.state === GoalState.Active);
+        get("goal-summary").textContent = active
+            ? t("workspace.currentGoal", { title: active.input.title })
+            : t("workspace.goalSummary");
+        document.dispatchEvent(new Event("workspace-goals"));
         const list = get("goal-list");
         const opened = new Set([
             ...list.querySelectorAll("details[open][data-goal-id]"),

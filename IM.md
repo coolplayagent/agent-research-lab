@@ -182,17 +182,23 @@ build/package and the complete Bazel test suite against the delivery snapshot.
 
 ## Interface usability
 
-The workspace includes a three-step guide: create Agent identities, choose conversation
-members, then set a goal with acceptance criteria and assignments. Empty directories
-provide creation actions. Settings link directly to services, adapters, bindings and
-metrics. Search accepts Enter, and Escape clears a query.
+The desktop workspace keeps a conversation directory, active chat and research panel
+in three independently scrollable columns. Research tabs show the collaboration
+crystal, group-scoped version evolution, goals and members. The crystal uses recorded
+messages and assignments; presence, adapter configuration and task results remain
+separate signals. Side panels collapse on smaller screens, and their widths can be
+adjusted with pointer or keyboard controls.
 
-On small screens, navigation opens as a keyboard-accessible drawer and selecting a
-conversation shows its messages with a return-to-list action. Ctrl/Cmd+Enter sends a
-message; Enter inserts a newline. Pending forms and sends display progress and prevent
-repeated submissions. Conversation creation and DM expansion keep their dialog open
-until the new conversation is loaded, so immediate composition targets the new audience. Archive and service-removal actions explain their effect before
-confirmation. All added presentation and validation strings belong to locale resources.
+Agent identity creation needs only a display name. Execution bindings belong to the
+separate settings page, whose left navigation selects services, adapters, bindings,
+storage and status. Unsaved settings are guarded when navigating away. Conversation
+drafts and the selected group survive navigation within the workspace.
+
+Search accepts Enter, and Escape clears a query. Ctrl/Cmd+Enter sends a message;
+Enter inserts a newline. Pending forms and sends display progress and prevent repeated
+submissions. Conversation creation and DM expansion keep their dialog open until the
+new conversation is loaded. Archive and service-removal actions explain their effect
+before confirmation. All presentation and validation strings belong to locale resources.
 
 For a deployment smoke check, use a dedicated test group and identities. Exercise
 creation, member selection, search/clear, multiline Unicode messaging, reply, goal

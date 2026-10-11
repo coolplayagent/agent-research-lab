@@ -41,8 +41,5 @@ export function initDialogs(): void {
   document
     .querySelectorAll<HTMLElement>("[data-close]")
     .forEach((node) => (node.onclick = () => close(node.dataset.close!)));
-  get<HTMLDialogElement>("credential-dialog").addEventListener("close", () => {
-    get<HTMLTextAreaElement>("credential-value").value = "";
-  });
 }
 export const presence = (value: string): string => label("Presence", value);

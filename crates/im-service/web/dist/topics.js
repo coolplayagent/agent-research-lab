@@ -1,3 +1,5 @@
+import { revealResearch } from "./workspace.js";
+import { loadEvolution } from "./evolution.js";
 import { TopicState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
 import { get, el, button, notice } from "./dom.js";
@@ -55,8 +57,8 @@ async function loadSubjects(more = false) {
         for (const row of page.subjects) {
             const subject = row.subject, card = el("article", undefined, "card");
             card.append(el("h4", subject.name), el("p", `${label("SubjectKind", subject.kind)} · ${t("research.versions", { p0: row.node_count })}`), el("code", subject.reference), button(t("research.graph"), () => {
-                sessionStorage.setItem("evolution-subject", subject.id);
-                location.hash = "evolution";
+                if (selected)
+                    void openGraph(selected, subject.id).catch(notice);
             }), button(t("research.edit"), () => subjectForm(selected, subject, () => loadSubjects())));
             get("subject-list").append(card);
         }
@@ -86,8 +88,14 @@ export function initTopics() {
     };
     get("topic-open-graph").onclick = () => {
         if (selected) {
-            sessionStorage.setItem("evolution-topic", selected.id);
-            location.hash = "evolution";
+            void openGraph(selected).catch(notice);
         }
     };
+}
+async function openGraph(topic, subject = "") {
+    await selectConversation(topic.group_id);
+    sessionStorage.setItem("evolution-topic", topic.id);
+    sessionStorage.setItem("evolution-subject", subject);
+    revealResearch("evolution");
+    await loadEvolution();
 }

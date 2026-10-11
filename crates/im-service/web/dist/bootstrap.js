@@ -1,3 +1,5 @@
+import { initWorkspace } from "./workspace.js";
+import { initCollaboration } from "./collaboration.js";
 import { initTopics } from "./topics.js";
 import { initEvolution, refreshEvolution } from "./evolution.js";
 import { initServices } from "./settings.js";
@@ -34,6 +36,8 @@ async function start() {
     initServices();
     initTopics();
     initEvolution();
+    initWorkspace();
+    initCollaboration();
     initExperience();
     initNavigation();
     await loadGroups();

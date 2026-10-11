@@ -1,10 +1,11 @@
 import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
-import { button, close, el, get, notice, open, presence, value, } from "./dom.js";
+import { close, el, get, notice, open, presence, value } from "./dom.js";
 export const people = new Map();
 export const display = (id) => id === "operator" ? t("people.e19796712f") : people.get(id)?.name || id;
 let next = null, generation = 0;
+let personId = "";
 export async function loadPeople(append = false) {
     const request = ++generation;
     try {
@@ -31,8 +32,11 @@ export async function loadPeople(append = false) {
             })));
             if (person.application_id)
                 card.append(el("small", t("people.ad1028ba2a", { p0: person.application_id })));
-            if (person.id !== "operator")
-                card.append(button(t("people.529a88ccb5"), () => grant(person.id)));
+            if (person.id !== "operator") {
+                const link = el("a", t("workspace.configureExecution"));
+                link.href = "#settings/bindings";
+                card.append(link);
+            }
             root.append(card);
         }
     }
@@ -40,22 +44,9 @@ export async function loadPeople(append = false) {
         notice(error);
     }
 }
-export async function grant(person_id) {
-    try {
-        const result = await change({
-            operation: "grant",
-            person_id,
-            lifetime_seconds: 86400,
-        });
-        get("credential-value").value = result.token;
-        open("credential-dialog");
-    }
-    catch (error) {
-        notice(error);
-    }
-}
 export function initPeople() {
     get("new-person").onclick = () => {
+        personId = "agent-" + crypto.randomUUID();
         get("person-form").reset();
         notice("", "person-status");
         open("person-dialog");
@@ -70,7 +61,10 @@ export function initPeople() {
         try {
             await change({
                 operation: "person",
-                person: { id: value("person-id"), name: value("person-name") },
+                person: {
+                    id: personId,
+                    name: value("person-name"),
+                },
             });
             close("person-dialog");
             await loadPeople();

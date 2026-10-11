@@ -1,3 +1,5 @@
+import { revealResearch } from "./workspace.js";
+import { loadEvolution } from "./evolution.js";
 import { TopicState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
 import { get, el, button, notice } from "./dom.js";
@@ -86,8 +88,7 @@ async function loadSubjects(more = false): Promise<void> {
         ),
         el("code", subject.reference),
         button(t("research.graph"), () => {
-          sessionStorage.setItem("evolution-subject", subject.id);
-          location.hash = "evolution";
+          if (selected) void openGraph(selected, subject.id).catch(notice);
         }),
         button(t("research.edit"), () =>
           subjectForm(selected!, subject, () => loadSubjects()),
@@ -120,8 +121,15 @@ export function initTopics(): void {
   };
   get("topic-open-graph").onclick = () => {
     if (selected) {
-      sessionStorage.setItem("evolution-topic", selected.id);
-      location.hash = "evolution";
+      void openGraph(selected).catch(notice);
     }
   };
+}
+
+async function openGraph(topic: Topic, subject = ""): Promise<void> {
+  await selectConversation(topic.group_id);
+  sessionStorage.setItem("evolution-topic", topic.id);
+  sessionStorage.setItem("evolution-subject", subject);
+  revealResearch("evolution");
+  await loadEvolution();
 }

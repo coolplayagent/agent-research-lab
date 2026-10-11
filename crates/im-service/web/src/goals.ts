@@ -1,3 +1,4 @@
+import { revealResearch } from "./workspace.js";
 import { GoalState, GroupKind, WorkState } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { label } from "./i18n.js";
@@ -7,11 +8,37 @@ import { display } from "./people.js";
 import type { Group } from "./types.js";
 import type { Goal, Work } from "./goal-types.js";
 let selected: Group | null = null;
+let snapshot: Goal[] = [];
+export function goalSnapshot(): Goal[] {
+  return snapshot;
+}
+export function suspendGoals(): void {
+  selected = null;
+  generation++;
+  window.clearTimeout(expiryTimer);
+  snapshot = [];
+  get("goal-list").replaceChildren();
+  get("more-goals").hidden = true;
+  get("goal-summary").textContent = t("workspace.goalSummary");
+}
+export function focusGoal(id: string): void {
+  revealResearch("goals");
+  for (const node of get("goal-list").querySelectorAll<HTMLDetailsElement>(
+    "[data-goal-id]",
+  )) {
+    if (node.dataset.goalId === id) {
+      node.open = true;
+      node.scrollIntoView({ block: "nearest" });
+      return;
+    }
+  }
+}
+
 let generation = 0;
 let next: string | null = null;
 let expiryTimer: number | undefined;
 export function selectGoals(group: Group): void {
-  window.clearTimeout(expiryTimer);
+  suspendGoals();
   selected = group;
   get("goal-section").hidden = group.kind === GroupKind.Board;
   get<HTMLButtonElement>("new-goal").disabled = group.archived;
@@ -158,6 +185,12 @@ export async function loadGoals(append = false): Promise<void> {
         () => void loadGoals(),
         Math.max(1, Math.min(...deadlines) - Date.now() + 50),
       );
+    snapshot = append ? [...snapshot, ...page.goals] : page.goals;
+    const active = snapshot.find((goal) => goal.state === GoalState.Active);
+    get("goal-summary").textContent = active
+      ? t("workspace.currentGoal", { title: active.input.title })
+      : t("workspace.goalSummary");
+    document.dispatchEvent(new Event("workspace-goals"));
     const list = get("goal-list");
     const opened = new Set(
       [

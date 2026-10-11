@@ -1,3 +1,4 @@
+import { allowSettingsLeave, savedSettings } from "./settings-guard.js";
 import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
 export function element<K extends keyof HTMLElementTagNameMap>(
@@ -54,7 +55,12 @@ export function dialog(title: string): {
     header = element("header"),
     close = element("button", t("services.close"));
   close.type = "button";
-  close.onclick = () => dialog.close();
+  close.onclick = () => {
+    if (allowSettingsLeave()) dialog.close();
+  };
+  dialog.addEventListener("cancel", (event) => {
+    if (!allowSettingsLeave()) event.preventDefault();
+  });
   const heading = element("h2", title);
   heading.id = "dialog-" + crypto.randomUUID();
   dialog.setAttribute("aria-labelledby", heading.id);
@@ -82,6 +88,7 @@ export function finish(
     box.status.textContent = "";
     try {
       await save();
+      savedSettings(box.form);
       box.dialog.close();
     } catch (error) {
       box.status.textContent = String(error);
