@@ -1571,6 +1571,7 @@ pub fn run_scoped(
             .map(|a| a.job.task.exploratory)
             .unwrap_or(prefer_exploration);
         let mut pending = jobs(c)?;
+        let may_admit = active.is_empty() && pending.iter().all(|job| job.launch.is_none());
         pending.retain(|job| {
             scope
                 .as_ref()
@@ -1579,33 +1580,38 @@ pub fn run_scoped(
         pending.sort_by_key(|j| j.task.exploratory != track);
         let mut admitted = false;
         let mut retry_waiting = false;
-        // Remote checks can be slow. Verify only with no active leases, then
-        // admit one bounded cohort as a batch; never block a running heartbeat.
-        let may_admit = active.is_empty();
+        // Finish the selected cohort's prerequisites before the first lease.
+        // A failed prerequisite takes no capacity; later ready peers can join.
+        let mut prepared: Vec<Job> = Vec::new();
+        let mut deferred_admission = false;
         let mut checked_cohort: Option<String> = None;
+        let admission_deadline =
+            process::deadline_scope(Duration::from_secs(window.remaining(c, &ledger)));
         for mut job in pending {
             if !may_admit {
                 break;
             }
-            if active.len() >= c.max_agents {
+            if prepared.len() >= c.max_agents {
+                deferred_admission = true;
                 break;
             }
-            if !active.is_empty() && job.task.exploratory != active[0].job.task.exploratory {
-                continue;
+            if window.remaining(c, &ledger) == 0 {
+                break;
             }
             if job.launch.is_some() {
                 continue;
             }
-            // Sandbox verification executes a bounded sequence of real host
-            // commands. Do it in an idle window, before consuming a retry or
-            // claiming a write effect under a peer's 10-second allowance.
-            if !active.is_empty()
-                && job
-                    .task
-                    .required_tools
-                    .iter()
-                    .any(|name| name == "repo-sandbox")
-            {
+            // Sandbox verification stays in launch, with no earlier peer.
+            // Do not reorder it ahead of an already selected ordinary task.
+            if prepared.first().is_some_and(|first| {
+                job.task.exploratory != first.task.exploratory
+                    || job
+                        .task
+                        .required_tools
+                        .iter()
+                        .any(|name| name == "repo-sandbox")
+            }) {
+                deferred_admission = true;
                 continue;
             }
             if let Some(due) = job.retry_after {
@@ -1613,26 +1619,26 @@ pub fn run_scoped(
                 if due > time {
                     continue;
                 }
-                prepare_retry(c, &mut job)?;
+                if prepare_prerequisite(c, &mut ledger, window, false, || {
+                    prepare_retry(c, &mut job)
+                })?
+                .is_none()
+                {
+                    break;
+                }
+                last = now();
             }
             if job.last_error.is_some() {
                 continue;
             }
-            let s = w.status(&job.run_id)?;
-            if WorkflowState::from_value(&s["status"]) != Some(WorkflowState::Running)
-                || s.get("pause").is_some_and(|v| !v.is_null())
-            {
-                continue;
-            }
-            if job.task.dependencies.iter().any(|id| {
-                storage::read::<Job>(&job_path(c, id))
-                    .and_then(|j| w.status(&j.run_id))
-                    .map(|s| {
-                        WorkflowState::from_value(&s["status"]) != Some(WorkflowState::Succeeded)
-                    })
-                    .unwrap_or(true)
-            }) {
-                continue;
+            let eligible = prepare_prerequisite(c, &mut ledger, window, false, || {
+                admission_ready(c, &w, &job)
+            })?;
+            last = now();
+            match eligible {
+                Some(true) => {}
+                Some(false) => continue,
+                None => break,
             }
             let cohort = job
                 .research_inputs
@@ -1641,10 +1647,11 @@ pub fn run_scoped(
                 .unwrap_or_default();
             if let Some(checked) = &checked_cohort {
                 if checked != &cohort {
+                    deferred_admission = true;
                     continue;
                 }
             } else {
-                let checked = idle_host(c, &mut ledger, window, || {
+                let checked = prepare_prerequisite(c, &mut ledger, window, false, || {
                     let _deadline = process::deadline_scope(Duration::from_secs(60));
                     inputs::verify(c, job.research_inputs.as_ref())
                 });
@@ -1671,7 +1678,8 @@ pub fn run_scoped(
             {
                 // Cold preparation may download dependencies for up to 55 s.
                 // Never run it under the 10 s allowance of an active cohort.
-                if !active.is_empty() || now() < next_desktop_prepare {
+                retry_waiting = true;
+                if now() < next_desktop_prepare {
                     continue;
                 }
                 let prepared =
@@ -1711,9 +1719,6 @@ pub fn run_scoped(
             {
                 // Dependency copies can be large. Prepare only in an idle,
                 // accounted host window, before acquiring/claiming any effect.
-                if !active.is_empty() {
-                    continue;
-                }
                 retry_waiting = true;
                 if next_build_prepare
                     .get(&job.run_id)
@@ -1743,28 +1748,25 @@ pub fn run_scoped(
                     }
                 }
             }
-            let availability =
-                prepare_prerequisite(c, &mut ledger, window, !active.is_empty(), || {
-                    // DesktopSession verifies the cached dependency manifest in
-                    // each worker. Availability probing never downloads packages.
-                    job.task.required_tools.iter().try_for_each(|name| {
-                        let t = c
-                            .tools
-                            .get(name)
-                            .context("required tool no longer configured")?;
-                        let out = process::capture(
-                            t.binary.to_str().context("non-UTF8 tool path")?,
-                            &t.probe,
-                            &c.workspace,
-                            Duration::from_secs(15),
-                        )?;
-                        ensure!(out.status.success(), "required tool {name} unavailable");
-                        Ok::<_, anyhow::Error>(())
-                    })
-                });
-            if active.is_empty() {
-                last = now();
-            }
+            let availability = prepare_prerequisite(c, &mut ledger, window, false, || {
+                // DesktopSession verifies the cached dependency manifest in
+                // each worker. Availability probing never downloads packages.
+                job.task.required_tools.iter().try_for_each(|name| {
+                    let t = c
+                        .tools
+                        .get(name)
+                        .context("required tool no longer configured")?;
+                    let out = process::capture(
+                        t.binary.to_str().context("non-UTF8 tool path")?,
+                        &t.probe,
+                        &c.workspace,
+                        Duration::from_secs(15),
+                    )?;
+                    ensure!(out.status.success(), "required tool {name} unavailable");
+                    Ok::<_, anyhow::Error>(())
+                })
+            });
+            last = now();
             if matches!(availability, Ok(None)) {
                 break;
             }
@@ -1774,6 +1776,58 @@ pub fn run_scoped(
                 job.retry_after = None;
                 storage::write(&job_path(c, &job.task.id), &job)?;
                 continue;
+            }
+            prepared.push(job);
+        }
+        // Preparation and probes can be slow even when caches are warm. Check
+        // latest inputs again while still lease-free, then retain local launch
+        // checks for every task's frozen bytes, prompt, config and dependencies.
+        if let Some(first) = prepared.first() {
+            let checked = prepare_prerequisite(c, &mut ledger, window, false, || {
+                inputs::verify(c, first.research_inputs.as_ref())
+            });
+            last = now();
+            match checked {
+                Ok(Some(())) => {}
+                Ok(None) => prepared.clear(),
+                Err(error) => {
+                    for job in &mut prepared {
+                        job.last_error = Some(format!(
+                            "latest-baseline admission blocked; preserve this experiment and enqueue a fresh cohort: {error:#}"
+                        ));
+                        job.retry_after = None;
+                        storage::write(&job_path(c, &job.task.id), job)?;
+                    }
+                    prepared.clear();
+                }
+            }
+        }
+        for mut job in prepared {
+            if active.len() >= c.max_agents {
+                break;
+            }
+            if active.first().is_some_and(|first| {
+                job.task.exploratory != first.job.task.exploratory
+                    || job
+                        .task
+                        .required_tools
+                        .iter()
+                        .any(|name| name == "repo-sandbox")
+            }) {
+                deferred_admission = true;
+                continue;
+            }
+            let eligible =
+                prepare_prerequisite(c, &mut ledger, window, !active.is_empty(), || {
+                    admission_ready(c, &w, &job)
+                })?;
+            if active.is_empty() {
+                last = now();
+            }
+            match eligible {
+                Some(true) => {}
+                Some(false) => continue,
+                None => break,
             }
             ledger.budget.tick(now(), !active.is_empty())?;
             let bounded_remaining = window.remaining(c, &ledger);
@@ -1824,6 +1878,7 @@ pub fn run_scoped(
                 }
             }
         }
+        drop(admission_deadline);
         if !active.is_empty() && ledger.budget.active_since.is_none() {
             ledger.budget.tick(now(), true)?;
             storage::write(&ledger_path, &ledger)?;
@@ -1831,7 +1886,7 @@ pub fn run_scoped(
         if active.is_empty() && !admitted {
             ledger.budget.tick(now(), false)?;
             storage::write(&ledger_path, &ledger)?;
-            if !continuous && !retry_waiting && !host_progress {
+            if !continuous && !retry_waiting && !host_progress && !deferred_admission {
                 break;
             }
             if continuous && now() >= next_seed_check {
@@ -1853,6 +1908,25 @@ pub fn run_scoped(
         }
     }
     scoped_run_status(c, scope.as_ref(), &deferred_followups)
+}
+
+/// Recheck durable admission before preparation and again before a claim.
+/// Dependency errors or future protocol states cannot authorize execution.
+fn admission_ready(c: &Config, w: &Workflow, job: &Job) -> Result<bool> {
+    let state = w.status(&job.run_id)?;
+    if WorkflowState::from_value(&state["status"]) != Some(WorkflowState::Running)
+        || state.get("pause").is_some_and(|value| !value.is_null())
+    {
+        return Ok(false);
+    }
+    Ok(!job.task.dependencies.iter().any(|id| {
+        storage::read::<Job>(&job_path(c, id))
+            .and_then(|dependency| w.status(&dependency.run_id))
+            .map(|state| {
+                WorkflowState::from_value(&state["status"]) != Some(WorkflowState::Succeeded)
+            })
+            .unwrap_or(true)
+    }))
 }
 
 fn launch(
@@ -3198,7 +3272,7 @@ mod tests {
         }
     }
 
-    fn completion_fixture(
+    pub(super) fn completion_fixture(
         memory: bool,
         proposals: Value,
     ) -> (tempfile::TempDir, Config, Job, Workflow) {
@@ -5323,3 +5397,6 @@ mod host_budget_tests {
 #[cfg(test)]
 #[path = "team_tests.rs"]
 mod team_tests;
+
+#[cfg(test)]
+mod cohort_tests;
