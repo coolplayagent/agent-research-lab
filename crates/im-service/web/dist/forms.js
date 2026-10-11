@@ -1,3 +1,4 @@
+import { allowSettingsLeave, savedSettings } from "./settings-guard.js";
 import { t } from "./i18n.js";
 export function element(tag, text) {
     const node = document.createElement(tag);
@@ -41,7 +42,14 @@ export function field(title, node) {
 export function dialog(title) {
     const dialog = element("dialog"), form = element("form"), header = element("header"), close = element("button", t("services.close"));
     close.type = "button";
-    close.onclick = () => dialog.close();
+    close.onclick = () => {
+        if (allowSettingsLeave())
+            dialog.close();
+    };
+    dialog.addEventListener("cancel", (event) => {
+        if (!allowSettingsLeave())
+            event.preventDefault();
+    });
     header.append(element("h2", title), close);
     form.append(header);
     const status = element("p");
@@ -61,6 +69,7 @@ export function finish(box, save) {
         button.disabled = true;
         try {
             await save();
+            savedSettings(box.form);
             box.dialog.close();
         }
         catch (error) {

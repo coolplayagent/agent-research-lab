@@ -17,6 +17,22 @@ fn asset(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/css; charset=utf-8",
             include_bytes!("../web/style.css").as_slice(),
         )),
+        "/assets/workspace.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/workspace.js").as_slice(),
+        )),
+        "/assets/settings-guard.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/settings-guard.js").as_slice(),
+        )),
+        "/assets/collaboration.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/collaboration.js").as_slice(),
+        )),
+        "/assets/collaboration-model.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/collaboration-model.js").as_slice(),
+        )),
         "/assets/api.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../web/dist/api.js").as_slice(),

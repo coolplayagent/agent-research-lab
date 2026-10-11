@@ -1,3 +1,4 @@
+import { trackSettings } from "./settings-guard.js";
 import { CodingAgent, AgentProtocol, ServiceKind, } from "/assets/shared/contracts.js";
 import { t, label } from "./i18n.js";
 import { element, select, input, check, area, dialog, finish, field, } from "./forms.js";
@@ -16,6 +17,7 @@ export function editService(config, old, save) {
     endpoint.required = true;
     endpoint.placeholder = "/absolute/private/service.sock";
     box.form.append(field(t("services.id"), id), field(t("services.kind"), kind), field(t("services.endpoint"), endpoint), field(t("services.enabled"), enabled), field(t("services.sandbox"), sandbox));
+    trackSettings(box.form);
     finish(box, async () => {
         const value = {
             id: id.value.trim(),
@@ -43,6 +45,7 @@ export function editAdapter(config, old, save) {
     seconds.max = "3600";
     seconds.required = true;
     box.form.append(element("p", t("services.adapterNote")), field(t("services.id"), id), field(t("services.agent"), agent), field(t("services.executor"), executor), field(t("services.command"), command), element("p", t("services.commandNote")), field(t("services.env"), env), element("p", t("services.envNote")), field(t("services.mounts"), mounts), field(t("services.network"), network), field(t("services.limit"), seconds), field(t("services.enabled"), enabled));
+    trackSettings(box.form);
     finish(box, async () => {
         const argv = JSON.parse(command.value);
         if (!Array.isArray(argv) || !argv.every((v) => typeof v === "string"))

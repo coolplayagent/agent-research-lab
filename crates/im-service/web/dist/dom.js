@@ -33,8 +33,5 @@ export function initDialogs() {
     document
         .querySelectorAll("[data-close]")
         .forEach((node) => (node.onclick = () => close(node.dataset.close)));
-    get("credential-dialog").addEventListener("close", () => {
-        get("credential-value").value = "";
-    });
 }
 export const presence = (value) => label("Presence", value);

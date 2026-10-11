@@ -2,36 +2,63 @@ import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { api, query } from "./api.js";
 import { button, el, get, notice, value } from "./dom.js";
-let section = "groups", next = null, rows = [], selected = "", generation = 0;
+let next = null, rows = [], selected = "", generation = 0;
 let choose;
-export function setSection(value) {
-    section = value;
-    render();
-}
+let restored = false;
 export function setSelected(id) {
     selected = id;
+    sessionStorage.setItem("workspace-group", id);
     render();
-}
-function belongs(group) {
-    return section === "boards"
-        ? group.kind === GroupKind.Board
-        : section === "direct"
-            ? group.private || group.kind === GroupKind.Temporary
-            : group.kind === GroupKind.Conversation && !group.private;
 }
 function render() {
     const root = get("group-list");
+    const folded = new Set([...root.querySelectorAll("details:not([open])")].map((node) => node.dataset.section));
     root.replaceChildren();
-    for (const group of rows.filter(belongs)) {
-        const item = button("", () => choose(group));
-        item.className = "group-item" + (group.id === selected ? " selected" : "");
-        item.append(el("strong", `${group.pinned ? "★ " : ""}${group.title}`), el("small", t("directory.c04a113aca", {
-            p0: group.archived ? t("directory.bafe86d881") : "",
-            p1: group.member_count,
-        })));
-        root.append(item);
+    const sections = [
+        [
+            "groups",
+            t("workspace.groups"),
+            (g) => g.kind === GroupKind.Conversation && !g.private,
+        ],
+        [
+            "direct",
+            t("workspace.direct"),
+            (g) => g.kind !== GroupKind.Board &&
+                (g.private || g.kind === GroupKind.Temporary),
+        ],
+        ["boards", t("workspace.boards"), (g) => g.kind === GroupKind.Board],
+    ];
+    for (const [id, title, belongs] of sections) {
+        const section = el("details", undefined, "directory-section");
+        section.dataset.section = id;
+        section.open = !folded.has(id);
+        section.append(el("summary", title));
+        for (const group of rows
+            .filter(belongs)
+            .sort((a, b) => Number(b.pinned) - Number(a.pinned))) {
+            const item = button("", () => {
+                location.hash = id;
+                choose(group);
+                get("workspace").classList.remove("directory-open");
+            });
+            item.className =
+                "group-item" + (group.id === selected ? " selected" : "");
+            item.title = group.title;
+            item.setAttribute("aria-current", group.id === selected ? "true" : "false");
+            item.append(el("span", group.pinned
+                ? "★"
+                : id === "groups"
+                    ? "#"
+                    : id === "boards"
+                        ? "◇"
+                        : "@"), el("strong", group.title), el("small", group.archived
+                ? t("directory.bafe86d881")
+                : String(group.member_count)));
+            section.append(item);
+        }
+        root.append(section);
     }
-    if (!root.childElementCount)
+    if (!rows.length)
         root.append(el("p", t("directory.49ff4c1834"), "empty"));
 }
 export function metrics(data) {
@@ -66,6 +93,26 @@ export async function loadGroups(append = false) {
         get("more-groups").hidden = !next;
         metrics(result.metrics);
         render();
+        if (!restored) {
+            restored = true;
+            const saved = sessionStorage.getItem("workspace-group");
+            const found = rows.find((g) => g.id === saved);
+            if (found)
+                choose(found);
+            else if (saved) {
+                try {
+                    const view = await api("/api/crystal/view?" + query({ group_id: saved }));
+                    if (generation === request && !selected)
+                        choose(view.group);
+                }
+                catch {
+                    if (!selected && rows[0])
+                        choose(rows[0]);
+                }
+            }
+            else if (rows[0])
+                choose(rows[0]);
+        }
     }
     catch (error) {
         notice(error);
@@ -73,6 +120,10 @@ export async function loadGroups(append = false) {
 }
 export function initDirectory(select) {
     choose = select;
+    get("group-search").addEventListener("keydown", (event) => {
+        if (event.key === "Enter")
+            void loadGroups();
+    });
     get("search-groups").onclick = () => void loadGroups();
     get("more-groups").onclick = () => void loadGroups(true);
 }

@@ -1,3 +1,4 @@
+import { trackSettings } from "./settings-guard.js";
 import {
   CodingAgent,
   AgentProtocol,
@@ -51,6 +52,7 @@ export function editService(
     field(t("services.enabled"), enabled),
     field(t("services.sandbox"), sandbox),
   );
+  trackSettings(box.form);
   finish(box, async () => {
     const value: Service = {
       id: id.value.trim(),
@@ -111,6 +113,7 @@ export function editAdapter(
     field(t("services.limit"), seconds),
     field(t("services.enabled"), enabled),
   );
+  trackSettings(box.form);
   finish(box, async () => {
     const argv: unknown = JSON.parse(command.value);
     if (!Array.isArray(argv) || !argv.every((v) => typeof v === "string"))

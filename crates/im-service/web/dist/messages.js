@@ -5,16 +5,45 @@ import { button, el, get, notice } from "./dom.js";
 import { display } from "./people.js";
 let group = null, generation = 0, browsing = false, reply = null;
 const messages = new Map();
+const drafts = new Map();
+export function messageSnapshot() {
+    return [...messages.values()];
+}
+export function suspendMessages() {
+    if (group)
+        drafts.set(group.id, {
+            text: get("message-text").value,
+            reply,
+        });
+    group = null;
+    generation++;
+}
+function sizeComposer() {
+    const input = get("message-text");
+    input.style.height = "46px";
+    input.style.height = Math.min(130, Math.max(46, input.scrollHeight)) + "px";
+}
+export function locateMessage(sequence) {
+    for (const row of get("messages").querySelectorAll("[data-sequence]")) {
+        row.classList.toggle("target", row.dataset.sequence === String(sequence));
+        if (row.dataset.sequence === String(sequence))
+            row.scrollIntoView({ block: "center" });
+    }
+}
 let pending = null;
 export function resetMessages(selected, initial) {
+    if (group)
+        suspendMessages();
     generation++;
     group = selected;
     browsing = false;
-    reply = null;
+    reply = drafts.get(selected.id)?.reply ?? null;
     pending = null;
     messages.clear();
     initial.forEach((m) => messages.set(m.sequence, m));
-    get("message-text").value = "";
+    get("message-text").value =
+        drafts.get(selected.id)?.text || "";
+    sizeComposer();
     get("send-message").disabled = false;
     get("older-messages").disabled = false;
     updateReply();
@@ -78,8 +107,10 @@ function renderMessages() {
             : t("messages.25b7624487"), "empty"));
     if (bottom)
         root.scrollTop = root.scrollHeight;
+    document.dispatchEvent(new Event("workspace-messages"));
 }
 export function initMessages() {
+    get("message-text").addEventListener("input", sizeComposer);
     get("cancel-reply").onclick = () => {
         reply = null;
         updateReply();
@@ -154,6 +185,8 @@ export function initMessages() {
             pending = null;
             if (input.value.trim() === text)
                 input.value = "";
+            drafts.delete(id);
+            sizeComposer();
             reply = null;
             updateReply();
             incoming(result.message);

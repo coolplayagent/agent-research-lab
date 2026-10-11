@@ -1,3 +1,4 @@
+import { focusGoal } from "./goals.js";
 import { t, label } from "./i18n.js";
 import { el, button, get } from "./dom.js";
 import { openGroup as selectConversation } from "./conversation.js";
@@ -129,7 +130,7 @@ export function showNode(row: EvolutionRow): void {
   panel.append(pins);
   if (row.goal) {
     panel.append(
-      el("h4", row.goal.input.title),
+      button(row.goal.input.title, () => focusGoal(row.goal!.input.id)),
       el("p", label("GoalState", row.goal.state)),
       el("p", row.goal.input.acceptance),
     );

@@ -9,6 +9,34 @@ let group: Group | null = null,
   browsing = false,
   reply: number | null = null;
 const messages = new Map<number, Message>();
+const drafts = new Map<string, { text: string; reply: number | null }>();
+export function messageSnapshot(): Message[] {
+  return [...messages.values()];
+}
+export function suspendMessages(): void {
+  if (group)
+    drafts.set(group.id, {
+      text: get<HTMLTextAreaElement>("message-text").value,
+      reply,
+    });
+  group = null;
+  generation++;
+}
+function sizeComposer(): void {
+  const input = get<HTMLTextAreaElement>("message-text");
+  input.style.height = "46px";
+  input.style.height = Math.min(130, Math.max(46, input.scrollHeight)) + "px";
+}
+export function locateMessage(sequence: number): void {
+  for (const row of get("messages").querySelectorAll<HTMLElement>(
+    "[data-sequence]",
+  )) {
+    row.classList.toggle("target", row.dataset.sequence === String(sequence));
+    if (row.dataset.sequence === String(sequence))
+      row.scrollIntoView({ block: "center" });
+  }
+}
+
 let pending: {
   group_id: string;
   request_id: string;
@@ -16,14 +44,17 @@ let pending: {
   reply_to: number | null;
 } | null = null;
 export function resetMessages(selected: Group, initial: Message[]): void {
+  if (group) suspendMessages();
   generation++;
   group = selected;
   browsing = false;
-  reply = null;
+  reply = drafts.get(selected.id)?.reply ?? null;
   pending = null;
   messages.clear();
   initial.forEach((m) => messages.set(m.sequence, m));
-  get<HTMLTextAreaElement>("message-text").value = "";
+  get<HTMLTextAreaElement>("message-text").value =
+    drafts.get(selected.id)?.text || "";
+  sizeComposer();
   get<HTMLButtonElement>("send-message").disabled = false;
   get<HTMLButtonElement>("older-messages").disabled = false;
   updateReply();
@@ -110,8 +141,10 @@ function renderMessages(): void {
       ),
     );
   if (bottom) root.scrollTop = root.scrollHeight;
+  document.dispatchEvent(new Event("workspace-messages"));
 }
 export function initMessages(): void {
+  get("message-text").addEventListener("input", sizeComposer);
   get("cancel-reply").onclick = () => {
     reply = null;
     updateReply();
@@ -188,6 +221,8 @@ export function initMessages(): void {
       if (request !== generation) return;
       pending = null;
       if (input.value.trim() === text) input.value = "";
+      drafts.delete(id);
+      sizeComposer();
       reply = null;
       updateReply();
       incoming(result.message);

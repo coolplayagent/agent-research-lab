@@ -1,3 +1,10 @@
+import {
+  trackSettings,
+  savedSettings,
+  allowSettingsLeave,
+  hasUnsavedSettings,
+} from "./settings-guard.js";
+import type { Page, Person } from "./types.js";
 import { ServiceKind } from "/assets/shared/contracts.js";
 import { api } from "./api.js";
 import { get } from "./dom.js";
@@ -6,6 +13,8 @@ import { editAdapter, editService } from "./service-forms.js";
 import { element, select, field } from "./forms.js";
 import type { Configuration, ServiceView } from "./service-types.js";
 let current: ServiceView | undefined;
+let directory: Person[] = [];
+let generation = 0;
 function button(
   title: string,
   action: () => void | Promise<void>,
@@ -26,7 +35,7 @@ function button(
 }
 async function save(config: Configuration): Promise<void> {
   await api("/api/im/services", config, "manage-services");
-  await loadServices();
+  await loadServices(true);
 }
 function render(view: ServiceView): void {
   const config = view.configuration;
@@ -104,22 +113,40 @@ function render(view: ServiceView): void {
     ],
     config.storage_id || "",
   );
-  storage.append(
+  const storageForm = element("form");
+  trackSettings(storageForm);
+  storage.append(storageForm);
+  storageForm.append(
     field(t("services.storage"), selected),
     element("p", t("services.storageNote")),
-    button(t("services.saveStorage"), async () => {
+  );
+  const storeButton = element("button", t("services.saveStorage"));
+  storeButton.type = "submit";
+  storageForm.append(storeButton);
+  storageForm.onsubmit = async (event) => {
+    event.preventDefault();
+    storeButton.disabled = true;
+    try {
       const next = structuredClone(config);
       next.storage_id = selected.value || null;
       await save(next);
-    }),
-  );
+      savedSettings(storageForm);
+    } catch (error) {
+      get("services-status").textContent = String(error);
+    } finally {
+      storeButton.disabled = false;
+    }
+  };
   const bindings = get("binding-list");
   bindings.replaceChildren();
   for (const [person, id] of Object.entries(config.bindings)) {
     const row = element("div");
     row.className = "toolbar";
     row.append(
-      element("span", `${person} → ${id}`),
+      element(
+        "span",
+        `${directory.find((p) => p.id === person)?.name || person} → ${id}`,
+      ),
       button(t("services.unbind"), async () => {
         const next = structuredClone(config);
         delete next.bindings[person];
@@ -129,15 +156,19 @@ function render(view: ServiceView): void {
     bindings.append(row);
   }
   const form = element("form"),
-    person = element("input"),
+    person = select(
+      directory.filter((p) => p.id !== "operator").map((p) => [p.id, p.name]),
+      directory.find((p) => p.id !== "operator")?.id || "",
+    ),
     adapter = select(
       config.adapters.map((a) => [a.id, a.id]),
       config.adapters[0]?.id || "",
     );
   person.required = true;
-  person.placeholder = t("services.personPlaceholder");
+  trackSettings(form);
   const submit = element("button", t("services.bind"));
   submit.type = "submit";
+  submit.disabled = !person.value || !adapter.value;
   form.append(
     field(t("services.person"), person),
     field(t("services.adapter"), adapter),
@@ -150,24 +181,45 @@ function render(view: ServiceView): void {
       const next = structuredClone(config);
       next.bindings[person.value.trim()] = adapter.value;
       await save(next);
+      savedSettings(form);
     } catch (error) {
       get("services-status").textContent = String(error);
     } finally {
-      submit.disabled = false;
+      submit.disabled = !person.value || !adapter.value;
     }
   };
   bindings.append(form);
 }
-export async function loadServices(): Promise<void> {
+export async function loadServices(force = false): Promise<void> {
+  if (!force && hasUnsavedSettings()) return;
+  const request = ++generation;
   get("services-status").textContent = t("services.checking");
   try {
-    render(await api<ServiceView>("/api/im/services"));
+    const view = await api<ServiceView>("/api/im/services");
+    const people: Person[] = [];
+    let cursor = "";
+    do {
+      const page = await api<Page<Person>>(
+        "/api/im/people?after=" + encodeURIComponent(cursor),
+      );
+      if (request !== generation) return;
+      people.push(...page.people);
+      const next = page.next_after || "";
+      if (next === cursor) break;
+      cursor = next;
+    } while (cursor && people.length < 10000);
+    if (request !== generation || (!force && hasUnsavedSettings())) return;
+    directory = people;
+    render(view);
   } catch (error) {
-    get("services-status").textContent = String(error);
+    if (request === generation)
+      get("services-status").textContent = String(error);
   }
 }
 export function initServices(): void {
-  get("refresh-services").onclick = () => void loadServices();
+  get("refresh-services").onclick = () => {
+    if (allowSettingsLeave()) void loadServices();
+  };
   get("add-service").onclick = () => {
     if (current) editService(current.configuration, undefined, save);
   };

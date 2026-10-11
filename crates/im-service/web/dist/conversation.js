@@ -1,11 +1,14 @@
+import { selectEvolution } from "./evolution.js";
+import { selectCollaboration, refreshCollaboration } from "./collaboration.js";
 import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
 import { close, get, notice, open, value } from "./dom.js";
 import { loadGroups, metrics, setSelected } from "./directory.js";
-import { incoming, resetMessages, updateComposer } from "./messages.js";
-import { selectGoals, loadGoals } from "./goals.js";
+import { incoming, resetMessages, updateComposer, suspendMessages, } from "./messages.js";
+import { selectGoals, loadGoals, suspendGoals } from "./goals.js";
 export let current = null;
+let openGeneration = 0;
 let generation = 0, stream = null, converting = false, editSnapshot = null;
 export function renderHeader(group) {
     get("group-title").textContent = group.title;
@@ -31,6 +34,13 @@ export function renderHeader(group) {
     updateComposer(group);
 }
 export async function select(group) {
+    openGeneration++;
+    if (current?.id === group.id)
+        return;
+    suspendMessages();
+    suspendGoals();
+    selectEvolution(group.id);
+    selectCollaboration(null);
     const request = ++generation;
     stream?.close();
     stream = null;
@@ -46,6 +56,7 @@ export async function select(group) {
         resetMessages(current, page.messages);
         renderHeader(current);
         selectGoals(current);
+        selectCollaboration(page);
         get("empty-conversation").hidden = true;
         get("active-conversation").hidden = false;
         stream = new EventSource("/api/crystal/events?" +
@@ -61,11 +72,14 @@ export async function select(group) {
             if (request !== generation)
                 return;
             const status = JSON.parse(event.data);
+            if (!status.group)
+                return;
             const changed = current?.revision !== status.group.revision;
             current = status.group;
             renderHeader(current);
             metrics(status.metrics);
             void loadGoals();
+            refreshCollaboration();
             if (changed)
                 void loadGroups();
         });
@@ -77,7 +91,10 @@ export async function select(group) {
             if (request === generation)
                 get("connection").textContent = t("conversation.021bd7f674");
         };
-        stream.addEventListener("fault", () => notice(t("conversation.a94f45360c")));
+        stream.addEventListener("fault", () => {
+            if (request === generation)
+                notice(t("conversation.a94f45360c"));
+        });
     }
     catch (error) {
         if (request === generation)
@@ -174,7 +191,15 @@ export function initConversation() {
     };
 }
 export async function openGroup(id) {
+    const request = ++openGeneration;
     const view = await api("/api/crystal/view?" + query({ group_id: id }));
-    location.hash = "groups";
+    if (request !== openGeneration)
+        return;
+    location.hash =
+        view.group.kind === GroupKind.Board
+            ? "boards"
+            : view.group.private || view.group.kind === GroupKind.Temporary
+                ? "direct"
+                : "groups";
     await select(view.group);
 }

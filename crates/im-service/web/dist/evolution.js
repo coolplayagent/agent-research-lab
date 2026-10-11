@@ -6,50 +6,108 @@ import { select as picker } from "./forms.js";
 import { nodeForm } from "./research-forms.js";
 import { renderGraph, showNode } from "./evolution-render.js";
 let requestSequence = 0;
+let groupId = "";
+export function selectEvolution(id) {
+    if (id === groupId)
+        return;
+    groupId = id;
+    requestSequence++;
+    rows = [];
+    topics = [];
+    subjects = [];
+    topic = "";
+    subject = "";
+    after = null;
+    get("evolution-canvas").replaceChildren();
+    get("evolution-filters").replaceChildren();
+    get("evolution-detail").hidden = true;
+    get("more-evolution").hidden = true;
+    get("evolution-summary").textContent = t("workspace.loadingGraph");
+    get("new-evolution-node").disabled = true;
+    if (!get("evolution-page").hidden)
+        void loadEvolution();
+}
 let refreshTimer;
 export function refreshEvolution() {
-    if (location.hash !== "#evolution")
+    if (get("evolution-page").hidden ||
+        get("workspace").classList.contains("auxiliary"))
         return;
     if (refreshTimer)
         clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
-        void graph(false).catch(notice);
+        void loadEvolution();
     }, 120);
 }
 let rows = [], subjects = [], topics = [], after = null, topic = "", subject = "", zoom = 1;
 export async function loadEvolution(more = false) {
+    const request = ++requestSequence, group = groupId;
+    if (!group) {
+        get("evolution-summary").textContent = t("workspace.selectGroup");
+        return;
+    }
     try {
         if (!more) {
-            topic = sessionStorage.getItem("evolution-topic") || "";
-            subject = sessionStorage.getItem("evolution-subject") || "";
+            topic = sessionStorage.getItem("evolution-topic") || topic;
+            subject = sessionStorage.getItem("evolution-subject") || subject;
             sessionStorage.removeItem("evolution-topic");
             sessionStorage.removeItem("evolution-subject");
-            await filters();
+            if (!(await filters(request, group)))
+                return;
+        }
+        if (request !== requestSequence)
+            return;
+        if (!topic) {
+            rows = [];
+            after = null;
+            renderGraph([], showNode);
+            get("evolution-summary").textContent = t("workspace.noGroupTopics");
+            get("more-evolution").hidden = true;
+            get("evolution-detail").hidden = true;
+            return;
         }
         await graph(more);
     }
     catch (error) {
-        notice(error);
+        if (group === groupId) {
+            get("evolution-summary").textContent = String(error);
+            notice(error);
+        }
     }
 }
-async function filters() {
-    topics = [];
-    subjects = [];
-    let cursor = "";
+async function filters(request, group) {
+    const loadedTopics = [], loadedSubjects = [];
+    let cursor = "", count = 0;
     do {
         const page = await api("/api/im/topics?" + query({ after: cursor }));
-        topics.push(...page.topics);
-        cursor = page.next_after || "";
-    } while (cursor && topics.length < 2048);
-    do {
-        const page = await api("/api/im/subjects?" + query({ topic_id: topic, after: cursor }));
-        subjects.push(...page.subjects);
-        cursor = page.next_after || "";
-    } while (cursor && subjects.length < 8192);
-    const topicPicker = picker([
-        ["", t("research.allTopics")],
-        ...topics.map((r) => [r.topic.id, r.topic.title]),
-    ], topic), subjectPicker = picker([
+        if (request !== requestSequence)
+            return false;
+        loadedTopics.push(...page.topics.filter((row) => row.topic.group_id === group));
+        count += page.topics.length;
+        const next = page.next_after || "";
+        if (next && (next === cursor || count >= 8192))
+            throw new Error(t("workspace.topicLimit"));
+        cursor = next;
+    } while (cursor);
+    topics = loadedTopics;
+    if (!topics.some((row) => row.topic.id === topic)) {
+        topic = topics[0]?.topic.id || "";
+        subject = "";
+    }
+    if (topic)
+        do {
+            const page = await api("/api/im/subjects?" + query({ topic_id: topic, after: cursor }));
+            if (request !== requestSequence)
+                return false;
+            loadedSubjects.push(...page.subjects);
+            const next = page.next_after || "";
+            if (next && (next === cursor || loadedSubjects.length >= 8192))
+                throw new Error(t("workspace.topicLimit"));
+            cursor = next;
+        } while (cursor);
+    subjects = loadedSubjects;
+    if (!subjects.some((row) => row.subject.id === subject))
+        subject = "";
+    const topicPicker = picker([...topics.map((r) => [r.topic.id, r.topic.title])], topic), subjectPicker = picker([
         ["", t("research.allSubjects")],
         ...subjects.map((r) => [r.subject.id, r.subject.name]),
     ], subject);
@@ -59,17 +117,18 @@ async function filters() {
     topicPicker.onchange = () => {
         topic = topicPicker.value;
         subject = "";
-        void filters()
-            .then(() => graph(false))
-            .catch(notice);
+        void loadEvolution();
     };
     subjectPicker.onchange = () => {
         subject = subjectPicker.value;
         void graph(false).catch(notice);
     };
     get("new-evolution-node").disabled = !subject;
+    return true;
 }
 async function graph(more) {
+    if (!topic)
+        return;
     const request = ++requestSequence;
     const selected = get("evolution-canvas")
         .querySelector('[aria-pressed="true"]')
@@ -112,7 +171,7 @@ function scale() {
     }
 }
 export function initEvolution() {
-    get("refresh-evolution").onclick = () => void graph(false).catch(notice);
+    get("refresh-evolution").onclick = () => void loadEvolution();
     get("more-evolution").onclick = () => void graph(true).catch(notice);
     get("evolution-zoom-in").onclick = () => {
         zoom = Math.min(1.5, zoom + 0.15);

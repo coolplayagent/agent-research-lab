@@ -20,3 +20,10 @@ genrule(
 )
 
 filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])
+
+load("//web:defs.bzl", "node_test")
+node_test(
+    name = "workspace_tests",
+    script = "workspace-tests.cjs",
+    data = [":policy_sources", "//web/shared:policy_sources"],
+)
