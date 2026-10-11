@@ -91,17 +91,6 @@ export async function openGoal(scenarioId = "collaboration") {
 }
 export function initGoals() {
     get("new-goal").onclick = () => void openGoal();
-    get("discuss-message").onclick = async () => {
-        const draft = get("message-text").value.trim();
-        await openGoal("research");
-        if (!get("goal-dialog").open)
-            return;
-        get("goal-title").value = draft.slice(0, 60) || t("discussion.title");
-        get("goal-objective").value = draft || t("discussion.objective");
-        get("goal-acceptance").value = t("discussion.acceptance");
-        for (const member of selectedMembers.values())
-            member.instruction.value = t("discussion.assignment");
-    };
     get("goal-scenario").onchange = parameters;
     get("more-goal-members").onclick = () => {
         void members(true).catch((error) => notice(error, "goal-status"));

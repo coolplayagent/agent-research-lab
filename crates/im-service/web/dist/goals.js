@@ -1,4 +1,5 @@
 import { revealResearch } from "./workspace.js";
+import { contributionText } from "./contribution-text.js";
 import { GoalState, GroupKind, WorkState } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { label } from "./i18n.js";
@@ -90,7 +91,7 @@ function card(goal) {
         if (work.result) {
             row.append(el("p", goal.input.scenario === "research" && work.result.code
                 ? label("WorkResultCode", work.result.code)
-                : work.result.summary));
+                : contributionText(work.result.summary, display(work.person_id))));
             const evidence = el("details");
             evidence.dataset.evidenceKey = `${goal.input.id}/${work.id}/${work.attempt}`;
             evidence.append(el("summary", t("goals.da8098216f")), el("pre", JSON.stringify(work.result.evidence, null, 2)));

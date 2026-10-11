@@ -3,6 +3,10 @@ use crate::*;
 use contracts::GoalEventKind;
 use rusqlite::{Connection, OptionalExtension, params};
 pub(crate) enum GoalCommand {
+    Discuss {
+        input: GoalInput,
+        message: Publish,
+    },
     Change(GoalChange),
     Work {
         actor: String,
@@ -18,6 +22,11 @@ pub(crate) enum GoalCommand {
     },
 }
 impl Hub {
+    pub async fn discuss(&self, input: GoalInput, message: Publish) -> Result<Value> {
+        self.control(Control::Goal(GoalCommand::Discuss { input, message }))
+            .await
+    }
+
     pub async fn change_goal(&self, change: GoalChange) -> Result<Goal> {
         Ok(serde_json::from_value(
             self.control(Control::Goal(GoalCommand::Change(change)))
@@ -105,7 +114,7 @@ pub(crate) fn save(
                 .is_some_and(|result| result.code.is_none())
     });
     let reply_to = if contribution.is_some() {
-        connection.query_row("SELECT sequence FROM messages WHERE group_id=?1 AND json_extract(event,'$.goal_id')=?2 AND json_extract(event,'$.kind')=?3 ORDER BY sequence LIMIT 1",params![goal.input.group_id,goal.input.id,GoalEventKind::Created.as_str()],|row| row.get(0)).optional()?
+        connection.query_row("SELECT COALESCE(reply_to,sequence) FROM messages WHERE group_id=?1 AND json_extract(event,'$.goal_id')=?2 AND json_extract(event,'$.kind')=?3 ORDER BY sequence LIMIT 1",params![goal.input.group_id,goal.input.id,GoalEventKind::Created.as_str()],|row| row.get(0)).optional()?
     } else {
         None
     };
@@ -179,6 +188,35 @@ impl Store {
     pub(crate) fn goal_command(&mut self, command: GoalCommand) -> Result<Value> {
         match command {
             GoalCommand::Change(change) => self.goal_change(change),
+            GoalCommand::Discuss { input, message } => {
+                ensure!(
+                    input.group_id == message.group_id && input.objective == message.text,
+                    "discussion must bind its original message"
+                );
+                let expected = format!(
+                    "mention-{}",
+                    storage::digest(
+                        format!("{}:{}", message.group_id, message.request_id).as_bytes()
+                    )
+                );
+                ensure!(
+                    input.id == expected,
+                    "discussion ID must bind its message request"
+                );
+                let tx = self.connection.transaction()?;
+                let count: u64 = tx.query_row("SELECT COUNT(*) FROM messages", [], |r| r.get(0))?;
+                let receipt = store::append(
+                    &tx,
+                    "operator",
+                    &message,
+                    &mut MAX_MESSAGES.saturating_sub(count),
+                    true,
+                )?;
+                let goal = create_goal(&tx, input)?;
+                tx.execute("UPDATE messages SET reply_to=?1 WHERE group_id=?2 AND json_extract(event,'$.goal_id')=?3 AND json_extract(event,'$.kind')=?4", params![receipt.message.sequence, goal.input.group_id, goal.input.id, GoalEventKind::Created.as_str()])?;
+                tx.commit()?;
+                Ok(json!({"message":receipt.message,"goal":goal,"duplicate":receipt.duplicate}))
+            }
             GoalCommand::Work {
                 actor,
                 credential,
@@ -214,61 +252,7 @@ impl Store {
     fn goal_change(&mut self, change: GoalChange) -> Result<Value> {
         let tx = self.connection.transaction()?;
         if let GoalChange::Create { goal: input } = change {
-            input.validate()?;
-            let prior = tx
-                .query_row("SELECT value FROM goals WHERE id=?1", [&input.id], |r| {
-                    r.get::<_, String>(0)
-                })
-                .optional()?;
-            if let Some(prior) = prior {
-                let prior: Goal = serde_json::from_str(&prior)?;
-                ensure!(
-                    prior.input == input,
-                    "goal ID already binds different inputs"
-                );
-                return Ok(json!(prior));
-            }
-            available(&tx, &input.group_id)?;
-            ensure!(
-                tx.query_row("SELECT COUNT(*) FROM goals", [], |r| r.get::<_, usize>(0))? < 10000,
-                "goal capacity exhausted"
-            );
-            for assignment in &input.assignments {
-                member(&tx, &input.group_id, &assignment.person_id)?;
-            }
-            let work = input
-                .assignments
-                .iter()
-                .enumerate()
-                .map(|(i, a)| WorkItem {
-                    id: format!("work-{i}"),
-                    person_id: a.person_id.clone(),
-                    instruction: a.instruction.clone(),
-                    state: WorkState::Ready,
-                    attempt: 1,
-                    claim_id: None,
-                    deadline_ms: None,
-                    result: None,
-                })
-                .collect();
-            let goal = Goal {
-                input,
-                state: GoalState::Active,
-                revision: 1,
-                created_ms: now_ms(),
-                work,
-            };
-            tx.execute(
-                "INSERT INTO goals(id,group_id,scenario,active,value) VALUES(?1,?2,?3,1,'')",
-                params![goal.input.id, goal.input.group_id, goal.input.scenario],
-            )?;
-            for work in &goal.work {
-                tx.execute(
-                    "INSERT INTO goal_assignees(goal_id,actor_id) VALUES(?1,?2)",
-                    params![goal.input.id, work.person_id],
-                )?;
-            }
-            save(&tx, &goal, GoalEventKind::Created, None)?;
+            let goal = create_goal(&tx, input)?;
             tx.commit()?;
             return Ok(json!(goal));
         }
@@ -335,4 +319,64 @@ impl Store {
         tx.commit()?;
         Ok(json!(goal))
     }
+}
+
+fn create_goal(tx: &rusqlite::Transaction<'_>, input: GoalInput) -> Result<Goal> {
+    input.validate()?;
+    let prior = tx
+        .query_row("SELECT value FROM goals WHERE id=?1", [&input.id], |r| {
+            r.get::<_, String>(0)
+        })
+        .optional()?;
+    if let Some(prior) = prior {
+        let prior: Goal = serde_json::from_str(&prior)?;
+        ensure!(
+            prior.input == input,
+            "goal ID already binds different inputs"
+        );
+        return Ok(prior);
+    }
+    available(tx, &input.group_id)?;
+    ensure!(
+        tx.query_row("SELECT COUNT(*) FROM goals", [], |r| r.get::<_, usize>(0))? < 10000,
+        "goal capacity exhausted"
+    );
+    for assignment in &input.assignments {
+        member(tx, &input.group_id, &assignment.person_id)?;
+    }
+    let work = input
+        .assignments
+        .iter()
+        .enumerate()
+        .map(|(i, a)| WorkItem {
+            id: format!("work-{i}"),
+            person_id: a.person_id.clone(),
+            instruction: a.instruction.clone(),
+            state: WorkState::Ready,
+            attempt: 1,
+            claim_id: None,
+            deadline_ms: None,
+            result: None,
+        })
+        .collect();
+    let goal = Goal {
+        input,
+        state: GoalState::Active,
+        revision: 1,
+        created_ms: now_ms(),
+        work,
+    };
+    tx.execute(
+        "INSERT INTO goals(id,group_id,scenario,active,value) VALUES(?1,?2,?3,1,'')",
+        params![goal.input.id, goal.input.group_id, goal.input.scenario],
+    )?;
+    for work in &goal.work {
+        tx.execute(
+            "INSERT INTO goal_assignees(goal_id,actor_id) VALUES(?1,?2)",
+            params![goal.input.id, work.person_id],
+        )?;
+    }
+    save(tx, &goal, GoalEventKind::Created, None)?;
+
+    Ok(goal)
 }

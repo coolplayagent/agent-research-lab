@@ -64,3 +64,40 @@ pub async fn scenarios(State(web): State<Web>) -> Response {
         json!({"scenarios": web.scenarios.iter().map(|s| s.descriptor()).collect::<Vec<_>>(), "status": web.scenarios.iter().map(|s| (s.descriptor().id, s.status())).collect::<std::collections::BTreeMap<_,_>>()}),
     ))
 }
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Discussion {
+    goal: crystal::GoalInput,
+    message: crystal::Publish,
+}
+pub async fn discuss(State(web): State<Web>, request: Request) -> Response {
+    json_response(
+        async {
+            intent(request.headers(), web.addr, "manage-crystal")?;
+            let _permit = web
+                .reads
+                .clone()
+                .try_acquire_owned()
+                .context("discussion backpressure")?;
+            let mut input: Discussion = serde_json::from_slice(&body(request, 64 * 1024).await?)?;
+            input.goal.id = format!(
+                "mention-{}",
+                storage::digest(
+                    format!("{}:{}", input.message.group_id, input.message.request_id).as_bytes()
+                )
+            );
+            input.goal.validate()?;
+            let adapter = web
+                .scenarios
+                .iter()
+                .find(|s| s.descriptor().id == input.goal.scenario)
+                .cloned()
+                .context("scenario unavailable")?;
+            let goal = input.goal.clone();
+            tokio::task::spawn_blocking(move || adapter.validate(&goal)).await??;
+            web.hub.discuss(input.goal, input.message).await
+        }
+        .await,
+    )
+}

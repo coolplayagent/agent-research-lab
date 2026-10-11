@@ -358,3 +358,44 @@ async fn submitted_contributions_are_durable_person_authored_replies_and_idempot
         reply.text
     );
 }
+
+#[tokio::test]
+async fn mentioned_message_and_goal_commit_atomically_and_replay_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let hub = Hub::open(dir.path()).unwrap();
+    setup(&hub).await;
+    let message = Publish {
+        group_id: "team".into(),
+        request_id: "mention-request".into(),
+        text: "@a @b Compare alternatives".into(),
+        reply_to: None,
+    };
+    let mut goal = input();
+    goal.id = format!("mention-{}", storage::digest(b"team:mention-request"));
+    goal.objective = message.text.clone();
+    let mut invalid = goal.clone();
+    invalid.assignments[1].person_id = "outsider".into();
+    assert!(hub.discuss(invalid, message.clone()).await.is_err());
+    assert!(hub.history("team", 0, 100).await.unwrap().is_empty());
+    let first = hub.discuss(goal.clone(), message.clone()).await.unwrap();
+    let again = hub.discuss(goal.clone(), message.clone()).await.unwrap();
+    assert_eq!(first["message"]["sequence"], again["message"]["sequence"]);
+    assert_eq!(again["duplicate"], true);
+    assert_eq!(hub.history("team", 0, 100).await.unwrap().len(), 2);
+    assert_eq!(
+        hub.goals("team", "", "", false).await.unwrap()["goals"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let mut changed = message;
+    changed.text = "@a A different question".into();
+    goal.objective = changed.text.clone();
+    assert!(hub.discuss(goal, changed).await.is_err());
+    let audit = hub.history("team", 0, 100).await.unwrap();
+    assert_eq!(audit[1].reply_to, Some(audit[0].sequence));
+    drop(hub);
+    let hub = Hub::open(dir.path()).unwrap();
+    assert_eq!(hub.history("team", 0, 100).await.unwrap().len(), 2);
+}

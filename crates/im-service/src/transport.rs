@@ -60,6 +60,7 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
         .route("/api/crystal/history", get(crate::agents::history))
         .route("/api/im/people", get(crate::agents::people))
         .route("/api/im/scenarios", get(crate::goals::scenarios))
+        .route("/api/im/discussion", post(crate::goals::discuss))
         .route(
             "/api/im/goals",
             get(crate::goals::list).post(crate::goals::manage),

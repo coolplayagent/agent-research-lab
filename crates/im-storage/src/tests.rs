@@ -67,6 +67,47 @@ async fn remote_storage_preserves_durability_authority_and_stream_controls() {
         }
     }
     assert_eq!(client.history("room", 0, 10).await.unwrap().len(), 1);
+    let input = GoalInput {
+        id: "mention-4d4593b6df2d774271f7c54a33360db22850e8523bbc867d6deaa047c63b9629".into(),
+        group_id: "room".into(),
+        title: "Mention discussion".into(),
+        objective: "@worker review this".into(),
+        acceptance: "Provide evidence".into(),
+        scenario: "collaboration".into(),
+        parameters: json!({}),
+        max_seconds: 60,
+        assignments: vec![AssignmentInput {
+            person_id: "worker".into(),
+            instruction: "Discuss".into(),
+        }],
+    };
+    let message = Publish {
+        group_id: "room".into(),
+        request_id: "discussion".into(),
+        text: input.objective.clone(),
+        reply_to: Some(1),
+    };
+    let result = client
+        .discuss(input.clone(), message.clone())
+        .await
+        .unwrap();
+    assert_eq!(result["message"]["sequence"], 2);
+    assert_eq!(result["goal"]["input"]["id"], input.id);
+    assert_eq!(
+        client.discuss(input.clone(), message).await.unwrap()["duplicate"],
+        true
+    );
+    let history = client.history("room", 0, 10).await.unwrap();
+    assert_eq!(history.len(), 3);
+    assert_eq!(history[2].reply_to, Some(2));
+    assert!(client.membership("room", "worker", false).await.is_err());
+    client
+        .change_goal(GoalChange::Cancel {
+            goal_id: input.id,
+            revision: 1,
+        })
+        .await
+        .unwrap();
     client.set_presence("worker", Presence::Busy).await.unwrap();
     assert!(!sub.receives().await.unwrap());
     client.membership("room", "worker", false).await.unwrap();

@@ -1,3 +1,4 @@
+import { avatar } from "./avatar.js";
 import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
@@ -29,6 +30,7 @@ export async function loadPeople(append = false): Promise<void> {
       people.set(person.id, person);
       const card = el("article", undefined, "card");
       card.append(
+        avatar(person.id),
         el("h3", person.name),
         el("code", person.id),
         el(

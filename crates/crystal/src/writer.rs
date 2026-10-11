@@ -168,11 +168,13 @@ fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
         }
         Control::Goal(command) => {
             let read = matches!(&command, crate::goals::GoalCommand::List { .. });
+            let discussion = matches!(&command, crate::goals::GoalCommand::Discuss { .. });
             let result = store.goal_command(command)?;
             if read {
                 return Ok(result);
             }
-            let group = result["input"]["group_id"]
+            let goal = if discussion { &result["goal"] } else { &result };
+            let group = goal["input"]["group_id"]
                 .as_str()
                 .context("goal group missing")?;
             let after = shared

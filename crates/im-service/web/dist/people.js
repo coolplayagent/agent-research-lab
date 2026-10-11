@@ -1,3 +1,4 @@
+import { avatar } from "./avatar.js";
 import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
@@ -26,7 +27,7 @@ export async function loadPeople(append = false) {
         for (const person of page.people) {
             people.set(person.id, person);
             const card = el("article", undefined, "card");
-            card.append(el("h3", person.name), el("code", person.id), el("p", t("people.63daae1beb", {
+            card.append(avatar(person.id), el("h3", person.name), el("code", person.id), el("p", t("people.63daae1beb", {
                 p0: presence(person.presence),
                 p1: person.connections,
             })));
