@@ -155,7 +155,8 @@ fn execute(cli: Cli) -> Result<Value> {
                 } => {
                     runtime::run_scoped(&c, continuous, max_seconds, seed, task_ids_file.as_deref())
                 }
-                Commands::Status | Commands::Report => runtime::status(&c),
+                Commands::Status { summary: true } => runtime::status_summary(&c),
+                Commands::Status { summary: false } | Commands::Report => runtime::status(&c),
                 Commands::Pause => runtime::pause(&c, true),
                 Commands::Resume => runtime::pause(&c, false),
                 Commands::Retry { id } => runtime::retry(&c, &id),
