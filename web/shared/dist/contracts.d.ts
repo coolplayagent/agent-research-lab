@@ -346,6 +346,51 @@ export declare const NativeCaptureState: {
     readonly Incomplete: "incomplete";
 };
 export type NativeCaptureState = (typeof NativeCaptureState)[keyof typeof NativeCaptureState];
+export declare const NativeFilesystemOperation: {
+    readonly OpenWrite: "open_write";
+    readonly CreateDirectory: "create_directory";
+    readonly Write: "write";
+    readonly Truncate: "truncate";
+    readonly Sync: "sync";
+    readonly Chmod: "chmod";
+    readonly Rename: "rename";
+    readonly HardLink: "hard_link";
+    readonly Unlink: "unlink";
+    readonly RemoveDirectory: "remove_directory";
+    readonly Lock: "lock";
+    readonly Unlock: "unlock";
+};
+export type NativeFilesystemOperation = (typeof NativeFilesystemOperation)[keyof typeof NativeFilesystemOperation];
+export declare const NativeFilesystemResult: {
+    readonly NotAttempted: "not_attempted";
+    readonly Succeeded: "succeeded";
+    readonly Failed: "failed";
+    readonly Unknown: "unknown";
+};
+export type NativeFilesystemResult = (typeof NativeFilesystemResult)[keyof typeof NativeFilesystemResult];
+export declare const NativeFilesystemCompleteness: {
+    readonly Complete: "complete";
+    readonly Incomplete: "incomplete";
+};
+export type NativeFilesystemCompleteness = (typeof NativeFilesystemCompleteness)[keyof typeof NativeFilesystemCompleteness];
+export declare const NativeFilesystemScope: {
+    readonly Controller: "controller";
+    readonly SelectedAttempt: "selected_attempt";
+    readonly HistoricalRecovery: "historical_recovery";
+    readonly CaptureTemporary: "capture_temporary";
+};
+export type NativeFilesystemScope = (typeof NativeFilesystemScope)[keyof typeof NativeFilesystemScope];
+export declare const NativeFilesystemCategory: {
+    readonly Json: "json";
+    readonly Prompt: "prompt";
+    readonly Protocol: "protocol";
+    readonly Stream: "stream";
+    readonly PrivateConfiguration: "private_configuration";
+    readonly Cache: "cache";
+    readonly Launcher: "launcher";
+    readonly Directory: "directory";
+};
+export type NativeFilesystemCategory = (typeof NativeFilesystemCategory)[keyof typeof NativeFilesystemCategory];
 export declare const CheckedAcquireFailureCode: {
     readonly AdmissionConflict: "admission_conflict";
     readonly Unknown: "owner_acquire_unknown";

@@ -33,6 +33,7 @@ impl Controller {
 }
 impl Drop for Controller {
     fn drop(&mut self) {
+        let _cleanup = native_effects::cleanup_scope();
         let _ = self.record(ControllerPhase::Stopped, &[]);
     }
 }

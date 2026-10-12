@@ -137,7 +137,7 @@ fn checkout(
         .state_dir
         .join("sources")
         .join(format!("{name}-{}", upstream.commit));
-    fs::create_dir_all(path.parent().context("source directory missing")?)?;
+    native_effects::fs::create_dir_all(path.parent().context("source directory missing")?)?;
     if !path.exists() {
         git(
             repository,

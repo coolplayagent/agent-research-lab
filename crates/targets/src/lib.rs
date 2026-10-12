@@ -2,6 +2,7 @@ pub mod desktop;
 
 use anyhow::{Context, Result, ensure};
 use config::Config;
+use native_effects::fs as native_fs;
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -27,7 +28,7 @@ pub fn status(c: &Config) -> Result<Value> {
 }
 
 fn install_launcher(directory: &Path) -> Result<PathBuf> {
-    fs::create_dir_all(directory)?;
+    native_fs::create_dir_all(directory)?;
     let bytes = fs::read(std::env::current_exe()?)?;
     let path = directory.join(format!(
         "target-controller-{}",
@@ -39,14 +40,13 @@ fn install_launcher(directory: &Path) -> Result<PathBuf> {
             "target launcher changed"
         );
     } else {
-        use std::io::Write;
-        let mut file = fs::OpenOptions::new()
+        let mut file = native_fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&path)?;
-        file.write_all(&bytes)?;
-        file.sync_all()?;
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o500))?;
+        native_fs::write_all(&mut file, &path, &bytes)?;
+        native_fs::sync_all(&file, &path)?;
+        native_fs::set_permissions(&path, fs::Permissions::from_mode(0o500))?;
     }
     Ok(path)
 }
@@ -174,8 +174,8 @@ pub fn verify(c: &Config, kind: &str) -> Result<Value> {
     );
     let logs = c.state_dir.join("runs").join(&id);
     let worktree = c.state_dir.join("worktrees").join(&id);
-    fs::create_dir_all(&logs)?;
-    fs::create_dir_all(&worktree)?;
+    native_fs::create_dir_all(&logs)?;
+    native_fs::create_dir_all(&worktree)?;
     let mut result = json!({"id":id,"logs":logs,"verified_at":chrono::Utc::now().to_rfc3339()});
     if kind != "sandbox" {
         prepare(c)?;
@@ -229,8 +229,8 @@ pub fn agent_check(c: &Config) -> Result<Value> {
     );
     let logs = c.state_dir.join("runs").join(&id);
     let worktree = c.state_dir.join("worktrees").join(&id);
-    fs::create_dir_all(&logs)?;
-    fs::create_dir_all(&worktree)?;
+    native_fs::create_dir_all(&logs)?;
+    native_fs::create_dir_all(&worktree)?;
     let args = agent_backend::codex_desktop_arguments(
         &c.models["review"],
         &logs.join("model-result.txt"),
@@ -312,11 +312,11 @@ pub fn agent_check(c: &Config) -> Result<Value> {
 /// so the controller creates the sandbox directly and supplies bounded evidence.
 pub fn sandbox_verify(c: &Config, logs: &Path) -> Result<Value> {
     let root = logs.join("sandbox");
-    fs::create_dir(&root).context("sandbox verification output must be new")?;
+    native_fs::create_dir(&root).context("sandbox verification output must be new")?;
     let workspace = root.join("workspace");
-    fs::create_dir(&workspace)?;
+    native_fs::create_dir(&workspace)?;
     let state = root.join("state");
-    fs::create_dir(&state)?;
+    native_fs::create_dir(&state)?;
     let env = vec![
         ("REPO_SANDBOX_STATE_DIR".into(), state.display().to_string()),
         ("HOME".into(), root.display().to_string()),
@@ -441,6 +441,27 @@ fn require_session(report: &Value, status: contracts::SandboxSessionState) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn default_launcher_reuses_its_inode_and_rejects_changed_bytes() {
+        use std::os::unix::fs::MetadataExt;
+
+        let directory = tempfile::tempdir().unwrap();
+        let launcher = install_launcher(directory.path()).unwrap();
+        let original = fs::metadata(&launcher).unwrap();
+        assert_eq!(original.permissions().mode() & 0o777, 0o500);
+        assert_eq!(install_launcher(directory.path()).unwrap(), launcher);
+        let reused = fs::metadata(&launcher).unwrap();
+        assert_eq!(
+            (original.dev(), original.ino()),
+            (reused.dev(), reused.ino())
+        );
+
+        fs::set_permissions(&launcher, fs::Permissions::from_mode(0o600)).unwrap();
+        fs::write(&launcher, b"changed launcher").unwrap();
+        assert!(install_launcher(directory.path()).is_err());
+        assert_eq!(fs::read(&launcher).unwrap(), b"changed launcher");
+    }
 
     #[test]
     fn transport_success_and_partial_side_effects_are_not_business_success() {

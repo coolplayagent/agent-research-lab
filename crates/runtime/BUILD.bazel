@@ -13,7 +13,7 @@ rust_library(
     edition = "2024",
     aliases = aliases(),
     compile_data = ["//:prompt_assets"],
-    deps = [
+    deps = ["//crates/native-effects:native_effects",
         "//crates/contracts:contracts",
         "//crates/agent-backend:agent_backend",
         "//crates/agent-policy:agent_policy",

@@ -301,6 +301,46 @@ export const NativeCaptureState = {
     Overflow: "overflow",
     Incomplete: "incomplete",
 };
+export const NativeFilesystemOperation = {
+    OpenWrite: "open_write",
+    CreateDirectory: "create_directory",
+    Write: "write",
+    Truncate: "truncate",
+    Sync: "sync",
+    Chmod: "chmod",
+    Rename: "rename",
+    HardLink: "hard_link",
+    Unlink: "unlink",
+    RemoveDirectory: "remove_directory",
+    Lock: "lock",
+    Unlock: "unlock",
+};
+export const NativeFilesystemResult = {
+    NotAttempted: "not_attempted",
+    Succeeded: "succeeded",
+    Failed: "failed",
+    Unknown: "unknown",
+};
+export const NativeFilesystemCompleteness = {
+    Complete: "complete",
+    Incomplete: "incomplete",
+};
+export const NativeFilesystemScope = {
+    Controller: "controller",
+    SelectedAttempt: "selected_attempt",
+    HistoricalRecovery: "historical_recovery",
+    CaptureTemporary: "capture_temporary",
+};
+export const NativeFilesystemCategory = {
+    Json: "json",
+    Prompt: "prompt",
+    Protocol: "protocol",
+    Stream: "stream",
+    PrivateConfiguration: "private_configuration",
+    Cache: "cache",
+    Launcher: "launcher",
+    Directory: "directory",
+};
 export const CheckedAcquireFailureCode = {
     AdmissionConflict: "admission_conflict",
     Unknown: "owner_acquire_unknown",

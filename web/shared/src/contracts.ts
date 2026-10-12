@@ -347,6 +347,51 @@ export const NativeCaptureState = {
   Incomplete: "incomplete",
 } as const;
 export type NativeCaptureState = (typeof NativeCaptureState)[keyof typeof NativeCaptureState];
+export const NativeFilesystemOperation = {
+  OpenWrite: "open_write",
+  CreateDirectory: "create_directory",
+  Write: "write",
+  Truncate: "truncate",
+  Sync: "sync",
+  Chmod: "chmod",
+  Rename: "rename",
+  HardLink: "hard_link",
+  Unlink: "unlink",
+  RemoveDirectory: "remove_directory",
+  Lock: "lock",
+  Unlock: "unlock",
+} as const;
+export type NativeFilesystemOperation = (typeof NativeFilesystemOperation)[keyof typeof NativeFilesystemOperation];
+export const NativeFilesystemResult = {
+  NotAttempted: "not_attempted",
+  Succeeded: "succeeded",
+  Failed: "failed",
+  Unknown: "unknown",
+} as const;
+export type NativeFilesystemResult = (typeof NativeFilesystemResult)[keyof typeof NativeFilesystemResult];
+export const NativeFilesystemCompleteness = {
+  Complete: "complete",
+  Incomplete: "incomplete",
+} as const;
+export type NativeFilesystemCompleteness = (typeof NativeFilesystemCompleteness)[keyof typeof NativeFilesystemCompleteness];
+export const NativeFilesystemScope = {
+  Controller: "controller",
+  SelectedAttempt: "selected_attempt",
+  HistoricalRecovery: "historical_recovery",
+  CaptureTemporary: "capture_temporary",
+} as const;
+export type NativeFilesystemScope = (typeof NativeFilesystemScope)[keyof typeof NativeFilesystemScope];
+export const NativeFilesystemCategory = {
+  Json: "json",
+  Prompt: "prompt",
+  Protocol: "protocol",
+  Stream: "stream",
+  PrivateConfiguration: "private_configuration",
+  Cache: "cache",
+  Launcher: "launcher",
+  Directory: "directory",
+} as const;
+export type NativeFilesystemCategory = (typeof NativeFilesystemCategory)[keyof typeof NativeFilesystemCategory];
 export const CheckedAcquireFailureCode = {
   AdmissionConflict: "admission_conflict",
   Unknown: "owner_acquire_unknown",

@@ -2,12 +2,12 @@ use anyhow::{Context, Result, bail, ensure};
 use budget::Budget;
 use config::{Config, safe_id};
 use contracts::{ControllerPhase, ExecutionState, FollowupState, WorkflowNodeState, WorkflowState};
+use native_effects::fs;
 use process::{self, Process};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -1216,6 +1216,36 @@ pub fn run_scoped_with_admission(
     )
 }
 
+/// The runtime owns the one finalization, after its lock, watch and worker guards drop.
+pub struct ObservedRun {
+    pub result: Result<Value>,
+    pub filesystem: Result<contracts::NativeFilesystemReport>,
+}
+
+/// The caller prepares both observer domains before entering this function.
+/// A session is live source-owned authority, not a deserializable success flag.
+pub fn run_scoped_with_observations(
+    c: &Config,
+    max_seconds: u64,
+    task_ids_file: &Path,
+    hook: &mut dyn admission::ScopedAdmissionHook,
+    session: native_effects::NativeObservationSession,
+) -> ObservedRun {
+    let result = (|| {
+        let _effects = native_effects::observation_scope(&session)?;
+        run_scoped_impl(
+            c,
+            false,
+            max_seconds,
+            false,
+            Some(task_ids_file),
+            Some(hook),
+        )
+    })();
+    let filesystem = session.finish();
+    ObservedRun { result, filesystem }
+}
+
 fn run_scoped_impl(
     c: &Config,
     continuous: bool,
@@ -1921,6 +1951,17 @@ fn launch_guarded(
     admission_hook: &mut Option<&mut dyn admission::ScopedAdmissionHook>,
     job_writes: &mut admission::JobWrites,
 ) -> Result<(Process, lease_heartbeat::LeaseHeartbeat)> {
+    let _attempt = if fs::guarded() {
+        Some(native_effects::attempt_scope(
+            contracts::NativeFilesystemAttempt {
+                task_id: job.task.id.clone(),
+                run_id: job.run_id.clone(),
+                attempt: job.attempt,
+            },
+        )?)
+    } else {
+        None
+    };
     let launch_started = std::time::Instant::now();
     ensure!(remaining > 0, "execution budget exhausted");
     if let Some(inputs) = &job.research_inputs {
@@ -2153,6 +2194,7 @@ fn launch_guarded(
             !execution_timeout.is_zero(),
             "execution budget exhausted during final admission"
         );
+        process::ObserverContext::current().check_work()?;
         let process = Process::spawn(
             &program,
             &args,
@@ -4957,7 +4999,7 @@ print(json.dumps({'type':'session.activity','kind':'message','text':'The same pe
                 ] {
                     let source = dir.join(file);
                     if source.is_file() {
-                        fs::copy(&source, task_dir.join(source.file_name().unwrap())).unwrap();
+                        std::fs::copy(&source, task_dir.join(source.file_name().unwrap())).unwrap();
                     }
                 }
             }
@@ -5474,3 +5516,6 @@ mod cohort_tests;
 
 #[cfg(test)]
 mod admission_tests;
+
+#[cfg(test)]
+mod filesystem_tests;

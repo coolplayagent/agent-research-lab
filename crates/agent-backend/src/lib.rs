@@ -3,11 +3,11 @@
 use anyhow::{Context, Result, ensure};
 use config::Config;
 use isolation::AgentAccess;
+use native_effects::fs::{self, OpenOptions};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
-    fs::{self, OpenOptions},
-    io::{Read, Write},
+    io::Read,
     os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
 };
@@ -246,25 +246,29 @@ pub fn prepare(
             "permissions":{"worktree_write":context.write,"required_tools":context.required_tools,"external_writes":false,"nested_agents":false,"authority":"host controller; backend declarations do not grant authority"},
             "timeout_seconds":context.timeout_seconds
         });
-        let mut bytes = serde_json::to_vec(&request)?;
+        let stdin = context.logs.join("bridge-request.json");
+        let mut bytes = if fs::guarded() {
+            fs::json_bytes_limit(&stdin, &request, false, 3 * 1024 * 1024 - 1)?
+        } else {
+            serde_json::to_vec(&request)?
+        };
         bytes.push(b'\n');
         ensure!(
             bytes.len() <= 3 * 1024 * 1024,
             "bridge request exceeds 3 MiB"
         );
         let digest = storage::digest(&bytes);
-        let stdin = context.logs.join("bridge-request.json");
         ensure!(
             !stdin.exists(),
             "bridge request already exists for this attempt"
         );
-        OpenOptions::new()
+        let mut file = OpenOptions::new()
             .write(true)
             .create_new(true)
             .mode(0o600)
             .custom_flags(libc::O_NOFOLLOW)
-            .open(&stdin)?
-            .write_all(&bytes)?;
+            .open(&stdin)?;
+        fs::write_all(&mut file, &stdin, &bytes)?;
         Ok(Invocation {
             program: program.into(),
             args: args.clone(),

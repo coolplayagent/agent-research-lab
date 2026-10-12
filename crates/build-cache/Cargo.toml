@@ -8,6 +8,7 @@ license.workspace = true
 name = "build_cache"
 
 [dependencies]
+native_effects.workspace = true
 anyhow.workspace = true
 libc.workspace = true
 process.workspace = true

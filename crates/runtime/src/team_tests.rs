@@ -276,7 +276,7 @@ fn eight_peers_share_live_board_without_writes_fanout_or_extra_jobs() {
             ] {
                 let source = dir.join(file);
                 if source.is_file() {
-                    fs::copy(source, dest.join(Path::new(file).file_name().unwrap())).unwrap();
+                    std::fs::copy(source, dest.join(Path::new(file).file_name().unwrap())).unwrap();
                 }
             }
         }

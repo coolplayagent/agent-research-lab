@@ -1,10 +1,9 @@
 use anyhow::{Result, bail};
 use fs2::FileExt;
+use native_effects::fs::{self, File, OpenOptions};
 use serde::{Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use std::{
-    fs::{self, File, OpenOptions},
-    io::Write,
     os::unix::fs::OpenOptionsExt,
     path::Path,
     sync::atomic::{AtomicU64, Ordering},
@@ -29,6 +28,9 @@ pub fn write<T: Serialize>(p: &Path, v: &T) -> Result<()> {
     let parent = p
         .parent()
         .ok_or_else(|| anyhow::anyhow!("missing parent"))?;
+    let prepared = fs::guarded()
+        .then(|| fs::json_bytes(p, v, true))
+        .transpose()?;
     fs::create_dir_all(parent)?;
     let temp = p.with_extension(format!(
         "pending-{}-{}-{}",
@@ -41,16 +43,25 @@ pub fn write<T: Serialize>(p: &Path, v: &T) -> Result<()> {
         .write(true)
         .mode(0o600)
         .open(&temp)?;
-    f.write_all(&serde_json::to_vec_pretty(v)?)?;
-    f.sync_all()?;
-    fs::rename(temp, p)?;
-    File::open(parent)?.sync_all()?;
+    let bytes = match prepared {
+        Some(v) => v,
+        None => serde_json::to_vec_pretty(v)?,
+    };
+    fs::write_all(&mut f, &temp, &bytes)?;
+    fs::sync_all(&f, &temp)?;
+    fs::rename(&temp, p)?;
+    fs::sync_all(&File::open(parent)?, parent)?;
     Ok(())
 }
-pub struct LockGuard(File);
+pub struct LockGuard(File, std::path::PathBuf);
 impl Drop for LockGuard {
     fn drop(&mut self) {
-        let _ = FileExt::unlock(&self.0);
+        let _cleanup = native_effects::cleanup_scope();
+        let _ = if fs::guarded() {
+            fs::unlock(&self.0, &self.1)
+        } else {
+            FileExt::unlock(&self.0)
+        };
     }
 }
 pub fn lock(p: &Path) -> Result<LockGuard> {
@@ -61,10 +72,16 @@ pub fn lock(p: &Path) -> Result<LockGuard> {
         .read(true)
         .write(true)
         .open(p)?;
-    if f.try_lock_exclusive().is_err() {
+    if (if fs::guarded() {
+        fs::try_lock_exclusive(&f, p)
+    } else {
+        f.try_lock_exclusive()
+    })
+    .is_err()
+    {
         bail!("another controller owns {}", p.display());
     }
-    Ok(LockGuard(f))
+    Ok(LockGuard(f, p.to_owned()))
 }
 pub fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
