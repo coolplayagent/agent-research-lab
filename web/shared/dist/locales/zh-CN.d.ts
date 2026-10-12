@@ -1,4 +1,14 @@
 export declare const messages: {
+    readonly "NativeCaptureClass.normal": "常规";
+    readonly "NativeCaptureClass.cleanup": "清理";
+    readonly "NativeCaptureState.not_spawned": "未启动";
+    readonly "NativeCaptureState.exited": "已退出";
+    readonly "NativeCaptureState.signal": "信号终止";
+    readonly "NativeCaptureState.deadline": "超时";
+    readonly "NativeCaptureState.overflow": "输出超限";
+    readonly "NativeCaptureState.incomplete": "证据不完整";
+    readonly "CheckedAcquireFailureCode.admission_conflict": "准入状态冲突";
+    readonly "CheckedAcquireFailureCode.owner_acquire_unknown": "租约结果未知";
     readonly "PullRequestState.OPEN": "开放";
     readonly "PullRequestState.CLOSED": "已关闭";
     readonly "PullRequestState.MERGED": "已合并";

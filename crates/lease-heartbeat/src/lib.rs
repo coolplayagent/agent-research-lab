@@ -87,9 +87,11 @@ impl LeaseHeartbeat {
         let worker_journal = journal.clone();
         let worker_renew = Arc::clone(&renew);
         let renewal_worker = Arc::clone(&worker);
+        let capture_context = process::ObserverContext::current();
         let thread = thread::Builder::new()
             .name("workflow-lease".into())
             .spawn(move || {
+                let _capture_observer = capture_context.enter();
                 while matches!(
                     receive.recv_timeout(interval),
                     Err(mpsc::RecvTimeoutError::Timeout)

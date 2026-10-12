@@ -12,6 +12,7 @@ use std::{
     time::Duration,
 };
 use workflow::Workflow;
+pub mod admission;
 pub mod batch;
 pub mod people;
 mod registration;
@@ -1078,6 +1079,7 @@ pub fn seed(c: &Config) -> Result<Value> {
 
 struct Active {
     job: Job,
+    job_writes: admission::JobWrites,
     process: Process,
     heartbeat: lease_heartbeat::LeaseHeartbeat,
 }
@@ -1186,6 +1188,42 @@ pub fn run_scoped(
     seed_requested: bool,
     task_ids_file: Option<&Path>,
 ) -> Result<Value> {
+    run_scoped_impl(
+        c,
+        continuous,
+        max_seconds,
+        seed_requested,
+        task_ids_file,
+        None,
+    )
+}
+
+pub fn run_scoped_with_admission(
+    c: &Config,
+    max_seconds: u64,
+    task_ids_file: &Path,
+    hook: &mut dyn admission::ScopedAdmissionHook,
+    capture_observer: std::sync::Arc<dyn process::CaptureObserver>,
+) -> Result<Value> {
+    let _observer = process::observer_scope(capture_observer);
+    run_scoped_impl(
+        c,
+        false,
+        max_seconds,
+        false,
+        Some(task_ids_file),
+        Some(hook),
+    )
+}
+
+fn run_scoped_impl(
+    c: &Config,
+    continuous: bool,
+    max_seconds: u64,
+    seed_requested: bool,
+    task_ids_file: Option<&Path>,
+    mut admission_hook: Option<&mut dyn admission::ScopedAdmissionHook>,
+) -> Result<Value> {
     c.validate()?;
     ensure!(
         task_ids_file.is_none() || (!continuous && !seed_requested && max_seconds > 0),
@@ -1197,6 +1235,13 @@ pub fn run_scoped(
         max_seconds,
     };
     let _lock = storage::lock(&c.state_dir.join("controller.lock"))?;
+    if let Some(hook) = admission_hook.as_deref_mut() {
+        hook.register_cleanup_domain(
+            c,
+            task_ids_file.context("guarded admission requires an explicit task scope")?,
+            max_seconds,
+        )?;
+    }
     let mut observer = watch::Controller::start(c)?;
     kill_retained_workers(c)?;
     let scope = task_ids_file
@@ -1249,6 +1294,8 @@ pub fn run_scoped(
     let mut next_desktop_prepare = 0_i64;
     let mut next_build_prepare = BTreeMap::<String, i64>::new();
     let mut active: Vec<Active> = vec![];
+    let mut proof_prepared = false;
+    let mut guarded_admission_failed = false;
     loop {
         let time = now();
         observer.record(
@@ -1275,7 +1322,11 @@ pub fn run_scoped(
         storage::write(&ledger_path, &ledger)?;
         let stopping = (max_seconds > 0 && time - start >= max_seconds.min(i64::MAX as u64) as i64)
             || c.state_dir.join("paused").exists()
-            || ledger.budget.remaining(time, c.daily_seconds) == 0;
+            || ledger.budget.remaining(time, c.daily_seconds) == 0
+            || guarded_admission_failed
+            || admission_hook
+                .as_deref()
+                .is_some_and(|hook| hook.should_stop());
         if !stopping && !active.is_empty() && time >= next_communication_poll {
             let members = active
                 .iter()
@@ -1313,8 +1364,17 @@ pub fn run_scoped(
                 polled = Err(anyhow::anyhow!("lease heartbeat failed: {error}"));
             }
             if stopping || !matches!(polled, Ok(None)) {
+                let _cleanup = process::cleanup_scope();
                 let mut a = active.remove(i);
                 a.heartbeat.disarm_worker();
+                if let Err(drift) = a.job_writes.confirm(c) {
+                    if let Some(hook) = admission_hook.as_deref_mut() {
+                        hook.revoke(&format!("guarded active Job changed: {drift:#}"));
+                    }
+                    let lease = a.heartbeat.stop()?;
+                    let _ = w.release(&lease);
+                    return Err(drift);
+                }
                 let observation = ExitObservation {
                     success: matches!(&polled,Ok(Some(status)) if status.success()) && !stopping,
                     code: match &polled {
@@ -1355,12 +1415,18 @@ pub fn run_scoped(
                             a.job.retry_after = None;
                             queue_post_success(c, &w, &a.job)?;
                         } else {
-                            defer_read_retry(
-                                &mut a.job,
-                                observation.reason.clone().unwrap_or_else(|| {
-                                    format!("worker exited {:?}", observation.code)
-                                }),
-                            );
+                            let reason = observation
+                                .reason
+                                .clone()
+                                .unwrap_or_else(|| format!("worker exited {:?}", observation.code));
+                            if let Some(hook) = admission_hook.as_deref_mut() {
+                                hook.revoke(&format!("guarded worker failed: {reason}"));
+                                guarded_admission_failed = true;
+                                a.job.last_error = Some(reason);
+                                a.job.retry_after = None;
+                            } else {
+                                defer_read_retry(&mut a.job, reason);
+                            }
                         }
                     }
                     Err(error) => {
@@ -1377,7 +1443,7 @@ pub fn run_scoped(
                 }
                 let released = w.release(&launch.lease);
                 if let Err(error) = released {
-                    if a.job.launch.is_some() {
+                    if a.job.launch.is_some() || admission_hook.is_some() {
                         a.job.last_error = Some(format!(
                             "settlement/lease reconciliation required: {error:#}"
                         ));
@@ -1388,7 +1454,14 @@ pub fn run_scoped(
                         )?;
                     }
                 }
-                storage::write(&job_path(c, &a.job.task.id), &a.job)?;
+                if admission_hook.is_some() && a.job.last_error.is_some() {
+                    a.job.retry_after = None;
+                    guarded_admission_failed = true;
+                    if let Some(hook) = admission_hook.as_deref_mut() {
+                        hook.revoke("guarded settlement requires reconciliation");
+                    }
+                }
+                a.job_writes.persist(c, &a.job)?;
                 continue;
             }
             i += 1;
@@ -1467,6 +1540,7 @@ pub fn run_scoped(
         let admission_deadline =
             process::deadline_scope(Duration::from_secs(window.remaining(c, &ledger)));
         for mut job in pending {
+            let mut pending_writes = admission::JobWrites::new(&job, admission_hook.is_some());
             if !may_admit {
                 break;
             }
@@ -1494,6 +1568,10 @@ pub fn run_scoped(
                 continue;
             }
             if let Some(due) = job.retry_after {
+                ensure!(
+                    admission_hook.is_none(),
+                    "guarded admission cannot automatically retry an earlier attempt"
+                );
                 retry_waiting = true;
                 if due > time {
                     continue;
@@ -1543,7 +1621,7 @@ pub fn run_scoped(
                         "latest-baseline admission blocked; preserve this experiment and enqueue a fresh cohort: {error:#}"
                     ));
                     job.retry_after = None;
-                    storage::write(&job_path(c, &job.task.id), &job)?;
+                    pending_writes.persist(c, &job)?;
                     continue;
                 }
                 checked_cohort = Some(cohort);
@@ -1622,7 +1700,7 @@ pub fn run_scoped(
                         job.last_error = Some(format!(
                             "build cache preparation failed before claim: {error:#}"
                         ));
-                        storage::write(&job_path(c, &job.task.id), &job)?;
+                        pending_writes.persist(c, &job)?;
                         continue;
                     }
                 }
@@ -1653,7 +1731,7 @@ pub fn run_scoped(
                 // Missing bindings block this task until explicit retry/config repair.
                 job.last_error = Some(error.to_string());
                 job.retry_after = None;
-                storage::write(&job_path(c, &job.task.id), &job)?;
+                pending_writes.persist(c, &job)?;
                 continue;
             }
             prepared.push(job);
@@ -1671,17 +1749,35 @@ pub fn run_scoped(
                 Ok(None) => prepared.clear(),
                 Err(error) => {
                     for job in &mut prepared {
+                        let mut writes = admission::JobWrites::new(job, admission_hook.is_some());
                         job.last_error = Some(format!(
                             "latest-baseline admission blocked; preserve this experiment and enqueue a fresh cohort: {error:#}"
                         ));
                         job.retry_after = None;
-                        storage::write(&job_path(c, &job.task.id), job)?;
+                        writes.persist(c, job)?;
                     }
                     prepared.clear();
                 }
             }
         }
+        if !prepared.is_empty()
+            && !proof_prepared
+            && let Some(hook) = admission_hook.as_deref_mut()
+        {
+            if let Err(error) = hook.prepare(c, &prepared) {
+                hook.revoke(&format!("guarded proof failed: {error:#}"));
+                return Err(error);
+            }
+            proof_prepared = true;
+        }
         for mut job in prepared {
+            if guarded_admission_failed
+                || admission_hook
+                    .as_deref()
+                    .is_some_and(|hook| hook.should_stop())
+            {
+                break;
+            }
             if active.len() >= c.max_agents {
                 break;
             }
@@ -1713,8 +1809,21 @@ pub fn run_scoped(
             if bounded_remaining == 0 {
                 break;
             }
+            let guarded = admission_hook.is_some();
+            let mut job_writes = admission::JobWrites::new(&job, guarded);
             let launched = prepare_host(c, &mut ledger, window, !active.is_empty(), || {
-                launch(c, &w, &mut job, bounded_remaining)
+                if guarded {
+                    launch_guarded(
+                        c,
+                        &w,
+                        &mut job,
+                        bounded_remaining,
+                        &mut admission_hook,
+                        &mut job_writes,
+                    )
+                } else {
+                    launch(c, &w, &mut job, bounded_remaining)
+                }
             });
             if active.is_empty() {
                 last = now();
@@ -1723,6 +1832,7 @@ pub fn run_scoped(
                 Ok(Some((process, heartbeat))) => {
                     active.push(Active {
                         job,
+                        job_writes,
                         process,
                         heartbeat,
                     });
@@ -1730,30 +1840,12 @@ pub fn run_scoped(
                 }
                 Ok(None) => break,
                 Err(error) => {
-                    if let Some(launch) = job.launch.clone() {
-                        let observation = ExitObservation {
-                            success: false,
-                            code: None,
-                            reason: Some(format!("launch failed: {error:#}")),
-                        };
-                        let _ = storage::write(
-                            &w.work_dir
-                                .join("host-exits")
-                                .join(format!("{}.json", job.run_id)),
-                            &observation,
-                        );
-                        if settle(&w, &job, &observation).is_ok() {
-                            job.launch = None;
-                        }
-                        let _ = w.release(&launch.lease);
+                    let _cleanup = process::cleanup_scope();
+                    if let Some(hook) = admission_hook.as_deref_mut() {
+                        hook.revoke(&format!("guarded launch failed: {error:#}"));
+                        guarded_admission_failed = true;
                     }
-                    if job.launch.is_none() {
-                        defer_read_retry(&mut job, format!("launch failed: {error:#}"));
-                    } else {
-                        job.last_error = Some(format!("launch requires reconciliation: {error:#}"));
-                        job.retry_after = None;
-                    }
-                    storage::write(&job_path(c, &job.task.id), &job)?;
+                    admission::launch_failed(c, &w, &mut job, &mut job_writes, &error, guarded)?;
                 }
             }
         }
@@ -1761,6 +1853,9 @@ pub fn run_scoped(
         if !active.is_empty() && ledger.budget.active_since.is_none() {
             ledger.budget.tick(now(), true)?;
             storage::write(&ledger_path, &ledger)?;
+        }
+        if active.is_empty() && guarded_admission_failed {
+            break;
         }
         if active.is_empty() && !admitted {
             ledger.budget.tick(now(), false)?;
@@ -1814,6 +1909,18 @@ fn launch(
     job: &mut Job,
     remaining: u64,
 ) -> Result<(Process, lease_heartbeat::LeaseHeartbeat)> {
+    let mut writes = admission::JobWrites::new(job, false);
+    launch_guarded(c, w, job, remaining, &mut None, &mut writes)
+}
+
+fn launch_guarded(
+    c: &Config,
+    w: &Workflow,
+    job: &mut Job,
+    remaining: u64,
+    admission_hook: &mut Option<&mut dyn admission::ScopedAdmissionHook>,
+    job_writes: &mut admission::JobWrites,
+) -> Result<(Process, lease_heartbeat::LeaseHeartbeat)> {
     let launch_started = std::time::Instant::now();
     ensure!(remaining > 0, "execution budget exhausted");
     if let Some(inputs) = &job.research_inputs {
@@ -1835,20 +1942,45 @@ fn launch(
     let dependencies = completed_dependencies(c, w, job)?;
     let tool_bindings = observed_tools(c, job)?;
     let expected_git_dir = git(&job.worktree, &["rev-parse", "--absolute-git-dir"])?;
-    let lease = w.acquire(
-        &job.run_id,
-        "agent-research-lab",
-        &format!("{}-{}", std::process::id(), workflow::now_ms()?),
-        lease_heartbeat::TTL_MS,
-    )?;
+    let acquisition_id = format!("{}-{}", std::process::id(), workflow::now_ms()?);
+    let lease = if let Some(hook) = admission_hook.as_deref_mut() {
+        admission::current_job(c, job)?;
+        let preconditions = hook.take_acquire_preconditions(c, job)?;
+        preconditions.validate().map_err(anyhow::Error::msg)?;
+        admission::current_job(c, job)?;
+        w.acquire_checked(
+            &job.run_id,
+            "agent-research-lab",
+            &acquisition_id,
+            lease_heartbeat::TTL_MS,
+            &preconditions,
+        )?
+    } else {
+        w.acquire(
+            &job.run_id,
+            "agent-research-lab",
+            &acquisition_id,
+            lease_heartbeat::TTL_MS,
+        )?
+    };
     let mut heartbeat = match lease_heartbeat::LeaseHeartbeat::start(w, lease.clone()) {
         Ok(heartbeat) => heartbeat,
         Err(error) => {
-            let _ = w.release(&lease);
+            let release = w.release(&lease);
+            if admission_hook.is_some()
+                && let Err(release) = release
+            {
+                return Err(error.context(format!(
+                    "lease release requires reconciliation: {release:#}"
+                )));
+            }
             return Err(error);
         }
     };
     let result = (|| -> Result<Process> {
+        // Acquisition can run external owner code. Rejoin before claim, as well
+        // as before persisting its response, against the prior durable Job.
+        job_writes.confirm(c)?;
         let claimed = heartbeat.with_lease(|lease| {
             if job.task.write {
                 w.effect_claim(lease)
@@ -1890,7 +2022,7 @@ fn launch(
             .as_ref()
             .map(|team| team.member(job))
             .transpose()?;
-        storage::write(&job_path(c, &job.task.id), job)?;
+        job_writes.persist(c, job)?;
         storage::write(&dir.join("tool-bindings.json"), &tool_bindings)?;
         storage::write(
             &dir.join("agent-permissions.json"),
@@ -1983,7 +2115,7 @@ fn launch(
             .context("missing launch authority")?
             .backend_request_sha256 = invocation.request_sha256.clone();
         // The digest is private host authority before any backend process starts.
-        storage::write(&job_path(c, &job.task.id), job)?;
+        job_writes.persist(c, job)?;
         let env = vec![
             (
                 "RELAY_MEMORY_HOME".into(),
@@ -1994,41 +2126,33 @@ fn launch(
                 dir.join("knowledge-index").display().to_string(),
             ),
         ];
-        let (program, args) = if job
-            .task
-            .required_tools
-            .iter()
-            .any(|name| name == "computer-use-cli")
-        {
-            targets::wrap_desktop_backend(
-                c,
-                &job.worktree,
-                &dir,
-                job.task.write,
-                &invocation.program,
-                &invocation.args,
-                &invocation.access,
-            )?
-        } else {
-            isolation::wrap_agent_with_access(
-                &invocation.program,
-                &invocation.args,
-                &c.state_dir,
-                &job.worktree,
-                &dir,
-                job.task.write,
-                &invocation.access,
-            )?
-        };
+        let (program, args) = launch_program(c, job, &dir, &invocation)?;
         agent_backend::verify_job(c, job)?;
+        let before_hook = std::time::Instant::now();
         let execution_timeout = Duration::from_secs(remaining)
-            .saturating_sub(launch_started.elapsed())
+            .saturating_sub(before_hook.duration_since(launch_started))
             .min(Duration::from_secs(c.task_timeout_seconds));
+        let execution_deadline = before_hook
+            .checked_add(execution_timeout)
+            .context("execution deadline exceeds monotonic clock range")?;
         ensure!(
-            !execution_timeout.is_zero(),
+            before_hook < execution_deadline,
             "execution budget exhausted during preparation"
         );
-        let execution_started = std::time::Instant::now();
+        if let Some(hook) = admission_hook.as_deref_mut() {
+            admission::current_job(c, job)?;
+            hook.before_model_spawn(c, job)?;
+            admission::current_job(c, job)?;
+            ensure!(!hook.should_stop(), "guarded model entry stopped");
+        }
+        // Final admission work consumes the same pre-hook cutoff, including the
+        // task TTL. Never restart either budget when the hook returns success.
+        let execution_timeout =
+            execution_deadline.saturating_duration_since(std::time::Instant::now());
+        ensure!(
+            !execution_timeout.is_zero(),
+            "execution budget exhausted during final admission"
+        );
         let process = Process::spawn(
             &program,
             &args,
@@ -2044,16 +2168,17 @@ fn launch(
         heartbeat.watch_worker(
             launch.pid,
             launch.process_start.clone(),
-            execution_timeout.saturating_sub(execution_started.elapsed()),
+            execution_deadline.saturating_duration_since(std::time::Instant::now()),
             Some(c.state_dir.join("paused")),
         )?;
         launch.lease = heartbeat.current()?;
-        storage::write(&job_path(c, &job.task.id), job)?;
+        job_writes.persist(c, job)?;
         Ok(process)
     })();
     match result {
         Ok(process) => Ok((process, heartbeat)),
         Err(error) => {
+            let _cleanup = process::cleanup_scope();
             if let Some(launch) = &job.launch {
                 revoke_communication(c, job, launch);
             }
@@ -2063,10 +2188,55 @@ fn launch(
             if let Some(launch) = job.launch.as_mut() {
                 launch.lease = lease;
             } else {
-                let _ = w.release(&lease);
+                let release = w.release(&lease);
+                if admission_hook.is_some()
+                    && let Err(release) = release
+                {
+                    return Err(error.context(format!(
+                        "lease release requires reconciliation: {release:#}"
+                    )));
+                }
             }
             Err(error)
         }
+    }
+}
+
+fn launch_program(
+    c: &Config,
+    job: &Job,
+    dir: &Path,
+    invocation: &agent_backend::Invocation,
+) -> Result<(String, Vec<String>)> {
+    #[cfg(test)]
+    if admission_tests::direct_agent_fixture() {
+        return Ok((invocation.program.clone(), invocation.args.clone()));
+    }
+    if job
+        .task
+        .required_tools
+        .iter()
+        .any(|name| name == "computer-use-cli")
+    {
+        targets::wrap_desktop_backend(
+            c,
+            &job.worktree,
+            dir,
+            job.task.write,
+            &invocation.program,
+            &invocation.args,
+            &invocation.access,
+        )
+    } else {
+        isolation::wrap_agent_with_access(
+            &invocation.program,
+            &invocation.args,
+            &c.state_dir,
+            &job.worktree,
+            dir,
+            job.task.write,
+            &invocation.access,
+        )
     }
 }
 
@@ -3376,6 +3546,27 @@ mod tests {
                 {"repository":"superpod","role":"review","prompt":"duplicate binding","write":false,"exploratory":false,"required_tools":["computer-use-cli","computer-use-cli"]}
             ]),
         );
+        // Keep the unused generated transport executable busy throughout the positive case.
+        // This models a writable executable, not an owner transaction or the historic holder.
+        let private_script_writer = fs::OpenOptions::new()
+            .write(true)
+            .open(&c.workflow)
+            .unwrap();
+        let busy_error = w.status(&job.run_id).unwrap_err();
+        let io_error = busy_error
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<std::io::Error>())
+            .expect("the generated executable must fail with an I/O error");
+        assert_eq!(io_error.raw_os_error(), Some(26));
+        let fixture = if let Some(runfiles) = std::env::var_os("TEST_SRCDIR") {
+            PathBuf::from(runfiles)
+                .join(std::env::var_os("TEST_WORKSPACE").expect("Bazel test workspace"))
+                .join("crates/runtime/fixtures/completion-workflow.sh")
+        } else {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/completion-workflow.sh")
+        };
+        c.workflow = fixture.canonicalize().unwrap();
+        let w = workflow(&c);
         let binding = c.tools["relay-memory"].clone();
         c.tools.insert("computer-use-cli".into(), binding.clone());
         c.tools.insert("repo-sandbox".into(), binding);
@@ -3428,6 +3619,7 @@ mod tests {
         let replay = admit_followups(&c, &job, &dir, &receipt).unwrap();
         assert_eq!(replay.queued, report.queued);
         assert_eq!(jobs(&c).unwrap().len(), 2);
+        drop(private_script_writer);
     }
 
     #[test]
@@ -5279,3 +5471,6 @@ mod team_tests;
 
 #[cfg(test)]
 mod cohort_tests;
+
+#[cfg(test)]
+mod admission_tests;

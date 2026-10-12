@@ -333,6 +333,25 @@ export const WorkflowObservationErrorCode = {
   Mismatch: "mismatch",
 } as const;
 export type WorkflowObservationErrorCode = (typeof WorkflowObservationErrorCode)[keyof typeof WorkflowObservationErrorCode];
+export const NativeCaptureClass = {
+  Normal: "normal",
+  Cleanup: "cleanup",
+} as const;
+export type NativeCaptureClass = (typeof NativeCaptureClass)[keyof typeof NativeCaptureClass];
+export const NativeCaptureState = {
+  NotSpawned: "not_spawned",
+  Exited: "exited",
+  Signal: "signal",
+  Deadline: "deadline",
+  Overflow: "overflow",
+  Incomplete: "incomplete",
+} as const;
+export type NativeCaptureState = (typeof NativeCaptureState)[keyof typeof NativeCaptureState];
+export const CheckedAcquireFailureCode = {
+  AdmissionConflict: "admission_conflict",
+  Unknown: "owner_acquire_unknown",
+} as const;
+export type CheckedAcquireFailureCode = (typeof CheckedAcquireFailureCode)[keyof typeof CheckedAcquireFailureCode];
 export const GoalEventKind = {
   Created: "goal_created",
   Accepted: "goal_accepted",
