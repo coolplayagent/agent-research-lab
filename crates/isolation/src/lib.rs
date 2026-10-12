@@ -141,6 +141,14 @@ pub fn wrap_agent_with_launcher_access(
         wrap_agent_with_access(program, args, state_dir, worktree, log_dir, write, access)?;
     let command_start = wrapped.len() - args.len() - 1;
     let command = wrapped.split_off(command_start);
+    ensure!(
+        wrapped.pop().as_deref() == Some("--"),
+        "sandbox command delimiter is absent"
+    );
+    // Restore the task log directory for output, then protect only the trusted
+    // launcher file. This mount must precede bubblewrap's command delimiter.
+    add_mount(&mut wrapped, "--ro-bind", &launcher_path, &launcher_path)?;
+    wrapped.push("--".into());
     wrapped.push(utf8(&launcher_path)?);
     wrapped.extend_from_slice(launcher.1);
     wrapped.push("--".into());
@@ -696,6 +704,72 @@ mod tests {
             "own-log"
         );
         assert_eq!(fs::read_to_string(source).unwrap(), "unchanged");
+    }
+
+    #[test]
+    fn task_launcher_is_read_only_while_outputs_remain_writable() {
+        let (_temp, state, worktree, logs) = fixture();
+        let launcher = logs.join("trusted-launcher");
+        let script = r#"#!/bin/sh
+set -eu
+test "$0" = "$1"
+shift
+/usr/bin/python3 -c 'import os,sys; assert os.statvfs(sys.argv[1]).f_flag & os.ST_RDONLY' "$0"
+if chmod u+w "$0" 2>/dev/null; then exit 11; fi
+if ( : > "$0" ) 2>/dev/null; then exit 12; fi
+printf launcher-output > "$(dirname "$0")/launcher-output.txt"
+test "$1" = --
+shift
+exec "$@"
+"#;
+        fs::write(&launcher, script).unwrap();
+        // The host file is owner-writable: rejection inside the namespace must
+        // come from the precise read-only mount, not Unix permission bits.
+        fs::set_permissions(&launcher, fs::Permissions::from_mode(0o700)).unwrap();
+        let access = AgentAccess {
+            codex_credentials: false,
+            env_allowlist: vec![],
+            read_only_views: vec![],
+        };
+        let (program, args) = wrap_agent_with_launcher_access(
+            "/bin/sh",
+            &["-c".into(), "printf agent-output > agent-output.txt".into()],
+            &state,
+            &worktree,
+            &logs,
+            true,
+            (&launcher, &[utf8(&launcher).unwrap()]),
+            &access,
+        )
+        .unwrap();
+        let output = Command::new(program).args(args).output().unwrap();
+        assert!(
+            output.status.success(),
+            "launcher isolation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(fs::read_to_string(&launcher).unwrap(), script);
+        assert_eq!(
+            fs::read_to_string(logs.join("launcher-output.txt")).unwrap(),
+            "launcher-output"
+        );
+        assert_eq!(
+            fs::read_to_string(worktree.join("agent-output.txt")).unwrap(),
+            "agent-output"
+        );
+        assert!(
+            wrap_agent_with_launcher_access(
+                "/bin/true",
+                &[],
+                &state,
+                &worktree,
+                &logs,
+                false,
+                (Path::new("/bin/true"), &[]),
+                &access,
+            )
+            .is_err()
+        );
     }
 
     #[test]
