@@ -1064,28 +1064,37 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn index_refresh_respects_active_work_and_requires_complete_exact_snapshot() {
-        use std::os::unix::fs::PermissionsExt;
         let temp = tempfile::tempdir().unwrap();
-        let binary = temp.path().join("relay-knowledge-fixture");
-        fs::write(
-            &binary,
-            r#"#!/bin/sh
-set -eu
-case "$1 $2" in
-  'repo status') cat status.json ;;
-  'repo update') printf 'update\n' >> updates.log; cp after.json status.json; printf '{}\n' ;;
-  *) exit 9 ;;
-esac
-"#,
-        )
-        .unwrap();
-        fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+        let fixture = if let Some(runfiles) = std::env::var_os("TEST_SRCDIR") {
+            PathBuf::from(runfiles)
+                .join(std::env::var_os("TEST_WORKSPACE").expect("Bazel test workspace"))
+                .join("crates/knowledge/fixtures/index-refresh.sh")
+        } else {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/index-refresh.sh")
+        };
         let expected = "a".repeat(40);
         let request = IndexRefreshRequest {
-            relay_knowledge_binary: binary,
+            relay_knowledge_binary: fixture.canonicalize().unwrap(),
             superpod_root: temp.path().into(),
             repository_alias: "superpod".into(),
             expected_commit: expected.clone(),
+        };
+        #[cfg(target_os = "linux")]
+        let _private_script_writer = {
+            use std::os::unix::fs::PermissionsExt;
+            let binary = temp.path().join("relay-knowledge-fixture");
+            fs::copy(&request.relay_knowledge_binary, &binary).unwrap();
+            fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+            let writer = fs::OpenOptions::new().write(true).open(&binary).unwrap();
+            let mut busy_request = request.clone();
+            busy_request.relay_knowledge_binary = binary;
+            let error = refresh_index(&busy_request).unwrap_err();
+            let io_error = error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<std::io::Error>())
+                .expect("the writable executable must fail with an I/O error");
+            assert_eq!(io_error.raw_os_error(), Some(26));
+            writer
         };
         let complete = serde_json::json!({"status":{"last_indexed_commit":expected,"stale":false,"content_integrity":{"state":"complete"}},"retention":{"maintenance_pending":false}});
         let old = serde_json::json!({"status":{"last_indexed_commit":"b".repeat(40),"stale":true,"content_integrity":{"state":"complete"}}});

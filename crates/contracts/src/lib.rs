@@ -99,6 +99,11 @@ states! {
     WorkflowObservationErrorCode { Unavailable => "unavailable", Mismatch => "mismatch" }
     NativeCaptureClass { Normal => "normal", Cleanup => "cleanup" }
     NativeCaptureState { NotSpawned => "not_spawned", Exited => "exited", Signal => "signal", Deadline => "deadline", Overflow => "overflow", Incomplete => "incomplete" }
+    NativeFilesystemOperation { OpenWrite => "open_write", CreateDirectory => "create_directory", Write => "write", Truncate => "truncate", Sync => "sync", Chmod => "chmod", Rename => "rename", HardLink => "hard_link", Unlink => "unlink", RemoveDirectory => "remove_directory", Lock => "lock", Unlock => "unlock" }
+    NativeFilesystemResult { NotAttempted => "not_attempted", Succeeded => "succeeded", Failed => "failed", Unknown => "unknown" }
+    NativeFilesystemCompleteness { Complete => "complete", Incomplete => "incomplete" }
+    NativeFilesystemScope { Controller => "controller", SelectedAttempt => "selected_attempt", HistoricalRecovery => "historical_recovery", CaptureTemporary => "capture_temporary" }
+    NativeFilesystemCategory { Json => "json", Prompt => "prompt", Protocol => "protocol", Stream => "stream", PrivateConfiguration => "private_configuration", Cache => "cache", Launcher => "launcher", Directory => "directory" }
     CheckedAcquireFailureCode { AdmissionConflict => "admission_conflict", Unknown => "owner_acquire_unknown" }
 
     GoalEventKind { Created => "goal_created", Accepted => "goal_accepted", Cancelled => "goal_cancelled", Retried => "work_retried", Claimed => "work_claimed", Submitted => "work_submitted", Failed => "work_failed" }
@@ -208,3 +213,6 @@ impl ApiNotice {
         }
     }
 }
+
+mod filesystem;
+pub use filesystem::*;

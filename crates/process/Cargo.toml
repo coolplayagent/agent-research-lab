@@ -8,6 +8,7 @@ license.workspace = true
 name = "process"
 
 [dependencies]
+native_effects.workspace = true
 anyhow.workspace = true
 contracts.workspace = true
 libc.workspace = true

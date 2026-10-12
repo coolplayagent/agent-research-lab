@@ -4,12 +4,12 @@
 //! extracted repositories and compiler output are never imported.
 
 use anyhow::{Context, Result, ensure};
+use native_effects::fs::{self, File, OpenOptions};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
-    fs::{self, File, OpenOptions},
-    io::{Read, Write},
+    io::Read,
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Component, Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
@@ -343,6 +343,7 @@ impl Seeder {
             SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ));
         let result = (|| -> Result<()> {
+            fs::check_write_bound(&temporary, size)?;
             let mut output = OpenOptions::new()
                 .write(true)
                 .create_new(true)
@@ -360,7 +361,7 @@ impl Seeder {
                 }
                 copied += count as u64;
                 ensure!(copied <= size, "cache source grew during copy");
-                output.write_all(&buffer[..count])?;
+                fs::write_all(&mut output, &temporary, &buffer[..count])?;
                 hash.update(&buffer[..count]);
             }
             ensure!(copied == size, "cache source changed during copy");
@@ -371,13 +372,14 @@ impl Seeder {
                 source.display()
             );
             if executable {
-                output.set_permissions(fs::Permissions::from_mode(0o700))?;
+                fs::set_file_permissions(&output, &temporary, fs::Permissions::from_mode(0o700))?;
             }
             drop(output);
             fs::rename(&temporary, destination)?;
             Ok(())
         })();
         if result.is_err() {
+            let _cleanup = native_effects::cleanup_scope();
             let _ = fs::remove_file(&temporary);
         }
         result?;
@@ -1137,7 +1139,7 @@ MINOR_MAPPING = {{
             let relative = std::str::from_utf8(relative).unwrap();
             let target = worktree.join(relative);
             checked_directory(target.parent().unwrap(), true).unwrap();
-            fs::copy(source.join(relative), target).unwrap();
+            std::fs::copy(source.join(relative), target).unwrap();
         }
         let report = prepare(&worktree, &logs).unwrap();
         eprintln!(

@@ -1,8 +1,9 @@
 //! Disposable real X11 desktop targets. No inherited desktop or session bus is used.
 use anyhow::{Context, Result, bail, ensure};
+use native_effects::fs::{self as native_fs, OpenOptions};
 use serde_json::{Value, json};
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::{self, File},
     io::Read,
     os::unix::{fs::PermissionsExt, process::CommandExt},
     path::{Component, Path, PathBuf},
@@ -157,13 +158,13 @@ impl DesktopSession {
         );
         let name = output.file_name().context("missing output name")?;
         let output = parent.join(name);
-        fs::create_dir(&output).context("desktop output must be a new private directory")?;
-        fs::set_permissions(&output, fs::Permissions::from_mode(0o700))?;
+        native_fs::create_dir(&output).context("desktop output must be a new private directory")?;
+        native_fs::set_permissions(&output, fs::Permissions::from_mode(0o700))?;
         verify_dependencies(&dependencies)?;
         for path in ["home", "run", "config", "cache", "data"] {
             let directory = output.join(path);
-            fs::create_dir(&directory)?;
-            fs::set_permissions(directory, fs::Permissions::from_mode(0o700))?;
+            native_fs::create_dir(&directory)?;
+            native_fs::set_permissions(directory, fs::Permissions::from_mode(0o700))?;
         }
         let mut random = [0_u8; 20];
         File::open("/dev/urandom")?.read_exact(&mut random)?;
@@ -299,7 +300,7 @@ impl DesktopSession {
             "could not start private Xvfb; inspect owned xvfb logs"
         );
         let config = session.output.join("openbox.xml");
-        fs::write(
+        native_fs::write(
             &config,
             r#"<openbox_config xmlns="http://openbox.org/3.4/rc"><focus><focusNew>yes</focusNew></focus><theme><name>Clearlooks</name></theme><desktops><number>1</number></desktops></openbox_config>"#,
         )?;
@@ -315,7 +316,7 @@ impl DesktopSession {
             "openbox",
         )?);
         let app = session.output.join("target.py");
-        fs::write(&app, TARGET)?;
+        native_fs::write(&app, TARGET)?;
         let child = OwnedChild::spawn(
             Path::new("/usr/bin/python3"),
             &[

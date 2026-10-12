@@ -1,7 +1,7 @@
 //! Bounded process groups. Arguments are never interpreted by a shell.
 use anyhow::{Context, Result, bail};
+use native_effects::fs::{self, File, OpenOptions};
 use std::{
-    fs::{self, File, OpenOptions},
     io::Read,
     os::unix::process::CommandExt,
     path::{Path, PathBuf},
@@ -52,6 +52,7 @@ pub fn parallel_map<T: Sync, R: Send>(
     let observer_context = ObserverContext::current();
     let mut output = Vec::with_capacity(items.len());
     for batch in items.chunks(4) {
+        observer_context.check_work()?;
         if deadline_exhausted() {
             bail!("host operation wall-clock budget exhausted");
         }
@@ -187,6 +188,7 @@ impl Process {
             Some(path) => Stdio::from(File::open(path)?),
             None => Stdio::null(),
         });
+        ObserverContext::current().check_work()?;
         let child = cmd.spawn().context("launch bounded process")?;
         Ok(Self {
             child,
@@ -326,6 +328,7 @@ fn capture_reserved(
 ) -> Result<Output> {
     use contracts::NativeCaptureState;
     use std::os::unix::process::ExitStatusExt;
+
     let mut observed = CapturedControl {
         state: NativeCaptureState::NotSpawned,
         pid: None,
@@ -338,6 +341,15 @@ fn capture_reserved(
         failure: None,
         cleanup_error: None,
     };
+    let span = native_effects::control_scope(reservation.control_ordinal());
+    if let Err(error) = span {
+        observed.state = NativeCaptureState::Incomplete;
+        observed.failure = Some(format!("guarded control span: {error:#}"));
+        reservation.finish(&observed)?;
+        return Err(error);
+    }
+    let _span = span?;
+    let _capture_scope = native_effects::capture_scope();
     let limit = reservation.retained_stream_limit();
     let path = std::env::temp_dir().join(format!(
         "agent-lab-capture-{}-{}",
@@ -444,7 +456,19 @@ fn capture_reserved(
     // A reservation's error never prevents cleanup or erases the first actual wait.
     let publication = reservation.finish(&observed);
     let removal = if created {
-        fs::remove_dir_all(&path)
+        let cleanup_needed = operation.is_err()
+            || publication.is_err()
+            || ObserverContext::current().check_work().is_err();
+        let _cleanup = cleanup_needed.then(cleanup_scope);
+        let removal = fs::remove_dir_all(&path);
+        if removal.is_err() && !cleanup_needed && ObserverContext::current().normal_revoked() {
+            // Only this source-created scratch directory is eligible. A failed normal
+            // reservation must not consume the independent containment allowance.
+            // Retain the original failure even if the remaining owned entries are removed.
+            let _cleanup = cleanup_scope();
+            let _ = fs::remove_dir_all(&path);
+        }
+        removal
     } else {
         Ok(())
     };

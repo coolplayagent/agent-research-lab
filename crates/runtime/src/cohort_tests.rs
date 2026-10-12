@@ -296,7 +296,7 @@ fn actual_cli_mixed_prerequisites_finish_before_first_lease() {
             .success()
     );
     let installed = tools.join("computer-use");
-    fs::copy(computer, &installed).unwrap();
+    std::fs::copy(computer, &installed).unwrap();
     fs::set_permissions(&installed, fs::Permissions::from_mode(0o500)).unwrap();
     let desktop_probe = tools.join("computer-probe");
     let desktop_ready = temp.path().join("desktop-ready-nanos");
@@ -630,7 +630,7 @@ fn freshness_is_reverified_after_all_probes_without_claiming_stale_tasks() {
             )
             .unwrap(),
             _ => {
-                fs::copy("/bin/true", &binary).unwrap();
+                std::fs::copy("/bin/true", &binary).unwrap();
             }
         }
         fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();

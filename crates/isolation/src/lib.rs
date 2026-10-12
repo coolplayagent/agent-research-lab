@@ -3,8 +3,7 @@
 //! read-only tool installation. Network access remains available to model APIs.
 
 use anyhow::{Context, Result, ensure};
-use std::fs;
-use std::io::Write;
+use native_effects::fs;
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
@@ -468,6 +467,7 @@ fn mask_credentials(args: &mut Vec<String>, path: &Path) -> Result<()> {
 }
 
 fn write_private_file(path: &Path, bytes: &[u8]) -> Result<()> {
+    fs::check_write_bound(path, bytes.len() as u64)?;
     if let Ok(metadata) = fs::symlink_metadata(path) {
         ensure!(
             metadata.is_file() && !metadata.file_type().is_symlink(),
@@ -481,9 +481,9 @@ fn write_private_file(path: &Path, bytes: &[u8]) -> Result<()> {
         .custom_flags(libc::O_NOFOLLOW)
         .mode(0o600)
         .open(path)?;
-    file.set_permissions(fs::Permissions::from_mode(0o600))?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
+    fs::set_file_permissions(&file, path, fs::Permissions::from_mode(0o600))?;
+    fs::write_all(&mut file, path, bytes)?;
+    fs::sync_all(&file, path)?;
     Ok(())
 }
 

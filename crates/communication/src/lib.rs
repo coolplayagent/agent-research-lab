@@ -1,14 +1,14 @@
 //! Host-authorized, bounded cohort proposals. This is not a task or knowledge store.
 use anyhow::{Context, Result, bail, ensure};
+use native_effects::fs::{self, File, OpenOptions};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ffi::CString,
-    fs::{self, File, OpenOptions},
     io::Read,
     os::{
         fd::{AsRawFd, FromRawFd},
-        unix::fs::{MetadataExt, OpenOptionsExt},
+        unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
     },
     path::{Component, Path, PathBuf},
 };
@@ -499,6 +499,10 @@ impl Board {
         }
     }
     fn save(&self, c: &Cohort) -> Result<()> {
+        if fs::guarded() {
+            fs::json_bytes_limit(&self.state_path(&c.id), c, true, MAX_STATE_BYTES)?;
+            return storage::write(&self.state_path(&c.id), c);
+        }
         ensure!(
             serde_json::to_vec_pretty(c)?.len() <= MAX_STATE_BYTES,
             "board state size limit reached"
@@ -543,10 +547,14 @@ impl Board {
             CapacityKind::RunOwners,
         )?;
         index.bindings.insert(key, member.clone());
-        capacity(
-            serde_json::to_vec_pretty(&index)?.len() <= MAX_STATE_BYTES,
-            CapacityKind::RunIndexBytes,
-        )?;
+        if fs::guarded() {
+            fs::json_bytes_limit(&path, &index, true, MAX_STATE_BYTES)?;
+        } else {
+            capacity(
+                serde_json::to_vec_pretty(&index)?.len() <= MAX_STATE_BYTES,
+                CapacityKind::RunIndexBytes,
+            )?;
+        }
         storage::write(&path, &index)
     }
     /// Explicit host opt-in. Registration replay preserves counters, slots and TTL.
@@ -1157,7 +1165,10 @@ impl Board {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
             Err(e) => return Err(e.into()),
         }
-        File::open(self.index_path(shard).parent().unwrap())?.sync_all()?;
+        fs::sync_all(
+            &File::open(self.index_path(shard).parent().unwrap())?,
+            self.index_path(shard).parent().unwrap(),
+        )?;
         Ok(())
     }
 }
@@ -1166,10 +1177,10 @@ fn remove_view(view: &Path) -> Result<()> {
     match directory(view, false) {
         Ok(dir) => {
             let name = CString::new("board.json")?;
-            if unsafe { libc::unlinkat(dir.as_raw_fd(), name.as_ptr(), 0) } < 0
-                && std::io::Error::last_os_error().kind() != std::io::ErrorKind::NotFound
-            {
-                return Err(std::io::Error::last_os_error().into());
+            match fs::unlink_at(&dir, &view.join("board.json"), &name) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e.into()),
             }
         }
         Err(e)
@@ -1451,23 +1462,24 @@ fn read_json<T: DeserializeOwned>(path: &Path) -> Result<Option<T>> {
 fn directory(path: &Path, create: bool) -> Result<File> {
     ensure!(path.is_absolute(), "directory path must be absolute");
     let mut dir = File::open("/")?;
+    let mut current = PathBuf::from("/");
     for component in path.components() {
         let name = match component {
             Component::RootDir => continue,
             Component::Normal(s) => CString::new(s.as_encoded_bytes())?,
             _ => bail!("non-normal directory component"),
         };
+        current.push(component.as_os_str());
         let flags = libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC;
         let mut fd = unsafe { libc::openat(dir.as_raw_fd(), name.as_ptr(), flags) };
         if fd < 0
             && create
             && std::io::Error::last_os_error().kind() == std::io::ErrorKind::NotFound
         {
-            let result = unsafe { libc::mkdirat(dir.as_raw_fd(), name.as_ptr(), 0o700) };
-            if result < 0
-                && std::io::Error::last_os_error().kind() != std::io::ErrorKind::AlreadyExists
-            {
-                return Err(std::io::Error::last_os_error().into());
+            match fs::mkdir_at(&dir, &current, &name, 0o700) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+                Err(e) => return Err(e.into()),
             }
             fd = unsafe { libc::openat(dir.as_raw_fd(), name.as_ptr(), flags) };
         }
@@ -1484,10 +1496,7 @@ fn private_directory(path: &Path) -> Result<()> {
         file.metadata()?.uid() == unsafe { libc::geteuid() },
         "board directory is not host-owned"
     );
-    ensure!(
-        unsafe { libc::fchmod(file.as_raw_fd(), 0o700) } == 0,
-        "cannot secure board directory"
-    );
+    fs::set_file_permissions(&file, path, fs::Permissions::from_mode(0o700))?;
     Ok(())
 }
 

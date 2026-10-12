@@ -8,6 +8,7 @@ license.workspace = true
 name = "agent_backend"
 
 [dependencies]
+native_effects.workspace = true
 agent_policy.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
