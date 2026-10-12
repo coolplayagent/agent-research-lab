@@ -983,6 +983,7 @@ name = "lab-process"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "lab-contracts",
  "libc",
  "tempfile",
 ]

@@ -97,6 +97,9 @@ states! {
     BatchRegistrationErrorCode { InvalidRequest => "invalid_request", RequestConflict => "request_conflict", FrozenBindingConflict => "frozen_binding_conflict", FreshnessFailure => "freshness_failure", FreshnessDrift => "freshness_drift", OwnerProofUnavailable => "owner_proof_unavailable", OwnerProofMismatch => "owner_proof_mismatch", CurrentAttemptChanged => "current_attempt_changed", DeadlineExceeded => "deadline_exceeded", RegistrationFailure => "registration_failure", ReceiptPersistenceFailure => "receipt_persistence_failure" }
     WorkflowLookupErrorCode { NotFound => "not_found" }
     WorkflowObservationErrorCode { Unavailable => "unavailable", Mismatch => "mismatch" }
+    NativeCaptureClass { Normal => "normal", Cleanup => "cleanup" }
+    NativeCaptureState { NotSpawned => "not_spawned", Exited => "exited", Signal => "signal", Deadline => "deadline", Overflow => "overflow", Incomplete => "incomplete" }
+    CheckedAcquireFailureCode { AdmissionConflict => "admission_conflict", Unknown => "owner_acquire_unknown" }
 
     GoalEventKind { Created => "goal_created", Accepted => "goal_accepted", Cancelled => "goal_cancelled", Retried => "work_retried", Claimed => "work_claimed", Submitted => "work_submitted", Failed => "work_failed" }
     ScenarioStatus { Ready => "scenario_ready", Unavailable => "scenario_unavailable", BatchComplete => "scenario_batch_complete" }
@@ -106,6 +109,55 @@ states! {
     SessionItemStatus { InProgress => "in_progress", Completed => "completed", Failed => "failed", Error => "error", Unknown => "unknown" }
     SessionEventKind { SessionStarted => "session_started", TurnStarted => "turn_started", TurnCompleted => "turn_completed", ExecutionError => "execution_error", ToolStarted => "tool_started", ToolCompleted => "tool_completed", AgentMessage => "agent_message", FileChange => "file_change", Activity => "activity" }
     WorkResultCode { ExecutorFailed => "executor_failed", Completed => "research_completed", Failed => "research_failed", AdmissionFailed => "research_admission_failed" }
+}
+
+/// Expectations for one owner transaction, bound to the original registered run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AcquirePreconditionsV1 {
+    pub expected_run_digest: String,
+    pub expected_bundle_digest: String,
+    pub expected_snapshot_digest: String,
+    pub expected_execution_digest: String,
+    pub expected_snapshot_revision: u64,
+}
+/// Existing owner lease wire data, parsed strictly at the checked boundary.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CheckedLeaseAuthority {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generation: Option<String>,
+    pub run_id: String,
+    pub owner: String,
+    pub acquisition_id: String,
+    pub epoch: u64,
+    pub issued_at_unix_ms: u64,
+    pub expires_at_unix_ms: u64,
+}
+impl AcquirePreconditionsV1 {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.expected_snapshot_revision == 0 {
+            return Err("checked acquire requires a positive snapshot revision");
+        }
+        for digest in [
+            &self.expected_run_digest,
+            &self.expected_bundle_digest,
+            &self.expected_snapshot_digest,
+            &self.expected_execution_digest,
+        ] {
+            let Some(value) = digest.strip_prefix("sha256:") else {
+                return Err("checked acquire requires canonical sha256 digests");
+            };
+            if value.len() != 64
+                || !value
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            {
+                return Err("checked acquire requires canonical sha256 digests");
+            }
+        }
+        Ok(())
+    }
 }
 impl Presence {
     pub fn receives(self) -> bool {

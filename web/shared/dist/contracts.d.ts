@@ -332,6 +332,25 @@ export declare const WorkflowObservationErrorCode: {
     readonly Mismatch: "mismatch";
 };
 export type WorkflowObservationErrorCode = (typeof WorkflowObservationErrorCode)[keyof typeof WorkflowObservationErrorCode];
+export declare const NativeCaptureClass: {
+    readonly Normal: "normal";
+    readonly Cleanup: "cleanup";
+};
+export type NativeCaptureClass = (typeof NativeCaptureClass)[keyof typeof NativeCaptureClass];
+export declare const NativeCaptureState: {
+    readonly NotSpawned: "not_spawned";
+    readonly Exited: "exited";
+    readonly Signal: "signal";
+    readonly Deadline: "deadline";
+    readonly Overflow: "overflow";
+    readonly Incomplete: "incomplete";
+};
+export type NativeCaptureState = (typeof NativeCaptureState)[keyof typeof NativeCaptureState];
+export declare const CheckedAcquireFailureCode: {
+    readonly AdmissionConflict: "admission_conflict";
+    readonly Unknown: "owner_acquire_unknown";
+};
+export type CheckedAcquireFailureCode = (typeof CheckedAcquireFailureCode)[keyof typeof CheckedAcquireFailureCode];
 export declare const GoalEventKind: {
     readonly Created: "goal_created";
     readonly Accepted: "goal_accepted";

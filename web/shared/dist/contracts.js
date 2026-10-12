@@ -289,6 +289,22 @@ export const WorkflowObservationErrorCode = {
     Unavailable: "unavailable",
     Mismatch: "mismatch",
 };
+export const NativeCaptureClass = {
+    Normal: "normal",
+    Cleanup: "cleanup",
+};
+export const NativeCaptureState = {
+    NotSpawned: "not_spawned",
+    Exited: "exited",
+    Signal: "signal",
+    Deadline: "deadline",
+    Overflow: "overflow",
+    Incomplete: "incomplete",
+};
+export const CheckedAcquireFailureCode = {
+    AdmissionConflict: "admission_conflict",
+    Unknown: "owner_acquire_unknown",
+};
 export const GoalEventKind = {
     Created: "goal_created",
     Accepted: "goal_accepted",

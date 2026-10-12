@@ -43,6 +43,7 @@ rust_test(
     name = "tests",
     crate = ":runtime",
     aliases = aliases(normal_dev = True, proc_macro_dev = True),
+    data = ["fixtures/completion-workflow.sh"],
     deps = all_crate_deps(normal_dev = True),
     proc_macro_deps = all_crate_deps(proc_macro_dev = True),
     visibility = ["//visibility:public"],

@@ -12,7 +12,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+mod checked_acquire;
 mod observation;
+pub use checked_acquire::CheckedAcquireError;
 pub use observation::{ObservationError, RegistrationProof};
 
 static FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -270,6 +272,7 @@ impl Workflow {
     }
 
     pub fn release(&self, lease: &Value) -> Result<Value> {
+        let _cleanup = process::cleanup_scope();
         self.run(&["release".into(), self.db(), self.save("lease", lease)?])
     }
 
