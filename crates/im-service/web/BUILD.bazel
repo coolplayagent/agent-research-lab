@@ -32,3 +32,8 @@ node_test(
     script = "layout-tests.cjs",
     data = [":policy_sources", "//web/shared:policy_sources"],
 )
+node_test(
+    name = "bootstrap_tests",
+    script = "bootstrap-tests.cjs",
+    data = [":policy_sources"],
+)

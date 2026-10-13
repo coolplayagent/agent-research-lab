@@ -334,7 +334,7 @@ export const messages = {
   "html.be58521719": "管理凭据",
   "html.736d069565": "进入工作空间",
   "html.86e58d9517": "使用服务生成的管理链接，或运行",
-  "html.b5143f9ac0": "agent-research-lab serve-link --state-dir <数据目录>",
+  "html.b5143f9ac0": "使用研究配置启动时：agent-research-lab --config <配置文件> serve-link；独立协作服务：agent-research-lab serve-link --state-dir <数据目录>",
   "html.a1208633c3": "AI-IM",
   "html.2b40f38b90": "＋ 发起会话",
   "html.6bf9df0bea": "＃ 群组",

@@ -90,14 +90,24 @@ get("login-form").onsubmit = async (event) => {
     }
 };
 try {
-    if (location.hash.startsWith("#access=")) {
+    let session = null;
+    try {
+        session = await api("/api/operator/session");
+    }
+    catch (error) {
+        if (!location.hash.startsWith("#access="))
+            throw error;
+    }
+    if (session && (session.local_operator === true || !location.hash.startsWith("#access="))) {
+        if (location.hash.startsWith("#access="))
+            history.replaceState(null, "", location.pathname + "#groups");
+        await start();
+        get("logout").hidden = session.local_operator === true;
+    }
+    else {
         const token = new URLSearchParams(location.hash.slice(1)).get("access") || "";
         history.replaceState(null, "", location.pathname + "#groups");
         await login(token);
-    }
-    else {
-        await api("/api/operator/session");
-        await start();
     }
 }
 catch (error) {

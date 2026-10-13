@@ -16,7 +16,7 @@ mod server;
 pub mod transport;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
-pub use server::serve;
+pub use server::{serve, serve_with_local_operator};
 use std::{
     fs::{self, File},
     io::Read,

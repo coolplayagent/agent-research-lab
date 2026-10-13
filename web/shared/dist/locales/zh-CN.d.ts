@@ -1,4 +1,11 @@
 export declare const messages: {
+    readonly "researchProcess.open": "研究过程";
+    readonly "researchProcess.loading": "正在读取研究过程…";
+    readonly "researchProcess.scope": "公开执行事件摘要，属于当前任务尝试；工作记录不代表验收通过。";
+    readonly "researchProcess.unavailable": "当前尝试的研究过程暂不可读取，请刷新重试。";
+    readonly "researchProcess.empty": "尚无公开执行事件。";
+    readonly "researchProcess.refresh": "刷新最新事件";
+    readonly "researchProcess.older": "较早事件";
     readonly "NativeCaptureClass.normal": "常规";
     readonly "NativeCaptureClass.cleanup": "清理";
     readonly "NativeCaptureState.not_spawned": "未启动";

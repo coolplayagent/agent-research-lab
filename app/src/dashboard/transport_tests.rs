@@ -92,6 +92,11 @@ async fn actual_async_http_enforces_origin_intent_and_resource_boundaries() {
         ("/assets/feedback.js", "200 OK", "export"),
         ("/favicon.svg", "200 OK", "<svg"),
         ("/api/snapshot", "200 OK", "first"),
+        (
+            "/api/research-process?group_id=g&goal_id=goal&work_id=work-0&attempt=1",
+            "404 Not Found",
+            "Research process unavailable",
+        ),
         ("/../local.toml", "404 Not Found", "Resource unavailable"),
         (
             "/api/session/../../local.toml",
@@ -280,5 +285,17 @@ async fn network_busy_queue_reconnect_ack_and_revocation_preserve_private_delive
     );
     assert_eq!(h.hub.cursor("b", "private").await.unwrap(), sequence);
     drop(stream);
+    h.close().await;
+}
+
+#[tokio::test]
+async fn research_process_requires_operator_cookie() {
+    let h = Harness::new().await;
+    let mut stream = tokio::net::TcpStream::connect(h.addr).await.unwrap();
+    stream.write_all(format!("GET /api/research-process?group_id=g&goal_id=goal&work_id=work-0&attempt=1 HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n", h.addr).as_bytes()).await.unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).await.unwrap();
+    assert!(response.starts_with("HTTP/1.1 401"));
+    assert!(response.contains("Host operator login required"));
     h.close().await;
 }

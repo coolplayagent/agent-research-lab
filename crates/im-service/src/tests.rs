@@ -12,6 +12,9 @@ pub(super) struct Harness {
 }
 impl Harness {
     pub(super) async fn new() -> Self {
+        Self::with_local_operator(false).await
+    }
+    async fn with_local_operator(local_operator: bool) -> Self {
         let state = tempfile::tempdir().unwrap();
         let hub = crystal::Hub::open(state.path()).unwrap();
         hub.register_operator().await.unwrap();
@@ -19,7 +22,11 @@ impl Harness {
         let addr = listener.local_addr().unwrap();
         let (stop, mut stopped) = watch::channel(false);
         let mut web = transport::Web::new(hub.clone(), addr, stop.clone());
-        web.operator = Some(Arc::new(operator::Operator::fixture(&"f".repeat(64))));
+        web.operator = Some(Arc::new(if local_operator {
+            operator::Operator::local(state.path(), addr).unwrap()
+        } else {
+            operator::Operator::fixture(&"f".repeat(64))
+        }));
         let server = tokio::spawn(async move {
             axum::serve(listener, transport::router(web, axum::Router::new()))
                 .with_graceful_shutdown(async move {
@@ -210,4 +217,91 @@ async fn independent_host_manages_agents_groups_dms_boards_without_research_conf
             .contains("Announcements")
     );
     h.close().await;
+}
+
+#[tokio::test]
+async fn local_operator_enters_management_without_changing_actor_grants() {
+    let h = Harness::with_local_operator(true).await;
+    let (status, session) = h.request("/api/operator/session", None, false, None).await;
+    assert_eq!(status, 200);
+    let session: Value = serde_json::from_str(&session).unwrap();
+    assert_eq!(session["authenticated"], true);
+    assert_eq!(session["local_operator"], true);
+    assert_eq!(h.request("/api/im/people", None, false, None).await.0, 200);
+    let (status, response) = h.request("/api/crystal/manage",Some(json!({"operation":"person","person":{"id":"worker","name":"Worker","application_id":null}})),false,None).await;
+    assert_eq!(status, 200, "{response}");
+    let grant = h
+        .manage(json!({"operation":"grant","person_id":"worker","lifetime_seconds":60}))
+        .await;
+    let token = grant["token"].as_str().unwrap();
+    assert_eq!(
+        h.request("/api/im/people", None, false, Some(token))
+            .await
+            .0,
+        401
+    );
+    assert_eq!(h.request("/api/crystal/manage",Some(json!({"operation":"person","person":{"id":"imposter","name":"Imposter","application_id":null}})),false,Some(token)).await.0,401);
+    assert_ne!(
+        h.request("/api/crystal/inbox", None, false, None).await.0,
+        200
+    );
+    assert_ne!(
+        h.request("/api/crystal/inbox", None, false, Some("wrong-token"))
+            .await
+            .0,
+        200
+    );
+    assert_eq!(
+        h.request("/api/crystal/inbox", None, false, Some(token))
+            .await
+            .0,
+        200
+    );
+    for headers in [
+        format!("Host: evil.example\r\n"),
+        format!("Host: {}\r\nOrigin: https://evil.invalid\r\n", h.addr),
+        format!("Host: {}\r\nSec-Fetch-Site: cross-site\r\n", h.addr),
+    ] {
+        let mut stream = tokio::net::TcpStream::connect(h.addr).await.unwrap();
+        stream
+            .write_all(
+                format!("GET /api/operator/session HTTP/1.1\r\n{headers}Connection: close\r\n\r\n")
+                    .as_bytes(),
+            )
+            .await
+            .unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).await.unwrap();
+        assert!(response.starts_with("HTTP/1.1 403"));
+    }
+    assert!(
+        !h._state
+            .path()
+            .join("dashboard/operator-credential.json")
+            .exists()
+    );
+    let access: Value = storage::read(&h._state.path().join("dashboard/access.json")).unwrap();
+    assert_eq!(access["url"], format!("http://{}/", h.addr));
+    h.close().await;
+}
+#[test]
+fn local_operator_rejects_remote_bind_and_preserves_existing_credential() {
+    let state = tempfile::tempdir().unwrap();
+    assert!(operator::Operator::local(state.path(), "0.0.0.0:8090".parse().unwrap()).is_err());
+    let addr = "127.0.0.1:8090".parse().unwrap();
+    operator::Operator::open(state.path(), addr).unwrap();
+    let before = fs::read(state.path().join("dashboard/operator-credential.json")).unwrap();
+    operator::Operator::local(state.path(), addr).unwrap();
+    assert_eq!(
+        fs::read(state.path().join("dashboard/operator-credential.json")).unwrap(),
+        before
+    );
+    let headers = axum::http::HeaderMap::new();
+    assert!(
+        !operator::Operator::open(state.path(), addr)
+            .unwrap()
+            .authorized(&headers)
+    );
+    let access: Value = storage::read(&state.path().join("dashboard/access.json")).unwrap();
+    assert!(access["url"].as_str().unwrap().contains("#access="));
 }

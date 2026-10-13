@@ -1156,3 +1156,10 @@ dialog header h2 { overflow-wrap: anywhere; }
 @media (max-height: 600px) {
   #workspace-navigation .directory { flex: 1 0 180px; }
 }
+.task-progress-members > li:has(.research-process) { flex: 1 1 100%; min-width: 0; }
+.research-process { flex-basis: 100%; min-width: 0; margin: 4px 0 8px; }
+.research-process summary { cursor: pointer; color: #4e7863; }
+.research-process ol { list-style: none; padding: 0; }
+.task-progress-members .research-process li { display: block; padding: 7px 0; border-bottom: 1px solid #dce6e0; }
+.research-process li small { margin-left: 8px; }
+.research-process pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; font-size: 11px; line-height: 1.5; }

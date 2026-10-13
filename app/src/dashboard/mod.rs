@@ -24,6 +24,8 @@ mod observe;
 mod operator;
 mod personas;
 mod profiles;
+mod research_campaign;
+mod research_process;
 mod research_scenario;
 mod resources;
 mod sessions;
@@ -247,7 +249,12 @@ fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
     Ok(first[1])
 }
 
-pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<Value> {
+pub(crate) fn serve(
+    c: &Config,
+    listen: SocketAddr,
+    max_seconds: u64,
+    local_operator: bool,
+) -> Result<Value> {
     ensure!(
         listen.ip().is_loopback(),
         "dashboard must bind a loopback address"
@@ -277,7 +284,11 @@ pub(crate) fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<
         shutdown.clone(),
     );
     web.services = Some(services.clone());
-    web.operator = Some(Arc::new(operator::Operator::open(&c.state_dir, addr)?));
+    web.operator = Some(Arc::new(if local_operator {
+        operator::Operator::local(&c.state_dir, addr)?
+    } else {
+        operator::Operator::open(&c.state_dir, addr)?
+    }));
     eprintln!("Management link is in masked controller state: dashboard/access.json");
     eprintln!("Research dashboard: http://{addr} (event-driven, {max_seconds}s)");
     let runtime = tokio::runtime::Builder::new_multi_thread()

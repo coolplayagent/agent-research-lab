@@ -41,6 +41,9 @@ pub(crate) enum Commands {
         /// Bound this observer's lifetime independently from the research controller.
         #[arg(long, default_value_t = 43200, value_parser = clap::value_parser!(u64).range(1..=43200))]
         max_seconds: u64,
+        /// Allow browser management directly on this trusted loopback host.
+        #[arg(long)]
+        local_operator: bool,
     },
     /// Inspect agent adapters and bounded team communication, or simulate logical scale.
     Agents {
