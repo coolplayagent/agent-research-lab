@@ -347,6 +347,27 @@ fn verify(
     storage::write(&verified_path, &verified)?;
     Ok(Some(verified))
 }
+fn activation_output(bytes: &[u8]) -> Result<Value> {
+    let mut value: Value = serde_json::from_slice(bytes)?;
+    if value.get("ok").is_some() {
+        ensure!(
+            value.as_object().is_some_and(|object| object
+                .keys()
+                .all(|key| matches!(key.as_str(), "ok" | "result"))),
+            "activation command envelope contains conflicting fields"
+        );
+        ensure!(value["ok"] == true, "activation command reported failure");
+        value = value
+            .get_mut("result")
+            .context("activation command result missing")?
+            .take();
+    }
+    ensure!(
+        value.is_object() && value["schema_version"] == 1,
+        "activation adapter returned an unsupported receipt"
+    );
+    Ok(value)
+}
 fn validate_activation(
     activated: &Value,
     candidate: &str,
@@ -631,10 +652,7 @@ async fn deliver(
     let activated: Value = if activated_path.exists() {
         storage::read(&activated_path)?
     } else {
-        let value: Value = serde_json::from_slice(
-            &tokio::task::spawn_blocking(move || command(&args, &cwd, 1800)).await??,
-        )?;
-        value
+        activation_output(&tokio::task::spawn_blocking(move || command(&args, &cwd, 1800)).await??)?
     };
     ensure!(
         activated["requires_reconciliation"] != true,
@@ -845,6 +863,35 @@ pub(super) async fn reconcile(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn activation_adapters_decode_native_cli_envelopes_and_raw_receipts() {
+        let receipt = json!({"schema_version":1,"active":true,"goal_id":"goal",
+            "candidate_commit":"a".repeat(40),"merged_commit":"b".repeat(40),
+            "artifact_sha256":"c".repeat(64),"reference":"artifact/version", "activation_claim_id":"claim"});
+        for encoded in [receipt.clone(), json!({"ok":true,"result":receipt})] {
+            let decoded = activation_output(&serde_json::to_vec(&encoded).unwrap()).unwrap();
+            assert_eq!(decoded, receipt);
+            validate_activation(&decoded, &"a".repeat(40), &"b".repeat(40), "goal").unwrap();
+        }
+        for malformed in [
+            json!({"ok":true,"error":"failed","result":receipt}),
+            json!({"ok":true,"active":false,"result":receipt}),
+            json!({"ok":false,"result":receipt}),
+            json!({"ok":"true","result":receipt}),
+            json!({"ok":true}),
+            json!({"ok":true,"result":null}),
+            json!({"schema_version":2,"active":true}),
+        ] {
+            assert!(activation_output(&serde_json::to_vec(&malformed).unwrap()).is_err());
+        }
+        let pending =
+            json!({"schema_version":1,"active":false,"phase":contracts::ActivationPhase::Prepared});
+        let decoded =
+            activation_output(&serde_json::to_vec(&json!({"ok":true,"result":pending})).unwrap())
+                .unwrap();
+        assert_eq!(decoded, pending);
+        assert!(validate_activation(&decoded, &"a".repeat(40), &"b".repeat(40), "goal").is_err());
+    }
     #[test]
     fn activation_requires_actual_merged_source_and_current_goal() {
         let mut receipt = json!({"schema_version":1,"active":true,"candidate_commit":"a".repeat(40),"merged_commit":"b".repeat(40),"goal_id":"goal","artifact_sha256":"c".repeat(64),"reference":"artifact/version"});
