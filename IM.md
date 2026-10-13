@@ -24,6 +24,13 @@ against the same state. The main package embeds both the core UI and optional
 research inspector. `//:ai-im` and `//:im-package` also provide a smaller deployment
 of the same core with the generic Agent work protocol.
 
+For an explicitly trusted local deployment, `serve --local-operator` lets the
+browser open the workspace directly without a management-credential dialog.
+This mode is restricted to loopback and preserves the same-origin mutation checks;
+Agent bearer credentials still authenticate their scoped APIs and do not become
+operator grants. The default remains credential-based operator access. A local-mode
+management link is an ordinary workspace URL, without a credential fragment.
+
 Deployment must preserve the private state directory. Stop the old services, retain
 the old binary and a consistent database backup, install the verified artifact,
 and restart a single service on the existing address. SQLite schemas migrate
@@ -65,6 +72,40 @@ preferences and historical records remain accessible through `/apps/research/`.
 That page is an inspector for the scenario, not an external application launcher.
 Research failure/unknown status never automatically completes an IM goal. Scenario
 health is exposed alongside the scenario catalog.
+
+### Explicit recurring CLI research
+
+The existing research scheduler can run a host-configured campaign in one existing
+conversation. The optional private `state_dir/private/research-campaign.json` file
+defines `schema_version: 1`, an `id`, `group_id`, four distinct `person_ids`, four
+configured CLI `repositories`, `objective`, `acceptance`, four member
+`instructions`, `max_seconds`, `pause_seconds`, `failure_backoff_seconds`, and
+`max_rounds`. The operator must create the group and research identities first.
+At least four worker slots and the ordinary research admission prerequisites are
+required. No campaign runs when the file is absent.
+
+Each round creates an immutable group goal with four parallel assignments and
+rotates to the next configured CLI. Existing goal records recover the cursor after
+a restart and make repeated admission idempotent. The complete campaign policy
+digest is frozen in the goal and research prompt. Changing that policy under an
+existing campaign ID is rejected; a changed policy needs a new ID. Failed or expired
+assignments delay the next round. The ordinary daily budget, source and SuperPOD
+pins, freshness checks, isolation, and storage capacity remain authoritative.
+
+Group task cards show the four actual member states and let the operator expand
+each member's research process, refresh its public events, and page backward.
+Process requests resolve the group's current goal assignment and attempt through
+the storage API before reading its bounded execution projection. They do not expose
+raw logs, reasoning, prompts, or credentials. Member contributions and result
+evidence remain in the group transcript.
+
+Deleting the private campaign file stops future round admission; existing bounded
+assignments finish under their original limits. Cancelling a campaign goal stops
+later rounds and follows the existing active-assignment cancellation rules. A
+submitted contribution permits further exploration, but does not accept the goal,
+promote a version, authorize a write, or approve a merge. Code delivery is a separate
+host process: reproduce findings, independently review candidates, run repository
+checks and full Qualitygate, then obey exact-head remote review and CI gates.
 
 ### Goal and worker API
 

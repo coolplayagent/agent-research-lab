@@ -67,6 +67,7 @@ pub(super) fn router(web: Web) -> Router {
         .route("/api/people/{id}", get(resource))
         .route("/api/profile/{id}", get(resource))
         .route("/api/session/{id}", get(resource))
+        .route("/api/research-process", get(research_process))
         .route("/api/evolution/lineage", get(resource))
         .route("/apps/research/", get(resource))
         .route("/apps/research/{*asset}", get(resource))
@@ -144,5 +145,23 @@ async fn resource(State(web): State<Web>, request: Request) -> Response {
     {
         Ok(result) => result,
         Err(e) => error(e),
+    }
+}
+
+async fn research_process(
+    State(web): State<Web>,
+    axum::extract::Query(scope): axum::extract::Query<super::research_process::Scope>,
+) -> Response {
+    let _permit = match web.reads.clone().try_acquire_owned() {
+        Ok(permit) => permit,
+        Err(e) => return error(e),
+    };
+    match super::research_process::get(&web, scope).await {
+        Ok(value) => json_response(Ok(value)),
+        Err(_) => response(
+            StatusCode::NOT_FOUND,
+            "application/json",
+            br#"{"error":"Research process unavailable"}"#.as_slice(),
+        ),
     }
 }

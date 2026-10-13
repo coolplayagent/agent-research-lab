@@ -90,6 +90,33 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 (async () => {
+  const processRequests = [];
+  const processRenderer = moduleFrom(base + "research-process.ts", {
+    "/assets/shared/contracts.js": contracts, "./dom.js": dom,
+    "./i18n.js": { ...i18n, label: (type, value) => `${type}.${value}` },
+    "./api.js": { query: fields => new URLSearchParams(fields).toString(), api: path => {
+      const pending = deferred(); processRequests.push({path, ...pending}); return pending.promise;
+    } },
+  });
+  const processGoal = {input:{id:"process-goal",group_id:"group",scenario:"research"}, revision:7};
+  const processWork = {id:"work-0",attempt:2};
+  const processDetails = processRenderer.researchProcess(processGoal, processWork);
+  assert.equal(processRequests.length, 0, "Collapsed processes do not poll");
+  processDetails.open = true; processDetails.ontoggle();
+  assert(processRequests[0].path.includes("attempt=2"));
+  processRequests[0].resolve({group_id:"group",goal_id:"process-goal",work_id:"work-0",attempt:2,goal_revision:7,
+    events:[{title:contracts.SessionEventKind.AgentMessage,status:contracts.SessionItemStatus.Unknown,text:"<script>保留用户内容</script>",command:null,output:null}],next_before:42});
+  await new Promise(resolve => setImmediate(resolve));
+  const processContent = processDetails.children[2];
+  assert.equal(processContent.children[1].children[0].children[2].textContent, "<script>保留用户内容</script>");
+  processDetails.children[1].children[1].onclick();
+  assert(processRequests[1].path.includes("before=42"));
+  processRequests[1].resolve({group_id:"group",goal_id:"process-goal",work_id:"work-0",attempt:1,goal_revision:7,events:[],next_before:null});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(processContent.children[0].textContent,"researchProcess.unavailable");
+  const retryDetails = processRenderer.researchProcess(processGoal, {...processWork,attempt:3});
+  assert.equal(retryDetails.open,false,"Retries do not inherit expanded sessions");
+
   const { contributionText } = moduleFrom(base + "contribution-text.ts");
   assert.equal(contributionText("Analyst: A finding", "Analyst"), "A finding");
   assert.equal(contributionText("@Analyst: A finding", "Analyst"), "A finding");
@@ -110,6 +137,7 @@ const deferred = () => {
   assert.equal(resultForMessage(failed, [{...goalResult, work:[{...goalResult.work[0], state:contracts.WorkState.Failed, result:{succeeded:false, summary:"Recorded failure"}}]}]).result.summary, "Recorded failure");
 
   const progressModule = moduleFrom(base + "task-progress.ts", {
+    "./research-process.js": { researchProcess: () => new Node("details") },
     "/assets/shared/contracts.js": contracts, "./dom.js": dom,
     "./i18n.js": { ...i18n, label: (type, value) => `${type}.${value}` },
     "./people.js": { display: id => id }, "./message-results.js": { resultForMessage },

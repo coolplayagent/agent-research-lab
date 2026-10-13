@@ -26,6 +26,7 @@ fn execute(cli: Cli) -> Result<Value> {
             listen,
             max_seconds,
             state_dir,
+            local_operator,
         } => {
             if let Some(path) = &cli.config {
                 let c = Config::load(path)?;
@@ -33,14 +34,19 @@ fn execute(cli: Cli) -> Result<Value> {
                     state_dir.is_none(),
                     "--config uses its configured state_dir; do not also pass --state-dir"
                 );
-                crate::dashboard::serve(&c, listen, max_seconds)
+                crate::dashboard::serve(&c, listen, max_seconds, local_operator)
             } else {
                 let state = state_dir.unwrap_or_else(|| ".ai-im".into());
                 tokio::runtime::Builder::new_multi_thread()
                     .worker_threads(4)
                     .enable_all()
                     .build()?
-                    .block_on(im_service::serve(&state, listen, max_seconds))?;
+                    .block_on(im_service::serve_with_local_operator(
+                        &state,
+                        listen,
+                        max_seconds,
+                        local_operator,
+                    ))?;
                 Ok(json!({"stopped":true,"mode":"ai-im"}))
             }
         }
@@ -242,6 +248,29 @@ pub fn run() {
 mod tests {
     use super::*;
 
+    #[test]
+    fn local_operator_is_an_explicit_serve_option() {
+        for args in [
+            vec!["lab", "serve", "--local-operator"],
+            vec!["lab", "--config", "local.toml", "serve", "--local-operator"],
+        ] {
+            let cli = Cli::try_parse_from(args).unwrap();
+            assert!(matches!(
+                cli.command,
+                Commands::Serve {
+                    local_operator: true,
+                    ..
+                }
+            ));
+        }
+        assert!(matches!(
+            Cli::try_parse_from(["lab", "serve"]).unwrap().command,
+            Commands::Serve {
+                local_operator: false,
+                ..
+            }
+        ));
+    }
     #[test]
     fn service_state_selection_rejects_ambiguous_sources() {
         for command in ["serve", "serve-link"] {

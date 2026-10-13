@@ -2,6 +2,14 @@ use crate::*;
 use std::future::IntoFuture;
 /// A bounded standalone host. A supervisor can restart it against the same durable state.
 pub async fn serve(state: &Path, listen: SocketAddr, seconds: u64) -> Result<()> {
+    serve_with_local_operator(state, listen, seconds, false).await
+}
+pub async fn serve_with_local_operator(
+    state: &Path,
+    listen: SocketAddr,
+    seconds: u64,
+    local_operator: bool,
+) -> Result<()> {
     ensure!(listen.ip().is_loopback(), "IM must bind a loopback address");
     ensure!(
         (1..=43200).contains(&seconds),
@@ -22,7 +30,11 @@ pub async fn serve(state: &Path, listen: SocketAddr, seconds: u64) -> Result<()>
         seconds,
         shutdown.subscribe(),
     ));
-    web.operator = Some(Arc::new(operator::Operator::open(state, addr)?));
+    web.operator = Some(Arc::new(if local_operator {
+        operator::Operator::local(state, addr)?
+    } else {
+        operator::Operator::open(state, addr)?
+    }));
     eprintln!(
         "AI-IM: http://{addr}; access link: ai-im link --state-dir {}",
         state.display()

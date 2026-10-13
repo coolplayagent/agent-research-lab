@@ -15,6 +15,7 @@ use serde::Deserialize;
 use std::os::unix::fs::PermissionsExt;
 pub struct Operator {
     digest: String,
+    local_operator: bool,
 }
 impl Operator {
     pub fn open(state: &Path, addr: SocketAddr) -> Result<Self> {
@@ -56,9 +57,32 @@ impl Operator {
         )?;
         Ok(Self {
             digest: storage::digest(token.as_bytes()),
+            local_operator: false,
+        })
+    }
+    pub fn local(state: &Path, addr: SocketAddr) -> Result<Self> {
+        ensure!(
+            addr.ip().is_loopback(),
+            "local operator requires a loopback address"
+        );
+        let directory = state.join("dashboard");
+        fs::create_dir_all(&directory)?;
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))?;
+        let _lock = storage::lock(&directory.join("operator.lock"))?;
+        storage::write(
+            &directory.join("access.json"),
+            &json!({"url":format!("http://{addr}/")}),
+        )?;
+        Ok(Self {
+            digest: String::new(),
+            local_operator: true,
         })
     }
     fn matches(&self, token: &str) -> bool {
+        if self.local_operator {
+            return false;
+        }
+
         if token.len() != 64 {
             return false;
         }
@@ -69,6 +93,10 @@ impl Operator {
             == 0
     }
     pub fn authorized(&self, headers: &HeaderMap) -> bool {
+        if self.local_operator {
+            return !headers.contains_key("authorization");
+        }
+
         let mut tokens = headers
             .get_all("cookie")
             .iter()
@@ -80,6 +108,7 @@ impl Operator {
     pub fn fixture(token: &str) -> Self {
         Self {
             digest: storage::digest(token.as_bytes()),
+            local_operator: false,
         }
     }
 }
@@ -135,7 +164,9 @@ async fn session(State(web): State<Web>, headers: HeaderMap) -> Response {
         .as_ref()
         .is_some_and(|operator| operator.authorized(&headers))
     {
-        return json_response(Ok(json!({"authenticated":true})));
+        return json_response(Ok(
+            json!({"authenticated":true,"local_operator":web.operator.as_ref().is_some_and(|operator| operator.local_operator)}),
+        ));
     }
     response(
         StatusCode::UNAUTHORIZED,

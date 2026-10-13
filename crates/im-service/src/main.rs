@@ -19,6 +19,9 @@ enum Command {
         listen: SocketAddr,
         #[arg(long, default_value_t = 43200)]
         max_seconds: u64,
+        /// Allow browser management directly on this trusted loopback host.
+        #[arg(long)]
+        local_operator: bool,
     },
     Link {
         #[arg(long, default_value = ".ai-im")]
@@ -32,7 +35,11 @@ async fn main() -> Result<()> {
             state_dir,
             listen,
             max_seconds,
-        } => im_service::serve(&state_dir, listen, max_seconds).await,
+            local_operator,
+        } => {
+            im_service::serve_with_local_operator(&state_dir, listen, max_seconds, local_operator)
+                .await
+        }
         Command::Link { state_dir } => {
             let value: serde_json::Value = storage::read(&state_dir.join("dashboard/access.json"))?;
             println!(
