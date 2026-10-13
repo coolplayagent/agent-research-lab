@@ -85,6 +85,34 @@ impl Harness {
     }
 }
 #[tokio::test]
+async fn bootstrap_module_graph_is_publicly_served() {
+    let h = Harness::new().await;
+    let mut pending = vec!["/assets/bootstrap.js".to_owned()];
+    let mut visited = std::collections::BTreeSet::new();
+    while let Some(path) = pending.pop() {
+        if !visited.insert(path.clone()) {
+            continue;
+        }
+        let (status, body) = h.request(&path, None, false, None).await;
+        assert_eq!(status, 200, "Unavailable module {path}: {body}");
+        for line in body.lines().filter(|line| line.starts_with("import ")) {
+            let import = line.split('"').nth(1).expect("literal module import");
+            let target = if import.starts_with('/') {
+                import.to_owned()
+            } else {
+                let relative = import.strip_prefix("./").expect("local module import");
+                format!("{}/{relative}", path.rsplit_once('/').unwrap().0)
+            };
+            pending.push(target);
+        }
+    }
+    assert!(
+        visited.len() > 10,
+        "Expected the complete workspace module graph"
+    );
+    h.close().await;
+}
+#[tokio::test]
 async fn independent_host_manages_agents_groups_dms_boards_without_research_configuration() {
     let h = Harness::new().await;
     let (status, html) = h.request("/", None, false, None).await;

@@ -21,12 +21,13 @@ export function selectTab(name) {
 }
 export function revealResearch(name) {
     const root = get("workspace");
+    root.classList.remove("directory-open");
     root.classList.remove("right-collapsed");
     root.classList.add("research-open");
     selectTab(name);
     syncControls();
 }
-function syncControls() {
+export function syncControls() {
     const root = get("workspace");
     const left = matchMedia("(max-width: 759px)").matches
         ? root.classList.contains("directory-open")
@@ -34,6 +35,9 @@ function syncControls() {
     const right = matchMedia("(max-width: 1099px)").matches
         ? root.classList.contains("research-open")
         : !root.classList.contains("right-collapsed");
+    const expanded = root.classList.contains("research-expanded");
+    get("expand-research").setAttribute("aria-pressed", String(expanded));
+    get("expand-research").textContent = expanded ? t("workspace.restore") : t("workspace.expand");
     get("toggle-directory").setAttribute("aria-expanded", String(left));
     get("toggle-research").setAttribute("aria-expanded", String(right));
 }
@@ -101,9 +105,13 @@ export function initWorkspace() {
         root.classList.toggle(matchMedia("(max-width: 759px)").matches
             ? "directory-open"
             : "left-collapsed");
+        if (matchMedia("(max-width: 759px)").matches && root.classList.contains("directory-open")) {
+            root.classList.remove("research-open", "research-expanded");
+        }
         syncControls();
     };
     get("toggle-research").onclick = () => {
+        root.classList.remove("directory-open");
         if (matchMedia("(max-width: 1099px)").matches) {
             root.classList.remove("right-collapsed");
             root.classList.toggle("research-open");
@@ -115,17 +123,13 @@ export function initWorkspace() {
     get("close-research").onclick = () => {
         root.classList.remove("research-open", "research-expanded");
         root.classList.add("right-collapsed");
-        expanded(false);
         syncControls();
         get("toggle-research").focus();
     };
-    function expanded(value) {
-        get("expand-research").setAttribute("aria-pressed", String(value));
-        get("expand-research").textContent = value
-            ? t("workspace.restore")
-            : t("workspace.expand");
-    }
-    get("expand-research").onclick = () => expanded(root.classList.toggle("research-expanded"));
+    get("expand-research").onclick = () => {
+        root.classList.toggle("research-expanded");
+        syncControls();
+    };
     get("goal-summary").onclick = () => revealResearch("goals");
     get("research-manage-members").onclick = () => get("manage-members").click();
     window.addEventListener("resize", syncControls);
@@ -133,7 +137,6 @@ export function initWorkspace() {
         if (event.key !== "Escape" || document.querySelector("dialog[open]"))
             return;
         root.classList.remove("directory-open", "research-open", "research-expanded");
-        expanded(false);
         syncControls();
     });
     resize("left", 240, 200, 300);

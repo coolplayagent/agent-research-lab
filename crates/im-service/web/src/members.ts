@@ -35,7 +35,10 @@ export function initMembers(): void {
       if (request !== generation) return;
       selected = page.group;
       const root = get("member-list");
-      if (!append) root.replaceChildren();
+      if (!append) {
+        root.replaceChildren();
+        picker.excluded = new Set(["operator"]);
+      }
       next = page.members.next_after;
       get("more-members").hidden = !next;
       for (const member of page.members.members) {
@@ -91,6 +94,9 @@ export function initMembers(): void {
     if (!current) return;
     selected = { ...current };
     picker.reset();
+    get("member-list").replaceChildren(el("p", t("ux.loading")));
+    get("more-members").hidden = true;
+    get<HTMLButtonElement>("add-members").disabled = true;
     notice("", "member-status");
     get<HTMLSelectElement>("include-history").value = "none";
     open("members-dialog");

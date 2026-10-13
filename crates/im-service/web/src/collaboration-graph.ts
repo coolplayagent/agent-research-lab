@@ -7,6 +7,12 @@ import { replyEdges } from "./collaboration-model.js";
 import type { Group, Member, Message } from "./types.js";
 import type { Goal } from "./goal-types.js";
 const ns = "http://www.w3.org/2000/svg";
+function compactName(name: string, limit: number): string {
+  const letters = Array.from(name);
+  if (letters.length <= limit) return name;
+  const start = Math.floor((limit - 1) / 2);
+  return letters.slice(0, start).join("") + "…" + letters.slice(-(limit - start - 1)).join("");
+}
 function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}, text?: string): SVGElementTagNameMap[K] {
   const node = document.createElementNS(ns, tag);
   for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
@@ -61,7 +67,7 @@ export function renderCrystal(host: HTMLElement, group: Group, members: Member[]
     const w = wide ? 166 : 112;
     const work = goals.flatMap((goal) => goal.work).find((work) => work.person_id === member.person_id && work.state === WorkState.Running);
     const node = svg("g", { class: `agent-node${work ? " working" : ""}${pulses.has(member.person_id) ? " speaking" : ""}`, transform: `translate(${x - w / 2},${y - 29})`, role: "button", tabindex: 0, "aria-label": `@${display(member.person_id)} · ${presence(member.presence)}` });
-    node.append(svg("rect", { width: w, height: 58, rx: 10 }), svg("circle", { cx: 31, cy: 43, r: 3, class: "agent-presence" }), svg("text", { x: 45, y: 25, class: "agent-name" }, `@${display(member.person_id).slice(0, wide ? 12 : 4)}`), svg("text", { x: 45, y: 43, class: "agent-activity" }, work ? label("WorkState", work.state) : presence(member.presence)), svg("title", {}, display(member.person_id)));
+    node.append(svg("rect", { width: w, height: 58, rx: 10 }), svg("circle", { cx: 31, cy: 43, r: 3, class: "agent-presence" }), svg("text", { x: 45, y: 25, class: "agent-name" }, `@${compactName(display(member.person_id), wide ? 12 : 4)}`), svg("text", { x: 45, y: 43, class: "agent-activity" }, work ? label("WorkState", work.state) : presence(member.presence)), svg("title", {}, display(member.person_id)));
     const face = avatarSvg(member.person_id);
     face.setAttribute("x", "7"); face.setAttribute("y", "12"); face.setAttribute("width", "32"); face.setAttribute("height", "32");
     node.append(face);

@@ -112,7 +112,25 @@ assignments accept results only from their host adapter, preserving runtime gate
 
 All conversations are durable. Archiving stops new posts and membership changes;
 reading previous messages remains available. Browser composition uses a stable
-request ID across retries so a lost response does not duplicate a committed post.
+request ID across retries and conversation switches so a lost response does not
+duplicate a committed post. Pending sends remain locked when returning to their
+conversation, and late success clears only the matching draft. While reading
+history, new arrivals are counted without replacing the page; returning to latest
+also retains messages received during the history request.
+
+Mentioning configured members in the composer sends the original message and
+creates one bounded discussion goal atomically. Mention suggestions and avatar
+actions use the current conversation's members. Retries preserve both the request
+ID and the original goal inputs across navigation; incoming Agent messages do not
+automatically create another goal. Crystal traffic animations reflect newly
+observed messages, respect reduced-motion preferences, and do not imply acceptance.
+
+Structured goal updates share one compact progress card per goal in the loaded
+chat page. Its member states come from the current group-scoped goal snapshot;
+past failures remain in an expandable timeline after a retry starts. A missing
+snapshot is explicitly unconfirmed, and submitted results remain distinct from
+host acceptance. Actual member contributions stay in the conversation. Expanded
+timelines survive live refreshes, and message references can reveal their events.
 
 The DM audience flow follows Slack's [group DM expansion](https://slack.com/help/articles/1500002969782-Add-people-to-a-direct-message)
 and [conversion to a channel](https://slack.com/help/articles/217555437-Convert-a-group-direct-message-to-a-private-channel)
@@ -193,6 +211,19 @@ Agent identity creation needs only a display name. Execution bindings belong to 
 separate settings page, whose left navigation selects services, adapters, bindings,
 storage and status. Unsaved settings are guarded when navigating away. Conversation
 drafts and the selected group survive navigation within the workspace.
+
+Directory and settings pages share responsive card grids with horizontal action
+rows and aligned card footers. Forms scroll within the viewport and keep submission
+controls reachable on short screens. Notices wrap in a dedicated content region.
+Phone navigation and the research drawer are mutually exclusive; selecting a
+conversation closes the directory and refreshes its accessibility state.
+
+Digital-person names can be edited without changing stable identity or application
+bindings. Topic creation selects an existing group by name; editing retains that
+group association. Saved topic data refreshes the detail view directly, and stale
+search/detail responses cannot replace a newer selection. Archived topics expose
+read-only subjects and version graphs. Removing a member refreshes the picker so
+that the same member can be added again without reopening the dialog.
 
 Search accepts Enter, and Escape clears a query. Ctrl/Cmd+Enter sends a message;
 Enter inserts a newline. Pending forms and sends display progress and prevent repeated

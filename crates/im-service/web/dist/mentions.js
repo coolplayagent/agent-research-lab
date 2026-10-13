@@ -83,6 +83,7 @@ function renderMentions() {
     });
 }
 export function initMentions() {
+    document.addEventListener("workspace-people", () => selectMentions(selected));
     const input = get("message-text");
     input.addEventListener("input", () => { highlighted = 0; renderMentions(); });
     input.addEventListener("keydown", (event) => {

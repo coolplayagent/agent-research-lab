@@ -22,8 +22,10 @@ export function initMembers() {
                 return;
             selected = page.group;
             const root = get("member-list");
-            if (!append)
+            if (!append) {
                 root.replaceChildren();
+                picker.excluded = new Set(["operator"]);
+            }
             next = page.members.next_after;
             get("more-members").hidden = !next;
             for (const member of page.members.members) {
@@ -71,6 +73,9 @@ export function initMembers() {
             return;
         selected = { ...current };
         picker.reset();
+        get("member-list").replaceChildren(el("p", t("ux.loading")));
+        get("more-members").hidden = true;
+        get("add-members").disabled = true;
         notice("", "member-status");
         get("include-history").value = "none";
         open("members-dialog");

@@ -2,10 +2,11 @@ import { loadTopics } from "./topics.js";
 import { loadServices } from "./settings.js";
 import { t } from "./i18n.js";
 import { get } from "./dom.js";
+import { icon } from "./icons.js";
 import { loadPeople } from "./people.js";
 import { loadApplications } from "./applications.js";
 import { allowSettingsLeave, initSettingsGuard } from "./settings-guard.js";
-import { revealResearch } from "./workspace.js";
+import { revealResearch, syncControls } from "./workspace.js";
 const titles: Record<string, string> = {
   groups: t("navigation.f3f8bcf3f5"),
   direct: t("navigation.484c0ffc97"),
@@ -61,7 +62,7 @@ export function navigate(): void {
   get("settings-navigation").hidden = !setting;
   get("workspace").classList.toggle("auxiliary", !conversation);
   if (!conversation) {
-    get("workspace").classList.remove("research-expanded");
+    get("workspace").classList.remove("research-expanded", "research-open");
     get("expand-research").setAttribute("aria-pressed", "false");
     get("expand-research").textContent = t("workspace.expand");
   }
@@ -99,8 +100,12 @@ export function navigate(): void {
       ),
     );
   previous = location.hash;
+  syncControls();
 }
 export function initNavigation(): void {
+  get("topic-nav-icon").replaceChildren(icon("topic"));
+  get("people-nav-icon").replaceChildren(icon("people"));
+  get("applications-nav-icon").replaceChildren(icon("applications"));
   initSettingsGuard();
   document.addEventListener("click", (event) => {
     const link = (event.target as Element).closest<HTMLAnchorElement>(

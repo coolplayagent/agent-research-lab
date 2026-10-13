@@ -1,4 +1,4 @@
-import { EvolutionState } from "/assets/shared/contracts.js";
+import { EvolutionState, TopicState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
 import { get, notice } from "./dom.js";
 import { t } from "./i18n.js";
@@ -39,6 +39,12 @@ export function refreshEvolution() {
     }, 120);
 }
 let rows = [], subjects = [], topics = [], after = null, topic = "", subject = "", zoom = 1;
+function updateCreate() {
+    const owner = topics.find(row => row.topic.id === topic)?.topic;
+    const button = get("new-evolution-node");
+    button.disabled = !subject || !owner || owner.state !== TopicState.Active;
+    button.title = owner?.state === TopicState.Archived ? t("layout.archivedTopic") : "";
+}
 export async function loadEvolution(more = false) {
     const request = ++requestSequence, group = groupId;
     if (!group) {
@@ -123,7 +129,7 @@ async function filters(request, group) {
         subject = subjectPicker.value;
         void graph(false).catch(notice);
     };
-    get("new-evolution-node").disabled = !subject;
+    updateCreate();
     return true;
 }
 async function graph(more) {
@@ -150,7 +156,7 @@ async function graph(more) {
         p2: rows.filter((r) => r.status === EvolutionState.Accepted).length,
         p3: rows.filter((r) => r.status === EvolutionState.Failed).length,
     });
-    get("new-evolution-node").disabled = !subject;
+    updateCreate();
     get("evolution-detail").hidden = true;
     renderGraph(rows, showNode);
     const current = rows.find((row) => row.node.input.id === selected);
@@ -183,7 +189,7 @@ export function initEvolution() {
     };
     get("new-evolution-node").onclick = () => {
         const target = subjects.find((r) => r.subject.id === subject)?.subject, owner = topics.find((r) => r.topic.id === target?.topic_id)?.topic;
-        if (target && owner)
+        if (target && owner?.state === TopicState.Active)
             void nodeForm(target, owner.group_id, rows, () => graph(false)).catch(notice);
     };
 }

@@ -35,6 +35,12 @@ class Node extends EventTarget {
     this.dataset = {};
     this.style = {};
     this.attributes = new Map();
+    this.classes = new Set();
+    this.classList = {
+      add: (name) => this.classes.add(name),
+      remove: (...names) => names.forEach(name => this.classes.delete(name)),
+      toggle: (name, enabled) => enabled ? this.classes.add(name) : this.classes.delete(name),
+    };
     this.value = "";
     this.hidden = false;
     this.isConnected = true;
@@ -52,7 +58,7 @@ class Node extends EventTarget {
     return this.children.length;
   }
   querySelectorAll(selector) {
-    const key = selector.includes("data-goal-id") ? "goalId" : selector.includes("data-evidence-key") ? "evidenceKey" : "sequence";
+    const key = selector.includes("data-progress-key") ? "progressKey" : selector.includes("data-goal-id") ? "goalId" : selector.includes("data-evidence-key") ? "evidenceKey" : "sequence";
     return this.children.flatMap((node) => [node, ...node.querySelectorAll(selector)])
       .filter((node) => node.dataset[key] && (!selector.includes("[open]") || node.open));
   }
@@ -74,7 +80,7 @@ const dom = {
     Object.assign(new Node("button", text), { onclick: action }),
   notice: () => {},
 };
-const i18n = { t: (key) => key };
+const i18n = { t: (key, params) => key === "messages.unseen" ? `${key}:${params.count}` : key };
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((r, j) => {
@@ -102,6 +108,49 @@ const deferred = () => {
   const failed = { ...submitted, event: { ...submitted.event, kind: contracts.GoalEventKind.Failed } };
   assert.equal(resultForMessage(failed, [goalResult]), null);
   assert.equal(resultForMessage(failed, [{...goalResult, work:[{...goalResult.work[0], state:contracts.WorkState.Failed, result:{succeeded:false, summary:"Recorded failure"}}]}]).result.summary, "Recorded failure");
+
+  const progressModule = moduleFrom(base + "task-progress.ts", {
+    "/assets/shared/contracts.js": contracts, "./dom.js": dom,
+    "./i18n.js": { ...i18n, label: (type, value) => `${type}.${value}` },
+    "./people.js": { display: id => id }, "./message-results.js": { resultForMessage },
+  });
+  const { taskTimeline, progressSummary, progressCard } = progressModule;
+  const event = (sequence, kind, attempt = 1, person_id = "member") => ({
+    ...submitted, sequence, accepted_ms: 1000, sender_id: "system", text: "Original persisted text",
+    event: { ...submitted.event, kind, attempt, person_id, title: "Research experience" },
+  });
+  const lifecycle = [event(1, contracts.GoalEventKind.Created, null, null), event(2, contracts.GoalEventKind.Claimed), event(3, contracts.GoalEventKind.Failed), event(4, contracts.GoalEventKind.Retried, 2), event(5, contracts.GoalEventKind.Claimed, 2)];
+  const runningGoal = { ...goalResult, state: contracts.GoalState.Active, work: [{ ...goalResult.work[0], state: contracts.WorkState.Running, deadline_ms: null, result: null }] };
+  const original = JSON.stringify(lifecycle);
+  const compact = taskTimeline(lifecycle, [runningGoal]);
+  assert.equal(compact.length, 1, "Repeated lifecycle updates share one progress card");
+  assert.equal(compact[0].progress.events.length, 5);
+  assert.equal(progressSummary(compact[0].progress.goal), "progress.running", "A retried attempt must supersede its historical failure");
+  assert.equal(JSON.stringify(lifecycle), original, "Stored Unicode/user text is never rewritten");
+  const currentFailure = { ...runningGoal, work: [{ ...runningGoal.work[0], state: contracts.WorkState.Failed }] };
+  assert.equal(progressSummary(currentFailure), "progress.attention");
+  assert.equal(progressSummary({ ...runningGoal, work: [{ ...runningGoal.work[0], deadline_ms: 10 }] }, 11), "progress.attention");
+  assert.equal(progressSummary({ ...runningGoal, work: [{ ...runningGoal.work[0], state: contracts.WorkState.Ready }] }), "progress.waiting");
+  assert.equal(progressSummary({ ...goalResult, state: contracts.GoalState.Active }), "progress.review");
+  assert.equal(progressSummary({ ...goalResult, state: contracts.GoalState.Completed }), "GoalState.completed");
+  assert.equal(progressSummary(undefined), "progress.unavailable");
+  assert.equal(progressSummary({ ...runningGoal, work: [] }), "progress.unavailable");
+  assert.equal(progressSummary({ ...runningGoal, work: [{ ...runningGoal.work[0], state: "future-unknown" }] }), "progress.unavailable");
+  const separate = taskTimeline([...lifecycle, { ...lifecycle[0], sequence: 6, group_id: "other" }, { ...lifecycle[0], sequence: 7, event: { ...lifecycle[0].event, goal_id: "other-goal" } }], [runningGoal]);
+  assert.equal(separate.length, 3);
+  assert.equal(separate[1].progress.goal, undefined, "Do not attach another group's goal snapshot");
+  const contribution = { ...event(6, contracts.GoalEventKind.Submitted, 2), sender_id: "member", text: "Actual contribution" };
+  const ordinary = { sequence: 7, group_id: "team", sender_id: "operator", text: "User-owned content" };
+  const withContributions = taskTimeline([...lifecycle, contribution, ordinary], []);
+  assert.equal(withContributions[1].message, contribution, "Actual research stays visible, including older attempts");
+  assert.equal(withContributions[2].message, ordinary);
+  assert.equal(taskTimeline([event(6, contracts.GoalEventKind.Submitted, 2)], [goalResult]).length, 2, "Retain legacy result projections");
+  assert.equal(taskTimeline([event(6, contracts.GoalEventKind.Failed, 2)], [currentFailure]).length, 1, "Failed attempts stay in progress history");
+  let reviewed;
+  const card = progressCard(compact[0].progress, true, id => reviewed = id);
+  assert.equal(card.querySelectorAll("details[open][data-progress-key]").length, 1);
+  assert.equal(card.querySelectorAll("[data-sequence]").length, 5);
+  await card.children.at(-1).onclick(); assert.equal(reviewed, "goal");
 
   const { mentionText, mentionNames, resolveMentions } = moduleFrom(base + "mention-model.ts");
   const participants = [{id:"a",name:"Analyst"},{id:"b",name:"Research Lead"}];
@@ -195,21 +244,26 @@ const deferred = () => {
 
   let request = deferred();
   const sends = [];
+  const discussionSends = [];
+  let discussionInput = null;
+  const draftModule = moduleFrom(base + "message-drafts.ts", {}, { crypto: require("node:crypto").webcrypto });
   const messages = moduleFrom(
     base + "messages.ts",
     {
       "/assets/shared/contracts.js": contracts,
       "./i18n.js": i18n,
       "./api.js": {
-        api: () => request.promise,
+        api: (url, payload) => { if (url === "/api/im/discussion") discussionSends.push(payload); return request.promise; },
         change: (payload) => { sends.push(payload); return request.promise; },
         query: () => "",
       },
       "./dom.js": dom,
       "./people.js": { display: (id) => id },
       "./goals.js": { goalSnapshot: () => [], focusGoal: () => {} },
+      "./message-drafts.js": draftModule,
       "./message-view.js": { messageRow: () => new Node("article") },
-      "./mentions.js": { initMentions: () => {}, insertMention: () => {}, prepareDiscussion: async () => null },
+      "./task-progress.js": progressModule,
+      "./mentions.js": { initMentions: () => {}, insertMention: () => {}, prepareDiscussion: async () => discussionInput },
     },
     { document: new EventTarget(), CustomEvent: class extends Event { constructor(type, options) { super(type); this.detail = options.detail; } }, crypto: require("node:crypto").webcrypto },
   );
@@ -220,6 +274,10 @@ const deferred = () => {
     },
     b = { ...a, id: "b" };
   messages.initMessages();
+  messages.resetMessages({ ...a, id: "team" }, lifecycle);
+  get("messages").querySelectorAll("[data-progress-key]")[0].open = true;
+  messages.incoming(ordinary);
+  assert.equal(get("messages").querySelectorAll("details[open][data-progress-key]").length, 1, "Live arrivals preserve an expanded task history");
   messages.resetMessages(a, [msg(1, "a")]);
   get("message-text").value = "unfinished";
   messages.suspendMessages();
@@ -256,15 +314,71 @@ const deferred = () => {
   request.reject(new Error("network failure"));
   await sending;
   assert.equal(get("message-text").value, "one submission");
+  messages.suspendMessages();
+  messages.resetMessages(a, [msg(1, "a")]);
+  messages.suspendMessages();
+  messages.resetMessages(b, [msg(8, "b", null, "b")]);
   request = deferred();
   const retry = submit();
-  assert.equal(sends[1].message.request_id, sends[0].message.request_id, "Retry must retain request identity");
+  assert.equal(sends[1].message.request_id, sends[0].message.request_id, "Retry after navigation must retain request identity");
   messages.suspendMessages();
   messages.resetMessages(a, [msg(1, "a")]);
   request.resolve({ message: msg(11, "b", null, "b") });
   await retry;
   assert.equal(get("message-text").value, "unfinished", "Late send must not clear another group's draft");
   assert.equal(messages.messageSnapshot()[0].group_id, "a");
+  messages.suspendMessages();
+  messages.resetMessages(b, [msg(11, "b", null, "b")]);
+  assert.equal(get("message-text").value, "", "Late success must clear its own saved draft");
+
+  request = deferred();
+  get("message-text").value = "in flight across navigation";
+  const returningSend = submit();
+  await Promise.resolve();
+  messages.suspendMessages(); messages.resetMessages(a, [msg(1, "a")]);
+  messages.suspendMessages(); messages.resetMessages(b, [msg(11, "b", null, "b")]);
+  assert.equal(get("send-message").disabled, true, "Returning must retain the in-flight lock");
+  const beforeRepeat = sends.length;
+  await submit();
+  assert.equal(sends.length, beforeRepeat);
+  request.resolve({message:msg(12,"b",null,"b")}); await returningSend;
+  assert.equal(get("message-text").value, "");
+
+  request = deferred();
+  const older = get("older-messages").onclick();
+  request.resolve({messages:[msg(8,"b",null,"b")]}); await older;
+  messages.incoming(msg(13,"b",null,"b"));
+  messages.incoming(msg(13,"b",null,"b"));
+  assert.equal(get("latest-messages").textContent,"messages.unseen:1","Replayed events must not increase the unseen count");
+  assert.deepEqual(messages.messageSnapshot().map(m=>m.sequence),[8],"New arrivals must not replace the history being read");
+  request = deferred();
+  const latest = get("latest-messages").onclick();
+  messages.incoming(msg(14,"b",null,"b"));
+  request.resolve({messages:[msg(12,"b",null,"b")]}); await latest;
+  assert(messages.messageSnapshot().some(m=>m.sequence===14),"Live events during a latest-page request must survive its older snapshot");
+  assert.equal(get("latest-messages").textContent,"html.1c59875d3a");
+  request = deferred();
+  const staleHistory = get("older-messages").onclick();
+  const oldPage = request;
+  request = deferred();
+  const freshLatest = get("latest-messages").onclick();
+  request.resolve({messages:[msg(14,"b",null,"b")]}); await freshLatest;
+  oldPage.resolve({messages:[msg(8,"b",null,"b")]}); await staleHistory;
+  assert(messages.messageSnapshot().some(m=>m.sequence===14),"A late history page must not undo returning to latest");
+
+  discussionInput = {scenario:"research", assignments:[{person_id:"member",instruction:"Initial instruction"}]};
+  get("message-text").value = "@member discuss this";
+  request = deferred();
+  const discussion = submit(); await Promise.resolve();
+  request.reject(new Error("lost discussion response")); await discussion;
+  messages.suspendMessages(); messages.resetMessages(a,[msg(1,"a")]);
+  messages.suspendMessages(); messages.resetMessages(b,[msg(14,"b",null,"b")]);
+  discussionInput = {scenario:"collaboration", assignments:[]};
+  request = deferred(); const repeatDiscussion = submit(); await Promise.resolve();
+  assert.equal(discussionSends.length,2);
+  assert.deepEqual(discussionSends[1],discussionSends[0],"Discussion retries must freeze both the message identity and its original goal input across navigation");
+  request.resolve({message:msg(15,"b",null,"b")}); await repeatDiscussion;
+  discussionInput = null;
 
   const pending = new Map();
   const chosen = [];
@@ -284,6 +398,7 @@ const deferred = () => {
   const conversation = moduleFrom(
     base + "conversation.ts",
     {
+      "./workspace.js": { syncControls() {} },
       "/assets/shared/contracts.js": contracts,
       "./i18n.js": i18n,
       "./api.js": {

@@ -1,3 +1,4 @@
+import { syncControls } from "./workspace.js";
 import { selectMentions } from "./mentions.js";
 import { selectEvolution } from "./evolution.js";
 import { selectCollaboration, refreshCollaboration } from "./collaboration.js";
@@ -47,7 +48,11 @@ export function renderHeader(group: Group): void {
 }
 export async function select(group: Group): Promise<void> {
   openGeneration++;
-  if (current?.id === group.id) return;
+  if (current?.id === group.id) {
+    get("workspace").classList.remove("directory-open");
+    syncControls();
+    return;
+  }
   suspendMessages();
   suspendGoals();
   selectEvolution(group.id);
@@ -66,6 +71,8 @@ export async function select(group: Group): Promise<void> {
     );
     if (request !== generation) return;
     current = page.group;
+    get("workspace").classList.remove("directory-open");
+    syncControls();
     setSelected(group.id);
     resetMessages(current, page.messages);
     renderHeader(current);
@@ -127,6 +134,10 @@ export async function refreshCurrent(): Promise<void> {
   await loadGroups();
 }
 export function initConversation(): void {
+  const menu = get<HTMLDetailsElement>("conversation-menu");
+  menu.addEventListener("click", event => {
+    if ((event.target as Element).closest("button")) menu.open = false;
+  });
   for (const field of ["pinned", "archived"] as const)
     get(field === "pinned" ? "pin-group" : "archive-group").onclick =
       async () => {

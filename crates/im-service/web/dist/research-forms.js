@@ -4,23 +4,37 @@ import { t, label } from "./i18n.js";
 import { element, select, input, area, dialog, finish, field, } from "./forms.js";
 const save = (value) => api("/api/im/research", value, "manage-research");
 export async function topicForm(old, done) {
+    const groups = [];
+    let cursor = "", count = 0;
+    do {
+        const page = await api("/api/crystal/view?" + query({ after: cursor }));
+        groups.push(...page.directory.groups.filter(g => !g.archived && g.kind !== GroupKind.Board));
+        count += page.directory.groups.length;
+        const next = page.directory.next_after || "";
+        if (next && (next === cursor || count >= 8192))
+            throw new Error(t("workspace.topicLimit"));
+        cursor = next;
+    } while (cursor);
     const box = dialog(t("research.topicForm")), id = input(old?.id || "topic-" + crypto.randomUUID()), title = input(old?.title || ""), objective = area(old?.objective || ""), state = select(Object.values(TopicState).map((s) => [s, label("TopicState", s)]), old?.state || TopicState.Active);
-    const groups = (await api("/api/crystal/view")).directory.groups.filter((g) => !g.archived && g.kind !== GroupKind.Board);
-    const group = input(old?.group_id || groups[0]?.id || ""), options = element("datalist");
-    options.id = "topic-group-options";
-    for (const row of groups) {
-        const option = element("option", row.title);
-        option.value = row.id;
-        options.append(option);
-    }
-    group.setAttribute("list", options.id);
-    group.readOnly = !!old;
+    const options = groups.map(group => [group.id, group.title]);
+    if (old && !groups.some(group => group.id === old.group_id))
+        options.push([old.group_id, old.group_id]);
+    const group = select(options, old?.group_id || groups[0]?.id || "");
+    group.disabled = !!old;
     id.readOnly = !!old;
     for (const node of [id, title, objective, group])
         node.required = true;
-    box.form.append(field(t("research.id"), id), field(t("research.title"), title), field(t("research.objective"), objective), field(t("research.group"), group), options, element("p", t("research.groupNote")), field(t("research.state"), state));
+    box.form.append(field(t("research.id"), id), field(t("research.title"), title), field(t("research.objective"), objective), field(t("research.group"), group), element("p", t("research.groupNote")), field(t("research.state"), state));
+    if (!groups.length && !old) {
+        const note = element("p", t("layout.topicPrerequisite"));
+        const link = element("a", t("workspace.conversations"));
+        link.href = "#groups";
+        link.onclick = () => box.dialog.close();
+        note.append(link);
+        box.form.append(note);
+    }
     finish(box, async () => {
-        await save({
+        const updated = await api("/api/im/research", {
             operation: "topic",
             topic: {
                 id: id.value.trim(),
@@ -30,8 +44,8 @@ export async function topicForm(old, done) {
                 state: state.value,
                 revision: old?.revision || 0,
             },
-        });
-        await done();
+        }, "manage-research");
+        await done(updated);
     });
 }
 export function subjectForm(topic, old, done) {

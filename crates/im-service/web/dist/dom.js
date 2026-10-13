@@ -33,6 +33,11 @@ export function button(text, action) {
     };
     return node;
 }
+export function actions(...controls) {
+    const row = el("div", undefined, "card-actions");
+    row.append(...controls);
+    return row;
+}
 export const value = (id) => get(id).value.trim();
 export function notice(error, id = "notice") {
     get(id).textContent = error instanceof Error ? error.message : String(error);

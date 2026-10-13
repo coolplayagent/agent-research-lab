@@ -9,6 +9,18 @@ use clap::Parser;
 use serde_json::{Value, json};
 
 fn execute(cli: Cli) -> Result<Value> {
+    if cli.config.is_some() {
+        anyhow::ensure!(
+            !matches!(
+                &cli.command,
+                Commands::Serve {
+                    state_dir: Some(_),
+                    ..
+                } | Commands::ServeLink { state_dir: Some(_) }
+            ),
+            "--config uses its configured state_dir; do not also pass --state-dir"
+        );
+    }
     match cli.command {
         Commands::Serve {
             listen,
@@ -222,6 +234,41 @@ pub fn run() {
             }
             eprintln!("{envelope}");
             std::process::exit(1);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn service_state_selection_rejects_ambiguous_sources() {
+        for command in ["serve", "serve-link"] {
+            for args in [
+                vec![
+                    "lab",
+                    "--config",
+                    "local.toml",
+                    command,
+                    "--state-dir",
+                    "/tmp/other",
+                ],
+                vec![
+                    "lab",
+                    command,
+                    "--state-dir",
+                    "/tmp/other",
+                    "--config",
+                    "local.toml",
+                ],
+            ] {
+                let cli = Cli::try_parse_from(args).unwrap();
+                let error = execute(cli).unwrap_err();
+                assert!(error.to_string().contains("do not also pass --state-dir"));
+            }
+            assert!(Cli::try_parse_from(["lab", command, "--state-dir", "/tmp/other"]).is_ok());
+            assert!(Cli::try_parse_from(["lab", "--config", "local.toml", command]).is_ok());
         }
     }
 }
