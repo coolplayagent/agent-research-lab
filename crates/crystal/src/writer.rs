@@ -192,7 +192,10 @@ fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
             result
         }
         Control::Goal(command) => {
-            let read = matches!(&command, crate::goals::GoalCommand::List { .. });
+            let read = matches!(
+                &command,
+                crate::goals::GoalCommand::List { .. } | crate::goals::GoalCommand::Current { .. }
+            );
             let discussion = matches!(&command, crate::goals::GoalCommand::Discuss { .. });
             let result = store.goal_command(command)?;
             if read {

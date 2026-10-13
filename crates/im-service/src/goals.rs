@@ -11,9 +11,24 @@ pub struct Page {
     group_id: String,
     #[serde(default)]
     after: String,
+    #[serde(default)]
+    current: bool,
 }
 pub async fn list(State(web): State<Web>, Query(page): Query<Page>) -> Response {
-    json_response(web.hub.goals(&page.group_id, "", &page.after, false).await)
+    json_response(
+        async {
+            if page.current {
+                anyhow::ensure!(
+                    page.after.is_empty(),
+                    "current goal does not support a cursor"
+                );
+                web.hub.current_goal(&page.group_id).await
+            } else {
+                web.hub.goals(&page.group_id, "", &page.after, false).await
+            }
+        }
+        .await,
+    )
 }
 pub async fn manage(State(web): State<Web>, request: Request) -> Response {
     json_response(

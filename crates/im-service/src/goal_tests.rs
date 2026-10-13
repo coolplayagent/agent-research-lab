@@ -20,6 +20,24 @@ async fn group_goal_http_flow_is_independent_of_research_and_enforces_operator_a
         .request("/api/im/goals", Some(create.clone()), true, None)
         .await;
     assert_eq!(status, 200, "{body}");
+    let current_url = "/api/im/goals?group_id=team&current=true";
+    assert_eq!(h.request(current_url, None, false, None).await.0, 401);
+    let (current_status, current_body) = h.request(current_url, None, true, None).await;
+    assert_eq!(current_status, 200, "{current_body}");
+    let current: Value = serde_json::from_str(&current_body).unwrap();
+    assert_eq!(current["goals"][0]["input"]["id"], "goal");
+    assert!(current["next_after"].is_null());
+    for url in [
+        "/api/im/goals?current=true",
+        "/api/im/goals?group_id=team&current=true&after=goal",
+    ] {
+        let (status, body) = h.request(url, None, true, None).await;
+        assert_eq!(status, 400, "{body}");
+        assert_eq!(
+            serde_json::from_str::<Value>(&body).unwrap()["code"],
+            contracts::ApiErrorCode::InvalidRequest.as_str()
+        );
+    }
     let mut invalid = create;
     invalid["goal"]["id"] = json!("invalid");
     invalid["goal"]["scenario"] = json!("not-installed");

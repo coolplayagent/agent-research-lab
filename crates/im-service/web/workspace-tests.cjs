@@ -26,6 +26,7 @@ function moduleFrom(file, imports = {}, globals = {}) {
 }
 const base = "crates/im-service/web/src/";
 const contracts = moduleFrom("web/shared/src/contracts.ts");
+const goalSelection = moduleFrom(base + "goal-selection.ts", { "/assets/shared/contracts.js": contracts });
 class Node extends EventTarget {
   constructor(tag = "div", text = "") {
     super();
@@ -138,6 +139,7 @@ const deferred = () => {
   assert.equal(resultForMessage(failed, [{...goalResult, work:[{...goalResult.work[0], state:contracts.WorkState.Failed, result:{succeeded:false, summary:"Recorded failure"}}]}]).result.summary, "Recorded failure");
 
   const progressModule = moduleFrom(base + "task-progress.ts", {
+    "./goal-selection.js": goalSelection,
     "./research-process.js": { researchProcess: () => new Node("details"), supportsProcess: () => true },
     "/assets/shared/contracts.js": contracts, "./dom.js": dom,
     "./i18n.js": { ...i18n, label: (type, value) => `${type}.${value}` },
@@ -149,7 +151,7 @@ const deferred = () => {
     event: { ...submitted.event, kind, attempt, person_id, title: "Research experience" },
   });
   const lifecycle = [event(1, contracts.GoalEventKind.Created, null, null), event(2, contracts.GoalEventKind.Claimed), event(3, contracts.GoalEventKind.Failed), event(4, contracts.GoalEventKind.Retried, 2), event(5, contracts.GoalEventKind.Claimed, 2)];
-  const runningGoal = { ...goalResult, state: contracts.GoalState.Active, work: [{ ...goalResult.work[0], state: contracts.WorkState.Running, deadline_ms: null, result: null }] };
+  const runningGoal = { ...goalResult, state: contracts.GoalState.Active, work: [{ ...goalResult.work[0], state: contracts.WorkState.Running, deadline_ms: Date.now() + 60000, result: null }] };
   const original = JSON.stringify(lifecycle);
   const compact = taskTimeline(lifecycle, [runningGoal]);
   assert.equal(compact.length, 1, "Repeated lifecycle updates share one progress card");
@@ -165,6 +167,11 @@ const deferred = () => {
   assert.equal(progressSummary(undefined), "progress.unavailable");
   assert.equal(progressSummary({ ...runningGoal, work: [] }), "progress.unavailable");
   assert.equal(progressSummary({ ...runningGoal, work: [{ ...runningGoal.work[0], state: "future-unknown" }] }), "progress.unavailable");
+  for (const deadline_ms of [null, undefined, NaN, Infinity]) {
+    const unknownLease = { ...runningGoal, work: [{ ...runningGoal.work[0], deadline_ms }] };
+    assert.equal(progressSummary(unknownLease), "progress.unavailable", "An unknown lease cannot establish current execution");
+    assert.equal(goalSelection.memberRunningWork([unknownLease], "member"), undefined);
+  }
   const separate = taskTimeline([...lifecycle, { ...lifecycle[0], sequence: 6, group_id: "other" }, { ...lifecycle[0], sequence: 7, event: { ...lifecycle[0].event, goal_id: "other-goal" } }], [runningGoal]);
   assert.equal(separate.length, 3);
   assert.equal(separate[1].progress.goal, undefined, "Do not attach another group's goal snapshot");
@@ -214,19 +221,73 @@ const deferred = () => {
     "A missing parent is not proof of collaboration",
   );
 
-  const goalFixture = (id) => ({input:{id, group_id:"a", title:id, objective:"Question", acceptance:"Evidence", scenario:"research", max_seconds:60}, state:contracts.GoalState.Active, revision:1, work:[{id:"work",person_id:"member",attempt:1,state:contracts.WorkState.Submitted,deadline_ms:null,instruction:"Review",result:{succeeded:true,summary:"Result",evidence:{pin:"one"}}}]});
-  const goalPages = {"":{goals:[goalFixture("first")],next_after:"first"}, first:{goals:[goalFixture("second")],next_after:"second"}, second:{goals:[goalFixture("third")],next_after:null}};
+  const goalFixture = (id, created_ms = 1) => ({input:{id, group_id:"a", title:id, objective:"Question", acceptance:"Evidence", scenario:"research", max_seconds:60}, state:contracts.GoalState.Active, revision:1, created_ms, work:[{id:"work",person_id:"member",attempt:1,state:contracts.WorkState.Submitted,deadline_ms:null,instruction:"Review",result:{succeeded:true,summary:"Result",evidence:{pin:"one"}}}]});
+  const oldSubmitted = goalFixture("z-old", 1), newerSubmitted = goalFixture("a-new", 20);
+  const activeExecution = goalFixture("middle-running", 10);
+  activeExecution.work[0] = { ...activeExecution.work[0], state: contracts.WorkState.Running, deadline_ms: 100 };
+  const pendingExecution = goalFixture("ready", 30);
+  pendingExecution.work[0].state = contracts.WorkState.Ready;
+  const acceptedGoal = {...goalFixture("completed", 40), state: contracts.GoalState.Completed};
+  const cancelledWithOldLease = {...activeExecution, state:contracts.GoalState.Cancelled, created_ms:50};
+  const order = [oldSubmitted, newerSubmitted, acceptedGoal, pendingExecution, cancelledWithOldLease, activeExecution];
+  const beforeSelection = JSON.stringify(order);
+  assert.equal(goalSelection.currentGoal(order, 90), activeExecution, "Running work outranks old pending reviews and newer queued or terminal goals");
+  assert.equal(goalSelection.currentGoal(order, 100), pendingExecution, "An expired lease cannot outrank work ready to start");
+  assert.equal(goalSelection.currentGoal([oldSubmitted, newerSubmitted, acceptedGoal], 90), newerSubmitted, "Use created_ms, never lexical IDs, for the most recent pending review");
+  assert.equal(progressSummary(newerSubmitted, 90), "progress.review", "A successful worker submission remains unaccepted");
+  assert.equal(goalSelection.currentGoal([acceptedGoal, cancelledWithOldLease], 90), cancelledWithOldLease);
+  assert.equal(goalSelection.currentGoal([], 90), undefined);
+  assert.equal(goalSelection.memberRunningWork([cancelledWithOldLease, activeExecution], "member", 90), activeExecution.work[0]);
+  assert.equal(goalSelection.memberRunningWork([cancelledWithOldLease, activeExecution], "member", 100), undefined);
+  assert.equal(goalSelection.memberRunningWork([activeExecution], "other", 90), undefined);
+  assert.equal(JSON.stringify(order), beforeSelection, "Selecting a summary does not reorder or promote recorded goals");
+  const graph = moduleFrom(base + "collaboration-graph.ts", {
+    "./goal-selection.js":goalSelection, "./avatar.js":{avatarSvg:()=>new Node("svg")},
+    "./i18n.js":{...i18n,label:(type,value)=>`${type}.${value}`},
+    "./people.js":{display:id=>id}, "./dom.js":{...dom,presence:value=>value},
+    "./collaboration-model.js":{replyEdges},
+  }, {document:{createElementNS:(_namespace,tag)=>new Node(tag)}});
+  const graphHost = new Node(), graphMember = {person_id:"member",presence:contracts.Presence.Offline};
+  const draw = goals => {
+    graphHost.replaceChildren();
+    graph.renderCrystal(graphHost,{id:"a",title:"Group"},[graphMember],[],goals,()=>{},new Set(),()=>{});
+    return graphHost.children[0].children.find(node=>node.attributes.get("class")?.startsWith("agent-node"));
+  };
+  const liveGraphGoal = {...activeExecution,work:[{...activeExecution.work[0],deadline_ms:Date.now()+60000}]};
+  assert(draw([oldSubmitted,liveGraphGoal]).attributes.get("class").includes("working"));
+  for (const stale of [cancelledWithOldLease,{...liveGraphGoal,work:[{...liveGraphGoal.work[0],deadline_ms:1}]},{...liveGraphGoal,input:{...liveGraphGoal.input,group_id:"other"}}]) {
+    const node = draw([stale]);
+    assert(!node.attributes.get("class").includes("working"),"Graph activity obeys the same goal state, group and live lease constraints");
+    assert.equal(node.children.find(child=>child.attributes.get("class")==="agent-activity").textContent,contracts.Presence.Offline);
+  }
+  const goalPages = {"":{goals:[goalFixture("first", 1)],next_after:"first"}, first:{goals:[goalFixture("second", 2)],next_after:"second"}, second:{goals:[goalFixture("third", 3)],next_after:null}};
+  let projectedGoal = structuredClone(goalPages.second.goals[0]);
+  projectedGoal.revision = 2;
+  projectedGoal.work[0].state = contracts.WorkState.Running;
+  projectedGoal.work[0].deadline_ms = Date.now() + 60000;
   goalPages.first.goals[0].iteration_id = "owned-iteration";
   let focusedIteration = "";
   let holdGoals = null;
+  let failCurrent = false, failHistory = false;
+  let scheduledRefreshes = 0;
   const goals = moduleFrom(base + "goals.ts", {
-    "/assets/shared/contracts.js":contracts, "./i18n.js":{...i18n,label:(_type,value)=>value}, "./dom.js":dom,
+    "./goal-selection.js": goalSelection, "./task-progress.js": progressModule,
+    "/assets/shared/contracts.js":contracts, "./i18n.js":{...i18n,t:(key,params)=>key+(params?JSON.stringify(params):""),label:(_type,value)=>value}, "./dom.js":dom,
     "./people.js":{display:id=>id}, "./workspace.js":{revealResearch:()=>{}}, "./contribution-text.js": { contributionText },
     "./iterations.js":{focusIteration:async id=>{ focusedIteration=id; }},
-    "./api.js":{query:p=>new URLSearchParams(p).toString(),api:async url=>holdGoals ? holdGoals.promise : goalPages[new URL(url,"http://local").searchParams.get("after")]},
-  }, {document:new EventTarget(),window:{clearTimeout,setTimeout}});
+    "./api.js":{query:p=>new URLSearchParams(p).toString(),api:async url=>{
+      if (holdGoals) return holdGoals.promise;
+      const fields = new URL(url,"http://local").searchParams;
+      if (fields.get("current") === "true" ? failCurrent : failHistory) throw new Error("Goal read unavailable");
+      return fields.get("current") === "true" ? {goals:[projectedGoal],next_after:null} : goalPages[fields.get("after")];
+    }},
+  }, {document:new EventTarget(),window:{clearTimeout,setTimeout:(action,delay)=>{scheduledRefreshes++;return setTimeout(action,delay);}}});
   goals.selectGoals({id:"a",kind:contracts.GroupKind.Conversation});
   await goals.loadGoals(); await goals.loadGoals(true);
+  assert.equal(goals.goalSnapshot().length,3,"The current goal is available before its historical page is loaded");
+  assert.equal(get("goal-list").children.length,2,"The current projection does not consume a historical page");
+  assert(get("goal-summary").textContent.includes('"title":"third"'));
+  assert(get("goal-summary").textContent.includes("progress.running"));
   const secondCard = get("goal-list").children[1]; secondCard.open = true;
   const allText = node => [node.textContent, ...node.children.map(allText)].join(" ");
   assert(!allText(secondCard).includes("goals.bd7dd17c34"), "Iteration-owned work cannot be retried through ordinary goal controls");
@@ -235,12 +296,39 @@ const deferred = () => {
   assert.equal(focusedIteration,"owned-iteration");
   secondCard.querySelectorAll("[data-evidence-key]")[0].open = true;
   await goals.loadGoals();
-  assert.equal(goals.goalSnapshot().length,2,"Refresh must retain already loaded pages");
+  assert.equal(goals.goalSnapshot().length,3,"Refresh retains loaded pages plus the current projection");
   assert(get("goal-list").children[1].open);
   assert(get("goal-list").children[1].querySelectorAll("[data-evidence-key]")[0].open,"Refresh must retain an open evidence disclosure");
   await goals.focusGoal("third");
   assert.equal(goals.goalSnapshot().length,3,"Focusing historical evidence must load its goal");
   assert(get("goal-list").children[2].open);
+  assert.equal(goals.goalSnapshot().find(goal=>goal.input.id==="third").revision,2,"An older historical revision cannot overwrite the current projection");
+  projectedGoal = {...projectedGoal,revision:3,work:[{...projectedGoal.work[0],state:contracts.WorkState.Submitted}]};
+  await goals.loadGoals();
+  assert(get("goal-summary").textContent.includes("progress.review"));
+  assert(!get("goal-summary").textContent.includes("completed"),"Waiting for host acceptance is not completion");
+  const stableSnapshot = JSON.stringify(goals.goalSnapshot()), stableSummary = get("goal-summary").textContent;
+  projectedGoal = {...projectedGoal,revision:4,state:contracts.GoalState.Completed};
+  for (const failingPart of ["current","history"]) {
+    failCurrent = failingPart === "current"; failHistory = failingPart === "history";
+    await goals.loadGoals();
+    assert.equal(JSON.stringify(goals.goalSnapshot()),stableSnapshot,"A failed half of the concurrent load must not publish a partial snapshot");
+    assert.equal(get("goal-summary").textContent,stableSummary);
+  }
+  failCurrent = false; failHistory = false;
+  for (const page of Object.values(goalPages)) for (const goal of page.goals) goal.state = contracts.GoalState.Completed;
+  await goals.loadGoals();
+  assert(get("goal-summary").textContent.startsWith("workspace.latestGoal"));
+  assert(get("goal-summary").textContent.includes('"title":"third"'));
+  assert(get("goal-summary").textContent.includes("GoalState.completed"),"Only the host-completed goal has an accepted summary");
+  const refreshesBeforeUnknownLease = scheduledRefreshes;
+  projectedGoal = {...projectedGoal,revision:5,state:contracts.GoalState.Active,work:[{...projectedGoal.work[0],state:contracts.WorkState.Running,deadline_ms:Infinity}]};
+  await goals.loadGoals();
+  assert(get("goal-summary").textContent.includes("progress.unavailable"));
+  assert.equal(scheduledRefreshes,refreshesBeforeUnknownLease,"An unknown lease cannot create an immediate-refresh timer loop");
+  projectedGoal = {...projectedGoal,revision:6,state:contracts.GoalState.Cancelled,work:[{...projectedGoal.work[0],deadline_ms:Date.now()+60000}]};
+  await goals.loadGoals();
+  assert.equal(scheduledRefreshes,refreshesBeforeUnknownLease,"Terminal goals do not schedule running-work refresh timers");
   holdGoals = deferred(); const staleGoals = goals.loadGoals(); goals.suspendGoals();
   holdGoals.resolve(goalPages[""]); await staleGoals;
   assert.equal(goals.goalSnapshot().length,0,"Old group fetches must not restore results");

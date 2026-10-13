@@ -167,6 +167,15 @@ async fn remote_iteration_commands_preserve_revision_fences_and_change_events() 
         client.goals("room", "", "", false).await.unwrap()["goals"][0]["state"],
         contracts::GoalState::Cancelled.as_str()
     );
+    let current = client.current_goal("room").await.unwrap();
+    assert_eq!(current["goals"].as_array().unwrap().len(), 1);
+    assert_eq!(current["goals"][0]["iteration_id"], "iteration");
+    assert_eq!(
+        current["goals"][0]["state"],
+        contracts::GoalState::Cancelled.as_str()
+    );
+    assert!(current["next_after"].is_null());
+    assert!(client.current_goal("").await.is_err());
     service.abort();
     let _ = service.await;
 }

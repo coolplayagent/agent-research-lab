@@ -297,7 +297,7 @@ pub(super) fn bounded_evidence(mut evidence: Value) -> Result<Value> {
     }
     Ok(evidence)
 }
-async fn advance(
+pub(super) async fn advance(
     hub: &im_storage::Client,
     c: Arc<Config>,
     goal: &Goal,
@@ -306,7 +306,9 @@ async fn advance(
     if work.state == WorkState::Ready && c.state_dir.join("private/activation-drain").exists() {
         return Ok(None);
     }
-    if !turn_ready(goal, work)? {
+    // Dependencies gate new admission; already running work must still reconcile
+    // its receipt even when a sibling fails. Storage fences every submission.
+    if work.state == WorkState::Ready && !turn_ready(goal, work)? {
         return Ok(None);
     }
     if !matches!(work.state, WorkState::Ready | WorkState::Running)

@@ -1,5 +1,5 @@
 import { avatarSvg } from "./avatar.js";
-import { WorkState } from "/assets/shared/contracts.js";
+import { memberRunningWork } from "./goal-selection.js";
 import { t, label } from "./i18n.js";
 import { display } from "./people.js";
 import { el, presence } from "./dom.js";
@@ -21,6 +21,7 @@ function svg(tag, attrs = {}, text) {
     return node;
 }
 export function renderCrystal(host, group, members, messages, goals, select, pulses, openConversation) {
+    const now = Date.now(), scopedGoals = goals.filter(goal => goal.input.group_id === group.id);
     const wide = host.clientWidth > 550;
     const width = wide ? 800 : 360, height = wide ? 490 : 440;
     const cx = width / 2, cy = height / 2, radius = wide ? 82 : 57;
@@ -73,7 +74,7 @@ export function renderCrystal(host, group, members, messages, goals, select, pul
     shown.forEach((member) => {
         const { x, y } = positions.get(member.person_id);
         const w = wide ? 166 : 112;
-        const work = goals.flatMap((goal) => goal.work).find((work) => work.person_id === member.person_id && work.state === WorkState.Running);
+        const work = memberRunningWork(scopedGoals, member.person_id, now);
         const node = svg("g", { class: `agent-node${work ? " working" : ""}${pulses.has(member.person_id) ? " speaking" : ""}`, transform: `translate(${x - w / 2},${y - 29})`, role: "button", tabindex: 0, "aria-label": `@${display(member.person_id)} · ${presence(member.presence)}` });
         node.append(svg("rect", { width: w, height: 58, rx: 10 }), svg("circle", { cx: 31, cy: 43, r: 3, class: "agent-presence" }), svg("text", { x: 45, y: 25, class: "agent-name" }, `@${compactName(display(member.person_id), wide ? 12 : 4)}`), svg("text", { x: 45, y: 43, class: "agent-activity" }, work ? label("WorkState", work.state) : presence(member.presence)), svg("title", {}, display(member.person_id)));
         const face = avatarSvg(member.person_id);

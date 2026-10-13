@@ -1,6 +1,8 @@
 import { revealResearch } from "./workspace.js";
 import { focusIteration } from "./iterations.js";
 import { contributionText } from "./contribution-text.js";
+import { currentGoal, overdueWork, runningWork } from "./goal-selection.js";
+import { progressSummary } from "./task-progress.js";
 import { GoalState, GroupKind, WorkState } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { label } from "./i18n.js";
@@ -9,6 +11,7 @@ import { button, el, get, notice } from "./dom.js";
 import { display } from "./people.js";
 let selected = null;
 let snapshot = [];
+let historySnapshot = [];
 export function goalSnapshot() {
     return snapshot;
 }
@@ -17,6 +20,7 @@ export function suspendGoals() {
     generation++;
     window.clearTimeout(expiryTimer);
     snapshot = [];
+    historySnapshot = [];
     get("goal-list").replaceChildren();
     get("more-goals").hidden = true;
     get("goal-summary").textContent = t("workspace.goalSummary");
@@ -24,7 +28,7 @@ export function suspendGoals() {
 export async function focusGoal(id) {
     const groupId = selected?.id;
     revealResearch("goals");
-    while (selected?.id === groupId && !snapshot.some((goal) => goal.input.id === id) && next) {
+    while (selected?.id === groupId && !historySnapshot.some((goal) => goal.input.id === id) && next) {
         const cursor = next;
         await loadGoals(true);
         if (next === cursor)
@@ -66,9 +70,7 @@ async function mutate(goal, operation, work_id) {
     }
 }
 function expired(work) {
-    return (work.state === WorkState.Running &&
-        work.deadline_ms !== null &&
-        work.deadline_ms <= Date.now());
+    return overdueWork(work);
 }
 function card(goal) {
     const details = el("details", undefined, "goal-card");
@@ -83,10 +85,12 @@ function card(goal) {
         const row = el("section", undefined, "work-item");
         row.append(el("strong", display(work.person_id)), el("span", expired(work)
             ? t("goals.58ada57084")
-            : goal.state === GoalState.Completed &&
-                work.state === WorkState.Submitted
-                ? t("goals.788add54b2")
-                : label("WorkState", work.state), "badge"), el("p", work.instruction));
+            : work.state === WorkState.Running && !runningWork(work)
+                ? t("progress.unavailable")
+                : goal.state === GoalState.Completed &&
+                    work.state === WorkState.Submitted
+                    ? t("goals.788add54b2")
+                    : label("WorkState", work.state), "badge"), el("p", work.instruction));
         if (work.result) {
             row.append(el("p", work.result.code
                 ? label("WorkResultCode", work.result.code)
@@ -122,34 +126,50 @@ export async function loadGoals(append = false) {
         return;
     const groupId = selected.id, request = ++generation;
     try {
-        const loaded = [];
-        let cursor = append ? next || "" : "";
-        const target = append ? 0 : snapshot.length;
-        do {
-            const page = await api("/api/im/goals?" +
-                query({ group_id: groupId, after: cursor }));
-            if (generation !== request || selected?.id !== groupId)
-                return;
-            loaded.push(...page.goals);
-            const following = page.next_after || "";
-            if (following === cursor) {
-                cursor = "";
-                break;
-            }
-            cursor = following;
-        } while (!append && cursor && loaded.length < target);
-        snapshot = append ? [...snapshot, ...loaded] : loaded;
+        const [current, history] = await Promise.all([
+            api("/api/im/goals?" + query({ group_id: groupId, current: "true" })),
+            (async () => {
+                const loaded = [];
+                let cursor = append ? next || "" : "";
+                const target = append ? 0 : historySnapshot.length;
+                do {
+                    const page = await api("/api/im/goals?" + query({ group_id: groupId, after: cursor }));
+                    if (generation !== request || selected?.id !== groupId)
+                        return { loaded, cursor };
+                    loaded.push(...page.goals);
+                    const following = page.next_after || "";
+                    if (following === cursor) {
+                        cursor = "";
+                        break;
+                    }
+                    cursor = following;
+                } while (!append && cursor && loaded.length < target);
+                return { loaded, cursor };
+            })(),
+        ]);
+        if (generation !== request || selected?.id !== groupId)
+            return;
+        const { loaded, cursor } = history;
+        historySnapshot = append ? [...historySnapshot, ...loaded] : loaded;
+        const combined = new Map(historySnapshot.map(goal => [goal.input.id, goal]));
+        for (const goal of current.goals) {
+            const known = combined.get(goal.input.id);
+            if (!known || known.revision <= goal.revision)
+                combined.set(goal.input.id, goal);
+        }
+        snapshot = [...combined.values()];
         window.clearTimeout(expiryTimer);
-        const deadlines = snapshot.flatMap((g) => g.work
-            .filter((w) => w.state === WorkState.Running &&
-            w.deadline_ms !== null &&
-            w.deadline_ms > Date.now())
+        const now = Date.now();
+        const deadlines = snapshot.filter(goal => goal.state === GoalState.Active).flatMap((g) => g.work
+            .filter(work => runningWork(work, now))
             .map((w) => w.deadline_ms));
         if (deadlines.length)
-            expiryTimer = window.setTimeout(() => void loadGoals(), Math.max(1, Math.min(...deadlines) - Date.now() + 50));
-        const active = snapshot.find((goal) => goal.state === GoalState.Active);
+            expiryTimer = window.setTimeout(() => void loadGoals(), Math.max(1, Math.min(...deadlines) - now + 50));
+        const active = currentGoal(snapshot, now);
         get("goal-summary").textContent = active
-            ? t("workspace.currentGoal", { title: active.input.title })
+            ? t(active.state === GoalState.Active ? "workspace.currentGoal" : "workspace.latestGoal", {
+                title: active.input.title, status: progressSummary(active, now),
+            })
             : t("workspace.goalSummary");
         document.dispatchEvent(new Event("workspace-goals"));
         const list = get("goal-list");
@@ -158,10 +178,9 @@ export async function loadGoals(append = false) {
         ].map((d) => d.dataset.goalId));
         const evidenceOpened = new Set([...list.querySelectorAll("details[open][data-evidence-key]")]
             .map((node) => node.dataset.evidenceKey));
-        if (!append)
-            list.replaceChildren();
-        for (const goal of loaded) {
-            const node = card(goal);
+        list.replaceChildren();
+        for (const goal of historySnapshot) {
+            const node = card(combined.get(goal.input.id));
             node.open = opened.has(goal.input.id);
             for (const evidence of node.querySelectorAll("[data-evidence-key]"))
                 evidence.open = evidenceOpened.has(evidence.dataset.evidenceKey);
