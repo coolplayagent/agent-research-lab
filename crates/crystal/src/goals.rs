@@ -20,6 +20,9 @@ pub(crate) enum GoalCommand {
         after: String,
         active: bool,
     },
+    Current {
+        group: String,
+    },
 }
 impl Hub {
     pub async fn discuss(&self, input: GoalInput, message: Publish) -> Result<Value> {
@@ -86,6 +89,12 @@ impl Hub {
             .await?;
         self.authenticate(token)?;
         Ok(result)
+    }
+    pub async fn current_goal(&self, group: &str) -> Result<Value> {
+        self.control(Control::Goal(GoalCommand::Current {
+            group: group.into(),
+        }))
+        .await
     }
 }
 pub(crate) fn read(connection: &Connection, id: &str) -> Result<Goal> {
@@ -185,8 +194,64 @@ pub(crate) fn available(connection: &Connection, group: &str) -> Result<()> {
     member(connection, group, "operator")
 }
 impl Store {
+    fn goal_projection(&self, goals: &[Goal], next: Option<String>) -> Result<Value> {
+        let mut projection = serde_json::to_value(goals)?;
+        for goal in projection.as_array_mut().unwrap() {
+            let iteration: Option<String> = self
+                .connection
+                .query_row(
+                    "SELECT run_id FROM evolution_goal_bindings WHERE goal_id=?1",
+                    [goal["input"]["id"].as_str().unwrap()],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if let Some(iteration) = iteration {
+                goal["iteration_id"] = json!(iteration);
+            }
+        }
+        Ok(json!({"goals":projection,"next_after":next}))
+    }
+
+    fn current_goal(&self, group: &str) -> Result<Value> {
+        id(group)?;
+        member(&self.connection, group, "operator")?;
+        let now = now_ms();
+        let value: Option<String> = self
+            .connection
+            .query_row(
+                "SELECT value FROM goals g WHERE group_id=?1 ORDER BY
+             CASE WHEN json_extract(value,'$.state')=?2 THEN
+               CASE WHEN EXISTS(SELECT 1 FROM json_each(g.value,'$.work') w
+                   WHERE json_extract(w.value,'$.state')=?3
+                   AND json_type(w.value,'$.deadline_ms') IN ('integer','real')
+                   AND json_extract(w.value,'$.deadline_ms')>?5
+                   AND json_extract(w.value,'$.deadline_ms')<1.7976931348623157e308) THEN 3
+                 WHEN EXISTS(SELECT 1 FROM json_each(g.value,'$.work') w
+                   WHERE json_extract(w.value,'$.state')=?4) THEN 2
+                 ELSE 1 END
+               ELSE 0 END DESC,
+             json_extract(value,'$.created_ms') DESC, id ASC LIMIT 1",
+                params![
+                    group,
+                    GoalState::Active.as_str(),
+                    WorkState::Running.as_str(),
+                    WorkState::Ready.as_str(),
+                    now
+                ],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let goals = value
+            .map(|value| serde_json::from_str::<Goal>(&value))
+            .transpose()?
+            .into_iter()
+            .collect::<Vec<_>>();
+        self.goal_projection(&goals, None)
+    }
+
     pub(crate) fn goal_command(&mut self, command: GoalCommand) -> Result<Value> {
         match command {
+            GoalCommand::Current { group } => self.current_goal(&group),
             GoalCommand::Change(change) => self.goal_change(change),
             GoalCommand::Discuss { input, message } => {
                 ensure!(
@@ -245,21 +310,7 @@ impl Store {
                     .collect::<serde_json::Result<Vec<_>>>()?;
                 let next = (goals.len() > 50).then(|| goals[49].input.id.clone());
                 goals.truncate(50);
-                let mut projection = serde_json::to_value(&goals)?;
-                for goal in projection.as_array_mut().unwrap() {
-                    let iteration: Option<String> = self
-                        .connection
-                        .query_row(
-                            "SELECT run_id FROM evolution_goal_bindings WHERE goal_id=?1",
-                            [goal["input"]["id"].as_str().unwrap()],
-                            |row| row.get(0),
-                        )
-                        .optional()?;
-                    if let Some(iteration) = iteration {
-                        goal["iteration_id"] = json!(iteration);
-                    }
-                }
-                Ok(json!({"goals":projection,"next_after":next}))
+                self.goal_projection(&goals, next)
             }
         }
     }

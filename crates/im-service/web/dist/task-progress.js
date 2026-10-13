@@ -4,6 +4,7 @@ import { button, el } from "./dom.js";
 import { label, t } from "./i18n.js";
 import { display } from "./people.js";
 import { resultForMessage } from "./message-results.js";
+import { overdueWork, runningWork } from "./goal-selection.js";
 /** Compact structured updates without changing stored messages or member contributions. */
 export function taskTimeline(messages, goals) {
     const timeline = [], tasks = new Map();
@@ -27,11 +28,8 @@ export function taskTimeline(messages, goals) {
     }
     return timeline;
 }
-function overdue(work, now) {
-    return work.state === WorkState.Running && work.deadline_ms !== null && work.deadline_ms <= now;
-}
 function needsAttention(goal, now) {
-    return goal?.state === GoalState.Active && goal.work.some(work => work.state === WorkState.Failed || overdue(work, now));
+    return goal?.state === GoalState.Active && goal.work.some(work => work.state === WorkState.Failed || overdueWork(work, now));
 }
 export function progressSummary(goal, now = Date.now()) {
     if (!goal)
@@ -40,7 +38,7 @@ export function progressSummary(goal, now = Date.now()) {
         return label("GoalState", goal.state);
     if (needsAttention(goal, now))
         return t("progress.attention");
-    if (goal.work.some(work => work.state === WorkState.Running))
+    if (goal.work.some(work => runningWork(work, now)))
         return t("progress.running");
     if (goal.work.some(work => work.state === WorkState.Ready))
         return t("progress.waiting");
@@ -68,9 +66,10 @@ export function progressCard(progress, opened, review) {
         for (const work of goal.work) {
             const member = el("li");
             member.dataset.workState = work.state;
-            member.classList.toggle("needs-attention", goal.state === GoalState.Active && (work.state === WorkState.Failed || overdue(work, now)));
-            const state = overdue(work, now) ? t("goals.58ada57084")
-                : goal.state === GoalState.Completed && work.state === WorkState.Submitted ? t("goals.788add54b2") : label("WorkState", work.state);
+            member.classList.toggle("needs-attention", goal.state === GoalState.Active && (work.state === WorkState.Failed || overdueWork(work, now)));
+            const state = overdueWork(work, now) ? t("goals.58ada57084")
+                : work.state === WorkState.Running && !runningWork(work, now) ? t("progress.unavailable")
+                    : goal.state === GoalState.Completed && work.state === WorkState.Submitted ? t("goals.788add54b2") : label("WorkState", work.state);
             member.append(el("span", display(work.person_id), "task-progress-person"), el("span", state, "task-progress-work"));
             if (work.attempt > 1)
                 member.append(el("small", t("progress.attempt", { attempt: work.attempt })));

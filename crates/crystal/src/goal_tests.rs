@@ -1,4 +1,189 @@
 use super::*;
+
+#[test]
+fn current_goal_orders_activity_creation_and_id_without_promoting_submissions() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::open(&dir.path().join("test.sqlite")).unwrap();
+    store
+        .register(&["operator".into(), "a".into(), "b".into()])
+        .unwrap();
+    store
+        .create_group(&NewGroup {
+            id: "team".into(),
+            title: "Team".into(),
+            topic: "Work".into(),
+            kind: GroupKind::Conversation,
+            private: false,
+            members: vec!["operator".into(), "a".into(), "b".into()],
+        })
+        .unwrap();
+    let current = |store: &mut Store| {
+        store
+            .goal_command(goals::GoalCommand::Current {
+                group: "team".into(),
+            })
+            .unwrap()
+    };
+    assert_eq!(current(&mut store), json!({"goals":[],"next_after":null}));
+    let base = now_ms();
+    for (id, created, state, work_state, deadline) in [
+        (
+            "a-submitted",
+            700,
+            GoalState::Active,
+            WorkState::Submitted,
+            None,
+        ),
+        (
+            "b-expired",
+            600,
+            GoalState::Active,
+            WorkState::Running,
+            Some(base - 1),
+        ),
+        ("c-null", 500, GoalState::Active, WorkState::Running, None),
+        (
+            "d-cancelled",
+            900,
+            GoalState::Cancelled,
+            WorkState::Running,
+            Some(base + 60000),
+        ),
+        (
+            "e-completed",
+            800,
+            GoalState::Completed,
+            WorkState::Submitted,
+            None,
+        ),
+        ("f-ready", 400, GoalState::Active, WorkState::Ready, None),
+        (
+            "g-older-running",
+            100,
+            GoalState::Active,
+            WorkState::Running,
+            Some(base + 60000),
+        ),
+        (
+            "y-running",
+            200,
+            GoalState::Active,
+            WorkState::Running,
+            Some(base + 60000),
+        ),
+        (
+            "z-running",
+            200,
+            GoalState::Active,
+            WorkState::Running,
+            Some(base + 60000),
+        ),
+    ] {
+        let mut goal_input = input();
+        goal_input.id = id.into();
+        store
+            .goal_command(goals::GoalCommand::Change(GoalChange::Create {
+                goal: goal_input,
+            }))
+            .unwrap();
+        let mut goal = goals::read(&store.connection, id).unwrap();
+        goal.created_ms = created;
+        goal.state = state;
+        for work in &mut goal.work {
+            work.state = work_state;
+            work.deadline_ms = deadline;
+        }
+        store
+            .connection
+            .execute(
+                "UPDATE goals SET value=?2 WHERE id=?1",
+                rusqlite::params![id, serde_json::to_string(&goal).unwrap()],
+            )
+            .unwrap();
+    }
+    for expected in [
+        "y-running",
+        "z-running",
+        "g-older-running",
+        "f-ready",
+        "a-submitted",
+    ] {
+        let page = current(&mut store);
+        assert_eq!(page["goals"].as_array().unwrap().len(), 1);
+        assert_eq!(page["goals"][0]["input"]["id"], expected);
+        assert_eq!(page["goals"][0]["state"], GoalState::Active.as_str());
+        assert!(page["next_after"].is_null());
+        store
+            .connection
+            .execute("DELETE FROM goal_assignees WHERE goal_id=?1", [expected])
+            .unwrap();
+        store
+            .connection
+            .execute("DELETE FROM goals WHERE id=?1", [expected])
+            .unwrap();
+    }
+    assert!(
+        store
+            .goal_command(goals::GoalCommand::Current { group: "".into() })
+            .is_err()
+    );
+    assert!(
+        store
+            .goal_command(goals::GoalCommand::Current {
+                group: "absent".into()
+            })
+            .is_err()
+    );
+    store
+        .connection
+        .execute(
+            "UPDATE goals SET value=json_set(value,'$.state','future-state','$.created_ms',1000)",
+            [],
+        )
+        .unwrap();
+    assert!(
+        store
+            .goal_command(goals::GoalCommand::Current {
+                group: "team".into()
+            })
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn current_goal_finds_work_beyond_history_page_without_writing_or_changing_cursors() {
+    let dir = tempfile::tempdir().unwrap();
+    let hub = Hub::open(dir.path()).unwrap();
+    setup(&hub).await;
+    for index in 0..51 {
+        let mut goal = input();
+        goal.id = format!("goal-{index:02}");
+        hub.change_goal(GoalChange::Create { goal }).await.unwrap();
+    }
+    let mut change = claim("work-0", "current");
+    if let WorkChange::Claim { goal_id, .. } = &mut change {
+        *goal_id = "goal-50".into();
+    }
+    hub.work_as("a", change).await.unwrap();
+    let first = hub.goals("team", "", "", false).await.unwrap();
+    assert_eq!(first["goals"].as_array().unwrap().len(), 50);
+    assert_eq!(first["next_after"], "goal-49");
+    let before = hub.metrics();
+    let selected = hub.current_goal("team").await.unwrap();
+    assert_eq!(selected["goals"][0]["input"]["id"], "goal-50");
+    assert!(selected["next_after"].is_null());
+    assert_eq!(
+        hub.metrics()["catalog_revision"],
+        before["catalog_revision"]
+    );
+    assert_eq!(hub.metrics()["stored_messages"], before["stored_messages"]);
+    assert_eq!(hub.goals("team", "", "", false).await.unwrap(), first);
+    assert_eq!(
+        hub.goals("team", "", "goal-49", false).await.unwrap()["goals"][0]["input"]["id"],
+        "goal-50"
+    );
+}
+
 fn input() -> GoalInput {
     GoalInput {
         id: "goal".into(),

@@ -109,6 +109,10 @@ fn asset(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../web/dist/goal-types.js").as_slice(),
         )),
+        "/assets/goal-selection.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/goal-selection.js").as_slice(),
+        )),
         "/assets/goals.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../web/dist/goals.js").as_slice(),

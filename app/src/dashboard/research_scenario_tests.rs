@@ -271,6 +271,216 @@ fn successful_workflow_status_without_a_matching_committed_receipt_cannot_submit
 }
 
 #[tokio::test]
+async fn running_receipts_reconcile_after_sibling_failure_without_admitting_dependents() {
+    let temp = Scratch::new();
+    let root = temp.path();
+    let binary = root.join("workflow-fixture");
+    fs::write(
+        &binary,
+        format!(
+            "#!/bin/sh\ncat '{}'\n",
+            root.join("response.json").display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+    let c: Config = serde_json::from_value(json!({"schema_version":1,"workspace":root,
+        "state_dir":root.join("state"),"superpod":root,"codex":"unused","workflow":binary,
+        "daily_seconds":600,"max_agents":4,"task_timeout_seconds":60,"require_latest":false,
+        "models":{},"tools":{}}))
+    .unwrap();
+    fs::create_dir_all(c.state_dir.join("workflow")).unwrap();
+    let c = Arc::new(c);
+    let hub = im_storage::Client::from(crystal::Hub::open(&root.join("collaboration")).unwrap());
+    hub.register_operator().await.unwrap();
+    let people = ["researcher", "sibling", "builder", "reviewer"];
+    for person in people {
+        hub.save_person(crystal::Person {
+            id: person.into(),
+            name: person.into(),
+            application_id: Some("research".into()),
+        })
+        .await
+        .unwrap();
+    }
+    hub.create_group(crystal::NewGroup {
+        id: "team".into(),
+        title: "Software research".into(),
+        topic: "Receipt reconciliation".into(),
+        kind: crystal::GroupKind::Conversation,
+        private: false,
+        members: std::iter::once("operator")
+            .chain(people)
+            .map(str::to_owned)
+            .collect(),
+    })
+    .await
+    .unwrap();
+    let input = GoalInput {
+        id: "software-goal".into(),
+        group_id: "team".into(),
+        title: "Reconcile research".into(),
+        objective: "Observe every started task before settling the round".into(),
+        acceptance: "Only current committed receipts can submit".into(),
+        scenario: "software-evolution".into(),
+        max_seconds: 180,
+        parameters: json!({"repository":"superpod","delivery_policy_digest":"a".repeat(64),
+            "roles":{"researcher":"research","sibling":"research","builder":"implement","reviewer":"review"}}),
+        assignments: people
+            .iter()
+            .map(|person| AssignmentInput {
+                person_id: (*person).into(),
+                instruction: "Inspect the frozen evidence".into(),
+            })
+            .collect(),
+    };
+    let mut goal = hub
+        .change_goal(crystal::GoalChange::Create { goal: input })
+        .await
+        .unwrap();
+    for index in [0, 1] {
+        let work = &goal.work[index];
+        goal = hub
+            .work_as(
+                &work.person_id,
+                crystal::WorkChange::Claim {
+                    attempt: work.attempt,
+                    goal_id: goal.input.id.clone(),
+                    work_id: work.id.clone(),
+                    claim_id: "research-attempt-1".into(),
+                },
+            )
+            .await
+            .unwrap();
+    }
+    let failure = crystal::WorkResult {
+        code: Some(contracts::WorkResultCode::Failed),
+        succeeded: false,
+        summary: "Declared sibling failure fixture".into(),
+        evidence: json!({"fixture":true}),
+    };
+    goal = hub
+        .work_as(
+            "sibling",
+            crystal::WorkChange::Submit {
+                attempt: 1,
+                goal_id: goal.input.id.clone(),
+                work_id: "work-1".into(),
+                claim_id: "research-attempt-1".into(),
+                result: failure.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    let stale_running = goal.clone();
+    let id = job_id(&goal, &goal.work[0]);
+    let job: Job = serde_json::from_value(json!({"task":{"id":id,"role":"research",
+        "repository":"superpod","prompt":"frozen"},"model":"fixture",
+        "source_commit":"a".repeat(40),"superpod_commit":"b".repeat(40),
+        "prompt_digest":"c".repeat(64),"config_digest":"d".repeat(64),"worktree":root,
+        "run_id":format!("{id}-attempt-1"),"attempt":1,"last_error":null,"launch":null}))
+    .unwrap();
+    storage::write(&c.state_dir.join("jobs").join(format!("{id}.json")), &job).unwrap();
+    let response = root.join("response.json");
+    storage::write(
+        &response,
+        &json!({"ok":true,"result":{"status":"succeeded"}}),
+    )
+    .unwrap();
+    assert!(
+        advance(&hub, c.clone(), &goal, &goal.work[0])
+            .await
+            .unwrap()
+            .is_some(),
+        "successful status without a committed receipt remains unresolved"
+    );
+    let read_goal = async || -> crystal::Goal {
+        let page = hub
+            .goals("team", "software-evolution", "", true)
+            .await
+            .unwrap();
+        serde_json::from_value(page["goals"][0].clone()).unwrap()
+    };
+    assert_eq!(read_goal().await.work[0].state, WorkState::Running);
+
+    let receipt = json!({"agent_report":{"summary":"Pinned research result","findings":[],
+        "sources":[],"limitations":["synthetic workflow fixture"],"next_tasks":[]},
+        "source_commit":job.source_commit,"superpod_commit":job.superpod_commit,
+        "prompt_digest":job.prompt_digest,"model":job.model,"research_inputs":null,"backend":null,
+        "receipt_protocol":2,"config_digest":job.config_digest});
+    storage::write(
+        &response,
+        &json!({"ok":true,"result":{"status":"succeeded", "frames":{
+        "1":{"nodes":{"task":{"outputs":{"result":receipt.to_string()}}}}}}}),
+    )
+    .unwrap();
+    storage::write(
+        &c.state_dir.join("private/activation-drain"),
+        &json!({"fixture":true}),
+    )
+    .unwrap();
+    assert!(
+        advance(&hub, c.clone(), &goal, &goal.work[0])
+            .await
+            .unwrap()
+            .is_none()
+    );
+    goal = read_goal().await;
+    assert_eq!(goal.state, GoalState::Active);
+    assert_eq!(goal.work[0].state, WorkState::Submitted);
+    let result = goal.work[0].result.as_ref().unwrap();
+    assert!(result.succeeded);
+    assert_eq!(
+        result.evidence["receipt_sha256"],
+        storage::digest(&serde_json::to_vec(&receipt).unwrap())
+    );
+    assert_eq!(result.evidence["policy_digest"], job.config_digest);
+    assert_eq!(goal.work[1].state, WorkState::Failed);
+    assert_eq!(goal.work[1].result.as_ref(), Some(&failure));
+    fs::remove_file(c.state_dir.join("private/activation-drain")).unwrap();
+    for work in &goal.work[2..] {
+        assert!(
+            advance(&hub, c.clone(), &goal, work)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            !c.state_dir
+                .join("jobs")
+                .join(format!("{}.json", job_id(&goal, work)))
+                .exists()
+        );
+    }
+    let current = read_goal().await;
+    assert_eq!(current.revision, goal.revision);
+    assert!(
+        current.work[2..]
+            .iter()
+            .all(|work| work.state == WorkState::Ready
+                && work.claim_id.is_none()
+                && work.result.is_none())
+    );
+
+    hub.change_goal(crystal::GoalChange::Retry {
+        goal_id: goal.input.id.clone(),
+        revision: goal.revision,
+        work_id: "work-0".into(),
+    })
+    .await
+    .unwrap();
+    let error = advance(&hub, c, &stale_running, &stale_running.work[0])
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("attempt has been superseded"));
+    let current = read_goal().await;
+    assert_eq!(current.work[0].attempt, 2);
+    assert_eq!(current.work[0].state, WorkState::Ready);
+    assert!(current.work[0].result.is_none());
+    assert_eq!(current.work[1].result.as_ref(), Some(&failure));
+}
+
+#[tokio::test]
 async fn admission_failure_is_unavailable_with_private_diagnostics_and_no_acceptance() {
     let temp = Scratch::new();
     let c: Config = serde_json::from_value(json!({"schema_version":1,"workspace":temp.path(),"state_dir":temp.path().join("state"),"superpod":temp.path(),"codex":"unused","workflow":"unused","daily_seconds":600,"max_agents":1,"task_timeout_seconds":60,"require_latest":true,"models":{"research":"fixture"},"tools":{}})).unwrap();

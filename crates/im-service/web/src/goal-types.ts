@@ -42,5 +42,6 @@ export interface Goal {
   };
   state: GoalState;
   revision: number;
+  created_ms: number;
   work: Work[];
 }

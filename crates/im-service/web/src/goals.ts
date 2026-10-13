@@ -1,6 +1,8 @@
 import { revealResearch } from "./workspace.js";
 import { focusIteration } from "./iterations.js";
 import { contributionText } from "./contribution-text.js";
+import { currentGoal, overdueWork, runningWork } from "./goal-selection.js";
+import { progressSummary } from "./task-progress.js";
 import { GoalState, GroupKind, WorkState } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { label } from "./i18n.js";
@@ -11,6 +13,7 @@ import type { Group } from "./types.js";
 import type { Goal, Work } from "./goal-types.js";
 let selected: Group | null = null;
 let snapshot: Goal[] = [];
+let historySnapshot: Goal[] = [];
 export function goalSnapshot(): Goal[] {
   return snapshot;
 }
@@ -19,6 +22,7 @@ export function suspendGoals(): void {
   generation++;
   window.clearTimeout(expiryTimer);
   snapshot = [];
+  historySnapshot = [];
   get("goal-list").replaceChildren();
   get("more-goals").hidden = true;
   get("goal-summary").textContent = t("workspace.goalSummary");
@@ -26,7 +30,7 @@ export function suspendGoals(): void {
 export async function focusGoal(id: string): Promise<void> {
   const groupId = selected?.id;
   revealResearch("goals");
-  while (selected?.id === groupId && !snapshot.some((goal) => goal.input.id === id) && next) {
+  while (selected?.id === groupId && !historySnapshot.some((goal) => goal.input.id === id) && next) {
     const cursor = next;
     await loadGoals(true);
     if (next === cursor) break;
@@ -72,11 +76,7 @@ async function mutate(
   }
 }
 function expired(work: Work): boolean {
-  return (
-    work.state === WorkState.Running &&
-    work.deadline_ms !== null &&
-    work.deadline_ms <= Date.now()
-  );
+  return overdueWork(work);
 }
 function card(goal: Goal): HTMLDetailsElement {
   const details = el("details", undefined, "goal-card");
@@ -106,6 +106,8 @@ function card(goal: Goal): HTMLDetailsElement {
         "span",
         expired(work)
           ? t("goals.58ada57084")
+          : work.state === WorkState.Running && !runningWork(work)
+            ? t("progress.unavailable")
           : goal.state === GoalState.Completed &&
               work.state === WorkState.Submitted
             ? t("goals.788add54b2")
@@ -171,43 +173,51 @@ export async function loadGoals(append = false): Promise<void> {
   const groupId = selected.id,
     request = ++generation;
   try {
-    const loaded: Goal[] = [];
-    let cursor = append ? next || "" : "";
-    const target = append ? 0 : snapshot.length;
-    do {
-    const page = await api<{
-      goals: Goal[];
-      next_after: string | null;
-    }>(
-      "/api/im/goals?" +
-        query({ group_id: groupId, after: cursor }),
-    );
+    const [current, history] = await Promise.all([
+      api<{ goals: Goal[] }>("/api/im/goals?" + query({ group_id: groupId, current: "true" })),
+      (async () => {
+        const loaded: Goal[] = [];
+        let cursor = append ? next || "" : "";
+        const target = append ? 0 : historySnapshot.length;
+        do {
+          const page = await api<{ goals: Goal[]; next_after: string | null }>(
+            "/api/im/goals?" + query({ group_id: groupId, after: cursor }),
+          );
+          if (generation !== request || selected?.id !== groupId) return { loaded, cursor };
+          loaded.push(...page.goals);
+          const following = page.next_after || "";
+          if (following === cursor) { cursor = ""; break; }
+          cursor = following;
+        } while (!append && cursor && loaded.length < target);
+        return { loaded, cursor };
+      })(),
+    ]);
     if (generation !== request || selected?.id !== groupId) return;
-    loaded.push(...page.goals);
-    const following = page.next_after || "";
-    if (following === cursor) { cursor = ""; break; }
-    cursor = following;
-    } while (!append && cursor && loaded.length < target);
-    snapshot = append ? [...snapshot, ...loaded] : loaded;
+    const { loaded, cursor } = history;
+    historySnapshot = append ? [...historySnapshot, ...loaded] : loaded;
+    const combined = new Map(historySnapshot.map(goal => [goal.input.id, goal]));
+    for (const goal of current.goals) {
+      const known = combined.get(goal.input.id);
+      if (!known || known.revision <= goal.revision) combined.set(goal.input.id, goal);
+    }
+    snapshot = [...combined.values()];
     window.clearTimeout(expiryTimer);
-    const deadlines = snapshot.flatMap((g) =>
+    const now = Date.now();
+    const deadlines = snapshot.filter(goal => goal.state === GoalState.Active).flatMap((g) =>
       g.work
-        .filter(
-          (w) =>
-            w.state === WorkState.Running &&
-            w.deadline_ms !== null &&
-            w.deadline_ms > Date.now(),
-        )
+        .filter(work => runningWork(work, now))
         .map((w) => w.deadline_ms!),
     );
     if (deadlines.length)
       expiryTimer = window.setTimeout(
         () => void loadGoals(),
-        Math.max(1, Math.min(...deadlines) - Date.now() + 50),
+        Math.max(1, Math.min(...deadlines) - now + 50),
       );
-    const active = snapshot.find((goal) => goal.state === GoalState.Active);
+    const active = currentGoal(snapshot, now);
     get("goal-summary").textContent = active
-      ? t("workspace.currentGoal", { title: active.input.title })
+      ? t(active.state === GoalState.Active ? "workspace.currentGoal" : "workspace.latestGoal", {
+          title: active.input.title, status: progressSummary(active, now),
+        })
       : t("workspace.goalSummary");
     document.dispatchEvent(new Event("workspace-goals"));
     const list = get("goal-list");
@@ -222,9 +232,9 @@ export async function loadGoals(append = false): Promise<void> {
       [...list.querySelectorAll<HTMLDetailsElement>("details[open][data-evidence-key]")]
         .map((node) => node.dataset.evidenceKey),
     );
-    if (!append) list.replaceChildren();
-    for (const goal of loaded) {
-      const node = card(goal);
+    list.replaceChildren();
+    for (const goal of historySnapshot) {
+      const node = card(combined.get(goal.input.id)!);
       node.open = opened.has(goal.input.id);
       for (const evidence of node.querySelectorAll<HTMLDetailsElement>("[data-evidence-key]"))
         evidence.open = evidenceOpened.has(evidence.dataset.evidenceKey);

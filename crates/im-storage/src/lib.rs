@@ -136,6 +136,9 @@ pub enum Request {
         after: String,
         active: bool,
     },
+    CurrentGoal {
+        group: String,
+    },
     AssignedGoals {
         token: String,
         after: String,
@@ -651,6 +654,21 @@ impl Client {
             }
         }
     }
+    pub async fn current_goal(&self, group: &str) -> Result<Value> {
+        match self {
+            Self::Local(hub) => hub.current_goal(group).await,
+            Self::Remote(path) => {
+                rpc::call(
+                    path,
+                    &Request::CurrentGoal {
+                        group: group.into(),
+                    },
+                    Duration::from_secs(10),
+                )
+                .await
+            }
+        }
+    }
     pub async fn assigned_goals(&self, token: &str, after: &str) -> Result<Value> {
         match self {
             Self::Local(hub) => hub.assigned_goals(token, after).await,
@@ -1020,6 +1038,7 @@ async fn execute(hub: &Hub, request: Request) -> Result<Value> {
             after,
             active,
         } => Ok(json!(hub.goals(&group, &scenario, &after, active).await?)),
+        Request::CurrentGoal { group } => hub.current_goal(&group).await,
         Request::AssignedGoals { token, after } => {
             Ok(json!(hub.assigned_goals(&token, &after).await?))
         }
