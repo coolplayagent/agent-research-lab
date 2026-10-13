@@ -3,6 +3,7 @@ mod cli;
 mod dashboard;
 pub mod service;
 mod software_activation;
+mod software_verification;
 
 pub use agent_backend;
 pub use agent_policy;
