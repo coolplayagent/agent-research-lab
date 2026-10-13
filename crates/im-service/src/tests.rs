@@ -258,7 +258,7 @@ async fn local_operator_enters_management_without_changing_actor_grants() {
         200
     );
     for headers in [
-        format!("Host: evil.example\r\n"),
+        "Host: evil.example\r\n".to_owned(),
         format!("Host: {}\r\nOrigin: https://evil.invalid\r\n", h.addr),
         format!("Host: {}\r\nSec-Fetch-Site: cross-site\r\n", h.addr),
     ] {
