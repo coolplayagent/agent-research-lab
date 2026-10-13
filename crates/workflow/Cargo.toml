@@ -8,6 +8,7 @@ license.workspace = true
 name = "workflow"
 
 [dependencies]
+native_effects.workspace = true
 contracts.workspace = true
 anyhow.workspace = true
 process.workspace = true

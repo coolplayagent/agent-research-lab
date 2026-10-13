@@ -72,3 +72,13 @@ rust_test(
 )
 
 filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])
+
+rust_test(
+    name = "enqueue_batch_cli_tests",
+    srcs = ["tests/enqueue_batch_cli.rs"],
+    compile_data = ["tests/fixtures/enqueue_batch_cli.py"],
+    edition = "2024",
+    aliases = aliases(normal_dev = True, proc_macro_dev = True),
+    deps = ["//crates/process:process"] + all_crate_deps(normal_dev = True),
+    proc_macro_deps = all_crate_deps(proc_macro_dev = True),
+)

@@ -164,13 +164,31 @@ export const ExecutionState = {
 };
 export const WorkflowState = {
     Running: "running",
+    Cancelling: "cancelling",
     Succeeded: "succeeded",
     Failed: "failed",
     Cancelled: "cancelled",
     Unknown: "unknown",
 };
 export const WorkflowNodeState = {
+    Pending: "pending",
     TaskReady: "task_ready",
+    CheckingGate: "checking_gate",
+    CancelRequested: "cancel_requested",
+    Reconciling: "reconciling",
+    Waiting: "waiting",
+    Child: "child",
+    Succeeded: "succeeded",
+    Failed: "failed",
+    Cancelled: "cancelled",
+    Skipped: "skipped",
+};
+export const WorkflowFrameState = {
+    Active: "active",
+    Cancelling: "cancelling",
+    Succeeded: "succeeded",
+    Failed: "failed",
+    Cancelled: "cancelled",
 };
 export const EffectState = {
     Applied: "applied",
@@ -224,6 +242,108 @@ export const ExperimentTaskState = {
 };
 export const ProposalState = {
     PendingHostReview: "pending_host_review",
+};
+export const BatchPromptSelection = {
+    Builtin: "builtin",
+    Registered: "registered",
+};
+export const BatchRegistrationState = {
+    Complete: "complete",
+    Incomplete: "incomplete",
+    Rejected: "rejected",
+};
+export const BatchEntryRegistrationState = {
+    Pending: "pending",
+    JobRecorded: "job_recorded",
+    WorkflowConfirmed: "workflow_confirmed",
+    AdvancedExistingConfirmed: "advanced_existing_confirmed",
+    Unknown: "unknown",
+};
+export const BatchRegistrationPhase = {
+    Preflight: "preflight",
+    Collect: "collect",
+    Prepare: "prepare",
+    PersistPlan: "persist_plan",
+    RegisterJob: "register_job",
+    BindPersona: "bind_persona",
+    ConfirmWorkflow: "confirm_workflow",
+    PersistReceipt: "persist_receipt",
+};
+export const BatchRegistrationErrorCode = {
+    InvalidRequest: "invalid_request",
+    RequestConflict: "request_conflict",
+    FrozenBindingConflict: "frozen_binding_conflict",
+    FreshnessFailure: "freshness_failure",
+    FreshnessDrift: "freshness_drift",
+    OwnerProofUnavailable: "owner_proof_unavailable",
+    OwnerProofMismatch: "owner_proof_mismatch",
+    CurrentAttemptChanged: "current_attempt_changed",
+    DeadlineExceeded: "deadline_exceeded",
+    RegistrationFailure: "registration_failure",
+    ReceiptPersistenceFailure: "receipt_persistence_failure",
+};
+export const WorkflowLookupErrorCode = {
+    NotFound: "not_found",
+};
+export const WorkflowObservationErrorCode = {
+    Unavailable: "unavailable",
+    Mismatch: "mismatch",
+};
+export const NativeCaptureClass = {
+    Normal: "normal",
+    Cleanup: "cleanup",
+};
+export const NativeCaptureState = {
+    NotSpawned: "not_spawned",
+    Exited: "exited",
+    Signal: "signal",
+    Deadline: "deadline",
+    Overflow: "overflow",
+    Incomplete: "incomplete",
+};
+export const NativeFilesystemOperation = {
+    OpenWrite: "open_write",
+    CreateDirectory: "create_directory",
+    Write: "write",
+    Truncate: "truncate",
+    Sync: "sync",
+    Chmod: "chmod",
+    Rename: "rename",
+    HardLink: "hard_link",
+    Unlink: "unlink",
+    RemoveDirectory: "remove_directory",
+    Lock: "lock",
+    Unlock: "unlock",
+};
+export const NativeFilesystemResult = {
+    NotAttempted: "not_attempted",
+    Succeeded: "succeeded",
+    Failed: "failed",
+    Unknown: "unknown",
+};
+export const NativeFilesystemCompleteness = {
+    Complete: "complete",
+    Incomplete: "incomplete",
+};
+export const NativeFilesystemScope = {
+    Controller: "controller",
+    SelectedAttempt: "selected_attempt",
+    HistoricalRecovery: "historical_recovery",
+    CaptureTemporary: "capture_temporary",
+};
+export const NativeFilesystemCategory = {
+    Json: "json",
+    Prompt: "prompt",
+    Protocol: "protocol",
+    Stream: "stream",
+    PrivateConfiguration: "private_configuration",
+    Cache: "cache",
+    Launcher: "launcher",
+    Directory: "directory",
+};
+export const CheckedAcquireFailureCode = {
+    AdmissionConflict: "admission_conflict",
+    Unknown: "owner_acquire_unknown",
 };
 export const GoalEventKind = {
     Created: "goal_created",

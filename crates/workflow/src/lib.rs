@@ -1,16 +1,20 @@
 //! Adapter to tested workflow-cli 0.1.1 and 0.2.0 protocols. The external run store is the durable authority.
 //! Read-only workers and managed writes deliberately use separate protocols.
 use anyhow::{Context, Result, bail, ensure};
+use native_effects::fs::{self, OpenOptions};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
-    fs::{self, OpenOptions},
-    io::Write,
     path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+
+mod checked_acquire;
+mod observation;
+pub use checked_acquire::CheckedAcquireError;
+pub use observation::{ObservationError, RegistrationProof};
 
 static FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -267,6 +271,7 @@ impl Workflow {
     }
 
     pub fn release(&self, lease: &Value) -> Result<Value> {
+        let _cleanup = process::cleanup_scope();
         self.run(&["release".into(), self.db(), self.save("lease", lease)?])
     }
 
@@ -433,7 +438,7 @@ impl Workflow {
     }
 
     fn save(&self, kind: &str, value: &Value) -> Result<String> {
-        let bytes = serde_json::to_vec(value)?;
+        let bytes = fs::json_bytes(&self.work_dir.join("protocol/request.json"), value, false)?;
         let path = self
             .work_dir
             .join("protocol")
@@ -444,8 +449,14 @@ impl Workflow {
 
     fn persist_at(&self, path: &Path, value: &Value) -> Result<()> {
         let parent = path.parent().context("protocol path has no parent")?;
+        let prepared = fs::guarded()
+            .then(|| fs::json_bytes(path, value, false))
+            .transpose()?;
         fs::create_dir_all(parent)?;
-        let bytes = serde_json::to_vec(value)?;
+        let bytes = match prepared {
+            Some(v) => v,
+            None => serde_json::to_vec(value)?,
+        };
         if path.exists() {
             ensure!(
                 fs::read(path)? == bytes,
@@ -468,8 +479,8 @@ impl Workflow {
         }
         let result = (|| {
             let mut file = options.open(&temporary)?;
-            file.write_all(&bytes)?;
-            file.sync_all()?;
+            fs::write_all(&mut file, &temporary, &bytes)?;
+            fs::sync_all(&file, &temporary)?;
             // Publish only complete bytes; hard-link refuses to overwrite a concurrent publisher.
             match fs::hard_link(&temporary, path) {
                 Ok(()) => {}
@@ -482,9 +493,14 @@ impl Workflow {
                 }
                 Err(error) => return Err(error.into()),
             }
-            fs::File::open(parent)?.sync_all()?;
+            fs::sync_all(&fs::File::open(parent)?, parent)?;
             Ok(())
         })();
+        let _cleanup = (result.is_err()
+            || native_effects::ObserverContext::current()
+                .check_work()
+                .is_err())
+        .then(native_effects::cleanup_scope);
         let _ = fs::remove_file(&temporary);
         result
     }

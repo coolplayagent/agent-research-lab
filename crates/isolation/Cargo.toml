@@ -8,6 +8,7 @@ license.workspace = true
 name = "isolation"
 
 [dependencies]
+native_effects.workspace = true
 agent_policy.workspace = true
 anyhow.workspace = true
 libc.workspace = true

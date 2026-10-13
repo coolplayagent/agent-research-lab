@@ -50,6 +50,7 @@ isolation = { package = "lab-isolation", path = "crates/isolation" }
 knowledge = { package = "lab-knowledge", path = "crates/knowledge" }
 lease_heartbeat = { package = "lab-lease-heartbeat", path = "crates/lease-heartbeat" }
 multi_agent = { package = "lab-multi-agent", path = "crates/multi-agent" }
+native_effects = { package = "lab-native-effects", path = "crates/native-effects" }
 process = { package = "lab-process", path = "crates/process" }
 runtime = { package = "lab-runtime", path = "crates/runtime" }
 storage = { package = "lab-storage", path = "crates/storage" }

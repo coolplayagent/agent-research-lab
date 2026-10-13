@@ -145,6 +145,9 @@ fn execute(cli: Cli) -> Result<Value> {
                     &c,
                     storage::read(&input)?,
                 )?)?),
+                Commands::EnqueueBatch { input, max_seconds } => Ok(serde_json::to_value(
+                    runtime::batch::enqueue(&c, &input, max_seconds)?,
+                )?),
                 Commands::Seed => runtime::seed(&c),
                 Commands::Refresh => Ok(serde_json::to_value(crate::inputs::collect(&c)?)?),
                 Commands::Run {
@@ -155,7 +158,8 @@ fn execute(cli: Cli) -> Result<Value> {
                 } => {
                     runtime::run_scoped(&c, continuous, max_seconds, seed, task_ids_file.as_deref())
                 }
-                Commands::Status | Commands::Report => runtime::status(&c),
+                Commands::Status { summary: true } => runtime::status_summary(&c),
+                Commands::Status { summary: false } | Commands::Report => runtime::status(&c),
                 Commands::Pause => runtime::pause(&c, true),
                 Commands::Resume => runtime::pause(&c, false),
                 Commands::Retry { id } => runtime::retry(&c, &id),
@@ -211,7 +215,12 @@ pub fn run() {
             serde_json::to_string_pretty(&json!({"ok":true,"result":result})).unwrap()
         ),
         Err(e) => {
-            eprintln!("{}", json!({"ok":false,"error":format!("{e:#}")}));
+            let mut envelope = json!({"ok":false,"error":format!("{e:#}")});
+            if let Some(batch) = e.downcast_ref::<runtime::batch::Failure>() {
+                envelope["code"] = json!(batch.code);
+                envelope["registration"] = json!(batch.registration);
+            }
+            eprintln!("{envelope}");
             std::process::exit(1);
         }
     }

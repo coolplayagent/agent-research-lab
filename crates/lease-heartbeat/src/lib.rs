@@ -87,9 +87,11 @@ impl LeaseHeartbeat {
         let worker_journal = journal.clone();
         let worker_renew = Arc::clone(&renew);
         let renewal_worker = Arc::clone(&worker);
+        let capture_context = process::ObserverContext::current();
         let thread = thread::Builder::new()
             .name("workflow-lease".into())
             .spawn(move || {
+                let _capture_observer = capture_context.enter();
                 while matches!(
                     receive.recv_timeout(interval),
                     Err(mpsc::RecvTimeoutError::Timeout)
@@ -392,11 +394,13 @@ mod tests {
     fn renews_while_foreground_is_blocked_and_serializes_current_tokens() {
         let directory = tempfile::tempdir().unwrap();
         let w = Workflow::new("unused", directory.path().join("db"), directory.path());
-        let original = lease(300);
+        let ttl_ms = 3_000;
+        let original = lease(ttl_ms);
         let authority = Arc::new(Mutex::new(original.clone()));
         let calls = Arc::new(AtomicUsize::new(0));
         let remote = Arc::clone(&authority);
         let renew_calls = Arc::clone(&calls);
+        let (renewed, notifications) = mpsc::channel();
         let mut heartbeat = LeaseHeartbeat::start_with(
             original.clone(),
             journal_path(&w, &original).unwrap(),
@@ -409,15 +413,30 @@ mod tests {
                 );
                 current["expires_at_unix_ms"] = json!(workflow::now_ms()? + ttl);
                 renew_calls.fetch_add(1, Ordering::SeqCst);
+                renewed.send(()).context("foreground notification closed")?;
                 Ok(current.clone())
             }),
-            300,
+            ttl_ms,
             Duration::from_millis(30),
-            Duration::from_millis(30),
+            Duration::from_millis(300),
         )
         .unwrap();
-        // Several lease lifetimes elapse while the foreground does no polling.
-        thread::sleep(Duration::from_millis(750));
+        // Observe renewal notifications instead of assuming a short sleep schedules
+        // the background thread. Keep real expiry checks, with room for CI I/O.
+        let notification_deadline = Instant::now() + Duration::from_secs(10);
+        for _ in 0..3 {
+            notifications
+                .recv_timeout(notification_deadline.saturating_duration_since(Instant::now()))
+                .expect("background renewal must progress without foreground polling");
+        }
+        // The original authority expires while the foreground makes no lease calls.
+        thread::sleep(Duration::from_millis(
+            expiry(&original)
+                .unwrap()
+                .saturating_sub(workflow::now_ms().unwrap())
+                + 100,
+        ));
+        assert!(expiry(&original).unwrap() < workflow::now_ms().unwrap());
         assert!(calls.load(Ordering::SeqCst) >= 3);
         heartbeat
             .with_lease(|token| {

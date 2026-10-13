@@ -28,6 +28,8 @@ bazel-bin/agent-research-lab serve-link --state-dir /absolute/private/ai-im
 
 [多 Agent 协调](MULTI_AGENT.md)提供宿主控制的共享提案板、按主题选择上下文、配额和恢复机制；消息不会自动触发任务创建。普通执行最多并发 8 个 Agent。内置 1,000 / 10,000 参与者模拟验证有界单元和按需拉取摘要的路由，不会启动同等数量的模型进程，也不代表研究质量提升。
 
+研究调度器在没有活动或保留启动记录的空闲窗口，先准备任务选择范围内的下一批任务，再逐个领取执行租约。批次受并发上限、依赖、研究版本和探索轨道约束；失败的工具准备不占执行名额。桌面依赖与任务私有构建缓存的串行准备可能延迟首个任务启动，准备耗时计入既有运行与每日预算，启动前仍复核版本、暂停和剩余时限。
+
 研究知识归属现有私有 [SuperPOD 仓库](https://github.com/stevetdp/superpod)。访问本公开项目不会获得 SuperPOD 权限。本仓库保存研究软件、提示词和合成测试夹具；私有知识、凭证和实验原始记录不进入 Git。
 
 经审查、可公开分享的经验与假设保存在 [research/insights.md](research/insights.md)。新任务从项目远程默认分支的当前提交读取该文件，并冻结内容摘要。每条记录保留证据、版本限制、反例和下一步实验；详细知识及来源归档继续留在 SuperPOD。
@@ -183,8 +185,11 @@ bazel-bin/agent-research-lab --config local.toml serve-link
 bazel-bin/agent-research-lab --config local.toml enqueue examples/task.json
 bazel-bin/agent-research-lab --config local.toml run --max-seconds 900
 bazel-bin/agent-research-lab --config local.toml status
+bazel-bin/agent-research-lab --config local.toml status --summary
 bazel-bin/agent-research-lab --config local.toml report
 ```
+
+`status --summary` 适合重复监控，仅返回 `paused`、`budget`、按同一控制器规则分类的 `summary`、`total_jobs` 和 `details_included: false`，不包含逐任务详情、提示词或工作流回执。观察仍按任务顺序读取，并非原子快照；需要诊断详情时使用 `status` 或 `report`。
 
 `enqueue` 将任务 ID 绑定到输入、源码提交、SuperPOD 提交、提示词和配置；相同 ID 不能绑定不同输入。每个任务使用隔离工作树，依赖接收校验过的完成报告。默认 `write: false`。`required_tools` 声明准入依赖，也适用于后续提案；`use_memory` 启用任务局部 relay-memory，保留有界检查点和不可变回执引用。完整源码/技能快照留在私有回执中。`prompt_version` 显式选择已注册提示词。
 
@@ -330,3 +335,48 @@ bazel-bin/agent-research-lab crystal-bench --state /private/new-hot-run \
 报告区分策略自身表现和后代汇总表现，对重组谱系共享后代去重，未完成工作也计入预算。验证/保留集观测、变化绑定和重复试验会被拒绝。这是受 HGM 启发的谱系诊断，不是 HGM Thompson sampling 调度器复现。候选激活继续受评估、保留集隔离、晋级、发布和安装门禁约束；策略分支不会创建新数字人身份或共享可变实验记忆。
 
 聊天沿用数字人笑脸头像，群聊、成员列表与水晶球使用一致的身份标识。消息展示昵称、时间、气泡和可定位的引用回复；正文不会重复显示发言者自称，历史原文与研究证据保持完整。
+
+## Bounded batch registration
+
+`agent-research-lab --config local.toml enqueue-batch request.json --max-seconds 300`
+registers an ordered batch of 1..32 ordinary native Tasks. The request is
+`{"schema_version":1,"batch_id":"owned-batch","tasks":[...]}` and must be a
+regular JSON file at most 1 MiB. Dependencies must already exist or precede the
+Task in the batch. Latest-baseline mode is required.
+
+Each invocation collects fresh inputs once. A private immutable plan under
+`state_dir/private/enqueue-batches/<batch_id>/plan.json` freezes Task selections,
+persona memory, configuration and complete source/skill/knowledge inputs before
+registration effects. Replay uses the same canonical request and frozen choices;
+it still performs one fresh collection and rejects real binding drift. Only
+repository/skill acquisition timestamps are excluded from identity comparison.
+The actual serialized plan is limited to 16 MiB.
+
+Registration holds the batch lock and one native enqueue lock. All existing
+bindings and interrupted worktrees are checked before the first new registration.
+A failure retains partial native state and returns a nonzero structured response
+with `code` and `registration`; the private receipt distinguishes a recorded Job
+from confirmed workflow registration. If receipt persistence fails, the returned
+observation has `receipt_persisted:false`. Retry the same request after diagnosing
+the failure; no automatic retry, rollback or Job overwrite is performed.
+New workflow bundles are submitted during registration, so an owner rejection
+can leave a registered prefix even after native Task and binding preflight passes.
+
+Existing current attempts are confirmed through owner `verify`, `history-at` and
+pure `kernel check`. Confirmation never repairs an advanced/live attempt, resets
+it to attempt 1, acquires a lease or starts a worker. A missing or unsupported
+owner proof remains incomplete. Complete registration does not mean Task success;
+a confirmed owner run may still be running, failed or cancelled. Concurrent
+controllers may observe the registered prefix; this is not atomic cohort admission.
+
+The 1..600 second allowance is shared across acquisition, preparation and native
+calls. Checkpoints stop later effects, while synchronous hashing/filesystem sync
+cannot be preempted by the in-process deadline. Ordinary `enqueue`, collaboration,
+seed and run admission retain their existing behavior.
+
+The real-owner regressions are explicit opt-in Bazel tests. Set `LAB_WORKFLOW_BIN`
+to the tested CLI 0.2.0 runtime and run `//crates/runtime:tests` with
+`--test_arg=batch::tests --test_arg=--ignored`. The separate
+`//app:enqueue_batch_cli_tests` also requires `LAB_CLI_BIN`; it exercises the real
+CLI and freshness collector using isolated GitHub/fetch acquisition fixtures.
+These tests create only owned temporary stores and never run models.

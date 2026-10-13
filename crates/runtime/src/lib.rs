@@ -2,17 +2,20 @@ use anyhow::{Context, Result, bail, ensure};
 use budget::Budget;
 use config::{Config, safe_id};
 use contracts::{ControllerPhase, ExecutionState, FollowupState, WorkflowNodeState, WorkflowState};
+use native_effects::fs;
 use process::{self, Process};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs,
     path::{Path, PathBuf},
     time::Duration,
 };
 use workflow::Workflow;
+pub mod admission;
+pub mod batch;
 pub mod people;
+mod registration;
 mod watch;
 
 use multi_agent::TeamMembership;
@@ -131,136 +134,8 @@ pub fn enqueue_with_inputs(
         ensure_started(c, &prior)?;
         return Ok(prior);
     }
-    let persona = people::freeze(c, &task)?;
-    let preference = persona.as_ref().and_then(|p| p.execution.as_ref());
-    let backend =
-        agent_backend::freeze_selected(c, &task, preference.and_then(|p| p.backend.as_deref()))?;
-    let model = preference
-        .and_then(|p| p.model.clone())
-        .unwrap_or_else(|| c.models[&task.role].clone());
-    agent_backend::validate_model(
-        c,
-        backend.as_ref().map_or("codex", |b| b.id.as_str()),
-        &model,
-    )?;
-    let repository = if task.repository == "superpod" {
-        c.superpod.clone()
-    } else if task.repository == "agent-research-lab" {
-        c.workspace.join("agent-research-lab")
-    } else {
-        c.tools
-            .get(&task.repository)
-            .context("repository not allowlisted")?
-            .repository
-            .clone()
-    };
-    let mut commit = if let Some(inputs) = &inputs {
-        inputs
-            .repositories
-            .get(&task.repository)
-            .context("missing latest repository snapshot")?
-            .upstream
-            .commit
-            .clone()
-    } else {
-        git(&repository, &["rev-parse", "HEAD"])?
-    };
-    let mut baseline_commit = None;
-    if task.role == "review" {
-        for id in &task.dependencies {
-            let parent: Job = storage::read(&job_path(c, id))?;
-            if parent.task.write && parent.task.repository == task.repository {
-                ensure!(
-                    !persona
-                        .as_ref()
-                        .zip(parent.persona.as_ref())
-                        .is_some_and(|(reviewer, author)| reviewer.id == author.id),
-                    "independent review requires a different digital person from the implementation author"
-                );
-                if let Some(inputs) = &inputs {
-                    ensure!(
-                        parent.source_commit
-                            == inputs.repositories[&task.repository].upstream.commit,
-                        "candidate baseline is no longer the latest default branch; rerun implementation"
-                    );
-                }
-                let receipt = committed_receipt(c, &workflow(c), &parent)?;
-                let candidate = receipt["candidate"]["candidate_commit"]
-                    .as_str()
-                    .context("implementation has no frozen candidate commit")?;
-                ensure!(
-                    candidate.len() == 40 && candidate.bytes().all(|b| b.is_ascii_hexdigit()),
-                    "invalid candidate commit"
-                );
-                if baseline_commit.is_some() {
-                    ensure!(
-                        commit == candidate,
-                        "review cannot combine different candidate commits"
-                    );
-                }
-                git(
-                    &repository,
-                    &["cat-file", "-e", &format!("{candidate}^{{commit}}")],
-                )?;
-                commit = candidate.into();
-                baseline_commit = Some(parent.source_commit.clone());
-            }
-        }
-    }
-    let superpod_commit = if let Some(inputs) = &inputs {
-        inputs.repositories["superpod"].upstream.commit.clone()
-    } else {
-        git(&c.superpod, &["rev-parse", "HEAD"])?
-    };
-    let worktree = c.state_dir.join("worktrees").join(&task.id);
-    fs::create_dir_all(worktree.parent().unwrap())?;
-    if worktree.exists() {
-        ensure!(
-            git(&worktree, &["rev-parse", "HEAD"])? == commit,
-            "interrupted worktree has different base"
-        );
-    } else {
-        git(
-            &repository,
-            &[
-                "worktree",
-                "add",
-                "--detach",
-                worktree.to_str().context("UTF8 path")?,
-                &commit,
-            ],
-        )?;
-    }
-    let prompt_digest = storage::digest(
-        format!(
-            "{}{}",
-            rendered_experiment_prompt(c, &task, inputs.as_ref())?,
-            people::prompt(persona.as_ref())?
-        )
-        .as_bytes(),
-    );
-    let job = Job {
-        persona,
-        model,
-        backend,
-        source_commit: commit,
-        baseline_commit,
-        research_inputs: inputs,
-        superpod_commit,
-        prompt_digest,
-        config_digest: storage::digest(&serde_json::to_vec(c)?),
-        worktree,
-        run_id: format!("{}-attempt-1", task.id),
-        attempt: 1,
-        last_error: None,
-        launch: None,
-        retry_after: None,
-        task,
-    };
-    storage::write(&destination, &job)?;
-    people::bind(c, &job)?;
-    ensure_started(c, &job)?;
-    Ok(job)
+    let prepared = registration::prepare(c, task, inputs.as_ref())?;
+    registration::register(c, &prepared, inputs, |_, _| Ok(()))
 }
 
 fn frozen_input(job: &Job) -> Value {
@@ -506,7 +381,7 @@ fn seed_inputs(c: &Config) -> Result<Value> {
     Ok(json!({"queued":ids}))
 }
 
-fn rendered_task_prompt(c: &Config, task: &Task) -> Result<String> {
+fn role_prompt(c: &Config, task: &Task) -> Result<String> {
     let role = if let Some(version) = &task.prompt_version {
         let prompt = evolution_cli::resolve_registered_prompt(
             &c.state_dir.join("evolution/prompts.json"),
@@ -523,6 +398,11 @@ fn rendered_task_prompt(c: &Config, task: &Task) -> Result<String> {
         }
         .to_owned()
     };
+    Ok(role)
+}
+
+fn rendered_task_prompt(c: &Config, task: &Task) -> Result<String> {
+    let role = role_prompt(c, task)?;
     let mut prompt = format!(
         "{role}\n{}\n\n{}\n",
         task.prompt,
@@ -853,20 +733,59 @@ pub fn status(c: &Config) -> Result<Value> {
     status_for_jobs(c, &all_jobs)
 }
 
+/// Aggregate the same controller states without retaining workflow receipts.
+pub fn status_summary(c: &Config) -> Result<Value> {
+    let all_jobs = jobs(c)?;
+    observe_status(c, &all_jobs, false)
+}
+
+struct WorkflowStatusObservation {
+    state: Option<WorkflowState>,
+    paused: bool,
+    task_state: Option<WorkflowNodeState>,
+}
+
+impl WorkflowStatusObservation {
+    fn from_value(value: &Value) -> Self {
+        Self {
+            state: WorkflowState::from_value(&value["status"]),
+            paused: value.get("pause").is_some_and(|v| !v.is_null()),
+            task_state: WorkflowNodeState::from_value(
+                &value["frames"]["1"]["nodes"]["task"]["state"]["state"],
+            ),
+        }
+    }
+}
+
 /// Observe a caller-bounded job selection using the same controller state rules.
 /// Missing dependencies remain explicit; callers must label incomplete selections.
 pub fn status_for_jobs(c: &Config, all_jobs: &[Job]) -> Result<Value> {
+    observe_status(c, all_jobs, true)
+}
+
+fn observe_status(c: &Config, all_jobs: &[Job], details: bool) -> Result<Value> {
     let w = workflow(c);
     let indexed: BTreeMap<_, _> = all_jobs.iter().map(|j| (j.task.id.clone(), j)).collect();
     let mut states = BTreeMap::new();
+    let mut workflow_details = BTreeMap::new();
     let mut errors = BTreeMap::new();
     for job in all_jobs {
         match w.status(&job.run_id) {
             Ok(state) => {
-                states.insert(job.task.id.clone(), state);
+                states.insert(
+                    job.task.id.clone(),
+                    WorkflowStatusObservation::from_value(&state),
+                );
+                // Summary observation drops each raw response here, before reading
+                // the next workflow; only classification inputs cross iterations.
+                if details {
+                    workflow_details.insert(job.task.id.clone(), state);
+                }
             }
             Err(error) => {
-                errors.insert(job.task.id.clone(), error.to_string());
+                if details {
+                    errors.insert(job.task.id.clone(), error.to_string());
+                }
             }
         }
     }
@@ -877,6 +796,9 @@ pub fn status_for_jobs(c: &Config, all_jobs: &[Job]) -> Result<Value> {
         let (state, reason) =
             controller_state(job, &indexed, &states, paused, &mut BTreeSet::new());
         *summary.entry(state).or_default() += 1;
+        if !details {
+            continue;
+        }
         let postprocessing = if post_success_path(c, job).exists() {
             match storage::read::<PostSuccess>(&post_success_path(c, job)) {
                 Ok(record) => {
@@ -891,8 +813,8 @@ pub fn status_for_jobs(c: &Config, all_jobs: &[Job]) -> Result<Value> {
         };
         result.push(json!({"id":job.task.id,"run_id":job.run_id,"model":job.model,
             "source_commit":job.source_commit,"superpod_commit":job.superpod_commit,
-            "state":state,"reason":reason,"workflow_state":states.get(&job.task.id).map(|s| &s["status"]),
-            "status":states.get(&job.task.id),"error":errors.get(&job.task.id),
+            "state":state,"reason":reason,"workflow_state":workflow_details.get(&job.task.id).map(|s| &s["status"]),
+            "status":workflow_details.get(&job.task.id),"error":errors.get(&job.task.id),
             "last_error":job.last_error,"postprocessing":postprocessing}));
     }
     let ledger_path = c.state_dir.join("budget.json");
@@ -901,7 +823,13 @@ pub fn status_for_jobs(c: &Config, all_jobs: &[Job]) -> Result<Value> {
     } else {
         json!({})
     };
-    Ok(json!({"paused":paused,"summary":summary,"jobs":result,"budget":ledger}))
+    if details {
+        Ok(json!({"paused":paused,"summary":summary,"jobs":result,"budget":ledger}))
+    } else {
+        Ok(
+            json!({"paused":paused,"summary":summary,"total_jobs":all_jobs.len(),"details_included":false,"budget":ledger}),
+        )
+    }
 }
 
 /// Workflow `running` also includes task_ready. Only a matching retained live
@@ -909,7 +837,7 @@ pub fn status_for_jobs(c: &Config, all_jobs: &[Job]) -> Result<Value> {
 fn controller_state(
     job: &Job,
     indexed: &BTreeMap<String, &Job>,
-    states: &BTreeMap<String, Value>,
+    states: &BTreeMap<String, WorkflowStatusObservation>,
     paused: bool,
     visiting: &mut BTreeSet<String>,
 ) -> (ExecutionState, Option<String>) {
@@ -926,13 +854,13 @@ fn controller_state(
                 Some("workflow status unavailable; inspect error".into()),
             );
         };
-        if WorkflowState::from_value(&workflow["status"]).is_none() {
+        if workflow.state.is_none() {
             return (
                 ExecutionState::Unknown,
                 Some("unrecognized workflow state".into()),
             );
         }
-        if WorkflowState::from_value(&workflow["status"]) == Some(WorkflowState::Succeeded) {
+        if workflow.state == Some(WorkflowState::Succeeded) {
             return (ExecutionState::Succeeded, None);
         }
         if let Some(launch) = &job.launch {
@@ -955,15 +883,15 @@ fn controller_state(
         if let Some(error) = &job.last_error {
             return (ExecutionState::Blocked, Some(error.clone()));
         }
-        if WorkflowState::from_value(&workflow["status"]) == Some(WorkflowState::Failed)
-            || WorkflowState::from_value(&workflow["status"]) == Some(WorkflowState::Cancelled)
+        if workflow.state == Some(WorkflowState::Failed)
+            || workflow.state == Some(WorkflowState::Cancelled)
         {
             return (
                 ExecutionState::Failed,
                 Some("workflow ended without a successful receipt".into()),
             );
         }
-        if workflow.get("pause").is_some_and(|v| !v.is_null()) {
+        if workflow.paused {
             return (ExecutionState::Paused, Some("workflow is paused".into()));
         }
         let mut waiting = vec![];
@@ -1007,10 +935,7 @@ fn controller_state(
                 Some("controller admission is paused".into()),
             );
         }
-        if WorkflowNodeState::from_value(
-            &workflow["frames"]["1"]["nodes"]["task"]["state"]["state"],
-        ) == Some(WorkflowNodeState::TaskReady)
-        {
+        if workflow.task_state == Some(WorkflowNodeState::TaskReady) {
             return (ExecutionState::Ready, None);
         }
         (
@@ -1154,6 +1079,7 @@ pub fn seed(c: &Config) -> Result<Value> {
 
 struct Active {
     job: Job,
+    job_writes: admission::JobWrites,
     process: Process,
     heartbeat: lease_heartbeat::LeaseHeartbeat,
 }
@@ -1262,6 +1188,72 @@ pub fn run_scoped(
     seed_requested: bool,
     task_ids_file: Option<&Path>,
 ) -> Result<Value> {
+    run_scoped_impl(
+        c,
+        continuous,
+        max_seconds,
+        seed_requested,
+        task_ids_file,
+        None,
+    )
+}
+
+pub fn run_scoped_with_admission(
+    c: &Config,
+    max_seconds: u64,
+    task_ids_file: &Path,
+    hook: &mut dyn admission::ScopedAdmissionHook,
+    capture_observer: std::sync::Arc<dyn process::CaptureObserver>,
+) -> Result<Value> {
+    let _observer = process::observer_scope(capture_observer);
+    run_scoped_impl(
+        c,
+        false,
+        max_seconds,
+        false,
+        Some(task_ids_file),
+        Some(hook),
+    )
+}
+
+/// The runtime owns the one finalization, after its lock, watch and worker guards drop.
+pub struct ObservedRun {
+    pub result: Result<Value>,
+    pub filesystem: Result<contracts::NativeFilesystemReport>,
+}
+
+/// The caller prepares both observer domains before entering this function.
+/// A session is live source-owned authority, not a deserializable success flag.
+pub fn run_scoped_with_observations(
+    c: &Config,
+    max_seconds: u64,
+    task_ids_file: &Path,
+    hook: &mut dyn admission::ScopedAdmissionHook,
+    session: native_effects::NativeObservationSession,
+) -> ObservedRun {
+    let result = (|| {
+        let _effects = native_effects::observation_scope(&session)?;
+        run_scoped_impl(
+            c,
+            false,
+            max_seconds,
+            false,
+            Some(task_ids_file),
+            Some(hook),
+        )
+    })();
+    let filesystem = session.finish();
+    ObservedRun { result, filesystem }
+}
+
+fn run_scoped_impl(
+    c: &Config,
+    continuous: bool,
+    max_seconds: u64,
+    seed_requested: bool,
+    task_ids_file: Option<&Path>,
+    mut admission_hook: Option<&mut dyn admission::ScopedAdmissionHook>,
+) -> Result<Value> {
     c.validate()?;
     ensure!(
         task_ids_file.is_none() || (!continuous && !seed_requested && max_seconds > 0),
@@ -1273,6 +1265,13 @@ pub fn run_scoped(
         max_seconds,
     };
     let _lock = storage::lock(&c.state_dir.join("controller.lock"))?;
+    if let Some(hook) = admission_hook.as_deref_mut() {
+        hook.register_cleanup_domain(
+            c,
+            task_ids_file.context("guarded admission requires an explicit task scope")?,
+            max_seconds,
+        )?;
+    }
     let mut observer = watch::Controller::start(c)?;
     kill_retained_workers(c)?;
     let scope = task_ids_file
@@ -1325,6 +1324,8 @@ pub fn run_scoped(
     let mut next_desktop_prepare = 0_i64;
     let mut next_build_prepare = BTreeMap::<String, i64>::new();
     let mut active: Vec<Active> = vec![];
+    let mut proof_prepared = false;
+    let mut guarded_admission_failed = false;
     loop {
         let time = now();
         observer.record(
@@ -1351,7 +1352,11 @@ pub fn run_scoped(
         storage::write(&ledger_path, &ledger)?;
         let stopping = (max_seconds > 0 && time - start >= max_seconds.min(i64::MAX as u64) as i64)
             || c.state_dir.join("paused").exists()
-            || ledger.budget.remaining(time, c.daily_seconds) == 0;
+            || ledger.budget.remaining(time, c.daily_seconds) == 0
+            || guarded_admission_failed
+            || admission_hook
+                .as_deref()
+                .is_some_and(|hook| hook.should_stop());
         if !stopping && !active.is_empty() && time >= next_communication_poll {
             let members = active
                 .iter()
@@ -1389,8 +1394,17 @@ pub fn run_scoped(
                 polled = Err(anyhow::anyhow!("lease heartbeat failed: {error}"));
             }
             if stopping || !matches!(polled, Ok(None)) {
+                let _cleanup = process::cleanup_scope();
                 let mut a = active.remove(i);
                 a.heartbeat.disarm_worker();
+                if let Err(drift) = a.job_writes.confirm(c) {
+                    if let Some(hook) = admission_hook.as_deref_mut() {
+                        hook.revoke(&format!("guarded active Job changed: {drift:#}"));
+                    }
+                    let lease = a.heartbeat.stop()?;
+                    let _ = w.release(&lease);
+                    return Err(drift);
+                }
                 let observation = ExitObservation {
                     success: matches!(&polled,Ok(Some(status)) if status.success()) && !stopping,
                     code: match &polled {
@@ -1431,12 +1445,18 @@ pub fn run_scoped(
                             a.job.retry_after = None;
                             queue_post_success(c, &w, &a.job)?;
                         } else {
-                            defer_read_retry(
-                                &mut a.job,
-                                observation.reason.clone().unwrap_or_else(|| {
-                                    format!("worker exited {:?}", observation.code)
-                                }),
-                            );
+                            let reason = observation
+                                .reason
+                                .clone()
+                                .unwrap_or_else(|| format!("worker exited {:?}", observation.code));
+                            if let Some(hook) = admission_hook.as_deref_mut() {
+                                hook.revoke(&format!("guarded worker failed: {reason}"));
+                                guarded_admission_failed = true;
+                                a.job.last_error = Some(reason);
+                                a.job.retry_after = None;
+                            } else {
+                                defer_read_retry(&mut a.job, reason);
+                            }
                         }
                     }
                     Err(error) => {
@@ -1453,7 +1473,7 @@ pub fn run_scoped(
                 }
                 let released = w.release(&launch.lease);
                 if let Err(error) = released {
-                    if a.job.launch.is_some() {
+                    if a.job.launch.is_some() || admission_hook.is_some() {
                         a.job.last_error = Some(format!(
                             "settlement/lease reconciliation required: {error:#}"
                         ));
@@ -1464,7 +1484,14 @@ pub fn run_scoped(
                         )?;
                     }
                 }
-                storage::write(&job_path(c, &a.job.task.id), &a.job)?;
+                if admission_hook.is_some() && a.job.last_error.is_some() {
+                    a.job.retry_after = None;
+                    guarded_admission_failed = true;
+                    if let Some(hook) = admission_hook.as_deref_mut() {
+                        hook.revoke("guarded settlement requires reconciliation");
+                    }
+                }
+                a.job_writes.persist(c, &a.job)?;
                 continue;
             }
             i += 1;
@@ -1526,6 +1553,7 @@ pub fn run_scoped(
             .map(|a| a.job.task.exploratory)
             .unwrap_or(prefer_exploration);
         let mut pending = jobs(c)?;
+        let may_admit = active.is_empty() && pending.iter().all(|job| job.launch.is_none());
         pending.retain(|job| {
             scope
                 .as_ref()
@@ -1534,60 +1562,70 @@ pub fn run_scoped(
         pending.sort_by_key(|j| j.task.exploratory != track);
         let mut admitted = false;
         let mut retry_waiting = false;
-        // Remote checks can be slow. Verify only with no active leases, then
-        // admit one bounded cohort as a batch; never block a running heartbeat.
-        let may_admit = active.is_empty();
+        // Finish the selected cohort's prerequisites before the first lease.
+        // A failed prerequisite takes no capacity; later ready peers can join.
+        let mut prepared: Vec<Job> = Vec::new();
+        let mut deferred_admission = false;
         let mut checked_cohort: Option<String> = None;
+        let admission_deadline =
+            process::deadline_scope(Duration::from_secs(window.remaining(c, &ledger)));
         for mut job in pending {
+            let mut pending_writes = admission::JobWrites::new(&job, admission_hook.is_some());
             if !may_admit {
                 break;
             }
-            if active.len() >= c.max_agents {
+            if prepared.len() >= c.max_agents {
+                deferred_admission = true;
                 break;
             }
-            if !active.is_empty() && job.task.exploratory != active[0].job.task.exploratory {
-                continue;
+            if window.remaining(c, &ledger) == 0 {
+                break;
             }
             if job.launch.is_some() {
                 continue;
             }
-            // Sandbox verification executes a bounded sequence of real host
-            // commands. Do it in an idle window, before consuming a retry or
-            // claiming a write effect under a peer's 10-second allowance.
-            if !active.is_empty()
-                && job
-                    .task
-                    .required_tools
-                    .iter()
-                    .any(|name| name == "repo-sandbox")
-            {
+            // Sandbox verification stays in launch, with no earlier peer.
+            // Do not reorder it ahead of an already selected ordinary task.
+            if prepared.first().is_some_and(|first| {
+                job.task.exploratory != first.task.exploratory
+                    || job
+                        .task
+                        .required_tools
+                        .iter()
+                        .any(|name| name == "repo-sandbox")
+            }) {
+                deferred_admission = true;
                 continue;
             }
             if let Some(due) = job.retry_after {
+                ensure!(
+                    admission_hook.is_none(),
+                    "guarded admission cannot automatically retry an earlier attempt"
+                );
                 retry_waiting = true;
                 if due > time {
                     continue;
                 }
-                prepare_retry(c, &mut job)?;
+                if prepare_prerequisite(c, &mut ledger, window, false, || {
+                    prepare_retry(c, &mut job)
+                })?
+                .is_none()
+                {
+                    break;
+                }
+                last = now();
             }
             if job.last_error.is_some() {
                 continue;
             }
-            let s = w.status(&job.run_id)?;
-            if WorkflowState::from_value(&s["status"]) != Some(WorkflowState::Running)
-                || s.get("pause").is_some_and(|v| !v.is_null())
-            {
-                continue;
-            }
-            if job.task.dependencies.iter().any(|id| {
-                storage::read::<Job>(&job_path(c, id))
-                    .and_then(|j| w.status(&j.run_id))
-                    .map(|s| {
-                        WorkflowState::from_value(&s["status"]) != Some(WorkflowState::Succeeded)
-                    })
-                    .unwrap_or(true)
-            }) {
-                continue;
+            let eligible = prepare_prerequisite(c, &mut ledger, window, false, || {
+                admission_ready(c, &w, &job)
+            })?;
+            last = now();
+            match eligible {
+                Some(true) => {}
+                Some(false) => continue,
+                None => break,
             }
             let cohort = job
                 .research_inputs
@@ -1596,10 +1634,11 @@ pub fn run_scoped(
                 .unwrap_or_default();
             if let Some(checked) = &checked_cohort {
                 if checked != &cohort {
+                    deferred_admission = true;
                     continue;
                 }
             } else {
-                let checked = idle_host(c, &mut ledger, window, || {
+                let checked = prepare_prerequisite(c, &mut ledger, window, false, || {
                     let _deadline = process::deadline_scope(Duration::from_secs(60));
                     inputs::verify(c, job.research_inputs.as_ref())
                 });
@@ -1612,7 +1651,7 @@ pub fn run_scoped(
                         "latest-baseline admission blocked; preserve this experiment and enqueue a fresh cohort: {error:#}"
                     ));
                     job.retry_after = None;
-                    storage::write(&job_path(c, &job.task.id), &job)?;
+                    pending_writes.persist(c, &job)?;
                     continue;
                 }
                 checked_cohort = Some(cohort);
@@ -1626,7 +1665,8 @@ pub fn run_scoped(
             {
                 // Cold preparation may download dependencies for up to 55 s.
                 // Never run it under the 10 s allowance of an active cohort.
-                if !active.is_empty() || now() < next_desktop_prepare {
+                retry_waiting = true;
+                if now() < next_desktop_prepare {
                     continue;
                 }
                 let prepared =
@@ -1666,9 +1706,6 @@ pub fn run_scoped(
             {
                 // Dependency copies can be large. Prepare only in an idle,
                 // accounted host window, before acquiring/claiming any effect.
-                if !active.is_empty() {
-                    continue;
-                }
                 retry_waiting = true;
                 if next_build_prepare
                     .get(&job.run_id)
@@ -1693,33 +1730,30 @@ pub fn run_scoped(
                         job.last_error = Some(format!(
                             "build cache preparation failed before claim: {error:#}"
                         ));
-                        storage::write(&job_path(c, &job.task.id), &job)?;
+                        pending_writes.persist(c, &job)?;
                         continue;
                     }
                 }
             }
-            let availability =
-                prepare_prerequisite(c, &mut ledger, window, !active.is_empty(), || {
-                    // DesktopSession verifies the cached dependency manifest in
-                    // each worker. Availability probing never downloads packages.
-                    job.task.required_tools.iter().try_for_each(|name| {
-                        let t = c
-                            .tools
-                            .get(name)
-                            .context("required tool no longer configured")?;
-                        let out = process::capture(
-                            t.binary.to_str().context("non-UTF8 tool path")?,
-                            &t.probe,
-                            &c.workspace,
-                            Duration::from_secs(15),
-                        )?;
-                        ensure!(out.status.success(), "required tool {name} unavailable");
-                        Ok::<_, anyhow::Error>(())
-                    })
-                });
-            if active.is_empty() {
-                last = now();
-            }
+            let availability = prepare_prerequisite(c, &mut ledger, window, false, || {
+                // DesktopSession verifies the cached dependency manifest in
+                // each worker. Availability probing never downloads packages.
+                job.task.required_tools.iter().try_for_each(|name| {
+                    let t = c
+                        .tools
+                        .get(name)
+                        .context("required tool no longer configured")?;
+                    let out = process::capture(
+                        t.binary.to_str().context("non-UTF8 tool path")?,
+                        &t.probe,
+                        &c.workspace,
+                        Duration::from_secs(15),
+                    )?;
+                    ensure!(out.status.success(), "required tool {name} unavailable");
+                    Ok::<_, anyhow::Error>(())
+                })
+            });
+            last = now();
             if matches!(availability, Ok(None)) {
                 break;
             }
@@ -1727,16 +1761,99 @@ pub fn run_scoped(
                 // Missing bindings block this task until explicit retry/config repair.
                 job.last_error = Some(error.to_string());
                 job.retry_after = None;
-                storage::write(&job_path(c, &job.task.id), &job)?;
+                pending_writes.persist(c, &job)?;
                 continue;
+            }
+            prepared.push(job);
+        }
+        // Preparation and probes can be slow even when caches are warm. Check
+        // latest inputs again while still lease-free, then retain local launch
+        // checks for every task's frozen bytes, prompt, config and dependencies.
+        if let Some(first) = prepared.first() {
+            let checked = prepare_prerequisite(c, &mut ledger, window, false, || {
+                inputs::verify(c, first.research_inputs.as_ref())
+            });
+            last = now();
+            match checked {
+                Ok(Some(())) => {}
+                Ok(None) => prepared.clear(),
+                Err(error) => {
+                    for job in &mut prepared {
+                        let mut writes = admission::JobWrites::new(job, admission_hook.is_some());
+                        job.last_error = Some(format!(
+                            "latest-baseline admission blocked; preserve this experiment and enqueue a fresh cohort: {error:#}"
+                        ));
+                        job.retry_after = None;
+                        writes.persist(c, job)?;
+                    }
+                    prepared.clear();
+                }
+            }
+        }
+        if !prepared.is_empty()
+            && !proof_prepared
+            && let Some(hook) = admission_hook.as_deref_mut()
+        {
+            if let Err(error) = hook.prepare(c, &prepared) {
+                hook.revoke(&format!("guarded proof failed: {error:#}"));
+                return Err(error);
+            }
+            proof_prepared = true;
+        }
+        for mut job in prepared {
+            if guarded_admission_failed
+                || admission_hook
+                    .as_deref()
+                    .is_some_and(|hook| hook.should_stop())
+            {
+                break;
+            }
+            if active.len() >= c.max_agents {
+                break;
+            }
+            if active.first().is_some_and(|first| {
+                job.task.exploratory != first.job.task.exploratory
+                    || job
+                        .task
+                        .required_tools
+                        .iter()
+                        .any(|name| name == "repo-sandbox")
+            }) {
+                deferred_admission = true;
+                continue;
+            }
+            let eligible =
+                prepare_prerequisite(c, &mut ledger, window, !active.is_empty(), || {
+                    admission_ready(c, &w, &job)
+                })?;
+            if active.is_empty() {
+                last = now();
+            }
+            match eligible {
+                Some(true) => {}
+                Some(false) => continue,
+                None => break,
             }
             ledger.budget.tick(now(), !active.is_empty())?;
             let bounded_remaining = window.remaining(c, &ledger);
             if bounded_remaining == 0 {
                 break;
             }
+            let guarded = admission_hook.is_some();
+            let mut job_writes = admission::JobWrites::new(&job, guarded);
             let launched = prepare_host(c, &mut ledger, window, !active.is_empty(), || {
-                launch(c, &w, &mut job, bounded_remaining)
+                if guarded {
+                    launch_guarded(
+                        c,
+                        &w,
+                        &mut job,
+                        bounded_remaining,
+                        &mut admission_hook,
+                        &mut job_writes,
+                    )
+                } else {
+                    launch(c, &w, &mut job, bounded_remaining)
+                }
             });
             if active.is_empty() {
                 last = now();
@@ -1745,6 +1862,7 @@ pub fn run_scoped(
                 Ok(Some((process, heartbeat))) => {
                     active.push(Active {
                         job,
+                        job_writes,
                         process,
                         heartbeat,
                     });
@@ -1752,41 +1870,27 @@ pub fn run_scoped(
                 }
                 Ok(None) => break,
                 Err(error) => {
-                    if let Some(launch) = job.launch.clone() {
-                        let observation = ExitObservation {
-                            success: false,
-                            code: None,
-                            reason: Some(format!("launch failed: {error:#}")),
-                        };
-                        let _ = storage::write(
-                            &w.work_dir
-                                .join("host-exits")
-                                .join(format!("{}.json", job.run_id)),
-                            &observation,
-                        );
-                        if settle(&w, &job, &observation).is_ok() {
-                            job.launch = None;
-                        }
-                        let _ = w.release(&launch.lease);
+                    let _cleanup = process::cleanup_scope();
+                    if let Some(hook) = admission_hook.as_deref_mut() {
+                        hook.revoke(&format!("guarded launch failed: {error:#}"));
+                        guarded_admission_failed = true;
                     }
-                    if job.launch.is_none() {
-                        defer_read_retry(&mut job, format!("launch failed: {error:#}"));
-                    } else {
-                        job.last_error = Some(format!("launch requires reconciliation: {error:#}"));
-                        job.retry_after = None;
-                    }
-                    storage::write(&job_path(c, &job.task.id), &job)?;
+                    admission::launch_failed(c, &w, &mut job, &mut job_writes, &error, guarded)?;
                 }
             }
         }
+        drop(admission_deadline);
         if !active.is_empty() && ledger.budget.active_since.is_none() {
             ledger.budget.tick(now(), true)?;
             storage::write(&ledger_path, &ledger)?;
         }
+        if active.is_empty() && guarded_admission_failed {
+            break;
+        }
         if active.is_empty() && !admitted {
             ledger.budget.tick(now(), false)?;
             storage::write(&ledger_path, &ledger)?;
-            if !continuous && !retry_waiting && !host_progress {
+            if !continuous && !retry_waiting && !host_progress && !deferred_admission {
                 break;
             }
             if continuous && now() >= next_seed_check {
@@ -1810,12 +1914,54 @@ pub fn run_scoped(
     scoped_run_status(c, scope.as_ref(), &deferred_followups)
 }
 
+/// Recheck durable admission before preparation and again before a claim.
+/// Dependency errors or future protocol states cannot authorize execution.
+fn admission_ready(c: &Config, w: &Workflow, job: &Job) -> Result<bool> {
+    let state = w.status(&job.run_id)?;
+    if WorkflowState::from_value(&state["status"]) != Some(WorkflowState::Running)
+        || state.get("pause").is_some_and(|value| !value.is_null())
+    {
+        return Ok(false);
+    }
+    Ok(!job.task.dependencies.iter().any(|id| {
+        storage::read::<Job>(&job_path(c, id))
+            .and_then(|dependency| w.status(&dependency.run_id))
+            .map(|state| {
+                WorkflowState::from_value(&state["status"]) != Some(WorkflowState::Succeeded)
+            })
+            .unwrap_or(true)
+    }))
+}
+
 fn launch(
     c: &Config,
     w: &Workflow,
     job: &mut Job,
     remaining: u64,
 ) -> Result<(Process, lease_heartbeat::LeaseHeartbeat)> {
+    let mut writes = admission::JobWrites::new(job, false);
+    launch_guarded(c, w, job, remaining, &mut None, &mut writes)
+}
+
+fn launch_guarded(
+    c: &Config,
+    w: &Workflow,
+    job: &mut Job,
+    remaining: u64,
+    admission_hook: &mut Option<&mut dyn admission::ScopedAdmissionHook>,
+    job_writes: &mut admission::JobWrites,
+) -> Result<(Process, lease_heartbeat::LeaseHeartbeat)> {
+    let _attempt = if fs::guarded() {
+        Some(native_effects::attempt_scope(
+            contracts::NativeFilesystemAttempt {
+                task_id: job.task.id.clone(),
+                run_id: job.run_id.clone(),
+                attempt: job.attempt,
+            },
+        )?)
+    } else {
+        None
+    };
     let launch_started = std::time::Instant::now();
     ensure!(remaining > 0, "execution budget exhausted");
     if let Some(inputs) = &job.research_inputs {
@@ -1837,20 +1983,45 @@ fn launch(
     let dependencies = completed_dependencies(c, w, job)?;
     let tool_bindings = observed_tools(c, job)?;
     let expected_git_dir = git(&job.worktree, &["rev-parse", "--absolute-git-dir"])?;
-    let lease = w.acquire(
-        &job.run_id,
-        "agent-research-lab",
-        &format!("{}-{}", std::process::id(), workflow::now_ms()?),
-        lease_heartbeat::TTL_MS,
-    )?;
+    let acquisition_id = format!("{}-{}", std::process::id(), workflow::now_ms()?);
+    let lease = if let Some(hook) = admission_hook.as_deref_mut() {
+        admission::current_job(c, job)?;
+        let preconditions = hook.take_acquire_preconditions(c, job)?;
+        preconditions.validate().map_err(anyhow::Error::msg)?;
+        admission::current_job(c, job)?;
+        w.acquire_checked(
+            &job.run_id,
+            "agent-research-lab",
+            &acquisition_id,
+            lease_heartbeat::TTL_MS,
+            &preconditions,
+        )?
+    } else {
+        w.acquire(
+            &job.run_id,
+            "agent-research-lab",
+            &acquisition_id,
+            lease_heartbeat::TTL_MS,
+        )?
+    };
     let mut heartbeat = match lease_heartbeat::LeaseHeartbeat::start(w, lease.clone()) {
         Ok(heartbeat) => heartbeat,
         Err(error) => {
-            let _ = w.release(&lease);
+            let release = w.release(&lease);
+            if admission_hook.is_some()
+                && let Err(release) = release
+            {
+                return Err(error.context(format!(
+                    "lease release requires reconciliation: {release:#}"
+                )));
+            }
             return Err(error);
         }
     };
     let result = (|| -> Result<Process> {
+        // Acquisition can run external owner code. Rejoin before claim, as well
+        // as before persisting its response, against the prior durable Job.
+        job_writes.confirm(c)?;
         let claimed = heartbeat.with_lease(|lease| {
             if job.task.write {
                 w.effect_claim(lease)
@@ -1892,7 +2063,7 @@ fn launch(
             .as_ref()
             .map(|team| team.member(job))
             .transpose()?;
-        storage::write(&job_path(c, &job.task.id), job)?;
+        job_writes.persist(c, job)?;
         storage::write(&dir.join("tool-bindings.json"), &tool_bindings)?;
         storage::write(
             &dir.join("agent-permissions.json"),
@@ -1985,7 +2156,7 @@ fn launch(
             .context("missing launch authority")?
             .backend_request_sha256 = invocation.request_sha256.clone();
         // The digest is private host authority before any backend process starts.
-        storage::write(&job_path(c, &job.task.id), job)?;
+        job_writes.persist(c, job)?;
         let env = vec![
             (
                 "RELAY_MEMORY_HOME".into(),
@@ -1996,41 +2167,34 @@ fn launch(
                 dir.join("knowledge-index").display().to_string(),
             ),
         ];
-        let (program, args) = if job
-            .task
-            .required_tools
-            .iter()
-            .any(|name| name == "computer-use-cli")
-        {
-            targets::wrap_desktop_backend(
-                c,
-                &job.worktree,
-                &dir,
-                job.task.write,
-                &invocation.program,
-                &invocation.args,
-                &invocation.access,
-            )?
-        } else {
-            isolation::wrap_agent_with_access(
-                &invocation.program,
-                &invocation.args,
-                &c.state_dir,
-                &job.worktree,
-                &dir,
-                job.task.write,
-                &invocation.access,
-            )?
-        };
+        let (program, args) = launch_program(c, job, &dir, &invocation)?;
         agent_backend::verify_job(c, job)?;
+        let before_hook = std::time::Instant::now();
         let execution_timeout = Duration::from_secs(remaining)
-            .saturating_sub(launch_started.elapsed())
+            .saturating_sub(before_hook.duration_since(launch_started))
             .min(Duration::from_secs(c.task_timeout_seconds));
+        let execution_deadline = before_hook
+            .checked_add(execution_timeout)
+            .context("execution deadline exceeds monotonic clock range")?;
         ensure!(
-            !execution_timeout.is_zero(),
+            before_hook < execution_deadline,
             "execution budget exhausted during preparation"
         );
-        let execution_started = std::time::Instant::now();
+        if let Some(hook) = admission_hook.as_deref_mut() {
+            admission::current_job(c, job)?;
+            hook.before_model_spawn(c, job)?;
+            admission::current_job(c, job)?;
+            ensure!(!hook.should_stop(), "guarded model entry stopped");
+        }
+        // Final admission work consumes the same pre-hook cutoff, including the
+        // task TTL. Never restart either budget when the hook returns success.
+        let execution_timeout =
+            execution_deadline.saturating_duration_since(std::time::Instant::now());
+        ensure!(
+            !execution_timeout.is_zero(),
+            "execution budget exhausted during final admission"
+        );
+        process::ObserverContext::current().check_work()?;
         let process = Process::spawn(
             &program,
             &args,
@@ -2046,16 +2210,17 @@ fn launch(
         heartbeat.watch_worker(
             launch.pid,
             launch.process_start.clone(),
-            execution_timeout.saturating_sub(execution_started.elapsed()),
+            execution_deadline.saturating_duration_since(std::time::Instant::now()),
             Some(c.state_dir.join("paused")),
         )?;
         launch.lease = heartbeat.current()?;
-        storage::write(&job_path(c, &job.task.id), job)?;
+        job_writes.persist(c, job)?;
         Ok(process)
     })();
     match result {
         Ok(process) => Ok((process, heartbeat)),
         Err(error) => {
+            let _cleanup = process::cleanup_scope();
             if let Some(launch) = &job.launch {
                 revoke_communication(c, job, launch);
             }
@@ -2065,10 +2230,55 @@ fn launch(
             if let Some(launch) = job.launch.as_mut() {
                 launch.lease = lease;
             } else {
-                let _ = w.release(&lease);
+                let release = w.release(&lease);
+                if admission_hook.is_some()
+                    && let Err(release) = release
+                {
+                    return Err(error.context(format!(
+                        "lease release requires reconciliation: {release:#}"
+                    )));
+                }
             }
             Err(error)
         }
+    }
+}
+
+fn launch_program(
+    c: &Config,
+    job: &Job,
+    dir: &Path,
+    invocation: &agent_backend::Invocation,
+) -> Result<(String, Vec<String>)> {
+    #[cfg(test)]
+    if admission_tests::direct_agent_fixture() {
+        return Ok((invocation.program.clone(), invocation.args.clone()));
+    }
+    if job
+        .task
+        .required_tools
+        .iter()
+        .any(|name| name == "computer-use-cli")
+    {
+        targets::wrap_desktop_backend(
+            c,
+            &job.worktree,
+            dir,
+            job.task.write,
+            &invocation.program,
+            &invocation.args,
+            &invocation.access,
+        )
+    } else {
+        isolation::wrap_agent_with_access(
+            &invocation.program,
+            &invocation.args,
+            &c.state_dir,
+            &job.worktree,
+            dir,
+            job.task.write,
+            &invocation.access,
+        )
     }
 }
 
@@ -3153,7 +3363,7 @@ mod tests {
         }
     }
 
-    fn completion_fixture(
+    pub(super) fn completion_fixture(
         memory: bool,
         proposals: Value,
     ) -> (tempfile::TempDir, Config, Job, Workflow) {
@@ -3378,6 +3588,27 @@ mod tests {
                 {"repository":"superpod","role":"review","prompt":"duplicate binding","write":false,"exploratory":false,"required_tools":["computer-use-cli","computer-use-cli"]}
             ]),
         );
+        // Keep the unused generated transport executable busy throughout the positive case.
+        // This models a writable executable, not an owner transaction or the historic holder.
+        let private_script_writer = fs::OpenOptions::new()
+            .write(true)
+            .open(&c.workflow)
+            .unwrap();
+        let busy_error = w.status(&job.run_id).unwrap_err();
+        let io_error = busy_error
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<std::io::Error>())
+            .expect("the generated executable must fail with an I/O error");
+        assert_eq!(io_error.raw_os_error(), Some(26));
+        let fixture = if let Some(runfiles) = std::env::var_os("TEST_SRCDIR") {
+            PathBuf::from(runfiles)
+                .join(std::env::var_os("TEST_WORKSPACE").expect("Bazel test workspace"))
+                .join("crates/runtime/fixtures/completion-workflow.sh")
+        } else {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/completion-workflow.sh")
+        };
+        c.workflow = fixture.canonicalize().unwrap();
+        let w = workflow(&c);
         let binding = c.tools["relay-memory"].clone();
         c.tools.insert("computer-use-cli".into(), binding.clone());
         c.tools.insert("repo-sandbox".into(), binding);
@@ -3430,6 +3661,7 @@ mod tests {
         let replay = admit_followups(&c, &job, &dir, &receipt).unwrap();
         assert_eq!(replay.queued, report.queued);
         assert_eq!(jobs(&c).unwrap().len(), 2);
+        drop(private_script_writer);
     }
 
     #[test]
@@ -3500,16 +3732,26 @@ mod tests {
         child.task.dependencies = vec![parent.task.id.clone()];
         let ready = json!({"status":ExecutionState::Running,"frames":{"1":{"nodes":{"task":{"state":{"state":"task_ready"}}}}}});
         let mut states = BTreeMap::from([
-            (parent.task.id.clone(), ready.clone()),
-            (child.task.id.clone(), ready),
+            (
+                parent.task.id.clone(),
+                WorkflowStatusObservation::from_value(&ready),
+            ),
+            (
+                child.task.id.clone(),
+                WorkflowStatusObservation::from_value(&ready),
+            ),
         ]);
-        let classify = |job: &Job, parent: &Job, child: &Job, states: &BTreeMap<String, Value>| {
-            let indexed = BTreeMap::from([
-                (parent.task.id.clone(), parent),
-                (child.task.id.clone(), child),
-            ]);
-            controller_state(job, &indexed, states, false, &mut BTreeSet::new())
-        };
+        let classify =
+            |job: &Job,
+             parent: &Job,
+             child: &Job,
+             states: &BTreeMap<String, WorkflowStatusObservation>| {
+                let indexed = BTreeMap::from([
+                    (parent.task.id.clone(), parent),
+                    (child.task.id.clone(), child),
+                ]);
+                controller_state(job, &indexed, states, false, &mut BTreeSet::new())
+            };
         assert_eq!(
             classify(&parent, &parent, &child, &states).0,
             ExecutionState::Ready
@@ -3550,10 +3792,249 @@ mod tests {
             ExecutionState::NeedsReconciliation
         );
         parent.launch = None;
-        states.insert(parent.task.id.clone(), json!({"status":"succeeded"}));
+        states.insert(
+            parent.task.id.clone(),
+            WorkflowStatusObservation::from_value(&json!({"status":WorkflowState::Succeeded})),
+        );
         assert_eq!(
             classify(&child, &parent, &child, &states).0,
             ExecutionState::Ready
+        );
+    }
+
+    #[test]
+    fn summary_matches_detailed_controller_counts_without_losing_blockers() {
+        let (_temp, c, base, w) = completion_fixture(false, json!([]));
+        fs::remove_file(job_path(&c, &base.task.id)).unwrap();
+        fs::write(
+            &c.workflow,
+            "#!/bin/sh\nset -eu\n[ \"$1 $2\" = 'run status' ]\ncat \"$4.json\"\n",
+        )
+        .unwrap();
+        let ready = json!({"status":WorkflowState::Running,"frames":{"1":{"nodes":{"task":{"state":{"state":WorkflowNodeState::TaskReady}}}}}});
+        let cases = [
+            ("ready", Some(ready.clone()), vec![], ExecutionState::Ready),
+            (
+                "success",
+                Some(json!({"status":WorkflowState::Succeeded})),
+                vec![],
+                ExecutionState::Succeeded,
+            ),
+            (
+                "failed",
+                Some(json!({"status":WorkflowState::Failed})),
+                vec![],
+                ExecutionState::Failed,
+            ),
+            (
+                "cancelled",
+                Some(json!({"status":WorkflowState::Cancelled})),
+                vec![],
+                ExecutionState::Failed,
+            ),
+            (
+                "future",
+                Some(json!({"status":"future_workflow_state"})),
+                vec![],
+                ExecutionState::Unknown,
+            ),
+            ("unavailable", None, vec![], ExecutionState::Unknown),
+            (
+                "waiting",
+                Some(ready.clone()),
+                vec!["ready"],
+                ExecutionState::WaitingDependencies,
+            ),
+            (
+                "blocked-failed",
+                Some(ready.clone()),
+                vec!["failed"],
+                ExecutionState::Blocked,
+            ),
+            (
+                "blocked-future",
+                Some(ready.clone()),
+                vec!["future"],
+                ExecutionState::Blocked,
+            ),
+            (
+                "blocked-unavailable",
+                Some(ready.clone()),
+                vec!["unavailable"],
+                ExecutionState::Blocked,
+            ),
+            (
+                "missing-dependency",
+                Some(ready.clone()),
+                vec!["absent"],
+                ExecutionState::Blocked,
+            ),
+            (
+                "cycle-a",
+                Some(ready.clone()),
+                vec!["cycle-b"],
+                ExecutionState::Blocked,
+            ),
+            (
+                "cycle-b",
+                Some(ready.clone()),
+                vec!["cycle-a"],
+                ExecutionState::Blocked,
+            ),
+            (
+                "workflow-paused",
+                Some(json!({"status":WorkflowState::Running,"pause":{}})),
+                vec![],
+                ExecutionState::Paused,
+            ),
+            (
+                "stale-launch",
+                Some(ready.clone()),
+                vec![],
+                ExecutionState::NeedsReconciliation,
+            ),
+            (
+                "live-launch",
+                Some(ready.clone()),
+                vec![],
+                ExecutionState::Running,
+            ),
+            (
+                "retry",
+                Some(ready.clone()),
+                vec![],
+                ExecutionState::RetryWait,
+            ),
+            (
+                "last-error",
+                Some(ready.clone()),
+                vec![],
+                ExecutionState::Blocked,
+            ),
+            (
+                "no-ready-task",
+                Some(json!({"status":WorkflowState::Running})),
+                vec![],
+                ExecutionState::NeedsReconciliation,
+            ),
+            (
+                "known-unknown",
+                Some(json!({"status":WorkflowState::Unknown})),
+                vec![],
+                ExecutionState::NeedsReconciliation,
+            ),
+            (
+                "missing-status",
+                Some(json!({})),
+                vec![],
+                ExecutionState::Unknown,
+            ),
+        ];
+        for (id, state, dependencies, _) in &cases {
+            let mut job = base.clone();
+            job.task.id = (*id).into();
+            job.run_id = format!("{id}-attempt-1");
+            job.task.dependencies = dependencies.iter().map(|id| (*id).into()).collect();
+            if matches!(*id, "stale-launch" | "live-launch") {
+                job.launch = Some(Launch {
+                    pid: std::process::id(),
+                    process_start: if *id == "live-launch" {
+                        process_start(std::process::id()).unwrap()
+                    } else {
+                        "different-process-identity".into()
+                    },
+                    lease: json!({}),
+                    attempt: json!({}),
+                    log_dir: PathBuf::new(),
+                    tools: json!({}),
+                    git_dir: String::new(),
+                    backend_request_sha256: None,
+                    communication: None,
+                    communication_gap: None,
+                    communication_member: None,
+                });
+            }
+            if *id == "retry" {
+                job.retry_after = Some(now() + 60);
+            }
+            if *id == "last-error" {
+                job.last_error = Some("baseline needs review".into());
+            }
+            storage::write(&job_path(&c, id), &job).unwrap();
+            if let Some(state) = state {
+                storage::write(
+                    &w.work_dir.join(format!("{}.json", job.run_id)),
+                    &json!({"ok":true,"result":state}),
+                )
+                .unwrap();
+            }
+        }
+        let budget = json!({"budget":{"days":{"1":17},"active_since":null},"main_seconds":17});
+        storage::write(&c.state_dir.join("budget.json"), &budget).unwrap();
+        for paused in [false, true] {
+            pause(&c, paused).unwrap();
+            let detailed = status(&c).unwrap();
+            let summary = status_summary(&c).unwrap();
+            let mut expected = BTreeMap::<ExecutionState, usize>::new();
+            for (id, _, _, state) in &cases {
+                let state = if paused && matches!(*id, "ready" | "no-ready-task" | "known-unknown")
+                {
+                    ExecutionState::Paused
+                } else {
+                    *state
+                };
+                let row = detailed["jobs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|row| row["id"] == *id)
+                    .unwrap();
+                assert_eq!(row["state"], json!(state), "{id}, paused={paused}");
+                *expected.entry(state).or_default() += 1;
+            }
+            assert_eq!(detailed["summary"], json!(expected));
+            assert_eq!(
+                summary,
+                json!({"paused":paused,"summary":expected,"total_jobs":cases.len(),"details_included":false,"budget":budget})
+            );
+            assert_eq!(detailed["budget"], summary["budget"]);
+            assert_eq!(detailed["paused"], summary["paused"]);
+            assert!(detailed.get("total_jobs").is_none());
+            assert!(detailed.get("details_included").is_none());
+            let unavailable = detailed["jobs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["id"] == "unavailable")
+                .unwrap();
+            assert!(unavailable["error"].as_str().is_some());
+        }
+    }
+
+    #[test]
+    fn summary_omits_large_workflow_receipts_and_handles_an_empty_store() {
+        let (temp, c, job, _w) = completion_fixture(false, json!([]));
+        let path = temp.path().join("authority.json");
+        let mut authority: Value = storage::read(&path).unwrap();
+        let payload = "frozen-prompt-and-receipt-body".repeat(40000);
+        authority["result"]["inputs"] = json!({"prompt":payload});
+        authority["result"]["frames"]["1"]["nodes"]["task"]["outputs"]["result"] = json!(payload);
+        storage::write(&path, &authority).unwrap();
+        let detailed = status(&c).unwrap();
+        let summary = status_summary(&c).unwrap();
+        assert_eq!(summary["summary"], detailed["summary"]);
+        assert_eq!(summary["summary"][ExecutionState::Succeeded.as_str()], 1);
+        assert_eq!(detailed["jobs"][0]["status"], authority["result"]);
+        assert!(serde_json::to_vec(&detailed).unwrap().len() > 2_000_000);
+        let encoded = serde_json::to_string(&summary).unwrap();
+        assert!(encoded.len() < 1024);
+        assert!(!encoded.contains("frozen-prompt-and-receipt-body"));
+        assert_eq!(summary.as_object().unwrap().len(), 5);
+        assert!(summary.get("jobs").is_none());
+        fs::remove_file(job_path(&c, &job.task.id)).unwrap();
+        assert_eq!(
+            status_summary(&c).unwrap(),
+            json!({"paused":false,"summary":{},"total_jobs":0,"details_included":false,"budget":{}})
         );
     }
 
@@ -4518,7 +4999,7 @@ print(json.dumps({'type':'session.activity','kind':'message','text':'The same pe
                 ] {
                     let source = dir.join(file);
                     if source.is_file() {
-                        fs::copy(&source, task_dir.join(source.file_name().unwrap())).unwrap();
+                        std::fs::copy(&source, task_dir.join(source.file_name().unwrap())).unwrap();
                     }
                 }
             }
@@ -5029,3 +5510,12 @@ mod host_budget_tests {
 #[cfg(test)]
 #[path = "team_tests.rs"]
 mod team_tests;
+
+#[cfg(test)]
+mod cohort_tests;
+
+#[cfg(test)]
+mod admission_tests;
+
+#[cfg(test)]
+mod filesystem_tests;

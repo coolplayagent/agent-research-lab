@@ -4,9 +4,9 @@ use super::*;
 fn home(c: &Config, id: &str) -> Result<PathBuf> {
     safe_id(id)?;
     let home = c.state_dir.join("people/memory").join(id);
-    fs::create_dir_all(&home)?;
+    native_effects::fs::create_dir_all(&home)?;
     use std::os::unix::fs::PermissionsExt;
-    fs::set_permissions(&home, fs::Permissions::from_mode(0o700))?;
+    native_effects::fs::set_permissions(&home, fs::Permissions::from_mode(0o700))?;
     Ok(home)
 }
 fn call(c: &Config, id: &str, operation: &str, arguments: &[String]) -> Result<Value> {

@@ -27,6 +27,19 @@ pub struct ResearchInputs {
     pub shared_knowledge: Option<SharedKnowledge>,
 }
 
+/// Full typed input identity; only acquisition timestamps are observations.
+/// Ordered knowledge excerpts and literal checked_at text remain bound.
+pub fn identity(inputs: &ResearchInputs) -> Result<String> {
+    let mut normalized = inputs.clone();
+    for repository in normalized.repositories.values_mut() {
+        repository.upstream.checked_at.clear();
+    }
+    for skill in &mut normalized.skills.skills {
+        skill.checked_at.clear();
+    }
+    Ok(storage::digest(&serde_json::to_vec(&normalized)?))
+}
+
 const KNOWLEDGE_ENTRYPOINTS: [&str; 3] = [
     "knowledge/index.md",
     "knowledge/software/ai-sdlc/index.md",
@@ -124,7 +137,7 @@ fn checkout(
         .state_dir
         .join("sources")
         .join(format!("{name}-{}", upstream.commit));
-    fs::create_dir_all(path.parent().context("source directory missing")?)?;
+    native_effects::fs::create_dir_all(path.parent().context("source directory missing")?)?;
     if !path.exists() {
         git(
             repository,
@@ -586,5 +599,59 @@ mod tests {
         let next = cohort(&input);
         input.insights_sha256 = storage::digest(b"counterexample H1");
         assert_ne!(next, cohort(&input));
+    }
+}
+
+#[cfg(test)]
+mod complete_identity_tests {
+    use super::*;
+    #[test]
+    fn identity_ignores_only_two_typed_observation_locations() {
+        let original = serde_json::json!({
+            "repositories":{"superpod":{"upstream":{"repository":"fixture/source","default_branch":"main","commit":"a".repeat(40),"checked_at":"observed"},"checkout":"/owned/source"}},
+            "skills":{"schema_version":1,"skills":[{"name":"owned","repository":"fixture/source","installed_path":"/owned/skill","runtime_path":"/owned/runtime","tree_sha256":"b".repeat(64),"runtime_sha256":"c".repeat(64),"release_tag":null,"release_id":null,"source_commit":"a".repeat(40),"source_qualitygate":{"path":"/owned/proof","sha256":"d".repeat(64)},"checked_at":"observed"}]},
+            "insights":"checked_at is literal knowledge", "insights_sha256":"insights",
+            "shared_knowledge":{"superpod_commit":"a".repeat(40),"documents":[{"path":"knowledge/index.md","source_sha256":"source","source_bytes":42,"excerpt":"checked_at original","excerpt_sha256":"excerpt","truncated":false}]}
+        });
+        let input: ResearchInputs = serde_json::from_value(original.clone()).unwrap();
+        let baseline = identity(&input).unwrap();
+        for pointer in [
+            "/repositories/superpod/upstream/checked_at",
+            "/skills/skills/0/checked_at",
+        ] {
+            let mut changed = original.clone();
+            *changed.pointer_mut(pointer).unwrap() = json!("new observation");
+            assert_eq!(
+                identity(&serde_json::from_value(changed).unwrap()).unwrap(),
+                baseline
+            );
+        }
+        for pointer in [
+            "/repositories/superpod/upstream/repository",
+            "/repositories/superpod/upstream/default_branch",
+            "/repositories/superpod/upstream/commit",
+            "/repositories/superpod/checkout",
+            "/skills/skills/0/installed_path",
+            "/skills/skills/0/runtime_path",
+            "/skills/skills/0/tree_sha256",
+            "/skills/skills/0/runtime_sha256",
+            "/skills/skills/0/source_commit",
+            "/skills/skills/0/source_qualitygate/path",
+            "/skills/skills/0/source_qualitygate/sha256",
+            "/insights",
+            "/insights_sha256",
+            "/shared_knowledge/documents/0/path",
+            "/shared_knowledge/documents/0/source_sha256",
+            "/shared_knowledge/documents/0/excerpt",
+            "/shared_knowledge/documents/0/excerpt_sha256",
+        ] {
+            let mut changed = original.clone();
+            *changed.pointer_mut(pointer).unwrap() = json!("changed checked_at literal");
+            assert_ne!(
+                identity(&serde_json::from_value(changed).unwrap()).unwrap(),
+                baseline,
+                "{pointer}"
+            );
+        }
     }
 }

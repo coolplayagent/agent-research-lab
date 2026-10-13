@@ -8,6 +8,7 @@ license.workspace = true
 name = "communication"
 
 [dependencies]
+native_effects.workspace = true
 contracts.workspace = true
 anyhow.workspace = true
 config.workspace = true

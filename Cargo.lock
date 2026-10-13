@@ -728,6 +728,7 @@ dependencies = [
  "lab-agent-policy",
  "lab-config",
  "lab-isolation",
+ "lab-native-effects",
  "lab-process",
  "lab-storage",
  "lab-task",
@@ -776,6 +777,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "lab-isolation",
+ "lab-native-effects",
  "lab-process",
  "lab-storage",
  "libc",
@@ -813,6 +815,7 @@ dependencies = [
  "anyhow",
  "lab-config",
  "lab-contracts",
+ "lab-native-effects",
  "lab-storage",
  "libc",
  "serde",
@@ -834,6 +837,7 @@ dependencies = [
 name = "lab-contracts"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "serde",
  "serde_json",
 ]
@@ -917,6 +921,7 @@ dependencies = [
  "lab-config",
  "lab-delivery",
  "lab-freshness",
+ "lab-native-effects",
  "lab-process",
  "lab-storage",
  "serde",
@@ -930,6 +935,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "lab-agent-policy",
+ "lab-native-effects",
  "libc",
  "tempfile",
  "toml",
@@ -979,10 +985,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "lab-native-effects"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-contracts",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "lab-process"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "lab-contracts",
+ "lab-native-effects",
  "libc",
  "tempfile",
 ]
@@ -1008,6 +1028,7 @@ dependencies = [
  "lab-isolation",
  "lab-lease-heartbeat",
  "lab-multi-agent",
+ "lab-native-effects",
  "lab-process",
  "lab-storage",
  "lab-targets",
@@ -1026,6 +1047,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "fs2",
+ "lab-native-effects",
  "libc",
  "serde",
  "serde_json",
@@ -1044,6 +1066,7 @@ dependencies = [
  "lab-config",
  "lab-contracts",
  "lab-isolation",
+ "lab-native-effects",
  "lab-process",
  "lab-storage",
  "lab-workflow",
@@ -1069,6 +1092,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "lab-contracts",
+ "lab-native-effects",
  "lab-process",
  "lab-storage",
  "serde",

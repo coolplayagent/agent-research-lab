@@ -283,11 +283,15 @@ fn load(c: &Config) -> Result<Directory> {
 }
 fn save(c: &Config, directory: &Directory) -> Result<()> {
     validate(directory)?;
-    ensure!(
-        serde_json::to_vec_pretty(directory)?.len() <= 16 * 1024 * 1024,
-        "identity directory storage bound reached"
-    );
-    let bytes = serde_json::to_vec_pretty(directory)?;
+    let bytes = if fs::guarded() {
+        fs::json_bytes_limit(&path(c), directory, true, 16 * 1024 * 1024)?
+    } else {
+        ensure!(
+            serde_json::to_vec_pretty(directory)?.len() <= 16 * 1024 * 1024,
+            "identity directory storage bound reached"
+        );
+        serde_json::to_vec_pretty(directory)?
+    };
     // Reads and unchanged history registration must not rewrite the directory:
     // event-driven observers would otherwise feed their own writes back forever.
     if fs::read(path(c)).ok().as_deref() == Some(bytes.as_slice()) {
@@ -449,6 +453,59 @@ pub(super) fn freeze(c: &Config, task: &Task) -> Result<Option<PersonaSnapshot>>
         .get(id)
         .cloned()
         .context("unknown digital person")?;
+    capture_snapshot(c, task, person)
+}
+
+/// Batch preparation reads the existing profile without persisting a directory.
+pub(super) fn freeze_for_batch(c: &Config, task: &Task) -> Result<Option<PersonaSnapshot>> {
+    let Some(id) = &task.persona_id else {
+        return Ok(None);
+    };
+    safe_id(id)?;
+    let person = load(c)?
+        .people
+        .get(id)
+        .cloned()
+        .context("unknown digital person")?;
+    capture_snapshot(c, task, person)
+}
+
+pub(super) fn validate_batch_persona(c: &Config, task: &Task) -> Result<()> {
+    if let Some(id) = &task.persona_id {
+        safe_id(id)?;
+        let directory = load(c)?;
+        let person = directory.people.get(id).context("unknown digital person")?;
+        if let Some(preference) = &person.execution {
+            agent_backend::validate_preference(c, preference)?;
+        }
+        if let Some(prior) = directory.tasks.get(&task.id) {
+            ensure!(prior == id, "task identity already bound");
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn validate_frozen_binding(c: &Config, job: &Job) -> Result<()> {
+    if let Some(snapshot) = &job.persona {
+        ensure!(
+            job.task.persona_id.as_ref() == Some(&snapshot.id),
+            "frozen persona identity mismatch"
+        );
+        let directory = load(c)?;
+        ensure!(
+            directory.people.contains_key(&snapshot.id),
+            "frozen person missing from directory"
+        );
+        if let Some(prior) = directory.tasks.get(&job.task.id) {
+            ensure!(prior == &snapshot.id, "task identity already bound");
+        }
+    } else {
+        ensure!(job.task.persona_id.is_none(), "frozen persona missing");
+    }
+    Ok(())
+}
+
+fn capture_snapshot(c: &Config, task: &Task, person: Person) -> Result<Option<PersonaSnapshot>> {
     if let Some(preference) = &person.execution {
         agent_backend::validate_preference(c, preference)?;
     }
