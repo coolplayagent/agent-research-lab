@@ -214,17 +214,35 @@ pub(super) fn observe_result(c: &Config, id: &str) -> Result<Option<WorkResult>>
         row["error"].is_null(),
         "research execution status is unavailable"
     );
-    let success = contracts::ExecutionState::from_value(&row["state"])
-        == Some(contracts::ExecutionState::Succeeded);
+    let state = contracts::ExecutionState::from_value(&row["state"]);
+    // Scenario tasks freeze an explicit attempt bound. A terminal host rejection
+    // must reach the goal, while unknown execution authority remains unresolved.
+    if state == Some(contracts::ExecutionState::Blocked)
+        && job.last_error.is_some()
+        && job.launch.is_none()
+        && job.retry_after.is_none()
+        && job
+            .task
+            .max_attempts
+            .is_some_and(|limit| (1..=3).contains(&limit) && job.attempt >= u32::from(limit))
+    {
+        return Ok(Some(WorkResult {
+            code: Some(contracts::WorkResultCode::Failed),
+            succeeded: false,
+            summary: contracts::WorkResultCode::Failed.as_str().into(),
+            evidence: json!({"job_id":id,"state":contracts::ExecutionState::Blocked,
+                "attempt":job.attempt,"source_commit":job.source_commit,
+                "superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,
+                "policy_digest":job.config_digest}),
+        }));
+    }
+    let success = state == Some(contracts::ExecutionState::Succeeded);
     let receipt = if success {
         runtime::completed_result(c, &job)?
     } else {
         Value::Null
     };
-    if !success
-        && contracts::ExecutionState::from_value(&row["state"])
-            != Some(contracts::ExecutionState::Failed)
-    {
+    if !success && state != Some(contracts::ExecutionState::Failed) {
         return Ok(None);
     }
     let projection = project(&job, row);

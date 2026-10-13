@@ -374,3 +374,95 @@ async fn admission_failure_is_unavailable_with_private_diagnostics_and_no_accept
             .exists()
     );
 }
+
+#[test]
+fn exhausted_native_rejection_fails_the_goal_without_exposing_private_diagnostics() {
+    let temp = Scratch::new();
+    let root = temp.path();
+    let binary = root.join("workflow-fixture");
+    fs::write(
+        &binary,
+        format!(
+            "#!/bin/sh\ncat '{}'\n",
+            root.join("response.json").display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+    let c: Config = serde_json::from_value(json!({"schema_version":1,"workspace":root,
+        "state_dir":root.join("state"),"superpod":root,"codex":"unused","workflow":binary,
+        "daily_seconds":600,"max_agents":1,"task_timeout_seconds":60,"require_latest":false,
+        "models":{},"tools":{}}))
+    .unwrap();
+    fs::create_dir_all(c.state_dir.join("workflow")).unwrap();
+    let mut job: Job = serde_json::from_value(json!({"task":{"id":"blocked-job","role":"research",
+        "repository":"superpod","prompt":"frozen","max_attempts":1},"model":"fixture",
+        "source_commit":"a".repeat(40),"superpod_commit":"b".repeat(40),"prompt_digest":"c".repeat(64),
+        "config_digest":"d".repeat(64),"worktree":root,"run_id":"blocked-job-attempt-1","attempt":1,
+        "last_error":"launch failed: PRIVATE_HOST_DIAGNOSTIC","launch":null,"retry_after":null})).unwrap();
+    let persist =
+        |job: &Job| storage::write(&c.state_dir.join("jobs/blocked-job.json"), job).unwrap();
+    let response = |state| {
+        storage::write(&root.join("response.json"), &json!({"ok":true,
+        "result":{"status":state,"frames":{"1":{"nodes":{"task":{"state":{"state":"task_ready"}}}}}}})).unwrap()
+    };
+    response(contracts::WorkflowState::Running.as_str());
+    persist(&job);
+    let result = observe_result(&c, "blocked-job").unwrap().unwrap();
+    assert!(!result.succeeded);
+    assert_eq!(result.code, Some(contracts::WorkResultCode::Failed));
+    assert_eq!(result.evidence["job_id"], job.task.id);
+    assert_eq!(result.evidence["attempt"], 1);
+    assert_eq!(result.evidence["policy_digest"], job.config_digest);
+    assert!(
+        !serde_json::to_string(&result)
+            .unwrap()
+            .contains("PRIVATE_HOST_DIAGNOSTIC")
+    );
+    let retained: Job = storage::read(&c.state_dir.join("jobs/blocked-job.json")).unwrap();
+    assert_eq!(retained.last_error, job.last_error);
+
+    job.task.max_attempts = Some(2);
+    persist(&job);
+    assert!(
+        observe_result(&c, "blocked-job").unwrap().is_none(),
+        "an explicit retry remains available"
+    );
+    job.task.max_attempts = Some(1);
+    job.retry_after = Some(i64::MAX);
+    persist(&job);
+    assert!(
+        observe_result(&c, "blocked-job").unwrap().is_none(),
+        "retry waiting is not terminal"
+    );
+    job.retry_after = None;
+    job.launch = Some(
+        serde_json::from_value(json!({"pid":0,"process_start":"unavailable","lease":{},
+        "attempt":{},"log_dir":root}))
+        .unwrap(),
+    );
+    persist(&job);
+    assert!(
+        observe_result(&c, "blocked-job").unwrap().is_none(),
+        "retained launch needs reconciliation"
+    );
+    job.launch = None;
+    persist(&job);
+    response("unsupported-future-state");
+    assert!(
+        observe_result(&c, "blocked-job").unwrap().is_none(),
+        "unknown authority is not a terminal receipt"
+    );
+    response(contracts::WorkflowState::Running.as_str());
+    job.last_error = None;
+    persist(&job);
+    assert!(
+        observe_result(&c, "blocked-job").unwrap().is_none(),
+        "ready work must remain eligible"
+    );
+    storage::write(&c.state_dir.join("paused"), &json!({})).unwrap();
+    assert!(
+        observe_result(&c, "blocked-job").unwrap().is_none(),
+        "paused admission must remain resumable"
+    );
+}

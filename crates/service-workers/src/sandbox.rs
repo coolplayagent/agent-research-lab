@@ -7,6 +7,11 @@ use std::{
 };
 const BWRAP: &str = "/usr/bin/bwrap";
 const PRLIMIT: &str = "/usr/bin/prlimit";
+// Native adapters maintain disposable databases and caches independently of
+// their protocol output. Keep their file quota below the enclosing tmpfs bound.
+const MAX_RUNTIME_FILE: u64 = 16 * 1024 * 1024;
+const MAX_PROTOCOL_OUTPUT: u64 = 256 * 1024;
+const MAX_DIAGNOSTIC_OUTPUT: u64 = 4 * 1024 * 1024;
 fn arguments(
     command: &[String],
     mounts: &[PathBuf],
@@ -16,7 +21,7 @@ fn arguments(
     let mut args = vec![
         format!("--cpu={}:{}", seconds + 1, seconds + 2),
         "--as=4294967296".into(),
-        "--fsize=4194304".into(),
+        format!("--fsize={MAX_RUNTIME_FILE}:{MAX_RUNTIME_FILE}"),
         "--nofile=256".into(),
         "--".into(),
         BWRAP.into(),
@@ -149,7 +154,16 @@ pub async fn run(
         Some(&stdin),
     )?;
     loop {
-        if let Some(status) = child.poll()? {
+        let status = child.poll()?;
+        ensure!(
+            fs::metadata(&child.stdout)?.len() <= MAX_PROTOCOL_OUTPUT,
+            "sandbox protocol output exceeds bound"
+        );
+        ensure!(
+            fs::metadata(&child.stderr)?.len() <= MAX_DIAGNOSTIC_OUTPUT,
+            "sandbox diagnostic output exceeds bound"
+        );
+        if let Some(status) = status {
             ensure!(
                 status.success(),
                 "sandbox command failed with exit code {:?}",
@@ -161,7 +175,7 @@ pub async fn run(
     }
     let stdout = fs::read_to_string(&child.stdout)?;
     ensure!(
-        stdout.len() <= 256 * 1024,
+        stdout.len() as u64 <= MAX_PROTOCOL_OUTPUT,
         "sandbox protocol output exceeds bound"
     );
     Ok(SandboxOutput {
@@ -180,5 +194,63 @@ mod tests {
         assert!(!args.contains(&"--share-net".into()));
         assert!(args.windows(2).any(|w| w == ["--tmpfs", "/workspace"]));
         assert!(!args.contains(&"/root".into()));
+    }
+
+    async fn python(state: &Path, script: &str) -> Result<SandboxOutput> {
+        run(
+            state,
+            vec!["/usr/bin/python3".into(), "-c".into(), script.into()],
+            vec![],
+            vec![],
+            false,
+            String::new(),
+            5,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn native_runtime_files_are_bounded_separately_from_protocol_output() {
+        let state = tempfile::tempdir().unwrap();
+        let result = python(
+            state.path(),
+            "with open('/workspace/runtime.db','wb') as f: f.write(b'x'*(8*1024*1024))\nprint('runtime file accepted')",
+        )
+        .await
+        .unwrap();
+        assert_eq!(result.stdout, "runtime file accepted\n");
+        assert!(
+            python(
+                state.path(),
+                "with open('/workspace/runtime.db','wb') as f: f.write(b'x'*(16*1024*1024+1))"
+            )
+            .await
+            .is_err()
+        );
+        let oversized = python(
+            state.path(),
+            "import sys; sys.stdout.write('x'*(256*1024+1))",
+        )
+        .await
+        .err()
+        .unwrap();
+        assert!(
+            oversized
+                .to_string()
+                .contains("protocol output exceeds bound")
+        );
+        let diagnostics = python(
+            state.path(),
+            "import sys; sys.stderr.write('x'*(4*1024*1024+1))",
+        )
+        .await
+        .err()
+        .unwrap();
+        assert!(
+            diagnostics
+                .to_string()
+                .contains("diagnostic output exceeds bound")
+        );
+        assert!(python(state.path(), "raise SystemExit(7)").await.is_err());
     }
 }
