@@ -1,6 +1,9 @@
 //! Durable digital-person conversations, independent of model execution.
 //! Host-authorized membership, ordered logs, bounded live delivery and replay.
 mod conversations;
+mod iteration;
+mod iteration_model;
+pub use iteration_model::*;
 mod research;
 mod research_model;
 pub use research_model::*;
@@ -34,6 +37,7 @@ use store::{Catalog, Store};
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 pub(crate) enum Control {
+    Evolution(iteration::IterationCommand),
     Research(research::ResearchCommand),
     Goal(goals::GoalCommand),
     #[cfg(test)]
@@ -627,3 +631,6 @@ mod goal_tests;
 
 #[cfg(test)]
 mod research_tests;
+
+#[cfg(test)]
+mod iteration_tests;

@@ -1,6 +1,7 @@
 import { get } from "./dom.js";
 import { t } from "./i18n.js";
 import { loadEvolution } from "./evolution.js";
+import { loadIterations } from "./iterations.js";
 
 let tab = "collaboration";
 export function selectTab(name: string): void {
@@ -19,6 +20,7 @@ export function selectTab(name: string): void {
     panel.setAttribute("aria-labelledby", item.id);
   }
   if (changed && tab === "evolution") void loadEvolution();
+  if (changed && tab === "iterations") void loadIterations();
 }
 export function revealResearch(name: string): void {
   const root = get("workspace");

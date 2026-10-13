@@ -25,10 +25,13 @@ mod operator;
 mod personas;
 mod profiles;
 mod research_campaign;
+mod research_lineage;
 mod research_process;
 mod research_scenario;
 mod resources;
 mod sessions;
+mod software_delivery;
+mod software_scenario;
 mod transport;
 
 const MAX_JOBS: usize = 512;
@@ -233,7 +236,8 @@ fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
         if name.eq_ignore_ascii_case("origin") {
             ensure!(
                 value == format!("http://{addr}")
-                    || value == format!("http://localhost:{}", addr.port()),
+                    || (addr.ip().is_loopback()
+                        && value == format!("http://localhost:{}", addr.port())),
                 "foreign origin"
             );
         }
@@ -243,7 +247,8 @@ fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
     }
     ensure!(
         host == Some(addr.to_string().as_str())
-            || host == Some(format!("localhost:{}", addr.port()).as_str()),
+            || (addr.ip().is_loopback()
+                && host == Some(format!("localhost:{}", addr.port()).as_str())),
         "foreign host"
     );
     Ok(first[1])
@@ -255,10 +260,7 @@ pub(crate) fn serve(
     max_seconds: u64,
     local_operator: bool,
 ) -> Result<Value> {
-    ensure!(
-        listen.ip().is_loopback(),
-        "dashboard must bind a loopback address"
-    );
+    im_service::validate_listen(listen, local_operator)?;
     ensure!(
         (1..=43200).contains(&max_seconds),
         "dashboard lifetime must be 1..43200 seconds"
@@ -309,9 +311,18 @@ pub(crate) fn serve(
             }
         });
         let result = runtime.block_on(async {
-            let execution = tokio::spawn(im_service::execution::run(
+            let scenarios = transport::scenarios(web.config.as_ref());
+            let iterations = tokio::spawn(im_service::iteration::run_with_registry(
+                web.hub.clone(),
+                scenarios.clone(),
+                Some(services.clone()),
+                max_seconds,
+                shutdown.subscribe(),
+            ));
+            let execution = tokio::spawn(im_service::execution::run_with_scenarios(
                 web.hub.clone(),
                 services.clone(),
+                scenarios,
                 max_seconds,
                 shutdown.subscribe(),
             ));
@@ -334,6 +345,8 @@ pub(crate) fn serve(
             )
             .await;
             execution.abort();
+            iterations.abort();
+            let _ = iterations.await;
             let _ = execution.await;
             let _ = scenario.await;
             served??;

@@ -61,6 +61,15 @@ states! {
     SubjectKind { Repository => "repository", Agent => "agent", Tool => "tool", Model => "model", Workflow => "workflow", Dataset => "dataset", Prompt => "prompt", Other => "other" }
     EvolutionState { Unassessed => "unassessed", Pending => "pending", Running => "running", Submitted => "submitted", Accepted => "accepted", Failed => "failed", Cancelled => "cancelled" }
     EvolutionOperation { Baseline => "baseline", Mutation => "mutation", Recombination => "recombination" }
+    IterationState { Running => "running", Paused => "paused", Stopped => "stopped", Completed => "completed", BudgetExhausted => "budget_exhausted" }
+    RoundState { Running => "running", Assessed => "assessed", Accepted => "accepted", Completed => "completed", Failed => "failed", NoImprovement => "no_improvement", Cancelled => "cancelled" }
+    CandidateState { Proposed => "proposed", Accepted => "accepted", Rejected => "rejected" }
+    EvaluationState { Passed => "passed", Failed => "failed" }
+    ActivationState { Pending => "pending", Active => "active", Failed => "failed", RolledBack => "rolled_back" }
+    ApiErrorCode { InvalidRequest => "invalid_request", Backpressure => "backpressure", StorageUnavailable => "storage_unavailable" }
+    ActivationPhase { Prepared => "prepared", Building => "building", Draining => "draining", Switching => "switching", Checking => "checking", Active => "active", RolledBack => "rolled_back", Blocked => "blocked" }
+    ScenarioCapability { Execute => "execute", Evaluate => "evaluate", Deliver => "deliver", Activate => "activate", Rollback => "rollback" }
+    CodingTaskRole { Research => "research", Implement => "implement", Review => "review" }
     ServiceKind { Storage => "storage", Executor => "executor", Sandbox => "sandbox" }
     ServiceHealth { Healthy => "healthy", Unavailable => "unavailable", Disabled => "disabled", ProtocolMismatch => "protocol_mismatch", RestartRequired => "restart_required" }
     CodingAgent { ClaudeCode => "cc", Codex => "codex", DeepseekHarness => "hds", Pi => "pi", Custom => "custom" }

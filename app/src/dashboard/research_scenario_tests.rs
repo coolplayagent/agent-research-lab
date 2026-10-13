@@ -28,6 +28,99 @@ impl Drop for Scratch {
     }
 }
 #[test]
+fn software_stages_require_successful_dependencies_regardless_of_assignment_order() {
+    let mut goal: crystal::Goal = serde_json::from_value(json!({
+        "input":{"id":"software-goal","group_id":"team","title":"Improve behavior",
+            "objective":"Fix the proven regression","acceptance":"Independent verification passes",
+            "scenario":"software-evolution","max_seconds":240,
+            "parameters":{"repository":"superpod","roles":{"reviewer":"review","builder":"implement","researcher":"research"},"delivery_policy_digest":"a".repeat(64)},
+            "assignments":[{"person_id":"reviewer","instruction":"Review"},{"person_id":"builder","instruction":"Implement"},{"person_id":"researcher","instruction":"Research"}]},
+        "state":"active","revision":1,"created_ms":0,
+        "work":[
+            {"id":"work-0","person_id":"reviewer","instruction":"Review","state":"ready","attempt":1,"claim_id":null,"deadline_ms":null,"result":null},
+            {"id":"work-1","person_id":"builder","instruction":"Implement","state":"ready","attempt":1,"claim_id":null,"deadline_ms":null,"result":null},
+            {"id":"work-2","person_id":"researcher","instruction":"Research","state":"ready","attempt":1,"claim_id":null,"deadline_ms":null,"result":null}
+        ]})).unwrap();
+    let ready = |goal: &crystal::Goal, index| {
+        super::software_scenario::ready(goal, &goal.work[index]).unwrap()
+    };
+    assert!(ready(&goal, 2));
+    assert!(!ready(&goal, 1));
+    assert!(!ready(&goal, 0));
+    goal.work[2].state = WorkState::Submitted;
+    assert!(
+        !ready(&goal, 1),
+        "a state without a successful receipt is insufficient"
+    );
+    goal.work[2].result = Some(crystal::WorkResult {
+        code: None,
+        succeeded: true,
+        summary: "Reproducible regression found".into(),
+        evidence: json!({}),
+    });
+    assert!(ready(&goal, 1));
+    assert!(!ready(&goal, 0));
+    let implementation = super::software_scenario::task(&goal, &goal.work[1], &[]).unwrap();
+    assert!(implementation.write);
+    assert_eq!(
+        implementation.dependencies,
+        vec![job_id(&goal, &goal.work[2])]
+    );
+    assert!(
+        implementation
+            .prompt
+            .contains("Reproducible regression found")
+    );
+    goal.work[1].state = WorkState::Submitted;
+    goal.work[1].result = Some(crystal::WorkResult {
+        code: None,
+        succeeded: true,
+        summary: "Candidate includes focused verification".into(),
+        evidence: json!({}),
+    });
+    assert!(ready(&goal, 0));
+    let review = super::software_scenario::task(&goal, &goal.work[0], &[]).unwrap();
+    assert!(!review.write);
+    assert_eq!(
+        review.dependencies,
+        vec![job_id(&goal, &goal.work[1]), job_id(&goal, &goal.work[2])]
+    );
+    assert!(
+        review
+            .prompt
+            .contains("Candidate includes focused verification")
+    );
+    goal.work[2].state = WorkState::Failed;
+    assert!(!ready(&goal, 0));
+    assert!(!ready(&goal, 1));
+}
+
+#[test]
+fn native_scope_retains_completed_dependencies_and_rejects_other_goal_attempts() {
+    let temp = Scratch::new();
+    let root = temp.path();
+    let c: Config = serde_json::from_value(json!({"schema_version":1,"workspace":root,"state_dir":root.join("state"),"superpod":root,"codex":"unused","workflow":"unused","daily_seconds":600,"max_agents":1,"task_timeout_seconds":60,"require_latest":false,"models":{},"tools":{}})).unwrap();
+    let mut owners = BTreeMap::new();
+    for (id, dependencies) in [
+        ("researcher", vec![]),
+        ("implementer", vec!["researcher"]),
+        ("reviewer", vec!["implementer", "researcher"]),
+    ] {
+        let job: Job = serde_json::from_value(json!({"task":{"id":id,"role":"research","repository":"superpod","prompt":"frozen","dependencies":dependencies},"model":"fixture","source_commit":"a".repeat(40),"superpod_commit":"b".repeat(40),"prompt_digest":"c".repeat(64),"config_digest":"d".repeat(64),"worktree":root,"run_id":format!("{id}-attempt-1"),"attempt":1,"last_error":null,"launch":null})).unwrap();
+        storage::write(&c.state_dir.join("jobs").join(format!("{id}.json")), &job).unwrap();
+        owners.insert(id.into(), "current-goal".into());
+    }
+    let pending = vec![("reviewer".into(), 1000)];
+    assert_eq!(
+        execution_scope(&c, &pending, &owners).unwrap(),
+        vec!["implementer", "researcher", "reviewer"]
+    );
+    owners.insert("researcher".into(), "another-goal".into());
+    assert!(execution_scope(&c, &pending, &owners).is_err());
+    owners.remove("researcher");
+    assert!(execution_scope(&c, &pending, &owners).is_err());
+}
+#[test]
 fn group_objective_becomes_a_read_only_person_bound_research_task() {
     let temp = Scratch::new();
     let c: Config = serde_json::from_value(json!({"schema_version":1,"workspace":temp.path(),"state_dir":temp.path().join("state"),"superpod":temp.path(),"codex":"unused","workflow":"unused","daily_seconds":600,"max_agents":2,"task_timeout_seconds":60,"require_latest":false,"models":{"research":"fixture"},"tools":{}})).unwrap();

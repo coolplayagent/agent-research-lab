@@ -1,6 +1,7 @@
 import { get } from "./dom.js";
 import { t } from "./i18n.js";
 import { loadEvolution } from "./evolution.js";
+import { loadIterations } from "./iterations.js";
 let tab = "collaboration";
 export function selectTab(name) {
     if (!document.querySelector(`[data-tab="${name}"]`))
@@ -18,6 +19,8 @@ export function selectTab(name) {
     }
     if (changed && tab === "evolution")
         void loadEvolution();
+    if (changed && tab === "iterations")
+        void loadIterations();
 }
 export function revealResearch(name) {
     const root = get("workspace");

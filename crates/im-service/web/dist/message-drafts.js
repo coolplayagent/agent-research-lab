@@ -1,3 +1,4 @@
+import { uuid } from "/assets/shared/identity.js";
 /** A request belongs to its conversation, including while another one is open. */
 export class MessageDrafts {
     drafts = new Map();
@@ -15,7 +16,7 @@ export class MessageDrafts {
         if (!message || message.text !== text || message.reply_to !== draft.reply) {
             if (message)
                 this.discussions.delete(message.request_id);
-            message = { group_id: id, request_id: crypto.randomUUID(), text, reply_to: draft.reply };
+            message = { group_id: id, request_id: uuid(), text, reply_to: draft.reply };
             this.pending.set(id, message);
         }
         this.save(id, draft);

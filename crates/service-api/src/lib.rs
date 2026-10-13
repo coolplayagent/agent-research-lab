@@ -1,8 +1,10 @@
 //! Versioned service and coding-agent contracts. Implementations live in independent processes.
 mod registry;
+mod scenarios;
 use anyhow::{Result, ensure};
 use contracts::{AgentProtocol, CodingAgent, ServiceKind};
 pub use registry::*;
+pub use scenarios::*;
 use serde::{Deserialize, Serialize};
 use service_protocol as rpc;
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};

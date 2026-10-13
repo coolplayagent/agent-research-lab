@@ -50,16 +50,21 @@ impl Web {
         }
     }
 }
+pub(super) fn scenarios(
+    config: Option<&Arc<Config>>,
+) -> Arc<Vec<Arc<dyn im_service::ScenarioAdapter>>> {
+    let mut scenarios = im_service::default_scenarios().as_ref().clone();
+    if let Some(config) = config {
+        scenarios.push(Arc::new(super::research_scenario::Research(config.clone())));
+        scenarios.push(Arc::new(super::software_scenario::Software(config.clone())));
+    }
+    Arc::new(scenarios)
+}
 pub(super) fn router(web: Web) -> Router {
     let mut core = im_service::transport::Web::new(web.hub.clone(), web.addr, web.shutdown.clone());
     core.services = web.services.clone();
     core.operator = web.operator.clone();
-    if let Some(config) = &web.config {
-        core.scenarios = Arc::new(vec![
-            Arc::new(im_service::Collaboration),
-            Arc::new(super::research_scenario::Research(config.clone())),
-        ]);
-    }
+    core.scenarios = scenarios(web.config.as_ref());
     let application = Router::new()
         .route("/api/events", get(snapshots))
         .route("/api/snapshot", get(resource))

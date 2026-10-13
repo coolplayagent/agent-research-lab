@@ -1,3 +1,4 @@
+import { uuid } from "/assets/shared/identity.js";
 import { avatar } from "./avatar.js";
 import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
@@ -126,7 +127,7 @@ export function initMembers(): void {
           source: group.id,
           history_from: value("include-history") === "all" ? 0 : null,
           group: {
-            id: "dm-" + crypto.randomUUID(),
+            id: "dm-" + uuid(),
             title:
               `${group.title}、${[...picker.chosen.values()].map((p) => p.name).join("、")}`.slice(
                 0,

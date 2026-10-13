@@ -1,3 +1,4 @@
+import { uuid } from "/assets/shared/identity.js";
 import { avatar } from "./avatar.js";
 import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
@@ -51,7 +52,7 @@ export async function loadPeople(append = false) {
 }
 function openPerson(person) {
     editing = person;
-    personId = person?.id || "agent-" + crypto.randomUUID();
+    personId = person?.id || "agent-" + uuid();
     get("person-form").reset();
     get("person-dialog-title").textContent = person ? t("layout.editPerson") : t("html.a29c23de8c");
     get("person-name").value = person?.name || "";

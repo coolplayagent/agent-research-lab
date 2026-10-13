@@ -1,3 +1,4 @@
+import { uuid } from "/assets/shared/identity.js";
 import { TopicState, SubjectKind, GroupKind, } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
 import { t, label } from "./i18n.js";
@@ -15,7 +16,7 @@ export async function topicForm(old, done) {
             throw new Error(t("workspace.topicLimit"));
         cursor = next;
     } while (cursor);
-    const box = dialog(t("research.topicForm")), id = input(old?.id || "topic-" + crypto.randomUUID()), title = input(old?.title || ""), objective = area(old?.objective || ""), state = select(Object.values(TopicState).map((s) => [s, label("TopicState", s)]), old?.state || TopicState.Active);
+    const box = dialog(t("research.topicForm")), id = input(old?.id || "topic-" + uuid()), title = input(old?.title || ""), objective = area(old?.objective || ""), state = select(Object.values(TopicState).map((s) => [s, label("TopicState", s)]), old?.state || TopicState.Active);
     const options = groups.map(group => [group.id, group.title]);
     if (old && !groups.some(group => group.id === old.group_id))
         options.push([old.group_id, old.group_id]);
@@ -49,7 +50,7 @@ export async function topicForm(old, done) {
     });
 }
 export function subjectForm(topic, old, done) {
-    const box = dialog(t("research.subjectForm")), id = input(old?.id || "subject-" + crypto.randomUUID()), name = input(old?.name || ""), kind = select(Object.values(SubjectKind).map((s) => [s, label("SubjectKind", s)]), old?.kind || SubjectKind.Repository), reference = input(old?.reference || "");
+    const box = dialog(t("research.subjectForm")), id = input(old?.id || "subject-" + uuid()), name = input(old?.name || ""), kind = select(Object.values(SubjectKind).map((s) => [s, label("SubjectKind", s)]), old?.kind || SubjectKind.Repository), reference = input(old?.reference || "");
     id.readOnly = !!old;
     for (const node of [id, name, reference])
         node.required = true;
@@ -77,7 +78,7 @@ export async function nodeForm(subject, group, nodes, done) {
         goals.push(...page.goals);
         after = page.next_after || "";
     } while (after && goals.length < 4096);
-    const box = dialog(t("research.nodeForm")), id = input("version-" + crypto.randomUUID()), version = input(""), reference = input(subject.reference), goal = select([
+    const box = dialog(t("research.nodeForm")), id = input("version-" + uuid()), version = input(""), reference = input(subject.reference), goal = select([
         ["", t("research.unassessed")],
         ...goals.map((g) => [g.input.id, g.input.title]),
     ], ""), parents = area("");

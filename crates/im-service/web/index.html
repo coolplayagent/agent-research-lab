@@ -86,6 +86,7 @@
           ></a>
           <h2 data-i18n="html.638daed1c4"></h2>
           <nav data-i18n-aria-label="workspace.settingsNav">
+            <a href="#settings/scenarios" data-setting="scenarios" data-i18n="scenarioSettings.title"></a>
             <a
               href="#settings/services"
               data-setting="services"
@@ -317,6 +318,14 @@
 
         <section id="settings-page" class="content-page" hidden>
           <p id="services-status" role="status"></p>
+          <section data-settings-panel="scenarios" hidden>
+            <header>
+              <h2 data-i18n="scenarioSettings.title"></h2>
+              <button id="add-scenario" class="primary" data-i18n="scenarioSettings.add"></button>
+            </header>
+            <p data-i18n="scenarioSettings.note"></p>
+            <div id="scenario-list" class="cards"></div>
+          </section>
           <section data-settings-panel="services">
             <header>
               <h2 data-i18n="workspace.services"></h2>
@@ -400,6 +409,13 @@
             data-i18n="workspace.goals"
           ></button>
           <button
+            id="tab-iterations"
+            role="tab"
+            aria-controls="iterations-page"
+            data-tab="iterations"
+            data-i18n="iterations.title"
+          ></button>
+          <button
             id="tab-members"
             role="tab"
             aria-controls="members-page"
@@ -408,6 +424,19 @@
           ></button>
         </div>
         <div class="research-body">
+          <section id="iterations-page" class="research-tab" hidden>
+            <div class="toolbar">
+              <h2 data-i18n="iterations.title"></h2>
+              <button id="new-iteration" class="primary" disabled data-i18n="iterations.create"></button>
+              <button id="refresh-iterations" data-i18n="research.refresh"></button>
+            </div>
+            <p data-i18n="iterations.description"></p>
+            <p id="iteration-status" role="status"></p>
+            <div id="iteration-list"></div>
+            <button id="more-iterations" hidden data-i18n="research.more"></button>
+            <button id="close-iteration" data-i18n="iterations.closeDetail"></button>
+            <section id="iteration-detail" class="research-detail" hidden></section>
+          </section>
           <section id="collaboration-page" class="research-tab">
             <p id="collaboration-status" role="status"></p>
             <div id="collaboration-graph"></div>

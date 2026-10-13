@@ -107,6 +107,73 @@ export declare const EvolutionOperation: {
     readonly Recombination: "recombination";
 };
 export type EvolutionOperation = (typeof EvolutionOperation)[keyof typeof EvolutionOperation];
+export declare const IterationState: {
+    readonly Running: "running";
+    readonly Paused: "paused";
+    readonly Stopped: "stopped";
+    readonly Completed: "completed";
+    readonly BudgetExhausted: "budget_exhausted";
+};
+export type IterationState = (typeof IterationState)[keyof typeof IterationState];
+export declare const RoundState: {
+    readonly Running: "running";
+    readonly Assessed: "assessed";
+    readonly Accepted: "accepted";
+    readonly Completed: "completed";
+    readonly Failed: "failed";
+    readonly NoImprovement: "no_improvement";
+    readonly Cancelled: "cancelled";
+};
+export type RoundState = (typeof RoundState)[keyof typeof RoundState];
+export declare const CandidateState: {
+    readonly Proposed: "proposed";
+    readonly Accepted: "accepted";
+    readonly Rejected: "rejected";
+};
+export type CandidateState = (typeof CandidateState)[keyof typeof CandidateState];
+export declare const EvaluationState: {
+    readonly Passed: "passed";
+    readonly Failed: "failed";
+};
+export type EvaluationState = (typeof EvaluationState)[keyof typeof EvaluationState];
+export declare const ActivationState: {
+    readonly Pending: "pending";
+    readonly Active: "active";
+    readonly Failed: "failed";
+    readonly RolledBack: "rolled_back";
+};
+export type ActivationState = (typeof ActivationState)[keyof typeof ActivationState];
+export declare const ApiErrorCode: {
+    readonly InvalidRequest: "invalid_request";
+    readonly Backpressure: "backpressure";
+    readonly StorageUnavailable: "storage_unavailable";
+};
+export type ApiErrorCode = (typeof ApiErrorCode)[keyof typeof ApiErrorCode];
+export declare const ActivationPhase: {
+    readonly Prepared: "prepared";
+    readonly Building: "building";
+    readonly Draining: "draining";
+    readonly Switching: "switching";
+    readonly Checking: "checking";
+    readonly Active: "active";
+    readonly RolledBack: "rolled_back";
+    readonly Blocked: "blocked";
+};
+export type ActivationPhase = (typeof ActivationPhase)[keyof typeof ActivationPhase];
+export declare const ScenarioCapability: {
+    readonly Execute: "execute";
+    readonly Evaluate: "evaluate";
+    readonly Deliver: "deliver";
+    readonly Activate: "activate";
+    readonly Rollback: "rollback";
+};
+export type ScenarioCapability = (typeof ScenarioCapability)[keyof typeof ScenarioCapability];
+export declare const CodingTaskRole: {
+    readonly Research: "research";
+    readonly Implement: "implement";
+    readonly Review: "review";
+};
+export type CodingTaskRole = (typeof CodingTaskRole)[keyof typeof CodingTaskRole];
 export declare const ServiceKind: {
     readonly Storage: "storage";
     readonly Executor: "executor";

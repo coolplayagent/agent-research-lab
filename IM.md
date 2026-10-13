@@ -31,6 +31,15 @@ Agent bearer credentials still authenticate their scoped APIs and do not become
 operator grants. The default remains credential-based operator access. A local-mode
 management link is an ordinary workspace URL, without a credential fragment.
 
+To let other computers connect, bind `--listen` to the current IPv4 address of the
+chosen network interface, such as `wlp0s20f3`, and keep the default credential mode.
+The generated `serve-link` uses that bound address. Client IP addresses are not
+allowlisted: any computer that can reach the address may exchange a valid operator
+credential for a session. The service requires a concrete interface address rather
+than an unspecified wildcard. `--local-operator` remains restricted to loopback and
+cannot enable unauthenticated remote management. Interface addresses and operator
+links belong in private deployment state, not committed configuration.
+
 Deployment must preserve the private state directory. Stop the old services, retain
 the old binary and a consistent database backup, install the verified artifact,
 and restart a single service on the existing address. SQLite schemas migrate
@@ -388,3 +397,109 @@ Topic/subject lists use stable ID cursors; graph pages use durable sequence curs
 Additive SQLite schema v5 owns topics, subjects, nodes and parent edges in the
 storage service. The graph UI supports subject/topic filters, pagination, zoom,
 keyboard node selection and inspection of goal results and evidence.
+
+## Multi-scenario recursive improvement
+
+The platform separates collaboration, iteration coordination and scenario execution.
+Core collaboration owns identities, groups, messages and goals. The generic
+iteration engine owns frozen inputs, rounds, candidate versions, independent
+evaluations, host acceptance, optional activation and feedback. Scenario adapters
+own domain-specific execution and evidence requirements. The engine has no CLI,
+repository, MR, vendor or four-person assumption; it starts without research
+configuration.
+
+The **演进迭代** tab starts a run in the selected conversation. Choose a scenario,
+an existing subject and baseline, the participants and their instructions, a round
+limit, an execution limit and a total budget. Scenario descriptors declare optional
+assignment roles and recommended execution seconds; the UI renders these values
+without imposing software roles on other scenarios. Software evolution declares
+research, implementation and independent review roles; other adapters may
+declare different identifiers. Existing assignment and resource bounds remain.
+Scenarios with required assignment roles use the iteration form; the ordinary
+goal picker only offers scenarios that it can configure.
+
+The generic collaboration scenario accepts external workers. The built-in
+`design-review` scenario runs bound agents to propose and independently review
+structured plans without a Git checkout, MR or code build. Its results are real
+agent submissions; a host records the evidence and accepts a candidate explicitly.
+The optional `research` scenario retains read-only CLI investigation, and
+`software-evolution` adds the repository-specific implementation and delivery
+policy. Four-agent CLI research is one deployment configuration of these adapters.
+Researching the platform itself uses a separate run and subject.
+
+`GET /api/im/iterations` accepts `group_id`, `scenario_id`, `after` and `active`
+filters and returns full run records. `POST /api/im/iterations` requires the
+`manage-crystal` intent and an envelope containing `request_id`, `run_id`,
+`revision` and an `action` tagged by `operation`. Creation freezes an `input` with
+the goal criteria, scenario parameters, subject, baseline, assignments and budgets.
+Pause, resume and stop use the same revision-bound idempotent envelope. Pausing
+blocks new claims and rounds while already claimed work retains its bound; stopping
+cancels the current round. An activation that has claimed its switching phase must
+first settle through host reconciliation; pause and stop are fenced while it is
+pending. Candidate, evaluation, acceptance, activation and round
+completion are separate recorded operations, each checked against the current
+goal and assignment attempts. Goals belonging to an iteration cannot be accepted,
+cancelled or retried through the ordinary goal mutation API; use the iteration
+controls so its evidence and lifecycle remain consistent.
+
+The detail panel presents candidate assessment, independent evaluation and actual
+activation separately. Its host review dialog references the evaluator's recorded
+work evidence and current goal revision. Candidate authors cannot evaluate their
+own candidates. Scenarios declare whether manual review is allowed. Policy-managed
+software evolution and external scenario services reject manual candidate,
+evaluation, acceptance and activation operations at the HTTP boundary; their
+adapter owns those gated transitions. An accepted result does not imply deployment; no-candidate,
+unassessed, failed and unknown results remain distinct. A completed iteration may
+also mean its configured round limit has been reached, so inspect its individual
+round outcomes. Public tool traces are shown only for scenarios advertising the
+`public_process` capability, with existing sanitization and attempt fences.
+
+System settings include a **场景服务** page. Optional `configuration.scenarios`
+entries specify stable ID, private Unix endpoint, enabled state, protocol version,
+declared capabilities and dependencies on configured services. Existing agent
+bindings select execution adapters independently. The versioned scenario protocol
+supports probe, goal validation and revision/attempt-bound reconciliation. A
+reconciliation request retains the same identity for retries; external effects
+must reconcile uncertain responses before being repeated. Configuration, protocol
+health and actual task results are shown separately. Credentials stay in service
+environments and are not returned in configuration responses.
+
+Repeated research of one source commit now creates separate immutable assessments
+under one version node. Each assessment binds its own goal, assignment attempts and
+per-work source, prompt, policy and SuperPOD pins. The optional CLI reconciler reads
+one bounded page of recorded goals at a time through the storage client, recovering
+its host cursor from private state. It creates only references supported by frozen
+jobs or matching recorded work evidence; incomplete or inconsistent history is
+left unassessed. It does not infer parent edges, invent promotions or copy knowledge
+out of SuperPOD. Existing host-edited topic and subject data is preserved.
+
+Group status events refresh both iteration records and visible version assessments,
+including changes that do not alter the group catalog. Reconnection fetches current
+state again. Request generations fence group switches; lower revisions cannot
+replace a newer displayed iteration. Version details link recent assessments back
+to their goals and evidence.
+
+### Storage migration and interrupted activation
+
+Collaboration storage schema v6 adds iteration records, request identities,
+goal bindings and immutable research assessments. The storage service remains the
+only writer and applies the additive migration when it starts. Prepare and back up
+its data before changing the storage deployment. The four-service rollout checks
+the new and previous storage binaries against a disposable data copy before
+changing live unit definitions; incompatible migration/rollback compatibility
+blocks the rollout. It never substitutes another database to make a check pass.
+
+If an activation stops after durable admission, inspect its private operation
+directory and run:
+
+```sh
+agent-research-lab software-activation-reconcile <operation-dir>
+```
+
+This command checks the actual service health, loaded configuration and executable
+hashes against the saved installation proof. It produces a receipt bound to the
+operation and activation claim only when the candidate or previous installation
+can be verified. The delivery coordinator then settles that receipt through the
+storage API. An uncertain installation remains pending; elapsed time alone does
+not unlock pause/stop or claim success. Reconciliation does not replay deployment,
+change service configuration or edit the collaboration database.

@@ -53,6 +53,22 @@ export interface EvolutionRow {
   status: EvolutionState;
   operation: EvolutionOperation;
   goal: Goal | null;
+  assessment_count?: number;
+  assessments?: {
+    assessment: {
+      input: {
+        id: string;
+        node_id: string;
+        goal_id: string;
+        goal_attempts: Record<string, number>;
+        pins_by_work: Record<string, Pins>;
+      };
+      created_ms: number;
+    };
+    status: EvolutionState;
+    goal_title: string;
+    goal_revision: number;
+  }[];
 }
 export interface GraphPage {
   nodes: EvolutionRow[];

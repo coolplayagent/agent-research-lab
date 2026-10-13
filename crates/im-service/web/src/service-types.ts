@@ -3,6 +3,7 @@ import type {
   AgentProtocol,
   ServiceKind,
   ServiceHealth,
+  ScenarioCapability,
 } from "/assets/shared/contracts.js";
 export interface Service {
   id: string;
@@ -29,6 +30,15 @@ export interface Configuration {
   services: Service[];
   adapters: Adapter[];
   bindings: Record<string, string>;
+  scenarios?: ScenarioRegistration[];
+}
+export interface ScenarioRegistration {
+  id: string;
+  endpoint: string;
+  enabled: boolean;
+  protocol_version: number;
+  capabilities: ScenarioCapability[];
+  dependencies: string[];
 }
 export interface ServiceView {
   configuration: Configuration;
@@ -41,4 +51,9 @@ export interface ServiceView {
   restart_required: boolean;
   active_storage: [string, string] | null;
   protocol_version: number;
+  scenario_health?: {
+    id: string;
+    status: ServiceHealth;
+    error: string | null;
+  }[];
 }

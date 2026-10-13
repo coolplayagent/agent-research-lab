@@ -1,6 +1,7 @@
 import { syncControls } from "./workspace.js";
 import { selectMentions } from "./mentions.js";
-import { selectEvolution } from "./evolution.js";
+import { selectEvolution, refreshEvolution } from "./evolution.js";
+import { selectIterations, refreshIterations } from "./iterations.js";
 import { selectCollaboration, refreshCollaboration } from "./collaboration.js";
 import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
@@ -34,6 +35,7 @@ export function renderHeader(group) {
         ? t("conversation.cbe48cfa3a")
         : t("conversation.5292ab1a36");
     get("new-goal").disabled = group.archived;
+    selectIterations(group);
     updateComposer(group);
 }
 export async function select(group) {
@@ -46,6 +48,7 @@ export async function select(group) {
     suspendMessages();
     suspendGoals();
     selectEvolution(group.id);
+    selectIterations(null);
     selectCollaboration(null);
     selectMentions("");
     const request = ++generation;
@@ -91,6 +94,8 @@ export async function select(group) {
             metrics(status.metrics);
             void loadGoals();
             refreshCollaboration();
+            refreshEvolution();
+            refreshIterations();
             if (changed)
                 void loadGroups();
         });
@@ -99,8 +104,12 @@ export async function select(group) {
                 get("connection").textContent = t("conversation.dd2b0733b6");
         };
         stream.onopen = () => {
-            if (request === generation)
+            if (request === generation) {
                 get("connection").textContent = t("conversation.021bd7f674");
+                void loadGoals();
+                refreshEvolution();
+                refreshIterations();
+            }
         };
         stream.addEventListener("fault", () => {
             if (request === generation)

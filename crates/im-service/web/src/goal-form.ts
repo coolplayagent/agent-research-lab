@@ -1,3 +1,4 @@
+import { uuid } from "/assets/shared/identity.js";
 import { busy } from "./feedback.js";
 import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
@@ -90,7 +91,7 @@ async function members(append = false): Promise<void> {
 export async function openGoal(scenarioId = "collaboration"): Promise<void> {
   if (!current || current.kind === GroupKind.Board || current.archived) return;
   groupId = current.id;
-  goalId = "goal-" + crypto.randomUUID();
+  goalId = "goal-" + uuid();
   get<HTMLFormElement>("goal-form").reset();
   get("goal-group-name").textContent = current.title;
   notice("", "goal-status");
@@ -98,7 +99,7 @@ export async function openGoal(scenarioId = "collaboration"): Promise<void> {
     const result = await api<{
       scenarios: Scenario[];
     }>("/api/im/scenarios");
-    scenarios = result.scenarios;
+    scenarios = result.scenarios.filter(scenario => !scenario.assignment_roles?.length);
     const select = get<HTMLSelectElement>("goal-scenario");
     select.replaceChildren();
     for (const scenario of scenarios) {

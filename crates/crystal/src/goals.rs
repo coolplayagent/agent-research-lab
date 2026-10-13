@@ -245,7 +245,21 @@ impl Store {
                     .collect::<serde_json::Result<Vec<_>>>()?;
                 let next = (goals.len() > 50).then(|| goals[49].input.id.clone());
                 goals.truncate(50);
-                Ok(json!({"goals":goals,"next_after":next}))
+                let mut projection = serde_json::to_value(&goals)?;
+                for goal in projection.as_array_mut().unwrap() {
+                    let iteration: Option<String> = self
+                        .connection
+                        .query_row(
+                            "SELECT run_id FROM evolution_goal_bindings WHERE goal_id=?1",
+                            [goal["input"]["id"].as_str().unwrap()],
+                            |row| row.get(0),
+                        )
+                        .optional()?;
+                    if let Some(iteration) = iteration {
+                        goal["iteration_id"] = json!(iteration);
+                    }
+                }
+                Ok(json!({"goals":projection,"next_after":next}))
             }
         }
     }
@@ -270,6 +284,14 @@ impl Store {
             "goal changed; refresh before editing"
         );
         available(&tx, &goal.input.group_id)?;
+        ensure!(
+            !tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM evolution_goal_bindings WHERE goal_id=?1)",
+                [&goal.input.id],
+                |row| row.get::<_, bool>(0)
+            )?,
+            "iteration-owned goals require iteration operations; retry in a new round"
+        );
         let mut changed_work = None;
         let kind = match change {
             GoalChange::Accept { .. } => {
@@ -321,7 +343,7 @@ impl Store {
     }
 }
 
-fn create_goal(tx: &rusqlite::Transaction<'_>, input: GoalInput) -> Result<Goal> {
+pub(crate) fn create_goal(tx: &rusqlite::Transaction<'_>, input: GoalInput) -> Result<Goal> {
     input.validate()?;
     let prior = tx
         .query_row("SELECT value FROM goals WHERE id=?1", [&input.id], |r| {

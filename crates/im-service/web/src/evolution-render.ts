@@ -128,6 +128,23 @@ export function showNode(row: EvolutionRow): void {
     );
   }
   panel.append(pins);
+  if (row.assessments?.length) {
+    panel.append(el("h4", t("research.assessmentCount", { count: row.assessment_count || row.assessments.length })));
+    for (const assessment of row.assessments) {
+      const card = el("article", undefined, "card");
+      card.append(
+        button(assessment.goal_title, () => focusGoal(assessment.assessment.input.goal_id)),
+        el("p", label("EvolutionState", assessment.status)),
+      );
+      const details = el("details");
+      details.append(
+        el("summary", t("research.evidence")),
+        el("pre", JSON.stringify(assessment.assessment.input, null, 2)),
+      );
+      card.append(details);
+      panel.append(card);
+    }
+  }
   if (row.goal) {
     panel.append(
       button(row.goal.input.title, () => focusGoal(row.goal!.input.id)),

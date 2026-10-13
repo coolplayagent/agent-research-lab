@@ -32,7 +32,7 @@ impl Web {
     pub fn new(hub: impl Into<Hub>, addr: SocketAddr, shutdown: watch::Sender<bool>) -> Self {
         Self {
             services: None,
-            scenarios: Arc::new(vec![Arc::new(crate::Collaboration)]),
+            scenarios: crate::default_scenarios(),
             hub: hub.into(),
             operator: None,
             addr,
@@ -60,6 +60,10 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
         .route("/api/crystal/history", get(crate::agents::history))
         .route("/api/im/people", get(crate::agents::people))
         .route("/api/im/scenarios", get(crate::goals::scenarios))
+        .route(
+            "/api/im/iterations",
+            get(crate::iteration::list).post(crate::iteration::manage),
+        )
         .route("/api/im/discussion", post(crate::goals::discuss))
         .route(
             "/api/im/goals",
@@ -120,17 +124,29 @@ pub fn token(headers: &HeaderMap) -> Result<&str> {
 }
 pub fn error(error: impl std::fmt::Display) -> Response {
     let text = error.to_string();
-    let code = if text.contains("backpressure") {
-        StatusCode::TOO_MANY_REQUESTS
+    let (status, code) = if text.contains("backpressure") {
+        (
+            StatusCode::TOO_MANY_REQUESTS,
+            contracts::ApiErrorCode::Backpressure,
+        )
     } else if text.contains("writer fault") {
-        StatusCode::SERVICE_UNAVAILABLE
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            contracts::ApiErrorCode::StorageUnavailable,
+        )
     } else {
-        StatusCode::BAD_REQUEST
+        (
+            StatusCode::BAD_REQUEST,
+            contracts::ApiErrorCode::InvalidRequest,
+        )
     };
     response(
-        code,
+        status,
         "application/json",
-        serde_json::to_vec(&json!({"error":text.chars().take(1000).collect::<String>()})).unwrap(),
+        serde_json::to_vec(
+            &json!({"code":code,"error":text.chars().take(1000).collect::<String>()}),
+        )
+        .unwrap(),
     )
 }
 pub fn response(status: StatusCode, mime: &str, body: impl Into<Body>) -> Response {

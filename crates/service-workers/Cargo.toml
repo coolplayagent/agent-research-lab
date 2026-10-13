@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 [lib]
 name = "service_workers"
+[[bin]]
+name = "ai-im-codex-adapter"
+path = "src/codex_main.rs"
 [dependencies]
 anyhow.workspace = true
 serde.workspace = true

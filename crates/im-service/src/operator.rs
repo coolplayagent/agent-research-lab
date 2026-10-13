@@ -117,7 +117,7 @@ pub async fn protect(State(web): State<Web>, request: Request, next: Next) -> Re
         return response(
             StatusCode::FORBIDDEN,
             "application/json",
-            br#"{"error":"Local origin required"}"#.as_slice(),
+            br#"{"error":"Service origin required"}"#.as_slice(),
         );
     }
     let path = request.uri().path();

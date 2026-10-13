@@ -28,9 +28,9 @@ async function boot(local, hash, existingCookie = false) {
   } };
   modules["./directory.js"].loadGroups = async () => { loaded++; };
   class Events { addEventListener() {} }
-  await new AsyncFunction("module","exports","require","location","history","EventSource",code)(
+  await new AsyncFunction("module","exports","require","location","history","EventSource","document",code)(
     {exports:{}},{},id => { assert(modules[id],id); return modules[id]; },
-    {hash,pathname:"/",reload:noOp}, {replaceState:(_state,_title,url) => replaced.push(url)}, Events,
+    {hash,pathname:"/",reload:noOp}, {replaceState:(_state,_title,url) => replaced.push(url)}, Events, new EventTarget(),
   );
   return {nodes,calls,replaced,loaded};
 }

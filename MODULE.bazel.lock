@@ -532,7 +532,7 @@
           "FILE:@@//crates/service-protocol/Cargo.toml 46005797ead2a7df48bd691a36b83d7f9820cc6d1f2561dba1470704c683c845",
           "FILE:@@//crates/service-api/Cargo.toml d79ebc0581ca620cf135083985b0a1c32dcd382028c3960774bc68d481e58f86",
           "FILE:@@//web/shared/Cargo.toml 1b46aa54795550ee6bb24f0e2d631172f45d827712c2de4fba5bec9155cfcb21",
-          "FILE:@@//crates/service-workers/Cargo.toml 4e4e1eee11a01fd180510e436d612dd185285fd8de909b0c86fb72600e8f1186"
+          "FILE:@@//crates/service-workers/Cargo.toml 331897362da307c3e1ea0c6f6eba426b881b675f0360055874aebdc6da591e64"
         ],
         "generatedRepoSpecs": {
           "crates": {

@@ -1,12 +1,16 @@
 //! Independently deployable AI-IM. Applications attach routes to this host;
 //! the core has no research controller, experiment configuration or CLI dependency.
 mod agents;
+mod design_review;
 pub mod execution;
 mod goals;
+pub mod iteration;
+mod remote_scenario;
 mod scenarios;
 mod services;
 pub use scenarios::{
     Collaboration, ConversationDefaults, Scenario, ScenarioAdapter, ScenarioField,
+    default_scenarios,
 };
 mod assets;
 pub mod operator;
@@ -17,6 +21,18 @@ pub mod transport;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 pub use server::{serve, serve_with_local_operator};
+/// Bind one advertised interface address; remote management always requires credentials.
+pub fn validate_listen(listen: SocketAddr, local_operator: bool) -> Result<()> {
+    ensure!(
+        !listen.ip().is_unspecified() && !listen.ip().is_multicast(),
+        "select an explicit unicast interface address"
+    );
+    ensure!(
+        !local_operator || listen.ip().is_loopback(),
+        "local operator requires a loopback address"
+    );
+    Ok(())
+}
 use std::{
     fs::{self, File},
     io::Read,
@@ -47,7 +63,8 @@ fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
         if name.eq_ignore_ascii_case("origin") {
             ensure!(
                 value == format!("http://{addr}")
-                    || value == format!("http://localhost:{}", addr.port()),
+                    || (addr.ip().is_loopback()
+                        && value == format!("http://localhost:{}", addr.port())),
                 "foreign origin"
             );
         }
@@ -57,7 +74,8 @@ fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
     }
     ensure!(
         host == Some(addr.to_string().as_str())
-            || host == Some(format!("localhost:{}", addr.port()).as_str()),
+            || (addr.ip().is_loopback()
+                && host == Some(format!("localhost:{}", addr.port()).as_str())),
         "foreign host"
     );
     Ok(first[1])
@@ -65,5 +83,7 @@ fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
 
 #[cfg(test)]
 mod goal_tests;
+#[cfg(test)]
+mod iteration_tests;
 #[cfg(test)]
 mod tests;

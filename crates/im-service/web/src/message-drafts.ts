@@ -1,3 +1,4 @@
+import { uuid } from "/assets/shared/identity.js";
 export interface Draft {
   text: string;
   reply: number | null;
@@ -26,7 +27,7 @@ export class MessageDrafts {
     let message = this.pending.get(id);
     if (!message || message.text !== text || message.reply_to !== draft.reply) {
       if (message) this.discussions.delete(message.request_id);
-      message = { group_id: id, request_id: crypto.randomUUID(), text, reply_to: draft.reply };
+      message = { group_id: id, request_id: uuid(), text, reply_to: draft.reply };
       this.pending.set(id, message);
     }
     this.save(id, draft);

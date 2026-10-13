@@ -13,6 +13,18 @@ use tokio::net::UnixStream;
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    EvolutionChange {
+        change: EvolutionChange,
+    },
+    EvolutionRun {
+        run_id: String,
+    },
+    EvolutionRuns {
+        group: String,
+        scenario: String,
+        after: String,
+        active: bool,
+    },
     Discuss {
         input: GoalInput,
         message: Publish,
@@ -179,6 +191,58 @@ impl From<Hub> for Client {
     }
 }
 impl Client {
+    pub async fn evolution_change(&self, change: EvolutionChange) -> Result<EvolutionRun> {
+        match self {
+            Self::Local(hub) => hub.evolution_change(change).await,
+            Self::Remote(path) => {
+                rpc::call(
+                    path,
+                    &Request::EvolutionChange { change },
+                    Duration::from_secs(10),
+                )
+                .await
+            }
+        }
+    }
+    pub async fn evolution_run(&self, run_id: &str) -> Result<EvolutionRun> {
+        match self {
+            Self::Local(hub) => hub.evolution_run(run_id).await,
+            Self::Remote(path) => {
+                rpc::call(
+                    path,
+                    &Request::EvolutionRun {
+                        run_id: run_id.into(),
+                    },
+                    Duration::from_secs(10),
+                )
+                .await
+            }
+        }
+    }
+    pub async fn evolution_runs(
+        &self,
+        group: &str,
+        scenario: &str,
+        after: &str,
+        active: bool,
+    ) -> Result<Value> {
+        match self {
+            Self::Local(hub) => hub.evolution_runs(group, scenario, after, active).await,
+            Self::Remote(path) => {
+                rpc::call(
+                    path,
+                    &Request::EvolutionRuns {
+                        group: group.into(),
+                        scenario: scenario.into(),
+                        after: after.into(),
+                        active,
+                    },
+                    Duration::from_secs(10),
+                )
+                .await
+            }
+        }
+    }
     pub async fn research_change(&self, change: ResearchChange) -> Result<Value> {
         match self {
             Self::Local(hub) => hub.research_change(change).await,
@@ -882,6 +946,14 @@ fn info() -> rpc::ServiceInfo {
 }
 async fn execute(hub: &Hub, request: Request) -> Result<Value> {
     match request {
+        Request::EvolutionChange { change } => Ok(json!(hub.evolution_change(change).await?)),
+        Request::EvolutionRun { run_id } => Ok(json!(hub.evolution_run(&run_id).await?)),
+        Request::EvolutionRuns {
+            group,
+            scenario,
+            after,
+            active,
+        } => hub.evolution_runs(&group, &scenario, &after, active).await,
         Request::ResearchChange { change } => hub.research_change(change).await,
         Request::Topics { after, query } => hub.topics(&after, &query).await,
         Request::Subjects { topic, after } => hub.subjects(&topic, &after).await,

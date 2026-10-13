@@ -18,6 +18,7 @@ const titles: Record<string, string> = {
 const settings: Record<string, string> = {
   services: t("workspace.services"),
   adapters: t("workspace.adapters"),
+  scenarios: t("scenarioSettings.title"),
   bindings: t("workspace.bindings"),
   storage: t("workspace.storage"),
   status: t("workspace.status"),
