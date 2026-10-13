@@ -20,6 +20,28 @@ struct RepositoryPolicy {
     tests: Vec<Vec<String>>,
     /// Host-owned deployment adapter; reads one JSON request path, returns a bound receipt.
     activation: Vec<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::software_verification::optional_budget"
+    )]
+    qualitygate_snapshot_max_file_mib: Option<crate::software_verification::SnapshotMaxFileMib>,
+}
+impl RepositoryPolicy {
+    fn qualitygate_command(
+        &self,
+        program: String,
+        source: &Path,
+        baseline: &str,
+        candidate: &str,
+    ) -> Vec<String> {
+        crate::software_verification::qualitygate_command(
+            program,
+            source,
+            format!("{baseline}..{candidate}"),
+            self.qualitygate_snapshot_max_file_mib,
+        )
+    }
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 struct Verified {
@@ -279,18 +301,12 @@ fn verify(
         )?;
         anyhow::bail!("new Qualitygate policy needs adoption before candidate delivery");
     }
-    let args = vec![
+    let args = policy.qualitygate_command(
         qg,
-        "check".into(),
-        "--root".into(),
-        implementer.worktree.display().to_string(),
-        "--diff".into(),
-        format!("{}..{candidate}", implementer.source_commit),
-        "--profile".into(),
-        "full".into(),
-        "--format".into(),
-        "json".into(),
-    ];
+        &implementer.worktree,
+        &implementer.source_commit,
+        &candidate,
+    );
     let report: Value = serde_json::from_slice(&command(&args, &implementer.worktree, 1200)?)?;
     clean_candidate(&implementer, &candidate)?;
     ensure!(
@@ -863,6 +879,77 @@ pub(super) async fn reconcile(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn candidate_snapshot_budget_preserves_legacy_policy_and_full_gate_arguments() {
+        let legacy = r#"{"schema_version":1,"repositories":{"example":{"repository":"owner/repo","tests":[["cargo","test"]],"activation":["host","activate"]}}}"#;
+        let policy: DeliveryPolicy = serde_json::from_str(legacy).unwrap();
+        let bytes = serde_json::to_vec(&policy).unwrap();
+        assert_eq!(bytes, legacy.as_bytes());
+        assert_eq!(
+            storage::digest(&bytes),
+            "760d52ac5569c44711a14013d1dff8aa3f2f4dd36d8242933f48b50471b39d8e"
+        );
+        let expected = [
+            "qualitygate",
+            "check",
+            "--root",
+            "/candidate",
+            "--diff",
+            "baseline..candidate",
+            "--profile",
+            "full",
+            "--format",
+            "json",
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        assert_eq!(
+            policy.repositories["example"].qualitygate_command(
+                "qualitygate".into(),
+                Path::new("/candidate"),
+                "baseline",
+                "candidate",
+            ),
+            expected
+        );
+        for budget in [1, 5, 8] {
+            let mut value: Value = serde_json::from_str(legacy).unwrap();
+            value["repositories"]["example"]["qualitygate_snapshot_max_file_mib"] = json!(budget);
+            let configured: DeliveryPolicy = serde_json::from_value(value).unwrap();
+            let args = configured.repositories["example"].qualitygate_command(
+                "qualitygate".into(),
+                Path::new("/candidate"),
+                "baseline",
+                "candidate",
+            );
+            assert_eq!(args[..expected.len()], expected);
+            assert_eq!(
+                args[expected.len()..],
+                ["--snapshot-max-file-mib".to_owned(), budget.to_string()]
+            );
+            assert_ne!(
+                storage::digest(&serde_json::to_vec(&configured).unwrap()),
+                storage::digest(&bytes)
+            );
+            assert_eq!(
+                serde_json::to_value(&configured).unwrap()["repositories"]["example"]["qualitygate_snapshot_max_file_mib"],
+                budget
+            );
+        }
+        for invalid in [
+            json!(0),
+            json!(9),
+            json!(-1),
+            json!(256),
+            json!(1.5),
+            json!("5"),
+            Value::Null,
+        ] {
+            let mut value: Value = serde_json::from_str(legacy).unwrap();
+            value["repositories"]["example"]["qualitygate_snapshot_max_file_mib"] = invalid;
+            assert!(serde_json::from_value::<DeliveryPolicy>(value).is_err());
+        }
+    }
     #[test]
     fn activation_adapters_decode_native_cli_envelopes_and_raw_receipts() {
         let receipt = json!({"schema_version":1,"active":true,"goal_id":"goal",

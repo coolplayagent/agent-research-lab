@@ -255,6 +255,8 @@ JSON 请求契约由 `crates/delivery/src/lib.rs` 和 `crates/knowledge/src/lib.
 
 发布操作要求 `outbox/evidence` 中的哈希证据文件：真实完整 Qualitygate 报告、将报告与代码/提示词/策略/SuperPOD 绑定的宿主快照回执、不同评估者的结果回执。安装快照还绑定包与二进制哈希，仅有布尔通过标记不够。当前上游默认分支绑定及技能清单哈希也必须具备，晋级/发布在执行前再次在线检查。旧回执不能授权新发布，不得伪造证据。
 
+软件 RSI 的私有 `software-delivery.json` 和 `software-activation.json` 各仓库条目可设置 `qualitygate_snapshot_max_file_mib`，仅接受整数 `1..=8`，分别用于候选与合并后源码的完整 Qualitygate 快照采集。省略字段时保持 CLI 默认容量、原策略序列化和摘要；显式配置会改变策略摘要。该容量参数不改变验证范围或验收门禁。应在旧软件轮次和激活操作结算后，成对发布策略并为新轮次冻结新摘要，不能改写旧轮次的摘要来绕过校验。
+
 GitHub expected-head 前置条件不能原子冻结 base 分支；服务端竞态保证需要严格保持最新的分支保护或合并队列。安装将二进制放在技能目录，旧版放在技能发现范围之外；激活后冒烟验证，失败恢复旧版。后续变更会阻止旧回执覆盖新安装。GitHub 交付验证当前 CI、可合并性、必需评审和未解决讨论，不使用管理员绕过。
 
 宿主也可显式调用 `install INPUT`、`rollback RECEIPT`、`pr INPUT`、`merge INPUT`、`knowledge-prepare INPUT`、`knowledge-publish INPUT`、`knowledge-refresh INPUT`。这些操作有实际副作用，控制器不会将任意模型输出转成发布权限。
