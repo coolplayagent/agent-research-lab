@@ -99,10 +99,14 @@ export async function iterationForm(
       capabilities: (selected?.capabilities || []).map(c => label("ScenarioCapability", c)).join(" · "),
     });
     for (const item of selected?.fields || []) {
-      const control = select(item.options.map(option => [option, item.id === "interaction"
+      const fixedChoice = label("ScenarioFieldChoice", item.id);
+      const control = select(item.options.map(option => [option,
+        item.options.length === 1 && fixedChoice !== item.id ? fixedChoice : item.id === "interaction"
         ? label("ResearchInteraction", option) : option]), item.options[0] || "");
       control.dataset.parameter = item.id;
       parameterPanel.append(field(label("ScenarioField", item.id), control));
+      const explanation = label("ScenarioFieldDescription", item.id);
+      if (explanation !== item.id) parameterPanel.append(el("small", explanation));
     }
   }
   let selection = 0;
