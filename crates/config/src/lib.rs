@@ -45,6 +45,10 @@ pub struct Tool {
     pub probe: Vec<String>,
 }
 impl Config {
+    pub fn to_toml(&self) -> Result<String> {
+        self.validate()?;
+        Ok(toml::to_string(self)?)
+    }
     pub fn load(path: &Path) -> Result<Self> {
         let c: Self = toml::from_str(&std::fs::read_to_string(path)?)?;
         c.validate()?;

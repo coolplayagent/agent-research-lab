@@ -1,6 +1,8 @@
 import { api, query } from "./api.js";
 import { button, el } from "./dom.js";
 import { label, t } from "./i18n.js";
+import { scenarioDescriptor } from "./scenario-catalog.js";
+export function supportsProcess(scenarioId) { return scenarioDescriptor(scenarioId)?.public_process === true; }
 // Retain only bounded expansion keys; attempts never share an expansion or page.
 const expanded = new Set();
 export function researchProcess(goal, work) {

@@ -142,7 +142,7 @@ async fn actual_async_http_enforces_origin_intent_and_resource_boundaries() {
     ] {
         let response=h.raw(format!("POST /api/crystal/manage HTTP/1.1\r\nHost: {}\r\n{extra}Content-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}",h.addr)).await;
         assert!(!response.starts_with("HTTP/1.1 200"));
-        assert!(response.contains("same-origin") || response.contains("Local origin"));
+        assert!(response.contains("same-origin") || response.contains("Service origin"));
     }
     h.close().await;
 }

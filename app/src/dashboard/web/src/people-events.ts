@@ -1,3 +1,4 @@
+import { uuid } from "/assets/shared/identity.js";
 import { t } from "./i18n.js";
 import { label } from "./i18n.js";
 import { workspaceState } from "./state.js";
@@ -63,7 +64,7 @@ export function initialize(): void {
       workspaceState.memoryNoteRequest?.note === note &&
       workspaceState.memoryNoteRequest.id === id
         ? workspaceState.memoryNoteRequest
-        : { id, note, key: crypto.randomUUID() };
+        : { id, note, key: uuid() };
     $("person-remember").disabled = true;
     try {
       await peopleApi({

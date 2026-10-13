@@ -45,6 +45,12 @@ impl ScenarioAdapter for Research {
         repositories.extend(self.0.tools.keys().cloned());
         Scenario {
             id: "research".into(),
+            protocol_version: crystal::SCENARIO_PROTOCOL_VERSION,
+            capabilities: vec![contracts::ScenarioCapability::Execute],
+            assignment_roles: vec![],
+            execution_seconds: Some(self.0.task_timeout_seconds.saturating_add(60)),
+            public_process: true,
+            manual_review: true,
             conversation: Some(im_service::ConversationDefaults {
                 parameters: json!({"repository":"superpod","interaction":contracts::ResearchInteraction::Discussion}),
                 max_seconds: self.0.task_timeout_seconds.saturating_add(60).min(43200),
@@ -117,6 +123,45 @@ pub(super) fn job_id(goal: &Goal, work: &WorkItem) -> String {
 }
 fn claim_id(work: &WorkItem) -> String {
     format!("research-attempt-{}", work.attempt)
+}
+/// Keep completed dependencies in the bounded native scope without admitting
+/// work belonging to another collaboration goal or a superseded attempt.
+pub(super) fn execution_scope(
+    c: &Config,
+    pending: &[(String, u64)],
+    owners: &BTreeMap<String, String>,
+) -> Result<Vec<String>> {
+    let mut selected = BTreeSet::new();
+    for (root, _) in pending {
+        let owner = owners
+            .get(root)
+            .context("native goal owner is unavailable")?;
+        let mut closure = BTreeSet::new();
+        let mut stack = vec![root.clone()];
+        while let Some(id) = stack.pop() {
+            config::safe_id(&id)?;
+            ensure!(
+                owners.get(&id) == Some(owner),
+                "native dependency belongs to another goal or attempt"
+            );
+            if !closure.insert(id.clone()) {
+                continue;
+            }
+            ensure!(
+                closure.len() <= 256,
+                "native dependency scope exceeds its limit"
+            );
+            let job = read_job(&c.state_dir.join("jobs").join(format!("{id}.json")))?;
+            ensure!(job.task.id == id, "native dependency identity mismatch");
+            stack.extend(job.task.dependencies);
+        }
+        if selected.union(&closure).count() > 256 {
+            break;
+        }
+        selected.extend(closure);
+    }
+    ensure!(!selected.is_empty(), "native execution scope is empty");
+    Ok(selected.into_iter().collect())
 }
 pub(super) fn task(
     goal: &Goal,
@@ -240,6 +285,9 @@ async fn advance(
     goal: &Goal,
     work: &WorkItem,
 ) -> Result<Option<(String, u64)>> {
+    if work.state == WorkState::Ready && c.state_dir.join("private/activation-drain").exists() {
+        return Ok(None);
+    }
     if !turn_ready(goal, work)? {
         return Ok(None);
     }
@@ -277,7 +325,11 @@ async fn advance(
         let history = hub
             .history_before(&goal.input.group_id, i64::MAX as u64, 32)
             .await?;
-        let input = task(goal, work, &history)?;
+        let input = if goal.input.scenario == "software-evolution" {
+            super::software_scenario::task(goal, work, &history)?
+        } else {
+            task(goal, work, &history)?
+        };
         let config = c.clone();
         let result = tokio::task::spawn_blocking(move || {
             let _deadline = process::deadline_scope(Duration::from_secs(60));
@@ -343,6 +395,9 @@ async fn advance(
     Ok(Some((id, deadline)))
 }
 pub(super) fn turn_ready(goal: &Goal, work: &WorkItem) -> Result<bool> {
+    if goal.input.scenario == "software-evolution" {
+        return super::software_scenario::ready(goal, work);
+    }
     let parameters: Parameters = serde_json::from_value(goal.input.parameters.clone())?;
     parameters.validate()?;
     Ok(
@@ -367,6 +422,9 @@ pub(super) async fn run(
         return;
     };
     let status_path = c.state_dir.join("private/im-scenario-status.json");
+    let mut lineage_at = Instant::now()
+        .checked_sub(Duration::from_secs(30))
+        .unwrap_or_else(Instant::now);
     loop {
         if *stop.borrow() || started.elapsed().as_secs() + 5 >= seconds {
             break;
@@ -382,7 +440,18 @@ pub(super) async fn run(
             );
         }
         let _ = sync_people(&hub, c.clone()).await;
-        if let Err(error) = super::research_campaign::admit(&hub, c.clone()).await {
+        if lineage_at.elapsed() >= Duration::from_secs(30) {
+            if let Err(error) = super::research_lineage::sync(&hub, &c).await {
+                let _ = storage::write(
+                    &c.state_dir.join("private/research-lineage-error.json"),
+                    &json!({"observed_ms":crystal::now_ms(),"error":format!("{error:#}")}),
+                );
+            }
+            lineage_at = Instant::now();
+        }
+        if !c.state_dir.join("private/activation-drain").exists()
+            && let Err(error) = super::research_campaign::admit(&hub, c.clone()).await
+        {
             let _ = storage::write(
                 &c.state_dir.join("private/research-campaign-error.json"),
                 &json!({"observed_ms":crystal::now_ms(),"error":format!("{error:#}").chars().take(4096).collect::<String>()}),
@@ -390,10 +459,20 @@ pub(super) async fn run(
         }
         let mut after = String::new();
         let mut pending = Vec::new();
-        while let Ok(page) = hub.goals("", "research", &after, true).await {
+        let mut owners = BTreeMap::new();
+        while let Ok(page) = hub.goals("", "", &after, true).await {
             let goals: Vec<Goal> =
                 serde_json::from_value(page["goals"].clone()).unwrap_or_default();
             for goal in goals {
+                if !matches!(
+                    goal.input.scenario.as_str(),
+                    "research" | "software-evolution"
+                ) {
+                    continue;
+                }
+                for work in &goal.work {
+                    owners.insert(job_id(&goal, work), goal.input.id.clone());
+                }
                 for work in &goal.work {
                     if *stop.borrow() || pending.len() >= 256 {
                         break;
@@ -423,7 +502,7 @@ pub(super) async fn run(
             let config = c.clone();
             execution = Some(tokio::task::spawn_blocking(move || {
                 let path = config.state_dir.join("private/im-goal-scope.json");
-                let ids: Vec<_> = pending.into_iter().map(|(id, _)| id).collect();
+                let ids = execution_scope(&config, &pending, &owners)?;
                 storage::write(&path, &ids)?;
                 runtime::run_scoped(&config, false, remaining, false, Some(&path))
             }));

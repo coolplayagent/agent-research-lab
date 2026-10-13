@@ -94,6 +94,64 @@ export const EvolutionOperation = {
     Mutation: "mutation",
     Recombination: "recombination",
 };
+export const IterationState = {
+    Running: "running",
+    Paused: "paused",
+    Stopped: "stopped",
+    Completed: "completed",
+    BudgetExhausted: "budget_exhausted",
+};
+export const RoundState = {
+    Running: "running",
+    Assessed: "assessed",
+    Accepted: "accepted",
+    Completed: "completed",
+    Failed: "failed",
+    NoImprovement: "no_improvement",
+    Cancelled: "cancelled",
+};
+export const CandidateState = {
+    Proposed: "proposed",
+    Accepted: "accepted",
+    Rejected: "rejected",
+};
+export const EvaluationState = {
+    Passed: "passed",
+    Failed: "failed",
+};
+export const ActivationState = {
+    Pending: "pending",
+    Active: "active",
+    Failed: "failed",
+    RolledBack: "rolled_back",
+};
+export const ApiErrorCode = {
+    InvalidRequest: "invalid_request",
+    Backpressure: "backpressure",
+    StorageUnavailable: "storage_unavailable",
+};
+export const ActivationPhase = {
+    Prepared: "prepared",
+    Building: "building",
+    Draining: "draining",
+    Switching: "switching",
+    Checking: "checking",
+    Active: "active",
+    RolledBack: "rolled_back",
+    Blocked: "blocked",
+};
+export const ScenarioCapability = {
+    Execute: "execute",
+    Evaluate: "evaluate",
+    Deliver: "deliver",
+    Activate: "activate",
+    Rollback: "rollback",
+};
+export const CodingTaskRole = {
+    Research: "research",
+    Implement: "implement",
+    Review: "review",
+};
 export const ServiceKind = {
     Storage: "storage",
     Executor: "executor",

@@ -7,10 +7,31 @@ import { nodeForm } from "./research-forms.js";
 import { renderGraph, showNode } from "./evolution-render.js";
 let requestSequence = 0;
 let groupId = "";
+export async function focusEvolutionSubject(id) {
+    const group = groupId;
+    let cursor = "", count = 0;
+    do {
+        const page = await api("/api/im/subjects?" + query({ after: cursor }));
+        if (group !== groupId)
+            return false;
+        const found = page.subjects.find(row => row.subject.id === id);
+        if (found) {
+            sessionStorage.setItem("evolution-topic", found.subject.topic_id);
+            sessionStorage.setItem("evolution-subject", found.subject.id);
+            return true;
+        }
+        count += page.subjects.length;
+        if (page.next_after && (page.next_after === cursor || count >= 8192))
+            throw new Error(t("workspace.topicLimit"));
+        cursor = page.next_after || "";
+    } while (cursor);
+    return false;
+}
 export function selectEvolution(id) {
     if (id === groupId)
         return;
     groupId = id;
+    clearTimeout(refreshTimer);
     requestSequence++;
     rows = [];
     topics = [];

@@ -3,6 +3,8 @@ import { api, query } from "./api.js";
 import { button, el } from "./dom.js";
 import { label, t } from "./i18n.js";
 import type { Goal, Work } from "./goal-types.js";
+import { scenarioDescriptor } from "./scenario-catalog.js";
+export function supportsProcess(scenarioId: string): boolean { return scenarioDescriptor(scenarioId)?.public_process === true; }
 interface PublicEvent {
   id: number;
   title: SessionEventKind;

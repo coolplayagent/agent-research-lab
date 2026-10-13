@@ -2,9 +2,16 @@ import type {
   GoalState,
   WorkState,
   WorkResultCode,
+  ScenarioCapability,
 } from "/assets/shared/contracts.js";
 export interface Scenario {
   id: string;
+  protocol_version?: number;
+  capabilities?: ScenarioCapability[];
+  assignment_roles?: string[];
+  execution_seconds?: number;
+  public_process?: boolean;
+  manual_review?: boolean;
   fields: { id: string; options: string[] }[];
   conversation?: { parameters: Record<string, unknown>; max_seconds: number };
 }
@@ -23,6 +30,7 @@ export interface Work {
   } | null;
 }
 export interface Goal {
+  iteration_id?: string | null;
   input: {
     id: string;
     group_id: string;

@@ -10,7 +10,7 @@ pub async fn serve_with_local_operator(
     seconds: u64,
     local_operator: bool,
 ) -> Result<()> {
-    ensure!(listen.ip().is_loopback(), "IM must bind a loopback address");
+    validate_listen(listen, local_operator)?;
     ensure!(
         (1..=43200).contains(&seconds),
         "service lifetime must be 1..43200 seconds"
@@ -24,6 +24,13 @@ pub async fn serve_with_local_operator(
     let (shutdown, _) = tokio::sync::watch::channel(false);
     let mut web = transport::Web::new(hub, addr, shutdown.clone());
     web.services = Some(services.clone());
+    let iterations = tokio::spawn(crate::iteration::run_with_registry(
+        web.hub.clone(),
+        web.scenarios.clone(),
+        Some(services.clone()),
+        seconds,
+        shutdown.subscribe(),
+    ));
     let execution = tokio::spawn(crate::execution::run(
         web.hub.clone(),
         services,
@@ -51,6 +58,8 @@ pub async fn serve_with_local_operator(
     )
     .await;
     execution.abort();
+    iterations.abort();
+    let _ = iterations.await;
     let _ = execution.await;
     served??;
     Ok(())

@@ -135,6 +135,65 @@ impl Store {
     fn research_change(&mut self, change: ResearchChange) -> Result<Value> {
         let tx = self.connection.transaction()?;
         let value = match change {
+            ResearchChange::Assessment { assessment: input } => {
+                id(&input.id)?;
+                id(&input.node_id)?;
+                id(&input.goal_id)?;
+                if let Some(value) = tx
+                    .query_row(
+                        "SELECT value FROM research_assessments WHERE id=?1",
+                        [&input.id],
+                        |r| r.get::<_, String>(0),
+                    )
+                    .optional()?
+                {
+                    let existing: VersionAssessment = serde_json::from_str(&value)?;
+                    ensure!(existing.input == input, "version assessment is immutable");
+                    return Ok(json!(existing));
+                }
+                let version = node(&tx, &input.node_id)?;
+                let owner = subject(&tx, &version.input.subject_id)?;
+                let topic = topic(&tx, &owner.topic_id)?;
+                let goal = goals::read(&tx, &input.goal_id)?;
+                ensure!(
+                    goal.input.group_id == topic.group_id,
+                    "assessment goal belongs to another group"
+                );
+                ensure!(
+                    input.goal_attempts.len() == goal.work.len()
+                        && input.pins_by_work.len() == goal.work.len()
+                        && goal
+                            .work
+                            .iter()
+                            .all(|w| input.goal_attempts.get(&w.id) == Some(&w.attempt)
+                                && input.pins_by_work.contains_key(&w.id)),
+                    "assessment attempts differ from current goal"
+                );
+                for pins in input.pins_by_work.values() {
+                    for pin in [&pins.source, &pins.prompt, &pins.policy, &pins.superpod]
+                        .into_iter()
+                        .flatten()
+                    {
+                        ensure!(
+                            [40, 64].contains(&pin.len())
+                                && pin.bytes().all(|b| b.is_ascii_hexdigit()),
+                            "invalid assessment pin"
+                        );
+                    }
+                    ensure!(
+                        version.input.pins.source.is_none()
+                            || pins.source == version.input.pins.source,
+                        "assessment source differs from version"
+                    );
+                }
+                capacity(&tx, "research_assessments", 100000)?;
+                let assessment = VersionAssessment {
+                    input,
+                    created_ms: now_ms(),
+                };
+                tx.execute("INSERT INTO research_assessments(id,node_id,goal_id,value) VALUES(?1,?2,?3,?4)", params![assessment.input.id, assessment.input.node_id, assessment.input.goal_id, serde_json::to_string(&assessment)?])?;
+                json!(assessment)
+            }
             ResearchChange::Topic { mut topic } => {
                 id(&topic.id)?;
                 id(&topic.group_id)?;
@@ -316,17 +375,87 @@ impl Store {
                 .as_ref()
                 .map(|id| goals::read(&self.connection, id))
                 .transpose()?;
-            let status = assessment(&node, goal.as_ref());
+            let mut status = match goal.as_ref() {
+                Some(goal) => crate::iteration::assessment(&self.connection, &node, goal)?
+                    .unwrap_or_else(|| assessment(&node, Some(goal))),
+                None => assessment(&node, None),
+            };
+            let mut assessments = Vec::new();
+            let mut query = self.connection.prepare("SELECT value FROM research_assessments WHERE node_id=?1 ORDER BY sequence DESC LIMIT 8")?;
+            for value in query.query_map([&node.input.id], |r| r.get::<_, String>(0))? {
+                let entry: VersionAssessment = serde_json::from_str(&value?)?;
+                let evaluated = goals::read(&self.connection, &entry.input.goal_id)?;
+                let verdict = version_assessment(&entry, &evaluated);
+                if assessments.is_empty() {
+                    status = verdict;
+                }
+                assessments.push(json!({"assessment":entry,"status":verdict,"goal_title":evaluated.input.title,"goal_revision":evaluated.revision}));
+            }
+            let assessment_count: u64 = self.connection.query_row(
+                "SELECT COUNT(*) FROM research_assessments WHERE node_id=?1",
+                [&node.input.id],
+                |r| r.get(0),
+            )?;
             let operation = match node.input.parents.len() {
                 0 => EvolutionOperation::Baseline,
                 1 => EvolutionOperation::Mutation,
                 _ => EvolutionOperation::Recombination,
             };
-            rows.push(json!({"sequence":sequence,"node":node,"subject":subject,"topic":topic,"status":status,"operation":operation,"goal":goal}));
+            rows.push(json!({"sequence":sequence,"node":node,"subject":subject,"topic":topic,"status":status,"operation":operation,"goal":goal,"assessments":assessments,"assessment_count":assessment_count}));
         }
         let next = (rows.len() > 128).then(|| rows[127]["sequence"].clone());
         rows.truncate(128);
         Ok(json!({"nodes":rows,"next_after":next}))
+    }
+}
+
+pub(super) fn version_assessment(assessment: &VersionAssessment, goal: &Goal) -> EvolutionState {
+    if assessment.input.goal_attempts.len() != goal.work.len()
+        || goal
+            .work
+            .iter()
+            .any(|work| assessment.input.goal_attempts.get(&work.id) != Some(&work.attempt))
+    {
+        return EvolutionState::Unassessed;
+    }
+    if goal.state == GoalState::Cancelled {
+        return EvolutionState::Cancelled;
+    }
+    if goal.work.iter().any(|w| w.state == WorkState::Failed) {
+        return EvolutionState::Failed;
+    }
+    if goal.work.iter().any(|w| w.state == WorkState::Running) {
+        return EvolutionState::Running;
+    }
+    if goal.work.iter().any(|w| w.state == WorkState::Ready) {
+        return EvolutionState::Pending;
+    }
+    let bound = goal.work.iter().all(|work| {
+        let Some(pins) = assessment.input.pins_by_work.get(&work.id) else {
+            return false;
+        };
+        let Some(result) = &work.result else {
+            return false;
+        };
+        result.succeeded
+            && [
+                (&pins.source, "source_commit"),
+                (&pins.prompt, "prompt_digest"),
+                (&pins.policy, "policy_digest"),
+                (&pins.superpod, "superpod_commit"),
+            ]
+            .into_iter()
+            .all(|(pin, field)| {
+                pin.as_deref()
+                    .is_some_and(|pin| result.evidence[field].as_str() == Some(pin))
+            })
+    });
+    if !bound {
+        EvolutionState::Unassessed
+    } else if goal.state == GoalState::Completed {
+        EvolutionState::Accepted
+    } else {
+        EvolutionState::Submitted
     }
 }
 

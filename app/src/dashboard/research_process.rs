@@ -15,7 +15,10 @@ fn assignment<'a>(scope: &Scope, goal: &'a Goal) -> Result<&'a WorkItem> {
     ensure!(
         goal.input.group_id == scope.group_id
             && goal.input.id == scope.goal_id
-            && goal.input.scenario == "research",
+            && matches!(
+                goal.input.scenario.as_str(),
+                "research" | "software-evolution"
+            ),
         "research scope mismatch"
     );
     let work = goal
@@ -54,10 +57,7 @@ fn cursor_before(id: &str) -> String {
 async fn find(web: &transport::Web, scope: &Scope) -> Result<Goal> {
     let mut after = cursor_before(&scope.goal_id);
     for _ in 0..16 {
-        let page = web
-            .hub
-            .goals(&scope.group_id, "research", &after, false)
-            .await?;
+        let page = web.hub.goals(&scope.group_id, "", &after, false).await?;
         let goals: Vec<Goal> = serde_json::from_value(page["goals"].clone())?;
         if let Some(goal) = goals
             .into_iter()

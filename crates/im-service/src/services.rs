@@ -23,6 +23,14 @@ pub async fn save(State(web): State<Web>, request: Request) -> Response {
             for person in next.bindings.keys() {
                 web.hub.person(person).await?;
             }
+            for registration in &next.scenarios {
+                ensure!(
+                    !web.scenarios
+                        .iter()
+                        .any(|scenario| scenario.descriptor().id == registration.id),
+                    "registered scenario conflicts with an installed adapter"
+                );
+            }
             Ok(json!(
                 web.services
                     .as_ref()

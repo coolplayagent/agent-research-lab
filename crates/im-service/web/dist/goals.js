@@ -1,4 +1,5 @@
 import { revealResearch } from "./workspace.js";
+import { focusIteration } from "./iterations.js";
 import { contributionText } from "./contribution-text.js";
 import { GoalState, GroupKind, WorkState } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
@@ -75,9 +76,7 @@ function card(goal) {
     const summary = el("summary");
     summary.append(el("strong", goal.input.title), el("span", label("GoalState", goal.state), "badge"));
     details.append(summary, el("p", goal.input.objective), el("p", t("goals.1459c102bb") + goal.input.acceptance), el("small", t("goals.6ea45dffbd", {
-        p0: goal.input.scenario === "research"
-            ? t("goals.70596ea10b")
-            : t("goals.0ad442f5f7"),
+        p0: label("Scenario", goal.input.scenario),
         p1: goal.input.max_seconds,
     })));
     for (const work of goal.work) {
@@ -89,7 +88,7 @@ function card(goal) {
                 ? t("goals.788add54b2")
                 : label("WorkState", work.state), "badge"), el("p", work.instruction));
         if (work.result) {
-            row.append(el("p", goal.input.scenario === "research" && work.result.code
+            row.append(el("p", work.result.code
                 ? label("WorkResultCode", work.result.code)
                 : contributionText(work.result.summary, display(work.person_id))));
             const evidence = el("details");
@@ -97,14 +96,17 @@ function card(goal) {
             evidence.append(el("summary", t("goals.da8098216f")), el("pre", JSON.stringify(work.result.evidence, null, 2)));
             row.append(evidence);
         }
-        if (goal.state === GoalState.Active &&
+        if (!goal.iteration_id && goal.state === GoalState.Active &&
             (expired(work) ||
                 work.state === WorkState.Submitted ||
                 work.state === WorkState.Failed))
             row.append(button(t("goals.bd7dd17c34"), () => mutate(goal, "retry", work.id)));
         details.append(row);
     }
-    if (goal.state === GoalState.Active) {
+    if (goal.iteration_id) {
+        details.append(button(t("iterations.manageRun"), () => focusIteration(goal.iteration_id)));
+    }
+    else if (goal.state === GoalState.Active) {
         const actions = el("div", undefined, "actions");
         const accept = button(t("goals.9a341c73e2"), () => mutate(goal, "accept"));
         accept.disabled = goal.work.some((w) => w.state !== WorkState.Submitted);

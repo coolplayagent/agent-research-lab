@@ -1,5 +1,5 @@
 import { GoalEventKind, GoalState, WorkState } from "/assets/shared/contracts.js";
-import { researchProcess } from "./research-process.js";
+import { researchProcess, supportsProcess } from "./research-process.js";
 import { button, el } from "./dom.js";
 import { label, t } from "./i18n.js";
 import { display } from "./people.js";
@@ -74,7 +74,7 @@ export function progressCard(progress, opened, review) {
             member.append(el("span", display(work.person_id), "task-progress-person"), el("span", state, "task-progress-work"));
             if (work.attempt > 1)
                 member.append(el("small", t("progress.attempt", { attempt: work.attempt })));
-            if (goal.input.scenario === "research")
+            if (supportsProcess(goal.input.scenario))
                 member.append(researchProcess(goal, work));
             members.append(member);
         }

@@ -17,6 +17,8 @@ import { initGoals } from "./goal-form.js";
 import { initNavigation } from "./navigation.js";
 import { initExperience } from "./experience.js";
 import { busy } from "./feedback.js";
+import { initIterations, refreshIterations } from "./iterations.js";
+import { loadScenarioCatalog } from "./scenario-catalog.js";
 apply();
 let started = false;
 async function start() {
@@ -36,16 +38,21 @@ async function start() {
     initServices();
     initTopics();
     initEvolution();
+    initIterations();
     initWorkspace();
     initCollaboration();
     initExperience();
+    await loadScenarioCatalog();
     initNavigation();
+    document.addEventListener("workspace-services", () => void loadScenarioCatalog().then(refreshIterations));
     await loadGroups();
     const directory = new EventSource("/api/crystal/events");
     let revision = -1;
     directory.addEventListener("status", (event) => {
         const data = JSON.parse(event.data).metrics;
         metrics(data);
+        refreshEvolution();
+        refreshIterations();
         const changed = Number(data.catalog_revision);
         if (revision !== changed) {
             revision = changed;
@@ -58,6 +65,9 @@ async function start() {
     };
     directory.onopen = () => {
         get("connection").textContent = t("bootstrap.021bd7f674");
+        refreshEvolution();
+        refreshIterations();
+        void loadGroups();
     };
     get("logout").onclick = async () => {
         try {

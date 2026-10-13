@@ -1,4 +1,5 @@
 //! Stateless executor and lightweight sandbox services; AI-IM owns goals and storage.
+pub mod codex_adapter;
 mod sandbox;
 use anyhow::{Result, ensure};
 use contracts::ServiceKind;

@@ -22,6 +22,8 @@ pub struct Configuration {
     pub services: Vec<Service>,
     pub adapters: Vec<Adapter>,
     pub bindings: Bindings,
+    #[serde(default)]
+    pub scenarios: Vec<ScenarioRegistration>,
 }
 impl Configuration {
     pub fn defaults(state: &Path) -> Self {
@@ -61,6 +63,7 @@ impl Configuration {
             services,
             adapters,
             bindings: Bindings::new(),
+            scenarios: vec![],
         }
     }
     pub fn service(&self, id: &str, kind: ServiceKind) -> Result<&Service> {
@@ -74,7 +77,10 @@ impl Configuration {
     }
     pub fn validate(&self) -> Result<()> {
         ensure!(
-            self.services.len() <= 64 && self.adapters.len() <= 64 && self.bindings.len() <= 20000,
+            self.services.len() <= 64
+                && self.adapters.len() <= 64
+                && self.bindings.len() <= 20000
+                && self.scenarios.len() <= 64,
             "service registry exceeds bound"
         );
         let mut ids = std::collections::BTreeSet::new();
@@ -118,6 +124,22 @@ impl Configuration {
                 self.adapters.iter().any(|a| a.id == *adapter),
                 "binding references missing adapter"
             );
+        }
+        ids.clear();
+        for scenario in &self.scenarios {
+            scenario.validate()?;
+            ensure!(ids.insert(&scenario.id), "duplicate scenario ID");
+            for dependency in &scenario.dependencies {
+                let service = self
+                    .services
+                    .iter()
+                    .find(|service| service.id == *dependency)
+                    .context("scenario dependency is missing")?;
+                ensure!(
+                    !scenario.enabled || service.enabled,
+                    "scenario dependency is disabled"
+                );
+            }
         }
         Ok(())
     }
@@ -217,8 +239,35 @@ impl Registry {
             health.push(result?);
         }
         health.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
+        for scenario in config.scenarios.clone() {
+            probes.spawn(async move {
+                let (status, info, error) = if !scenario.enabled {
+                    (ServiceHealth::Disabled, None, None)
+                } else {
+                    match probe_scenario(&scenario).await {
+                        Ok(info) => (ServiceHealth::Healthy, Some(info), None),
+                        Err(error) => {
+                            let message = error.to_string();
+                            let status =
+                                if message.contains("mismatch") || message.contains("version") {
+                                    ServiceHealth::ProtocolMismatch
+                                } else {
+                                    ServiceHealth::Unavailable
+                                };
+                            (status, None, Some(message))
+                        }
+                    }
+                };
+                serde_json::json!({"id":scenario.id,"status":status,"info":info,"error":error})
+            });
+        }
+        let mut scenario_health = Vec::new();
+        while let Some(result) = probes.join_next().await {
+            scenario_health.push(result?);
+        }
+        scenario_health.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
         Ok(
-            serde_json::json!({"configuration":config,"health":health,"restart_required":pending!=self.active_storage,"active_storage":self.active_storage,"protocol_version":rpc::VERSION}),
+            serde_json::json!({"configuration":config,"health":health,"scenario_health":scenario_health,"restart_required":pending!=self.active_storage,"active_storage":self.active_storage,"protocol_version":rpc::VERSION}),
         )
     }
 }
@@ -245,5 +294,35 @@ mod tests {
                 .revision,
             1
         );
+    }
+    #[test]
+    fn scenario_configuration_is_optional_versioned_and_dependency_checked() {
+        let root = tempfile::tempdir().unwrap();
+        let mut config = Configuration::defaults(root.path());
+        let mut legacy = serde_json::to_value(&config).unwrap();
+        legacy.as_object_mut().unwrap().remove("scenarios");
+        assert!(
+            serde_json::from_value::<Configuration>(legacy)
+                .unwrap()
+                .scenarios
+                .is_empty()
+        );
+        config.scenarios.push(ScenarioRegistration {
+            id: "planning".into(),
+            endpoint: root.path().join("private/planning.sock"),
+            enabled: true,
+            protocol_version: 1,
+            capabilities: vec![contracts::ScenarioCapability::Execute],
+            dependencies: vec!["executor".into()],
+        });
+        config.validate().unwrap();
+        config.scenarios[0].protocol_version = 2;
+        assert!(config.validate().is_err());
+        config.scenarios[0].protocol_version = 1;
+        config.scenarios[0].dependencies = vec!["missing".into()];
+        assert!(config.validate().is_err());
+        config.scenarios[0].dependencies = vec![];
+        config.scenarios.push(config.scenarios[0].clone());
+        assert!(config.validate().is_err());
     }
 }

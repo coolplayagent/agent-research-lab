@@ -1,4 +1,5 @@
 import { revealResearch } from "./workspace.js";
+import { focusIteration } from "./iterations.js";
 import { contributionText } from "./contribution-text.js";
 import { GoalState, GroupKind, WorkState } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
@@ -92,10 +93,7 @@ function card(goal: Goal): HTMLDetailsElement {
     el(
       "small",
       t("goals.6ea45dffbd", {
-        p0:
-          goal.input.scenario === "research"
-            ? t("goals.70596ea10b")
-            : t("goals.0ad442f5f7"),
+        p0: label("Scenario", goal.input.scenario),
         p1: goal.input.max_seconds,
       }),
     ),
@@ -120,7 +118,7 @@ function card(goal: Goal): HTMLDetailsElement {
       row.append(
         el(
           "p",
-          goal.input.scenario === "research" && work.result.code
+          work.result.code
             ? label("WorkResultCode", work.result.code)
             : contributionText(work.result.summary, display(work.person_id)),
         ),
@@ -134,7 +132,7 @@ function card(goal: Goal): HTMLDetailsElement {
       row.append(evidence);
     }
     if (
-      goal.state === GoalState.Active &&
+      !goal.iteration_id && goal.state === GoalState.Active &&
       (expired(work) ||
         work.state === WorkState.Submitted ||
         work.state === WorkState.Failed)
@@ -147,7 +145,9 @@ function card(goal: Goal): HTMLDetailsElement {
       );
     details.append(row);
   }
-  if (goal.state === GoalState.Active) {
+  if (goal.iteration_id) {
+    details.append(button(t("iterations.manageRun"), () => focusIteration(goal.iteration_id!)));
+  } else if (goal.state === GoalState.Active) {
     const actions = el("div", undefined, "actions");
     const accept = button(
       t("goals.9a341c73e2"),

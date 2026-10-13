@@ -640,6 +640,7 @@ dialog p {
 }
 #research-tabs {
   display: flex;
+  overflow-x: auto;
   padding: 0 10px;
   flex: none;
   border-bottom: 1px solid var(--line);
@@ -673,6 +674,17 @@ dialog p {
 .research-tab h2 {
   font-size: 14px;
 }
+.iteration-card { margin-bottom: 10px; }
+.iteration-card > button { text-align: left; font-weight: 600; }
+.iteration-round { margin-top: 12px; overflow-wrap: anywhere; }
+.iteration-facts { display: grid; grid-template-columns: minmax(80px, 1fr) 2fr; gap: 7px 12px; }
+.iteration-facts dt { color: var(--muted); }
+.iteration-facts dd { margin: 0; overflow-wrap: anywhere; }
+.iteration-round pre { max-height: 260px; overflow: auto; white-space: pre-wrap; }
+.iteration-assignment { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+.iteration-assignments details { padding: 7px 0; }
+.iteration-feedback { white-space: pre-wrap; }
+#iteration-detail { margin-top: 14px; }
 .research-tab p {
   font-size: 12px;
 }

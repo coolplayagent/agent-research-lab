@@ -9,6 +9,34 @@ fn asset(path: &str) -> Option<(&'static str, &'static [u8])> {
         return Some(asset);
     }
     match path {
+        "/assets/scenario-catalog.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/scenario-catalog.js").as_slice(),
+        )),
+        "/assets/iteration-review.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/iteration-review.js").as_slice(),
+        )),
+        "/assets/iteration-types.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/iteration-types.js").as_slice(),
+        )),
+        "/assets/iteration-render.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/iteration-render.js").as_slice(),
+        )),
+        "/assets/iteration-form.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/iteration-form.js").as_slice(),
+        )),
+        "/assets/iterations.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/iterations.js").as_slice(),
+        )),
+        "/assets/scenario-settings.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../web/dist/scenario-settings.js").as_slice(),
+        )),
         "/" => Some((
             "text/html; charset=utf-8",
             include_bytes!("../web/index.html").as_slice(),

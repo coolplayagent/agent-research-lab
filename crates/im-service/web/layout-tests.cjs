@@ -69,6 +69,7 @@ const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" "
   let writes = [], visible = [person]; const document = new EventTarget(); let refreshed = 0;
   document.addEventListener("workspace-people", () => refreshed++);
   const people = load(base + "people.ts", {
+    "/assets/shared/identity.js": { uuid: () => require("node:crypto").randomUUID() },
     "./avatar.js": { avatar: () => new Node("svg") }, "./feedback.js": { busy: () => () => {} }, "./i18n.js": i18n, "./dom.js": dom,
     "./api.js": { query: () => "", api: async () => ({ people: visible, next_after: null }), change: async value => { writes.push(value); visible = []; } },
   }, { document, crypto: require("node:crypto").webcrypto });
@@ -88,6 +89,7 @@ const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" "
   }
   const memberGroup = { id: "group", archived: false, private: false };
   const members = load(base + "members.ts", {
+    "/assets/shared/identity.js": { uuid: () => require("node:crypto").randomUUID() },
     "./avatar.js": { avatar: () => new Node("svg") }, "/assets/shared/contracts.js": contracts,
     "./i18n.js": i18n, "./dom.js": dom, "./feedback.js": { busy: () => () => {} },
     "./people.js": { display: id => id }, "./picker.js": { Picker: MemberPicker },
@@ -104,7 +106,7 @@ const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" "
   assert(memberIds.includes("researcher")); assert(picker.excluded.has("researcher"));
 
   const workspaceDocument = Object.assign(new EventTarget(), { querySelector: () => null, querySelectorAll: () => [] });
-  const workspace = load(base + "workspace.ts", { "./dom.js": dom, "./i18n.js": i18n, "./evolution.js": { loadEvolution: async () => {} } }, { document: workspaceDocument, window: new EventTarget(), matchMedia: () => ({ matches: true }) });
+  const workspace = load(base + "workspace.ts", { "./dom.js": dom, "./i18n.js": i18n, "./evolution.js": { loadEvolution: async () => {} }, "./iterations.js": { loadIterations: async () => {} } }, { document: workspaceDocument, window: new EventTarget(), matchMedia: () => ({ matches: true }) });
   workspace.initWorkspace();
   get("workspace").classList.add("research-open", "research-expanded");
   get("toggle-directory").onclick();

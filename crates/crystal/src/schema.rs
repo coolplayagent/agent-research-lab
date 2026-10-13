@@ -7,7 +7,7 @@ pub(crate) fn migrate(connection: &Connection) -> Result<()> {
         [],
         |r| r.get(0),
     )?;
-    ensure!((1..=5).contains(&version), "unsupported crystal schema");
+    ensure!((1..=6).contains(&version), "unsupported crystal schema");
     if version == 1 {
         connection.execute_batch(
             "BEGIN IMMEDIATE;
@@ -44,6 +44,16 @@ pub(crate) fn migrate(connection: &Connection) -> Result<()> {
           CREATE INDEX nodes_subject ON research_nodes(subject_id,sequence);
           CREATE TABLE research_edges(child_id TEXT NOT NULL REFERENCES research_nodes(id),parent_id TEXT NOT NULL REFERENCES research_nodes(id),PRIMARY KEY(child_id,parent_id));
           UPDATE crystal_meta SET value=5 WHERE key='schema'; COMMIT;")?;
+    }
+    if version < 6 {
+        connection.execute_batch("BEGIN IMMEDIATE;
+          CREATE TABLE evolution_runs(id TEXT PRIMARY KEY,group_id TEXT NOT NULL REFERENCES groups(id),scenario TEXT NOT NULL,active INTEGER NOT NULL,value TEXT NOT NULL);
+          CREATE INDEX evolution_runs_group ON evolution_runs(group_id,id);
+          CREATE TABLE evolution_goal_bindings(goal_id TEXT PRIMARY KEY REFERENCES goals(id),run_id TEXT NOT NULL REFERENCES evolution_runs(id),round INTEGER NOT NULL);
+          CREATE TABLE evolution_requests(run_id TEXT NOT NULL REFERENCES evolution_runs(id),request_id TEXT NOT NULL,digest TEXT NOT NULL,PRIMARY KEY(run_id,request_id));
+          CREATE TABLE research_assessments(sequence INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT NOT NULL UNIQUE,node_id TEXT NOT NULL REFERENCES research_nodes(id),goal_id TEXT NOT NULL REFERENCES goals(id),value TEXT NOT NULL);
+          CREATE INDEX assessments_node ON research_assessments(node_id,sequence);
+          UPDATE crystal_meta SET value=6 WHERE key='schema'; COMMIT;")?;
     }
     Ok(())
 }

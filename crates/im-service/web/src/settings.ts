@@ -13,6 +13,7 @@ import { editAdapter, editService } from "./service-forms.js";
 import { element, select, field } from "./forms.js";
 import type { Configuration, ServiceView } from "./service-types.js";
 import { busy } from "./feedback.js";
+import { renderScenarios } from "./scenario-settings.js";
 let current: ServiceView | undefined;
 let directory: Person[] = [];
 let generation = 0;
@@ -43,6 +44,7 @@ async function save(config: Configuration): Promise<void> {
 function render(view: ServiceView): void {
   const config = view.configuration;
   current = view;
+  renderScenarios(view, save);
   get("services-status").textContent = view.restart_required
     ? t("services.restart")
     : t("services.activeStorage", {

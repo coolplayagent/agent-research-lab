@@ -13,9 +13,31 @@ import type {
 } from "./research-types.js";
 let requestSequence = 0;
 let groupId = "";
+export async function focusEvolutionSubject(id: string): Promise<boolean> {
+  const group = groupId;
+  let cursor = "", count = 0;
+  do {
+    const page = await api<{ subjects: SubjectRow[]; next_after: string | null }>(
+      "/api/im/subjects?" + query({ after: cursor }),
+    );
+    if (group !== groupId) return false;
+    const found = page.subjects.find(row => row.subject.id === id);
+    if (found) {
+      sessionStorage.setItem("evolution-topic", found.subject.topic_id);
+      sessionStorage.setItem("evolution-subject", found.subject.id);
+      return true;
+    }
+    count += page.subjects.length;
+    if (page.next_after && (page.next_after === cursor || count >= 8192))
+      throw new Error(t("workspace.topicLimit"));
+    cursor = page.next_after || "";
+  } while (cursor);
+  return false;
+}
 export function selectEvolution(id: string): void {
   if (id === groupId) return;
   groupId = id;
+  clearTimeout(refreshTimer);
   requestSequence++;
   rows = [];
   topics = [];

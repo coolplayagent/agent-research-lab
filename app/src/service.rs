@@ -22,6 +22,19 @@ fn execute(cli: Cli) -> Result<Value> {
         );
     }
     match cli.command {
+        Commands::SoftwareActivate {
+            input,
+            policy_digest,
+        } => {
+            let config = cli.config.unwrap_or_else(|| "local.toml".into());
+            crate::software_activation::request(&config, &input, &policy_digest)
+        }
+        Commands::SoftwareActivationReconcile { operation } => {
+            crate::software_activation::reconcile(&operation)
+        }
+        Commands::SoftwareActivationWorker { operation } => {
+            crate::software_activation::worker(&operation)
+        }
         Commands::Serve {
             listen,
             max_seconds,

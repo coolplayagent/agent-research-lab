@@ -3,6 +3,71 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::watch,
 };
+#[tokio::test]
+async fn errors_preserve_messages_and_add_stable_codes_for_existing_statuses() {
+    for (message, status, code) in [
+        (
+            "invalid payload",
+            400,
+            contracts::ApiErrorCode::InvalidRequest,
+        ),
+        (
+            "execution backpressure",
+            429,
+            contracts::ApiErrorCode::Backpressure,
+        ),
+        (
+            "storage writer fault",
+            503,
+            contracts::ApiErrorCode::StorageUnavailable,
+        ),
+    ] {
+        let response = transport::error(message);
+        assert_eq!(response.status().as_u16(), status);
+        let body = axum::body::to_bytes(response.into_body(), 2048)
+            .await
+            .unwrap();
+        let value: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(value["code"], code.as_str());
+        assert_eq!(value["error"], message);
+    }
+}
+#[test]
+fn interface_access_requires_credentials_and_exact_service_origin() {
+    let addr: SocketAddr = "100.125.79.91:8090".parse().unwrap();
+    assert!(validate_listen(addr, false).is_ok());
+    assert!(validate_listen(addr, true).is_err());
+    for address in ["0.0.0.0:8090", "[::]:8090", "224.0.0.1:8090"] {
+        assert!(validate_listen(address.parse().unwrap(), false).is_err());
+    }
+    let request = |host: &str, origin: &str| {
+        format!("GET / HTTP/1.1\r\nHost: {host}\r\nOrigin: {origin}\r\n\r\n")
+    };
+    assert!(
+        allowed_request(
+            &request("100.125.79.91:8090", "http://100.125.79.91:8090"),
+            addr
+        )
+        .is_ok()
+    );
+    for (host, origin) in [
+        ("localhost:8090", "http://localhost:8090"),
+        ("127.0.0.1:8090", "http://127.0.0.1:8090"),
+        ("100.125.79.91:8090", "http://foreign.invalid"),
+    ] {
+        assert!(allowed_request(&request(host, origin), addr).is_err());
+    }
+    let state = tempfile::tempdir().unwrap();
+    let operator = operator::Operator::open(state.path(), addr).unwrap();
+    assert!(!operator.authorized(&axum::http::HeaderMap::new()));
+    let access: Value = storage::read(&state.path().join("dashboard/access.json")).unwrap();
+    assert!(
+        access["url"]
+            .as_str()
+            .unwrap()
+            .starts_with("http://100.125.79.91:8090/#access=")
+    );
+}
 pub(super) struct Harness {
     _state: tempfile::TempDir,
     hub: crystal::Hub,

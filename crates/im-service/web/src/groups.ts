@@ -1,3 +1,4 @@
+import { uuid } from "/assets/shared/identity.js";
 import { busy } from "./feedback.js";
 import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
@@ -45,7 +46,7 @@ export function initGroups(): void {
       const result = await change<Group>({
         operation: "create",
         group: {
-          id: "room-" + crypto.randomUUID(),
+          id: "room-" + uuid(),
           kind: kind.value as Kind,
           private: temporary,
           title: temporary ? names.slice(0, 70) : value("group-name"),

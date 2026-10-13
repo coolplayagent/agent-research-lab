@@ -6,6 +6,7 @@ import { t, label } from "./i18n.js";
 import { editAdapter, editService } from "./service-forms.js";
 import { element, select, field } from "./forms.js";
 import { busy } from "./feedback.js";
+import { renderScenarios } from "./scenario-settings.js";
 let current;
 let directory = [];
 let generation = 0;
@@ -36,6 +37,7 @@ async function save(config) {
 function render(view) {
     const config = view.configuration;
     current = view;
+    renderScenarios(view, save);
     get("services-status").textContent = view.restart_required
         ? t("services.restart")
         : t("services.activeStorage", {

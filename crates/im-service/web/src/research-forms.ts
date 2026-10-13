@@ -1,3 +1,4 @@
+import { uuid } from "/assets/shared/identity.js";
 import {
   TopicState,
   SubjectKind,
@@ -39,7 +40,7 @@ export async function topicForm(
     cursor = next;
   } while (cursor);
   const box = dialog(t("research.topicForm")),
-    id = input(old?.id || "topic-" + crypto.randomUUID()),
+    id = input(old?.id || "topic-" + uuid()),
     title = input(old?.title || ""),
     objective = area(old?.objective || ""),
     state = select(
@@ -87,7 +88,7 @@ export function subjectForm(
   done: () => Promise<void>,
 ): void {
   const box = dialog(t("research.subjectForm")),
-    id = input(old?.id || "subject-" + crypto.randomUUID()),
+    id = input(old?.id || "subject-" + uuid()),
     name = input(old?.name || ""),
     kind = select(
       Object.values(SubjectKind).map((s) => [s, label("SubjectKind", s)]),
@@ -135,7 +136,7 @@ export async function nodeForm(
     after = page.next_after || "";
   } while (after && goals.length < 4096);
   const box = dialog(t("research.nodeForm")),
-    id = input("version-" + crypto.randomUUID()),
+    id = input("version-" + uuid()),
     version = input(""),
     reference = input(subject.reference),
     goal = select(

@@ -1,3 +1,4 @@
+import { uuid } from "/assets/shared/identity.js";
 import { allowSettingsLeave, savedSettings } from "./settings-guard.js";
 import { busy } from "./feedback.js";
 import { t } from "./i18n.js";
@@ -63,7 +64,7 @@ export function dialog(title: string): {
     if (!allowSettingsLeave()) event.preventDefault();
   });
   const heading = element("h2", title);
-  heading.id = "dialog-" + crypto.randomUUID();
+  heading.id = "dialog-" + uuid();
   dialog.setAttribute("aria-labelledby", heading.id);
   header.append(heading, close);
   form.append(header);

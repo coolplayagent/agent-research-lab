@@ -28,14 +28,17 @@ pub async fn manage(State(web): State<Web>, request: Request) -> Response {
                 serde_json::from_slice(&body(request, 192 * 1024).await?)?;
             if let crystal::GoalChange::Create { goal } = &change {
                 goal.validate()?;
-                let adapter = web
-                    .scenarios
+                let scenarios =
+                    crate::scenarios::configured(&web.scenarios, web.services.as_deref())?;
+                let adapter = scenarios
                     .iter()
                     .find(|s| s.descriptor().id == goal.scenario)
                     .cloned()
                     .context("scenario unavailable")?;
                 let input = goal.clone();
-                tokio::task::spawn_blocking(move || adapter.validate(&input)).await??;
+                let checked = adapter.clone();
+                tokio::task::spawn_blocking(move || checked.validate(&input)).await??;
+                adapter.admission(goal).await?;
             }
             Ok(json!(web.hub.change_goal(change).await?))
         }
@@ -60,9 +63,22 @@ pub async fn work(State(web): State<Web>, request: Request) -> Response {
     )
 }
 pub async fn scenarios(State(web): State<Web>) -> Response {
-    json_response(Ok(
-        json!({"scenarios": web.scenarios.iter().map(|s| s.descriptor()).collect::<Vec<_>>(), "status": web.scenarios.iter().map(|s| (s.descriptor().id, s.status())).collect::<std::collections::BTreeMap<_,_>>()}),
-    ))
+    json_response(async {
+        let scenarios = crate::scenarios::configured(&web.scenarios, web.services.as_deref())?;
+        let mut status = scenarios.iter().map(|scenario| (scenario.descriptor().id, scenario.status())).collect::<std::collections::BTreeMap<_,_>>();
+        if let Some(registry) = &web.services {
+            let mut probes = tokio::task::JoinSet::new();
+            for registration in registry.configuration().scenarios.into_iter().filter(|registration| registration.enabled) {
+                probes.spawn(async move {
+                    let result = service_api::probe_scenario(&registration).await;
+                    let healthy = result.is_ok();
+                    (registration.id, json!({"available":healthy,"configured":true,"status":if healthy { contracts::ScenarioStatus::Ready } else { contracts::ScenarioStatus::Unavailable },"health":if healthy { contracts::ServiceHealth::Healthy } else { contracts::ServiceHealth::Unavailable },"error":result.err().map(|error|error.to_string())}))
+                });
+            }
+            while let Some(result) = probes.join_next().await { let (id, value) = result?; status.insert(id, value); }
+        }
+        Ok(json!({"scenarios":scenarios.iter().map(|scenario|scenario.descriptor()).collect::<Vec<_>>(),"status":status}))
+    }.await)
 }
 
 #[derive(Deserialize)]
@@ -88,14 +104,16 @@ pub async fn discuss(State(web): State<Web>, request: Request) -> Response {
                 )
             );
             input.goal.validate()?;
-            let adapter = web
-                .scenarios
+            let scenarios = crate::scenarios::configured(&web.scenarios, web.services.as_deref())?;
+            let adapter = scenarios
                 .iter()
                 .find(|s| s.descriptor().id == input.goal.scenario)
                 .cloned()
                 .context("scenario unavailable")?;
             let goal = input.goal.clone();
-            tokio::task::spawn_blocking(move || adapter.validate(&goal)).await??;
+            let checked = adapter.clone();
+            tokio::task::spawn_blocking(move || checked.validate(&goal)).await??;
+            adapter.admission(&input.goal).await?;
             web.hub.discuss(input.goal, input.message).await
         }
         .await,

@@ -33,7 +33,7 @@ rust_test(
 )
 pkg_tar(
     name = "package",
-    srcs = [":ai-im", "//crates/im-storage:ai-im-storage", "//crates/im-storage:units", "//crates/service-workers:ai-im-services", "//crates/service-workers:units", "systemd/ai-im.service"],
+    srcs = [":ai-im", "//crates/im-storage:ai-im-storage", "//crates/im-storage:units", "//crates/service-workers:ai-im-services", "//crates/service-workers:ai-im-codex-adapter", "//crates/service-workers:units", "systemd/ai-im.service"],
     package_dir = "ai-im",
     extension = "tar.gz",
     mode = "0755",

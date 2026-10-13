@@ -525,6 +525,7 @@ fn forbidden_candidate_path(path: &str) -> bool {
             || part.ends_with(".key")
     }) || path.starts_with(".github/")
         || path.starts_with(".qualitygate/")
+        || path.starts_with("qualitygate/")
         || path == "qualitygate.yaml"
         || path == "qualitygate.yml"
 }
@@ -1840,6 +1841,16 @@ fn run_scoped_impl(
                 break;
             }
             let guarded = admission_hook.is_some();
+            let Ok(_activation_admission) =
+                storage::lock(&c.state_dir.join("private/software-admission.lock"))
+            else {
+                deferred_admission = true;
+                continue;
+            };
+            if c.state_dir.join("private/activation-drain").exists() {
+                deferred_admission = true;
+                continue;
+            }
             let mut job_writes = admission::JobWrites::new(&job, guarded);
             let launched = prepare_host(c, &mut ledger, window, !active.is_empty(), || {
                 if guarded {
@@ -4400,6 +4411,8 @@ mod tests {
             "nested/auth.json",
             ".github/workflows/ci.yml",
             "qualitygate.yaml",
+            "qualitygate/rules/custom.yaml",
+            "qualitygate/reviews/source.md",
             "private/answers.json",
             "cert.pem",
         ] {

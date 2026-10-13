@@ -92,6 +92,7 @@ const deferred = () => {
 (async () => {
   const processRequests = [];
   const processRenderer = moduleFrom(base + "research-process.ts", {
+    "./scenario-catalog.js": { scenarioDescriptor: () => undefined },
     "/assets/shared/contracts.js": contracts, "./dom.js": dom,
     "./i18n.js": { ...i18n, label: (type, value) => `${type}.${value}` },
     "./api.js": { query: fields => new URLSearchParams(fields).toString(), api: path => {
@@ -137,7 +138,7 @@ const deferred = () => {
   assert.equal(resultForMessage(failed, [{...goalResult, work:[{...goalResult.work[0], state:contracts.WorkState.Failed, result:{succeeded:false, summary:"Recorded failure"}}]}]).result.summary, "Recorded failure");
 
   const progressModule = moduleFrom(base + "task-progress.ts", {
-    "./research-process.js": { researchProcess: () => new Node("details") },
+    "./research-process.js": { researchProcess: () => new Node("details"), supportsProcess: () => true },
     "/assets/shared/contracts.js": contracts, "./dom.js": dom,
     "./i18n.js": { ...i18n, label: (type, value) => `${type}.${value}` },
     "./people.js": { display: id => id }, "./message-results.js": { resultForMessage },
@@ -215,15 +216,23 @@ const deferred = () => {
 
   const goalFixture = (id) => ({input:{id, group_id:"a", title:id, objective:"Question", acceptance:"Evidence", scenario:"research", max_seconds:60}, state:contracts.GoalState.Active, revision:1, work:[{id:"work",person_id:"member",attempt:1,state:contracts.WorkState.Submitted,deadline_ms:null,instruction:"Review",result:{succeeded:true,summary:"Result",evidence:{pin:"one"}}}]});
   const goalPages = {"":{goals:[goalFixture("first")],next_after:"first"}, first:{goals:[goalFixture("second")],next_after:"second"}, second:{goals:[goalFixture("third")],next_after:null}};
+  goalPages.first.goals[0].iteration_id = "owned-iteration";
+  let focusedIteration = "";
   let holdGoals = null;
   const goals = moduleFrom(base + "goals.ts", {
     "/assets/shared/contracts.js":contracts, "./i18n.js":{...i18n,label:(_type,value)=>value}, "./dom.js":dom,
     "./people.js":{display:id=>id}, "./workspace.js":{revealResearch:()=>{}}, "./contribution-text.js": { contributionText },
+    "./iterations.js":{focusIteration:async id=>{ focusedIteration=id; }},
     "./api.js":{query:p=>new URLSearchParams(p).toString(),api:async url=>holdGoals ? holdGoals.promise : goalPages[new URL(url,"http://local").searchParams.get("after")]},
   }, {document:new EventTarget(),window:{clearTimeout,setTimeout}});
   goals.selectGoals({id:"a",kind:contracts.GroupKind.Conversation});
   await goals.loadGoals(); await goals.loadGoals(true);
   const secondCard = get("goal-list").children[1]; secondCard.open = true;
+  const allText = node => [node.textContent, ...node.children.map(allText)].join(" ");
+  assert(!allText(secondCard).includes("goals.bd7dd17c34"), "Iteration-owned work cannot be retried through ordinary goal controls");
+  assert(!allText(secondCard).includes("goals.9a341c73e2"), "Iteration-owned goals cannot bypass candidate acceptance");
+  await secondCard.children.at(-1).onclick();
+  assert.equal(focusedIteration,"owned-iteration");
   secondCard.querySelectorAll("[data-evidence-key]")[0].open = true;
   await goals.loadGoals();
   assert.equal(goals.goalSnapshot().length,2,"Refresh must retain already loaded pages");
@@ -274,7 +283,7 @@ const deferred = () => {
   const sends = [];
   const discussionSends = [];
   let discussionInput = null;
-  const draftModule = moduleFrom(base + "message-drafts.ts", {}, { crypto: require("node:crypto").webcrypto });
+  const draftModule = moduleFrom(base + "message-drafts.ts", { "/assets/shared/identity.js": { uuid: () => require("node:crypto").randomUUID() } }, { crypto: require("node:crypto").webcrypto });
   const messages = moduleFrom(
     base + "messages.ts",
     {
@@ -411,6 +420,7 @@ const deferred = () => {
   const pending = new Map();
   const chosen = [];
   const streams = [];
+  let graphRefreshes = 0, iterationRefreshes = 0;
   class Stream {
     constructor() {
       this.handlers = {};
@@ -455,7 +465,8 @@ const deferred = () => {
         suspendGoals: () => {},
         loadGoals: async () => {},
       },
-      "./evolution.js": { selectEvolution: () => {} },
+      "./evolution.js": { selectEvolution: () => {}, refreshEvolution: () => graphRefreshes++ },
+      "./iterations.js": { selectIterations: () => {}, refreshIterations: () => iterationRefreshes++ },
       "./mentions.js": { selectMentions: () => {} },
       "./collaboration.js": {
         selectCollaboration: () => {},
@@ -473,6 +484,12 @@ const deferred = () => {
   assert.equal(conversation.current.id, "b");
   assert.deepEqual(chosen, ["b"]);
   assert.equal(streams.length, 1);
+  streams[0].handlers.status({ data: JSON.stringify({ group: b, metrics: {} }) });
+  assert.equal(graphRefreshes, 1, "Goal-only changes must refresh graph assessment states even without catalog changes");
+  assert.equal(iterationRefreshes, 1);
+  streams[0].onopen();
+  assert.equal(graphRefreshes, 2, "Reconnect catches missed version changes");
+  assert.equal(iterationRefreshes, 2);
   const again = conversation.select(b);
   await again;
   assert.equal(
