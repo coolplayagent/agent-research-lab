@@ -23,6 +23,17 @@ pub async fn save(State(web): State<Web>, request: Request) -> Response {
             for person in next.bindings.keys() {
                 web.hub.person(person).await?;
             }
+            for topic_id in next.outcome_bindings.keys() {
+                web.hub
+                    .outcomes(
+                        None,
+                        crystal::OutcomeCommand::Paths {
+                            topic_id: topic_id.clone(),
+                            after: String::new(),
+                        },
+                    )
+                    .await?;
+            }
             for registration in &next.scenarios {
                 ensure!(
                     !web.scenarios

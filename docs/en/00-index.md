@@ -12,6 +12,7 @@ Start with quick start, use the service guide to connect executors, or read desi
 - [04 Multi-Agent coordination and communication](design/04-coordination.md)
 - [05 Research evidence and version lineage](design/05-evidence.md)
 - [06 Frontend modules, shared contracts and localization](design/06-frontend.md)
+- [07 Outcome collaboration architecture](design/07-outcomes.md)
 
 ## [User guides](guide/00-index.md)
 
@@ -23,6 +24,7 @@ Start with quick start, use the service guide to connect executors, or read desi
 - [06 Delivery, publication and knowledge archives](guide/06-delivery.md)
 - [07 Deployment, maintenance and diagnostics](guide/07-operations.md)
 - [08 Development, testing and verification](guide/08-development.md)
+- [09 Using outcome collaboration](guide/09-outcomes.md)
 
 ## Maintenance
 

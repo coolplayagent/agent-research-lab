@@ -13,6 +13,10 @@ use tokio::net::UnixStream;
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    Outcomes {
+        token: Option<String>,
+        command: Box<OutcomeCommand>,
+    },
     EvolutionChange {
         change: EvolutionChange,
     },
@@ -241,6 +245,22 @@ impl Client {
                         active,
                     },
                     Duration::from_secs(10),
+                )
+                .await
+            }
+        }
+    }
+    pub async fn outcomes(&self, token: Option<&str>, command: OutcomeCommand) -> Result<Value> {
+        match self {
+            Self::Local(hub) => hub.outcomes(token, command).await,
+            Self::Remote(path) => {
+                rpc::call(
+                    path,
+                    &Request::Outcomes {
+                        token: token.map(str::to_owned),
+                        command: Box::new(command),
+                    },
+                    Duration::from_secs(15),
                 )
                 .await
             }
@@ -964,6 +984,7 @@ fn info() -> rpc::ServiceInfo {
 }
 async fn execute(hub: &Hub, request: Request) -> Result<Value> {
     match request {
+        Request::Outcomes { token, command } => hub.outcomes(token.as_deref(), *command).await,
         Request::EvolutionChange { change } => Ok(json!(hub.evolution_change(change).await?)),
         Request::EvolutionRun { run_id } => Ok(json!(hub.evolution_run(&run_id).await?)),
         Request::EvolutionRuns {

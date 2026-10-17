@@ -80,6 +80,80 @@ export declare const TopicState: {
     readonly Archived: "archived";
 };
 export type TopicState = (typeof TopicState)[keyof typeof TopicState];
+export declare const OutcomeKind: {
+    readonly Finding: "finding";
+    readonly Experiment: "experiment";
+    readonly Counterexample: "counterexample";
+    readonly Artifact: "artifact";
+};
+export type OutcomeKind = (typeof OutcomeKind)[keyof typeof OutcomeKind];
+export declare const OutcomeReferenceKind: {
+    readonly Uses: "uses";
+    readonly Supports: "supports";
+    readonly Challenges: "challenges";
+};
+export type OutcomeReferenceKind = (typeof OutcomeReferenceKind)[keyof typeof OutcomeReferenceKind];
+export declare const OutcomePublicationState: {
+    readonly Published: "published";
+    readonly Withdrawn: "withdrawn";
+};
+export type OutcomePublicationState = (typeof OutcomePublicationState)[keyof typeof OutcomePublicationState];
+export declare const OutcomeVerificationState: {
+    readonly Unverified: "unverified";
+    readonly Running: "running";
+    readonly Passed: "passed";
+    readonly Failed: "failed";
+    readonly Unavailable: "unavailable";
+    readonly Unknown: "unknown";
+};
+export type OutcomeVerificationState = (typeof OutcomeVerificationState)[keyof typeof OutcomeVerificationState];
+export declare const VerificationRunState: {
+    readonly Running: "running";
+    readonly Passed: "passed";
+    readonly Failed: "failed";
+    readonly Unavailable: "unavailable";
+    readonly Unknown: "unknown";
+};
+export type VerificationRunState = (typeof VerificationRunState)[keyof typeof VerificationRunState];
+export declare const OutcomeAcceptanceState: {
+    readonly Pending: "pending";
+    readonly Accepted: "accepted";
+    readonly Returned: "returned";
+};
+export type OutcomeAcceptanceState = (typeof OutcomeAcceptanceState)[keyof typeof OutcomeAcceptanceState];
+export declare const KnowledgeWriteState: {
+    readonly Pending: "pending";
+    readonly Applied: "applied";
+    readonly Failed: "failed";
+    readonly Unknown: "unknown";
+};
+export type KnowledgeWriteState = (typeof KnowledgeWriteState)[keyof typeof KnowledgeWriteState];
+export declare const OutcomeServiceKind: {
+    readonly Verifier: "verifier";
+    readonly Knowledge: "knowledge";
+};
+export type OutcomeServiceKind = (typeof OutcomeServiceKind)[keyof typeof OutcomeServiceKind];
+export declare const OutcomeEventKind: {
+    readonly Withdrawn: "withdrawn";
+    readonly VerificationStarted: "verification_started";
+    readonly VerificationFinished: "verification_finished";
+    readonly Decision: "decision";
+    readonly WriteStarted: "write_started";
+    readonly WriteFinished: "write_finished";
+    readonly WriteReconciled: "write_reconciled";
+};
+export type OutcomeEventKind = (typeof OutcomeEventKind)[keyof typeof OutcomeEventKind];
+export declare const OutcomeErrorCode: {
+    readonly Invalid: "outcome_invalid";
+    readonly Forbidden: "outcome_forbidden";
+    readonly Conflict: "outcome_conflict";
+    readonly StaleAttempt: "outcome_stale_attempt";
+    readonly NotFound: "outcome_not_found";
+    readonly Capacity: "outcome_capacity";
+    readonly VerificationRequired: "outcome_verification_required";
+    readonly BindingChanged: "outcome_binding_changed";
+};
+export type OutcomeErrorCode = (typeof OutcomeErrorCode)[keyof typeof OutcomeErrorCode];
 export declare const SubjectKind: {
     readonly Repository: "repository";
     readonly Agent: "agent";

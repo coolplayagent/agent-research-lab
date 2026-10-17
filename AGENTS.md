@@ -1,9 +1,9 @@
 # Agent Research Lab
 
 Implement in Rust; Bazel is the build, test and packaging entrypoint.
-Knowledge belongs to the existing SuperPOD repository, not a duplicate local knowledge base.
+Knowledge contents belong to external knowledge repositories. SuperPOD is an optional binding; core collaboration must start without it and may update other external knowledge stores through explicit adapters.
 Keep credentials, raw runs, private holdouts and machine configuration out of Git.
-Pin evidence to source, prompt, policy and SuperPOD commits. Never weaken a gate to promote a candidate.
+Pin evidence to source, prompt and policy, and to external knowledge revisions when bound. Preserve the existing research adapter's required SuperPOD pins and gates. Never weaken a gate to promote a candidate.
 Use isolated worktrees and bounded processes. Do not share mutable experiment memories.
 Run the repository tests and full Qualitygate on the final snapshot before delivery.
 
@@ -68,7 +68,7 @@ never silently replace a live store. Preserve the existing research evidence gat
 ## Research coordination and lineage
 
 Keep research topics and subject/version lineage as coordination metadata linked
-to collaboration groups and goals. Knowledge contents remain in SuperPOD.
+to collaboration groups and goals. Knowledge contents remain in the bound external repository, including SuperPOD when selected.
 Version nodes and parent edges are append-only, scoped to one subject and acyclic.
 Derive graph assessment states from recorded goal execution and host acceptance;
 never present an unassessed reference or a worker's claim as verified promotion.

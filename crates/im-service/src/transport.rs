@@ -27,6 +27,7 @@ pub struct Web {
     pub shutdown: watch::Sender<bool>,
     pub streams: Arc<Semaphore>,
     pub reads: Arc<Semaphore>,
+    pub outcome_tasks: Arc<Semaphore>,
 }
 impl Web {
     pub fn new(hub: impl Into<Hub>, addr: SocketAddr, shutdown: watch::Sender<bool>) -> Self {
@@ -39,6 +40,7 @@ impl Web {
             shutdown,
             streams: Arc::new(Semaphore::new(20_100)),
             reads: Arc::new(Semaphore::new(16)),
+            outcome_tasks: Arc::new(Semaphore::new(8)),
         }
     }
 }
@@ -77,6 +79,20 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
         .route("/api/im/subjects", get(crate::research::subjects))
         .route("/api/im/evolution", get(crate::research::graph))
         .route("/api/im/research", post(crate::research::change))
+        .route(
+            "/api/im/outcomes",
+            get(crate::outcomes::list).post(crate::outcomes::manage),
+        )
+        .route("/api/im/outcomes/verify", post(crate::outcomes::verify))
+        .route(
+            "/api/im/outcomes/write",
+            post(crate::outcome_knowledge::write),
+        )
+        .route(
+            "/api/im/outcomes/reconcile",
+            post(crate::outcome_knowledge::reconcile),
+        )
+        .route("/api/crystal/outcomes", post(crate::outcomes::agent))
         .merge(application)
         .fallback(resource)
         .layer(axum::middleware::from_fn_with_state(

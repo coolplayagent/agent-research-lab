@@ -8,3 +8,4 @@
 - [04 Multi-Agent coordination and communication](04-coordination.md)
 - [05 Research evidence and version lineage](05-evidence.md)
 - [06 Frontend modules, shared contracts and localization](06-frontend.md)
+- [07 Outcome collaboration architecture](07-outcomes.md)

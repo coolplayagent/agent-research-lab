@@ -76,3 +76,7 @@ New crate paths are not a migration of existing private task records.
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.
 
 The durable production database belongs to the storage service. `crystal` implements its domain behavior; API consumers do not open the live database. `contracts` owns shared state enums, and `service-protocol` defines replaceable service messages.
+
+## Outcome collaboration
+
+Outcome collaboration connects goal paths within topics through immutable publications, explicit references, independent verification and host acceptance. SuperPOD is an optional knowledge binding; replaceable services update external repositories. See [architecture](07-outcomes.md) and [usage](../guide/09-outcomes.md).

@@ -24,6 +24,10 @@ pub struct Configuration {
     pub bindings: Bindings,
     #[serde(default)]
     pub scenarios: Vec<ScenarioRegistration>,
+    #[serde(default)]
+    pub outcome_services: Vec<OutcomeService>,
+    #[serde(default)]
+    pub outcome_bindings: BTreeMap<String, OutcomeServicesBinding>,
 }
 impl Configuration {
     pub fn defaults(state: &Path) -> Self {
@@ -64,6 +68,8 @@ impl Configuration {
             adapters,
             bindings: Bindings::new(),
             scenarios: vec![],
+            outcome_services: vec![],
+            outcome_bindings: BTreeMap::new(),
         }
     }
     pub fn service(&self, id: &str, kind: ServiceKind) -> Result<&Service> {
@@ -141,6 +147,50 @@ impl Configuration {
                 );
             }
         }
+        ensure!(
+            self.outcome_services.len() <= 64 && self.outcome_bindings.len() <= 2048,
+            "outcome registry exceeds bound"
+        );
+        ids.clear();
+        for service in &self.outcome_services {
+            service.validate()?;
+            ensure!(ids.insert(&service.id), "duplicate outcome service ID");
+            for dependency in &service.dependencies {
+                let target = self
+                    .services
+                    .iter()
+                    .find(|item| item.id == *dependency)
+                    .context("outcome dependency missing")?;
+                ensure!(
+                    !service.enabled || target.enabled,
+                    "outcome dependency disabled"
+                );
+            }
+        }
+        for (topic, binding) in &self.outcome_bindings {
+            crystal::id(topic)?;
+            for (kind, id) in &binding.verifiers {
+                ensure!(
+                    self.outcome_services.iter().any(|service| service.id == *id
+                        && service.kind == contracts::OutcomeServiceKind::Verifier
+                        && service.outcome_kinds.contains(kind)),
+                    "invalid verifier binding"
+                );
+            }
+            if let Some(target) = &binding.knowledge {
+                ensure!(
+                    !target.repository.trim().is_empty() && target.repository.len() <= 1024,
+                    "invalid knowledge repository"
+                );
+                ensure!(
+                    self.outcome_services
+                        .iter()
+                        .any(|service| service.id == target.service_id
+                            && service.kind == contracts::OutcomeServiceKind::Knowledge),
+                    "invalid knowledge binding"
+                );
+            }
+        }
         Ok(())
     }
     pub fn storage(&self, state: &Path) -> Result<im_storage::Client> {
@@ -211,6 +261,20 @@ impl Registry {
                     .map(|s| (id.clone(), s.endpoint.clone()))
             })
             .transpose()?;
+        let mut outcome_probes = tokio::task::JoinSet::new();
+        for service in config.outcome_services.clone() {
+            outcome_probes.spawn(async move {
+                let (status, error) = if !service.enabled {
+                    (ServiceHealth::Disabled, None)
+                } else {
+                    match probe_outcome_service(&service).await {
+                        Ok(_) => (ServiceHealth::Healthy, None),
+                        Err(error) => (ServiceHealth::Unavailable, Some(error.to_string())),
+                    }
+                };
+                serde_json::json!({"id":service.id,"status":status,"error":error})
+            });
+        }
         let mut probes = tokio::task::JoinSet::new();
         for service in config.services.clone() {
             probes.spawn(async move {
@@ -266,8 +330,13 @@ impl Registry {
             scenario_health.push(result?);
         }
         scenario_health.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
+        let mut outcome_health = Vec::new();
+        while let Some(result) = outcome_probes.join_next().await {
+            outcome_health.push(result?);
+        }
+        outcome_health.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
         Ok(
-            serde_json::json!({"configuration":config,"health":health,"scenario_health":scenario_health,"restart_required":pending!=self.active_storage,"active_storage":self.active_storage,"protocol_version":rpc::VERSION}),
+            serde_json::json!({"configuration":config,"health":health,"scenario_health":scenario_health,"outcome_health":outcome_health,"restart_required":pending!=self.active_storage,"active_storage":self.active_storage,"protocol_version":rpc::VERSION}),
         )
     }
 }

@@ -12,6 +12,7 @@
 - [04 多 Agent 协调与通信](design/04-coordination.md)
 - [05 研究证据与版本谱系](design/05-evidence.md)
 - [06 前端模块、共享契约与国际化](design/06-frontend.md)
+- [07 基于成果的协作架构](design/07-outcomes.md)
 
 ## [使用文档](guide/00-index.md)
 
@@ -23,6 +24,7 @@
 - [06 交付、发布与知识归档](guide/06-delivery.md)
 - [07 部署、维护与诊断](guide/07-operations.md)
 - [08 开发、测试与验证](guide/08-development.md)
+- [09 使用成果协作](guide/09-outcomes.md)
 
 ## 维护约定
 

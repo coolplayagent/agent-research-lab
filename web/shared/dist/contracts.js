@@ -70,6 +70,70 @@ export const TopicState = {
     Active: "active",
     Archived: "archived",
 };
+export const OutcomeKind = {
+    Finding: "finding",
+    Experiment: "experiment",
+    Counterexample: "counterexample",
+    Artifact: "artifact",
+};
+export const OutcomeReferenceKind = {
+    Uses: "uses",
+    Supports: "supports",
+    Challenges: "challenges",
+};
+export const OutcomePublicationState = {
+    Published: "published",
+    Withdrawn: "withdrawn",
+};
+export const OutcomeVerificationState = {
+    Unverified: "unverified",
+    Running: "running",
+    Passed: "passed",
+    Failed: "failed",
+    Unavailable: "unavailable",
+    Unknown: "unknown",
+};
+export const VerificationRunState = {
+    Running: "running",
+    Passed: "passed",
+    Failed: "failed",
+    Unavailable: "unavailable",
+    Unknown: "unknown",
+};
+export const OutcomeAcceptanceState = {
+    Pending: "pending",
+    Accepted: "accepted",
+    Returned: "returned",
+};
+export const KnowledgeWriteState = {
+    Pending: "pending",
+    Applied: "applied",
+    Failed: "failed",
+    Unknown: "unknown",
+};
+export const OutcomeServiceKind = {
+    Verifier: "verifier",
+    Knowledge: "knowledge",
+};
+export const OutcomeEventKind = {
+    Withdrawn: "withdrawn",
+    VerificationStarted: "verification_started",
+    VerificationFinished: "verification_finished",
+    Decision: "decision",
+    WriteStarted: "write_started",
+    WriteFinished: "write_finished",
+    WriteReconciled: "write_reconciled",
+};
+export const OutcomeErrorCode = {
+    Invalid: "outcome_invalid",
+    Forbidden: "outcome_forbidden",
+    Conflict: "outcome_conflict",
+    StaleAttempt: "outcome_stale_attempt",
+    NotFound: "outcome_not_found",
+    Capacity: "outcome_capacity",
+    VerificationRequired: "outcome_verification_required",
+    BindingChanged: "outcome_binding_changed",
+};
 export const SubjectKind = {
     Repository: "repository",
     Agent: "agent",

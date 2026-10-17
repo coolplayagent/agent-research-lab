@@ -58,6 +58,16 @@ states! {
     SandboxExecutionState { Completed => "completed", Running => "running", Failed => "failed" }
     ContentIntegrityState { Complete => "complete", Degraded => "degraded" }
     TopicState { Active => "active", Archived => "archived" }
+    OutcomeKind { Finding => "finding", Experiment => "experiment", Counterexample => "counterexample", Artifact => "artifact" }
+    OutcomeReferenceKind { Uses => "uses", Supports => "supports", Challenges => "challenges" }
+    OutcomePublicationState { Published => "published", Withdrawn => "withdrawn" }
+    OutcomeVerificationState { Unverified => "unverified", Running => "running", Passed => "passed", Failed => "failed", Unavailable => "unavailable", Unknown => "unknown" }
+    VerificationRunState { Running => "running", Passed => "passed", Failed => "failed", Unavailable => "unavailable", Unknown => "unknown" }
+    OutcomeAcceptanceState { Pending => "pending", Accepted => "accepted", Returned => "returned" }
+    KnowledgeWriteState { Pending => "pending", Applied => "applied", Failed => "failed", Unknown => "unknown" }
+    OutcomeServiceKind { Verifier => "verifier", Knowledge => "knowledge" }
+    OutcomeEventKind { Withdrawn => "withdrawn", VerificationStarted => "verification_started", VerificationFinished => "verification_finished", Decision => "decision", WriteStarted => "write_started", WriteFinished => "write_finished", WriteReconciled => "write_reconciled" }
+    OutcomeErrorCode { Invalid => "outcome_invalid", Forbidden => "outcome_forbidden", Conflict => "outcome_conflict", StaleAttempt => "outcome_stale_attempt", NotFound => "outcome_not_found", Capacity => "outcome_capacity", VerificationRequired => "outcome_verification_required", BindingChanged => "outcome_binding_changed" }
     SubjectKind { Repository => "repository", Agent => "agent", Tool => "tool", Model => "model", Workflow => "workflow", Dataset => "dataset", Prompt => "prompt", Other => "other" }
     EvolutionState { Unassessed => "unassessed", Pending => "pending", Running => "running", Submitted => "submitted", Accepted => "accepted", Failed => "failed", Cancelled => "cancelled" }
     EvolutionOperation { Baseline => "baseline", Mutation => "mutation", Recombination => "recombination" }

@@ -1,4 +1,6 @@
 import { loadTopics } from "./topics.js";
+import { showOutcome } from "./outcome-detail.js";
+import { notice } from "./dom.js";
 import { loadServices } from "./settings.js";
 import { t } from "./i18n.js";
 import { get } from "./dom.js";
@@ -42,11 +44,13 @@ export function navigate() {
         : "";
     const page = setting
         ? "settings"
-        : requested === "evolution"
-            ? "groups"
-            : titles[requested]
-                ? requested
-                : "groups";
+        : requested.startsWith("topics/outcomes/")
+            ? "topics"
+            : requested === "evolution"
+                ? "groups"
+                : titles[requested]
+                    ? requested
+                    : "groups";
     const conversation = ["groups", "direct", "boards"].includes(page);
     if (!get("conversations").hidden)
         scroll = get("messages").scrollTop;
@@ -76,6 +80,11 @@ export function navigate() {
         revealResearch("evolution");
     if (page === "topics")
         void loadTopics();
+    if (requested.startsWith("topics/outcomes/")) {
+        void showOutcome(decodeURIComponent(requested.slice("topics/outcomes/".length))).catch(notice);
+    }
+    else
+        document.getElementById("outcome-dialog")?.remove();
     if (page === "people")
         void loadPeople();
     if (page === "applications")

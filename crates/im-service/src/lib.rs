@@ -14,6 +14,8 @@ pub use scenarios::{
 };
 mod assets;
 pub mod operator;
+mod outcome_knowledge;
+mod outcomes;
 mod research;
 mod rooms;
 mod server;
@@ -85,5 +87,7 @@ fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
 mod goal_tests;
 #[cfg(test)]
 mod iteration_tests;
+#[cfg(test)]
+mod outcome_tests;
 #[cfg(test)]
 mod tests;

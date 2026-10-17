@@ -1,0 +1,35 @@
+{
+  "operation": "publish",
+  "input": {
+    "id": "outcome-example",
+    "topic_id": "topic-example",
+    "goal_id": "goal-example",
+    "kind": "finding",
+    "title": "A reproducible finding",
+    "summary": "Replace with the conclusion supported by the evidence",
+    "conditions": "Replace with applicability conditions and limitations",
+    "evidence": [
+      {
+        "repository": "source-repository",
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "path": "reports/evidence.json",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "references": [],
+    "supersedes": null,
+    "attempt": {
+      "goal_id": "goal-example",
+      "work_id": "work-0",
+      "attempt": 1,
+      "claim_id": "replace-with-current-claim"
+    },
+    "pins": {
+      "source": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "prompt": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "policy": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "superpod": null
+    },
+    "knowledge": null
+  }
+}

@@ -5,6 +5,7 @@ import type {
   ServiceHealth,
   ScenarioCapability,
 } from "/assets/shared/contracts.js";
+import type { OutcomeService, OutcomeBinding } from "./outcome-types.js";
 export interface Service {
   id: string;
   kind: ServiceKind;
@@ -31,6 +32,8 @@ export interface Configuration {
   adapters: Adapter[];
   bindings: Record<string, string>;
   scenarios?: ScenarioRegistration[];
+  outcome_services?: OutcomeService[];
+  outcome_bindings?: Record<string, OutcomeBinding>;
 }
 export interface ScenarioRegistration {
   id: string;
@@ -56,4 +59,5 @@ export interface ServiceView {
     status: ServiceHealth;
     error: string | null;
   }[];
+  outcome_health?: { id: string; status: ServiceHealth; error: string | null }[];
 }

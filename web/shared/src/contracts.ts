@@ -81,6 +81,80 @@ export const TopicState = {
   Archived: "archived",
 } as const;
 export type TopicState = (typeof TopicState)[keyof typeof TopicState];
+export const OutcomeKind = {
+  Finding: "finding",
+  Experiment: "experiment",
+  Counterexample: "counterexample",
+  Artifact: "artifact",
+} as const;
+export type OutcomeKind = (typeof OutcomeKind)[keyof typeof OutcomeKind];
+export const OutcomeReferenceKind = {
+  Uses: "uses",
+  Supports: "supports",
+  Challenges: "challenges",
+} as const;
+export type OutcomeReferenceKind = (typeof OutcomeReferenceKind)[keyof typeof OutcomeReferenceKind];
+export const OutcomePublicationState = {
+  Published: "published",
+  Withdrawn: "withdrawn",
+} as const;
+export type OutcomePublicationState = (typeof OutcomePublicationState)[keyof typeof OutcomePublicationState];
+export const OutcomeVerificationState = {
+  Unverified: "unverified",
+  Running: "running",
+  Passed: "passed",
+  Failed: "failed",
+  Unavailable: "unavailable",
+  Unknown: "unknown",
+} as const;
+export type OutcomeVerificationState = (typeof OutcomeVerificationState)[keyof typeof OutcomeVerificationState];
+export const VerificationRunState = {
+  Running: "running",
+  Passed: "passed",
+  Failed: "failed",
+  Unavailable: "unavailable",
+  Unknown: "unknown",
+} as const;
+export type VerificationRunState = (typeof VerificationRunState)[keyof typeof VerificationRunState];
+export const OutcomeAcceptanceState = {
+  Pending: "pending",
+  Accepted: "accepted",
+  Returned: "returned",
+} as const;
+export type OutcomeAcceptanceState = (typeof OutcomeAcceptanceState)[keyof typeof OutcomeAcceptanceState];
+export const KnowledgeWriteState = {
+  Pending: "pending",
+  Applied: "applied",
+  Failed: "failed",
+  Unknown: "unknown",
+} as const;
+export type KnowledgeWriteState = (typeof KnowledgeWriteState)[keyof typeof KnowledgeWriteState];
+export const OutcomeServiceKind = {
+  Verifier: "verifier",
+  Knowledge: "knowledge",
+} as const;
+export type OutcomeServiceKind = (typeof OutcomeServiceKind)[keyof typeof OutcomeServiceKind];
+export const OutcomeEventKind = {
+  Withdrawn: "withdrawn",
+  VerificationStarted: "verification_started",
+  VerificationFinished: "verification_finished",
+  Decision: "decision",
+  WriteStarted: "write_started",
+  WriteFinished: "write_finished",
+  WriteReconciled: "write_reconciled",
+} as const;
+export type OutcomeEventKind = (typeof OutcomeEventKind)[keyof typeof OutcomeEventKind];
+export const OutcomeErrorCode = {
+  Invalid: "outcome_invalid",
+  Forbidden: "outcome_forbidden",
+  Conflict: "outcome_conflict",
+  StaleAttempt: "outcome_stale_attempt",
+  NotFound: "outcome_not_found",
+  Capacity: "outcome_capacity",
+  VerificationRequired: "outcome_verification_required",
+  BindingChanged: "outcome_binding_changed",
+} as const;
+export type OutcomeErrorCode = (typeof OutcomeErrorCode)[keyof typeof OutcomeErrorCode];
 export const SubjectKind = {
   Repository: "repository",
   Agent: "agent",

@@ -1,6 +1,9 @@
 //! Durable digital-person conversations, independent of model execution.
 //! Host-authorized membership, ordered logs, bounded live delivery and replay.
 mod conversations;
+mod outcome_model;
+mod outcomes;
+pub use outcome_model::*;
 mod iteration;
 mod iteration_model;
 pub use iteration_model::*;
@@ -37,6 +40,11 @@ use store::{Catalog, Store};
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 pub(crate) enum Control {
+    Outcome {
+        actor: String,
+        credential: Option<String>,
+        command: Box<OutcomeCommand>,
+    },
     Evolution(iteration::IterationCommand),
     Research(research::ResearchCommand),
     Goal(goals::GoalCommand),
@@ -634,3 +642,6 @@ mod research_tests;
 
 #[cfg(test)]
 mod iteration_tests;
+
+#[cfg(test)]
+mod outcome_tests;

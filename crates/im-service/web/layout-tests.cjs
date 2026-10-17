@@ -34,6 +34,11 @@ const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" "
   const subject = owner => ({ subject: { id: owner + "-subject", topic_id: owner, name: owner + " subject", kind: contracts.SubjectKind.Repository, reference: "source:main", revision: 1 }, node_count: 0 });
   let catalog = [a, b], heldTopics, heldSubjects, editDone;
   const topics = load(base + "topics.ts", {
+    "./outcome-board.js": { outcomeBoard: topic => {
+      const board = new Node("section", topic.id);
+      board.remove = () => { get("topic-detail").children = get("topic-detail").children.filter(node => node !== board); };
+      return board;
+    } },
     "/assets/shared/contracts.js": contracts, "./dom.js": dom, "./i18n.js": i18n,
     "./icons.js": { icon: () => new Node("svg") }, "./workspace.js": { revealResearch: () => {} }, "./evolution.js": { loadEvolution: async () => {} }, "./conversation.js": { openGroup: async () => {} },
     "./research-forms.js": { topicForm: async (_old, done) => { editDone = done; }, subjectForm: () => {} },
@@ -42,7 +47,7 @@ const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" "
       const id = new URL(url, "http://local").searchParams.get("topic_id");
       return heldSubjects?.id === id ? heldSubjects.promise : { subjects: [subject(id)], next_after: null };
     } },
-  }, { location: { hash: "" }, sessionStorage: { setItem() {} } });
+  }, { location: { hash: "" }, sessionStorage: { setItem() {} }, document: { getElementById: id => get("topic-detail").children.find(node => node.id === id) } });
   topics.initTopics(); await topics.loadTopics();
   const oldCard = get("topic-list").children[0];
   await oldCard.children.at(-1).children[0].onclick();
@@ -58,6 +63,7 @@ const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" "
   await get("topic-list").children[1].children.at(-1).children[0].onclick();
   heldSubjects.resolve({ subjects: [subject("a")], next_after: null }); await first;
   assert.equal(get("topic-detail-title").textContent, "Second topic");
+  assert.equal(get("topic-detail").children.find(node => node.id === "topic-outcomes").textContent, "b", "The outcome board must follow the selected topic even when older subject reads finish later");
   assert(textOf(get("subject-list")).includes("b subject"));
   assert(!textOf(get("subject-list")).includes("a subject"), "An earlier topic response must not replace the current topic's subjects");
   heldTopics = pending(); const oldSearch = topics.loadTopics(); const response = heldTopics; heldTopics = null; catalog = [b]; await topics.loadTopics();

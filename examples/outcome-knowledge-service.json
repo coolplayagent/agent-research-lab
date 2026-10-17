@@ -1,0 +1,10 @@
+{
+  "kind": "knowledge",
+  "id": "team-knowledge-service",
+  "repositories": {
+    "team-knowledge": {
+      "path": "/path/to/external-knowledge",
+      "reference": "refs/heads/ai-im-incoming"
+    }
+  }
+}

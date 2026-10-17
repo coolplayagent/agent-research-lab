@@ -1,7 +1,7 @@
 load("@crates//:defs.bzl", "aliases", "all_crate_deps")
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test", "rust_binary")
 exports_files(["Cargo.toml"], visibility = ["//visibility:public"])
-rust_library(name = "service_workers", crate_name = "service_workers", srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs", "src/codex_main.rs"]), crate_root = "src/lib.rs", edition = "2024", aliases = aliases(), deps = ["//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/service-api:service_api", "//crates/process:process", "//crates/storage:storage"] + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])
+rust_library(name = "service_workers", crate_name = "service_workers", srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs", "src/codex_main.rs", "src/outcome_main.rs"]), crate_root = "src/lib.rs", edition = "2024", aliases = aliases(), deps = ["//crates/crystal:crystal", "//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/service-api:service_api", "//crates/process:process", "//crates/storage:storage"] + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])
 rust_test(name = "tests", crate = ":service_workers", aliases = aliases(normal_dev = True, proc_macro_dev = True), deps = all_crate_deps(normal_dev = True), proc_macro_deps = all_crate_deps(proc_macro_dev = True), visibility = ["//visibility:public"])
 filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs"]), visibility = ["//visibility:public"])
 rust_binary(name = "ai-im-services", srcs = ["src/main.rs"], edition = "2024", deps = [":service_workers", "//crates/contracts:contracts"] + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])
@@ -9,3 +9,5 @@ rust_binary(name = "ai-im-services", srcs = ["src/main.rs"], edition = "2024", d
 filegroup(name = "units", srcs = glob(["systemd/*.service"]), visibility = ["//visibility:public"])
 
 rust_binary(name = "ai-im-codex-adapter", srcs = ["src/codex_main.rs"], edition = "2024", deps = [":service_workers"] + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])
+
+rust_binary(name = "ai-im-outcome-service", srcs = ["src/outcome_main.rs"], edition = "2024", deps = [":service_workers", "//crates/storage:storage"] + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])

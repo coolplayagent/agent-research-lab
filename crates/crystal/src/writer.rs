@@ -158,6 +158,18 @@ fn publish_batch(store: &mut Store, shared: &Shared, batch: Vec<Command>) {
 }
 fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
     let result = match op {
+        Control::Outcome {
+            actor,
+            credential,
+            command,
+        } => {
+            let read = command.is_read();
+            let result = store.outcome_command(&actor, credential.as_deref(), *command)?;
+            if read {
+                return Ok(result);
+            }
+            result
+        }
         Control::Evolution(command) => {
             let write = matches!(&command, crate::iteration::IterationCommand::Change(_));
             let result = store.iteration_command(command)?;

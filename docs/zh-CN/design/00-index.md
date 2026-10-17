@@ -8,3 +8,4 @@
 - [04 多 Agent 协调与通信](04-coordination.md)
 - [05 研究证据与版本谱系](05-evidence.md)
 - [06 前端模块、共享契约与国际化](06-frontend.md)
+- [07 基于成果的协作架构](07-outcomes.md)

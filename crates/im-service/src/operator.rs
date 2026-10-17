@@ -131,6 +131,7 @@ pub async fn protect(State(web): State<Web>, request: Request, next: Next) -> Re
             | "/api/crystal/inbox"
             | "/api/crystal/history"
             | "/api/im/work"
+            | "/api/crystal/outcomes"
     );
     if static_get
         || actor_api

@@ -8,6 +8,9 @@ name = "service_workers"
 [[bin]]
 name = "ai-im-codex-adapter"
 path = "src/codex_main.rs"
+[[bin]]
+name = "ai-im-outcome-service"
+path = "src/outcome_main.rs"
 [dependencies]
 anyhow.workspace = true
 serde.workspace = true
@@ -15,6 +18,7 @@ serde_json.workspace = true
 tokio.workspace = true
 clap.workspace = true
 contracts.workspace = true
+crystal.workspace = true
 service_protocol.workspace = true
 service_api.workspace = true
 process.workspace = true

@@ -7,7 +7,7 @@ pub(crate) fn migrate(connection: &Connection) -> Result<()> {
         [],
         |r| r.get(0),
     )?;
-    ensure!((1..=6).contains(&version), "unsupported crystal schema");
+    ensure!((1..=7).contains(&version), "unsupported crystal schema");
     if version == 1 {
         connection.execute_batch(
             "BEGIN IMMEDIATE;
@@ -54,6 +54,17 @@ pub(crate) fn migrate(connection: &Connection) -> Result<()> {
           CREATE TABLE research_assessments(sequence INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT NOT NULL UNIQUE,node_id TEXT NOT NULL REFERENCES research_nodes(id),goal_id TEXT NOT NULL REFERENCES goals(id),value TEXT NOT NULL);
           CREATE INDEX assessments_node ON research_assessments(node_id,sequence);
           UPDATE crystal_meta SET value=6 WHERE key='schema'; COMMIT;")?;
+    }
+    if version < 7 {
+        connection.execute_batch("BEGIN IMMEDIATE;
+          CREATE TABLE outcome_paths(topic_id TEXT NOT NULL REFERENCES research_topics(id),goal_id TEXT NOT NULL REFERENCES goals(id),value TEXT NOT NULL,PRIMARY KEY(topic_id,goal_id));
+          CREATE TABLE outcomes(sequence INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT NOT NULL UNIQUE,topic_id TEXT NOT NULL REFERENCES research_topics(id),goal_id TEXT NOT NULL REFERENCES goals(id),author_id TEXT NOT NULL REFERENCES actors(id),kind TEXT NOT NULL,title TEXT NOT NULL,summary TEXT NOT NULL,value TEXT NOT NULL);
+          CREATE INDEX outcomes_topic ON outcomes(topic_id,sequence);
+          CREATE TABLE outcome_references(child_id TEXT NOT NULL REFERENCES outcomes(id),parent_id TEXT NOT NULL REFERENCES outcomes(id),kind TEXT NOT NULL,PRIMARY KEY(child_id,parent_id));
+          CREATE INDEX outcome_references_parent ON outcome_references(parent_id,child_id);
+          CREATE TABLE outcome_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,outcome_id TEXT NOT NULL REFERENCES outcomes(id),kind TEXT NOT NULL,request_id TEXT NOT NULL,value TEXT NOT NULL,created_ms INTEGER NOT NULL,UNIQUE(kind,request_id));
+          CREATE INDEX outcome_events_owner ON outcome_events(outcome_id,sequence);
+          UPDATE crystal_meta SET value=7 WHERE key='schema'; COMMIT;")?;
     }
     Ok(())
 }

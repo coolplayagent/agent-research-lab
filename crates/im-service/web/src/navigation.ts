@@ -1,4 +1,6 @@
 import { loadTopics } from "./topics.js";
+import { showOutcome } from "./outcome-detail.js";
+import { notice } from "./dom.js";
 import { loadServices } from "./settings.js";
 import { t } from "./i18n.js";
 import { get } from "./dom.js";
@@ -48,6 +50,8 @@ export function navigate(): void {
     : "";
   const page = setting
     ? "settings"
+    : requested.startsWith("topics/outcomes/")
+      ? "topics"
     : requested === "evolution"
       ? "groups"
       : titles[requested]
@@ -78,6 +82,9 @@ export function navigate(): void {
   }
   if (requested === "evolution") revealResearch("evolution");
   if (page === "topics") void loadTopics();
+  if (requested.startsWith("topics/outcomes/")) {
+    void showOutcome(decodeURIComponent(requested.slice("topics/outcomes/".length))).catch(notice);
+  } else document.getElementById("outcome-dialog")?.remove();
   if (page === "people") void loadPeople();
   if (page === "applications") void loadApplications();
   if (setting) {

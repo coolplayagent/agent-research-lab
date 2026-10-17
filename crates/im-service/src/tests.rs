@@ -70,7 +70,7 @@ fn interface_access_requires_credentials_and_exact_service_origin() {
 }
 pub(super) struct Harness {
     _state: tempfile::TempDir,
-    hub: crystal::Hub,
+    pub(super) hub: crystal::Hub,
     addr: SocketAddr,
     stop: watch::Sender<bool>,
     server: tokio::task::JoinHandle<std::io::Result<()>>,
@@ -80,6 +80,12 @@ impl Harness {
         Self::with_local_operator(false).await
     }
     async fn with_local_operator(local_operator: bool) -> Self {
+        Self::configured(local_operator, None).await
+    }
+    pub(super) async fn with_services(config: service_api::Configuration) -> Self {
+        Self::configured(false, Some(config)).await
+    }
+    async fn configured(local_operator: bool, config: Option<service_api::Configuration>) -> Self {
         let state = tempfile::tempdir().unwrap();
         let hub = crystal::Hub::open(state.path()).unwrap();
         hub.register_operator().await.unwrap();
@@ -87,6 +93,11 @@ impl Harness {
         let addr = listener.local_addr().unwrap();
         let (stop, mut stopped) = watch::channel(false);
         let mut web = transport::Web::new(hub.clone(), addr, stop.clone());
+        if let Some(config) = config {
+            let registry = service_api::Registry::open(state.path()).unwrap();
+            registry.save(config).unwrap();
+            web.services = Some(Arc::new(registry));
+        }
         web.operator = Some(Arc::new(if local_operator {
             operator::Operator::local(state.path(), addr).unwrap()
         } else {
@@ -114,6 +125,17 @@ impl Harness {
         operator: bool,
         token: Option<&str>,
     ) -> (u16, String) {
+        self.request_intent(path, body, operator, token, "manage-crystal")
+            .await
+    }
+    pub(super) async fn request_intent(
+        &self,
+        path: &str,
+        body: Option<Value>,
+        operator: bool,
+        token: Option<&str>,
+        intent: &str,
+    ) -> (u16, String) {
         let mut stream = tokio::net::TcpStream::connect(self.addr).await.unwrap();
         let method = if body.is_some() { "POST" } else { "GET" };
         let payload = body.map(|v| v.to_string()).unwrap_or_default();
@@ -126,7 +148,7 @@ impl Harness {
             .map(|t| format!("Authorization: Bearer {t}\r\n"))
             .unwrap_or_default();
         let request = format!(
-            "{method} {path} HTTP/1.1\r\nHost: {}\r\nOrigin: http://{}\r\nX-Crystal-Intent: manage-crystal\r\n{cookie}{auth}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nOrigin: http://{}\r\nX-Crystal-Intent: {intent}\r\n{cookie}{auth}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
             self.addr,
             self.addr,
             payload.len()

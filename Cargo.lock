@@ -106,6 +106,7 @@ dependencies = [
  "anyhow",
  "clap",
  "lab-contracts",
+ "lab-crystal",
  "lab-process",
  "lab-storage",
  "serde",

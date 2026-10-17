@@ -7,6 +7,7 @@ import { editAdapter, editService } from "./service-forms.js";
 import { element, select, field } from "./forms.js";
 import { busy } from "./feedback.js";
 import { renderScenarios } from "./scenario-settings.js";
+import { renderOutcomeSettings } from "./outcome-settings.js";
 let current;
 let directory = [];
 let generation = 0;
@@ -38,6 +39,7 @@ function render(view) {
     const config = view.configuration;
     current = view;
     renderScenarios(view, save);
+    renderOutcomeSettings(view, save);
     get("services-status").textContent = view.restart_required
         ? t("services.restart")
         : t("services.activeStorage", {

@@ -1,5 +1,7 @@
 //! Versioned service and coding-agent contracts. Implementations live in independent processes.
+mod outcomes;
 mod registry;
+pub use outcomes::*;
 mod scenarios;
 use anyhow::{Result, ensure};
 use contracts::{AgentProtocol, CodingAgent, ServiceKind};

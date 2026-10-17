@@ -1,4 +1,5 @@
 import { revealResearch } from "./workspace.js";
+import { outcomeBoard } from "./outcome-board.js";
 import { loadEvolution } from "./evolution.js";
 import { TopicState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
@@ -62,6 +63,9 @@ export async function loadTopics(more = false): Promise<void> {
 }
 async function openTopic(topic: Topic, reveal = true): Promise<void> {
   selected = topic;
+  document.getElementById("topic-outcomes")?.remove();
+  const outcomes = outcomeBoard(topic); outcomes.id = "topic-outcomes";
+  get("topic-detail").append(outcomes);
   get("subject-list").replaceChildren(el("p", t("ux.loading")));
   get("topic-detail").hidden = false;
   get("topic-detail-title").textContent = topic.title;

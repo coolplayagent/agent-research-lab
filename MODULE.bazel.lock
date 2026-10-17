@@ -498,7 +498,7 @@
           "REPO_MAPPING:rules_rust+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
           "REPO_MAPPING:rules_rust+,rules_cc rules_cc+",
-          "FILE:@@//Cargo.lock 5eb79da3c6db94fb2f140df7c238fa176f51f824971c1e333878e14a219aaefb",
+          "FILE:@@//Cargo.lock 6a7fc7e2509670c802821b7782936aa83441b66686c6d4b81f84034b08f0554e",
           "FILE:@@//Cargo.toml 1d205001a1097fb65ce72b9fab9d8c1a71a0f51eed1ac549fb16c8fd4bbce169",
           "FILE:@@//app/Cargo.toml 82d145e95485a539d08744a93d32ef73fa64f7828ec47b98495cd65af51fa6e5",
           "FILE:@@//crates/agent-backend/Cargo.toml e5e377a92d239da180aec36800a0110e246be08de18b9289e6da3f0d59c44f0d",
@@ -532,7 +532,7 @@
           "FILE:@@//crates/service-protocol/Cargo.toml 46005797ead2a7df48bd691a36b83d7f9820cc6d1f2561dba1470704c683c845",
           "FILE:@@//crates/service-api/Cargo.toml d79ebc0581ca620cf135083985b0a1c32dcd382028c3960774bc68d481e58f86",
           "FILE:@@//web/shared/Cargo.toml 1b46aa54795550ee6bb24f0e2d631172f45d827712c2de4fba5bec9155cfcb21",
-          "FILE:@@//crates/service-workers/Cargo.toml 331897362da307c3e1ea0c6f6eba426b881b675f0360055874aebdc6da591e64"
+          "FILE:@@//crates/service-workers/Cargo.toml cae9d8d05ddef3599ca12b1247fc3ab0759d8b06b8af008965f2c6018f7a1b17"
         ],
         "generatedRepoSpecs": {
           "crates": {
