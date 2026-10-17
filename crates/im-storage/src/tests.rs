@@ -297,3 +297,71 @@ async fn remote_storage_preserves_durability_authority_and_stream_controls() {
     service.abort();
     let _ = service.await;
 }
+
+#[tokio::test]
+async fn embedded_and_remote_clients_share_delivery_and_idempotency_contracts() {
+    let root = tempfile::tempdir().unwrap();
+    let socket = root.path().join("private/parity.sock");
+    let remote_state = root.path().join("remote");
+    let remote = tokio::spawn({
+        let socket = socket.clone();
+        async move { serve(&remote_state, &socket, 30).await }
+    });
+    let remote_client = Client::remote(socket.clone()).unwrap();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while remote_client.probe().await.is_err() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let local = client(Hub::open(&root.path().join("embedded")).unwrap());
+    for client in [local, remote_client] {
+        client.register_operator().await.unwrap();
+        client.register(vec!["worker".into()]).await.unwrap();
+        client
+            .create_group(NewGroup {
+                id: "room".into(),
+                title: "Room".into(),
+                topic: "Compare transports".into(),
+                private: false,
+                kind: GroupKind::Conversation,
+                members: vec!["operator".into(), "worker".into()],
+            })
+            .await
+            .unwrap();
+        let token = client.grant("worker", 60).await.unwrap();
+        let mut events = client.subscribe("worker", "room").await.unwrap();
+        let input = Publish {
+            group_id: "room".into(),
+            request_id: "same-request".into(),
+            text: include_str!("../fixtures/user-content.txt").trim().into(),
+            reply_to: None,
+        };
+        let first = client.publish(&token, input.clone()).await.unwrap();
+        assert!(first.durable && !first.duplicate);
+        let event = tokio::time::timeout(Duration::from_secs(2), events.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(event.text, input.text);
+        assert_eq!(event.sequence, first.message.sequence);
+        let repeated = client.publish(&token, input.clone()).await.unwrap();
+        assert!(repeated.duplicate);
+        assert_eq!(repeated.message.sequence, first.message.sequence);
+        let mut conflict = input.clone();
+        conflict.text = "Different content".into();
+        assert!(client.publish(&token, conflict).await.is_err());
+        let history = client.history("room", 0, 10).await.unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].text, input.text);
+        client.set_presence("worker", Presence::Busy).await.unwrap();
+        assert!(!events.receives().await.unwrap());
+        client.membership("room", "worker", false).await.unwrap();
+        assert!(events.receives().await.is_err());
+        assert!(client.publish(&token, input).await.is_err());
+    }
+    remote.abort();
+    let _ = remote.await;
+}

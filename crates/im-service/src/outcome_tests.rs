@@ -1,7 +1,7 @@
 use crate::tests::Harness;
 use crate::*;
+use collaboration_model::*;
 use contracts::*;
-use crystal::*;
 use std::collections::BTreeMap;
 
 async fn prepare(h: &Harness) -> String {

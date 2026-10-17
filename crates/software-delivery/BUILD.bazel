@@ -1,0 +1,6 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+exports_files(["Cargo.toml"], visibility = ["//visibility:public"])
+rust_library(name = "software_delivery", crate_name = "software_delivery", srcs = glob(["src/**/*.rs"]), crate_root = "src/lib.rs", edition = "2024", aliases = aliases(), deps = ["//crates/task:task", "//crates/config:config", "//crates/delivery:delivery", "//crates/freshness:freshness", "//crates/process:process", "//crates/storage:storage", "//crates/contracts:contracts", "//crates/collaboration-model:collaboration_model", "//crates/im-client:im_client", "//crates/software-verification:software_verification", "//crates/runtime:runtime"] + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])
+rust_test(name = "tests", crate = ":software_delivery", aliases = aliases(normal_dev = True, proc_macro_dev = True), deps = all_crate_deps(normal_dev = True), proc_macro_deps = all_crate_deps(proc_macro_dev = True))
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs"]), visibility = ["//visibility:public"])

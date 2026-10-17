@@ -27,7 +27,7 @@ pub async fn save(State(web): State<Web>, request: Request) -> Response {
                 web.hub
                     .outcomes(
                         None,
-                        crystal::OutcomeCommand::Paths {
+                        collaboration_model::OutcomeCommand::Paths {
                             topic_id: topic_id.clone(),
                             after: String::new(),
                         },

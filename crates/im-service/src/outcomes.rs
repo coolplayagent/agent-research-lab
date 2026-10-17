@@ -4,11 +4,11 @@ use crate::*;
 use axum::extract::{Query, Request, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use contracts::{OutcomeErrorCode, OutcomeServiceKind, VerificationRunState};
-use crystal::{
+use collaboration_model::{
     OutcomeCommand, OutcomeQuery, OutcomeVerification, OutcomeVerificationInput,
     OutcomeVerificationResult, OutcomeView,
 };
+use contracts::{OutcomeErrorCode, OutcomeServiceKind, VerificationRunState};
 use serde::Deserialize;
 
 pub(super) fn outcome_response(result: Result<Value>) -> Response {

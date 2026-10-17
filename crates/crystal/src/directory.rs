@@ -1,6 +1,7 @@
 //! Stable IM identities and actor-scoped group discovery, independent of execution apps.
-use crate::{Hub, Person, Presence, model::*, store::Store};
+use crate::{Hub, store::Store};
 use anyhow::{Result, ensure};
+use collaboration_model::*;
 use rusqlite::params;
 use serde_json::{Value, json};
 impl Store {

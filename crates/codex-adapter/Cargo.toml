@@ -1,0 +1,20 @@
+[package]
+name = "ai-im-codex-adapter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[lib]
+name = "codex_adapter"
+[dependencies]
+tempfile.workspace = true
+
+clap.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+service_api.workspace = true
+service_protocol.workspace = true
+process.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,9 @@
+[package]
+name = "lab-software-verification"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[lib]
+name = "software_verification"
+[dependencies]
+serde.workspace = true

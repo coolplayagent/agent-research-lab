@@ -1,71 +1,17 @@
 //! Stateless executor and lightweight sandbox services; AI-IM owns goals and storage.
-pub mod codex_adapter;
-pub mod outcome_worker;
-mod sandbox;
 use anyhow::{Result, ensure};
 use contracts::ServiceKind;
-pub use sandbox::run;
+use executor_service::execute;
+use sandbox_service as sandbox;
+pub use sandbox_service::run;
 use serde_json::{Value, json};
-use service_api::{ExecutionReceipt, ExecutorRequest, SandboxRequest};
+use service_api::SandboxRequest;
 use service_protocol as rpc;
 use std::{
     path::Path,
     sync::Arc,
     time::{Duration, Instant},
 };
-async fn execute(request: ExecutorRequest) -> Result<Value> {
-    match request {
-        ExecutorRequest::Probe => Ok(json!(info(ServiceKind::Executor, true))),
-        ExecutorRequest::Execute {
-            adapter,
-            sandbox,
-            input,
-            seconds,
-        } => {
-            adapter.validate()?;
-            ensure!(adapter.enabled, "adapter is disabled");
-            ensure!(
-                input.protocol_version == rpc::VERSION,
-                "unsupported agent input protocol version"
-            );
-            ensure!(
-                (1..=adapter.max_seconds).contains(&seconds),
-                "execution time exceeds adapter limit"
-            );
-            rpc::endpoint(&sandbox)?;
-            service_api::probe(&sandbox, ServiceKind::Sandbox).await?;
-            let encoded = serde_json::to_string(&input)?;
-            ensure!(encoded.len() <= 256 * 1024, "agent input exceeds bound");
-            let input_sha256 = storage::digest(encoded.as_bytes());
-            let adapter_sha256 = storage::digest(&serde_json::to_vec(&adapter)?);
-            let output: service_api::SandboxOutput = rpc::call(
-                &sandbox,
-                &SandboxRequest::Run {
-                    command: adapter.command.clone(),
-                    env_names: adapter.env_names.clone(),
-                    read_only_paths: adapter.read_only_paths.clone(),
-                    network: adapter.network,
-                    input: encoded,
-                    seconds,
-                },
-                Duration::from_secs(seconds + 10),
-            )
-            .await?;
-            let result: service_api::AgentOutput = serde_json::from_str(&output.stdout)?;
-            result.validate(&input)?;
-            Ok(json!(ExecutionReceipt {
-                output_sha256: storage::digest(&serde_json::to_vec(&result)?),
-                output: result,
-                agent: adapter.agent,
-                adapter_id: adapter.id,
-                input_sha256,
-                adapter_sha256,
-                sandbox_id: output.sandbox_id,
-                elapsed_ms: output.elapsed_ms
-            }))
-        }
-    }
-}
 fn info(kind: ServiceKind, ready: bool) -> rpc::ServiceInfo {
     rpc::ServiceInfo {
         protocol_version: rpc::VERSION,
@@ -177,5 +123,3 @@ pub async fn serve(
     tasks.shutdown().await;
     Ok(())
 }
-#[cfg(test)]
-mod tests;

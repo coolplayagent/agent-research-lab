@@ -7,25 +7,23 @@ license.workspace = true
 [lib]
 name = "im_service"
 
-[[bin]]
-name = "ai-im"
-path = "src/main.rs"
-
 [dependencies]
+service_registry.workspace = true
 service_protocol.workspace = true
 service_api.workspace = true
-im_storage.workspace = true
+im_client.workspace = true
 web_assets.workspace = true
 contracts.workspace = true
 anyhow.workspace = true
 async-stream.workspace = true
 axum.workspace = true
-clap.workspace = true
-crystal.workspace = true
+collaboration_model.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 storage.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+crystal.workspace = true
+im_storage.workspace = true
 tempfile.workspace = true

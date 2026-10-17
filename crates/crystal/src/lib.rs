@@ -1,29 +1,20 @@
 //! Durable digital-person conversations, independent of model execution.
 //! Host-authorized membership, ordered logs, bounded live delivery and replay.
+pub use collaboration_model::*;
 mod conversations;
-mod outcome_model;
-mod outcomes;
-pub use outcome_model::*;
-mod iteration;
-mod iteration_model;
-pub use iteration_model::*;
-mod research;
-mod research_model;
-pub use research_model::*;
 mod directory;
-mod goal_model;
 mod goal_work;
 mod goals;
 mod groups;
+mod iteration;
 mod metrics;
-mod model;
+mod outcomes;
+mod research;
 mod schema;
 mod store;
 mod writer;
 use anyhow::{Context, Result, anyhow, ensure};
-pub use goal_model::*;
 use metrics::Metrics;
-pub use model::*;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, HashMap},

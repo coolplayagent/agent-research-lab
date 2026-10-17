@@ -1,6 +1,6 @@
 //! SQLite is the durable authority. No acknowledgement or live publication precedes commit.
-use crate::model::*;
 use anyhow::{Context, Result, ensure};
+use collaboration_model::*;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use std::{
     collections::{BTreeMap, BTreeSet},

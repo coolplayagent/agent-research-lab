@@ -11,15 +11,15 @@ use axum::{
     },
     routing::{get, post},
 };
-use crystal::Publish;
-use im_storage::Client as Hub;
+use collaboration_model::Publish;
+use im_client::Client as Hub;
 use serde::Deserialize;
 use std::convert::Infallible;
 use tokio::sync::{Semaphore, watch};
 
 #[derive(Clone)]
 pub struct Web {
-    pub services: Option<Arc<service_api::Registry>>,
+    pub services: Option<Arc<service_registry::Registry>>,
     pub scenarios: Arc<Vec<Arc<dyn crate::ScenarioAdapter>>>,
     pub hub: Hub,
     pub operator: Option<Arc<super::operator::Operator>>,
@@ -216,7 +216,7 @@ async fn ack(State(web): State<Web>, request: Request) -> Response {
 }
 #[derive(Deserialize)]
 struct StateChange {
-    state: crystal::Presence,
+    state: collaboration_model::Presence,
 }
 async fn presence(State(web): State<Web>, request: Request) -> Response {
     let result = async {
@@ -272,7 +272,7 @@ async fn stream(
     let source = async_stream::stream! {
         let _permit=permit;
         yield Ok::<_,Infallible>(Event::default().event("ready").data("{}"));
-        let expires=tokio::time::sleep(Duration::from_millis(expiry.saturating_sub(crystal::now_ms())));tokio::pin!(expires);
+        let expires=tokio::time::sleep(Duration::from_millis(expiry.saturating_sub(collaboration_model::now_ms())));tokio::pin!(expires);
         let mut replay=true;
         'delivery: loop {
             if *shutdown.borrow() {break;}
@@ -286,14 +286,14 @@ async fn stream(
                 Ok(true)=>{}
             }
             if replay {
-                let page=match web.hub.history(&query.group_id,cursor,crystal::PAGE_SIZE).await{Ok(p)=>p,Err(e)=>{yield Ok(Event::default().event("fault").data(e.to_string()));break;}};
+                let page=match web.hub.history(&query.group_id,cursor,collaboration_model::PAGE_SIZE).await{Ok(p)=>p,Err(e)=>{yield Ok(Event::default().event("fault").data(e.to_string()));break;}};
                 // A control operation can run while the disk read is in flight.
                 if !subscription.receives().await.unwrap_or(false)||web.hub.authenticate(&token).await.is_err(){continue;}
                 subscription.replayed(page.len());
                 for message in &page {
                     if !subscription.receives().await.unwrap_or(false)||web.hub.authenticate(&token).await.is_err(){replay=true;continue 'delivery;}
                     cursor=message.sequence;yield Ok(Event::default().event("message").id(cursor.to_string()).json_data(message).unwrap());}
-                if page.len()==crystal::PAGE_SIZE {continue;}
+                if page.len()==collaboration_model::PAGE_SIZE {continue;}
                 replay=false;
             }
             tokio::select!{

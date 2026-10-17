@@ -1,0 +1,39 @@
+[package]
+name = "lab-research-console"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[lib]
+name = "research_console"
+[dependencies]
+async-stream.workspace = true
+im_host.workspace = true
+crystal.workspace = true
+im_storage.workspace = true
+service_registry.workspace = true
+im_client.workspace = true
+contracts.workspace = true
+im_service.workspace = true
+axum.workspace = true
+collaboration_model.workspace = true
+tokio.workspace = true
+libc.workspace = true
+agent_backend.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+communication.workspace = true
+config.workspace = true
+delivery.workspace = true
+evolution_cli.workspace = true
+freshness.workspace = true
+multi_agent.workspace = true
+process.workspace = true
+runtime.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+storage.workspace = true
+task.workspace = true
+software_verification.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

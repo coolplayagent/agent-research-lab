@@ -1,8 +1,8 @@
 //! A configured scenario is a host adapter, never an agent's native output parser.
 use crate::{Scenario, ScenarioAdapter};
 use anyhow::{Result, ensure};
+use collaboration_model::{EvolutionAction, EvolutionRun, GoalInput};
 use contracts::{ActivationState, RoundState, ScenarioCapability};
-use crystal::{EvolutionAction, EvolutionRun, GoalInput};
 use service_api::{
     ScenarioReconciliation, ScenarioRegistration, ScenarioRequest, ScenarioValidation,
 };
@@ -38,7 +38,7 @@ impl RemoteScenario {
         Ok(())
     }
 
-    async fn reconcile_run(&self, hub: &im_storage::Client, run: &EvolutionRun) -> Result<()> {
+    async fn reconcile_run(&self, hub: &im_client::Client, run: &EvolutionRun) -> Result<()> {
         self.ready().await?;
         let goal = crate::iteration::current_goal(hub, run).await?;
         let attempts = goal
@@ -180,7 +180,7 @@ impl ScenarioAdapter for RemoteScenario {
     }
     fn reconcile<'a>(
         &'a self,
-        hub: &'a im_storage::Client,
+        hub: &'a im_client::Client,
         run: &'a EvolutionRun,
     ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
         Box::pin(self.reconcile_run(hub, run))

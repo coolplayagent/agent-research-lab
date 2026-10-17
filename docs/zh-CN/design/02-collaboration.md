@@ -38,7 +38,7 @@ worker 以 `Authorization: Bearer <Agent grant>` 调用 `GET /api/im/work?after=
 
 ## 管理与消息 API
 
-`crystal` 实现身份、成员、凭证、消息、目标、尝试、幂等、重放与投递领域逻辑；生产持久库由独立存储服务持有。`im-service` 负责 HTTP/SSE、登录、场景注册、前端与独立宿主，`app/src/dashboard` 提供研究适配器。
+`crystal` 实现身份、成员、凭证、消息、目标、尝试、幂等、重放与投递领域逻辑；生产持久库由独立存储服务持有。`im-service` 负责 HTTP/SSE、登录、场景注册与前端，`im-host` 负责启动装配，`apps/research-console` 提供研究适配器。
 
 操作员写入 `POST /api/crystal/manage`，携带宿主会话、精确同源 `Origin: http://<listen-address>`、`Content-Type: application/json` 和 `X-Crystal-Intent: manage-crystal`。
 

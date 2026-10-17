@@ -18,7 +18,7 @@ impl ScenarioAdapter for DesignReview {
     fn descriptor(&self) -> Scenario {
         Scenario {
             id: "design-review".into(),
-            protocol_version: crystal::SCENARIO_PROTOCOL_VERSION,
+            protocol_version: collaboration_model::SCENARIO_PROTOCOL_VERSION,
             capabilities: vec![ScenarioCapability::Execute],
             assignment_roles: vec![],
             execution_seconds: Some(300),
@@ -32,7 +32,7 @@ impl ScenarioAdapter for DesignReview {
         }
     }
 
-    fn validate(&self, goal: &crystal::GoalInput) -> Result<()> {
+    fn validate(&self, goal: &collaboration_model::GoalInput) -> Result<()> {
         let parameters: Parameters = if goal.parameters.is_null() {
             Parameters::default()
         } else {
@@ -57,7 +57,11 @@ impl ScenarioAdapter for DesignReview {
         true
     }
 
-    fn assignment_ready(&self, goal: &crystal::Goal, work: &crystal::WorkItem) -> bool {
+    fn assignment_ready(
+        &self,
+        goal: &collaboration_model::Goal,
+        work: &collaboration_model::WorkItem,
+    ) -> bool {
         goal.work
             .last()
             .is_none_or(|reviewer| reviewer.id != work.id)

@@ -92,9 +92,9 @@ impl Harness {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let (stop, mut stopped) = watch::channel(false);
-        let mut web = transport::Web::new(hub.clone(), addr, stop.clone());
+        let mut web = transport::Web::new(im_storage::client(hub.clone()), addr, stop.clone());
         if let Some(config) = config {
-            let registry = service_api::Registry::open(state.path()).unwrap();
+            let registry = service_registry::Registry::open(state.path()).unwrap();
             registry.save(config).unwrap();
             web.services = Some(Arc::new(registry));
         }

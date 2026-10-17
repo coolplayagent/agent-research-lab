@@ -36,8 +36,8 @@ Agent 沿用 AI-IM 的 bearer 凭据和工作领取 API。先领取 `goal_id / w
 ## 启动可替换服务
 
 ```sh
-bazel build //crates/service-workers:ai-im-outcome-service
-bazel-bin/crates/service-workers/ai-im-outcome-service \
+bazel build //crates/outcome-service:ai-im-outcome-service
+bazel-bin/crates/outcome-service/ai-im-outcome-service \
   --config /private/services/outcome-service.json \
   --state-dir /private/services/outcome-state \
   --socket /private/services/outcome.sock \

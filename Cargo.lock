@@ -6,59 +6,27 @@ version = 4
 name = "agent-research-lab"
 version = "0.1.0"
 dependencies = [
- "ai-im",
- "ai-im-service-api",
- "ai-im-storage",
- "anyhow",
- "async-stream",
- "axum",
- "chrono",
- "clap",
- "futures-util",
- "lab-agent-backend",
- "lab-agent-policy",
- "lab-automation",
- "lab-budget",
- "lab-build-cache",
- "lab-collaboration-experiment",
- "lab-communication",
- "lab-config",
- "lab-contracts",
- "lab-crystal",
- "lab-delivery",
- "lab-evolution",
- "lab-evolution-cli",
- "lab-freshness",
- "lab-inputs",
- "lab-isolation",
- "lab-knowledge",
- "lab-lease-heartbeat",
- "lab-multi-agent",
  "lab-process",
- "lab-runtime",
- "lab-storage",
- "lab-targets",
- "lab-task",
- "lab-workflow",
- "libc",
+ "lab-research-cli",
  "serde",
  "serde_json",
- "tokio",
- "tokio-stream",
+ "tempfile",
 ]
 
 [[package]]
 name = "ai-im"
 version = "0.1.0"
 dependencies = [
+ "ai-im-client",
+ "ai-im-collaboration-model",
  "ai-im-service-api",
  "ai-im-service-protocol",
+ "ai-im-service-registry",
  "ai-im-storage",
  "ai-im-web-assets",
  "anyhow",
  "async-stream",
  "axum",
- "clap",
  "lab-contracts",
  "lab-crystal",
  "lab-storage",
@@ -69,15 +37,123 @@ dependencies = [
 ]
 
 [[package]]
+name = "ai-im-app"
+version = "0.1.0"
+dependencies = [
+ "ai-im-host",
+ "anyhow",
+ "clap",
+ "lab-storage",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "ai-im-client"
+version = "0.1.0"
+dependencies = [
+ "ai-im-collaboration-model",
+ "ai-im-service-protocol",
+ "anyhow",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "ai-im-codex-adapter"
+version = "0.1.0"
+dependencies = [
+ "ai-im-service-api",
+ "ai-im-service-protocol",
+ "anyhow",
+ "clap",
+ "lab-process",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "ai-im-collaboration-model"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lab-contracts",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "ai-im-executor-service"
+version = "0.1.0"
+dependencies = [
+ "ai-im-service-api",
+ "ai-im-service-protocol",
+ "anyhow",
+ "lab-contracts",
+ "lab-storage",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "ai-im-host"
+version = "0.1.0"
+dependencies = [
+ "ai-im",
+ "ai-im-client",
+ "ai-im-service-api",
+ "ai-im-service-registry",
+ "ai-im-storage",
+ "anyhow",
+ "axum",
+ "lab-contracts",
+ "lab-crystal",
+ "tokio",
+]
+
+[[package]]
+name = "ai-im-outcome-service"
+version = "0.1.0"
+dependencies = [
+ "ai-im-collaboration-model",
+ "ai-im-service-api",
+ "ai-im-service-protocol",
+ "anyhow",
+ "clap",
+ "lab-contracts",
+ "lab-process",
+ "lab-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "ai-im-sandbox-service"
+version = "0.1.0"
+dependencies = [
+ "ai-im-service-api",
+ "anyhow",
+ "lab-contracts",
+ "lab-process",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "ai-im-service-api"
 version = "0.1.0"
 dependencies = [
+ "ai-im-collaboration-model",
  "ai-im-service-protocol",
- "ai-im-storage",
  "anyhow",
  "lab-contracts",
- "lab-crystal",
- "lab-storage",
  "serde",
  "serde_json",
  "tempfile",
@@ -98,17 +174,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "ai-im-service-workers"
+name = "ai-im-service-registry"
 version = "0.1.0"
 dependencies = [
  "ai-im-service-api",
  "ai-im-service-protocol",
  "anyhow",
+ "lab-contracts",
+ "lab-storage",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "ai-im-service-workers"
+version = "0.1.0"
+dependencies = [
+ "ai-im-executor-service",
+ "ai-im-sandbox-service",
+ "ai-im-service-api",
+ "ai-im-service-protocol",
+ "anyhow",
  "clap",
  "lab-contracts",
- "lab-crystal",
- "lab-process",
- "lab-storage",
  "serde",
  "serde_json",
  "tempfile",
@@ -119,6 +208,7 @@ dependencies = [
 name = "ai-im-storage"
 version = "0.1.0"
 dependencies = [
+ "ai-im-client",
  "ai-im-service-protocol",
  "anyhow",
  "clap",
@@ -495,23 +585,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92d699e522242e69e3003b94ecc1f960f3a5e015aa7c5d7486e65ad01dd94f5e"
 
 [[package]]
-name = "futures-macro"
-version = "0.3.34"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fb9654ba8355388abeb8dcb4fc62f511300867002afc858860463bdd9fe0c44"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.6",
-]
-
-[[package]]
-name = "futures-sink"
-version = "0.3.34"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1944426bf7d03f1d14f708785e4b33efd750b36d48a157b836b3efc15ede8e1d"
-
-[[package]]
 name = "futures-task"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -524,7 +597,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d50a92467f8ba5dd6e3ee5d4bd04d73ab2e4e1c44474a0674821dfce14b79bc"
 dependencies = [
  "futures-core",
- "futures-macro",
  "futures-task",
  "pin-project-lite",
  "slab",
@@ -847,6 +919,7 @@ dependencies = [
 name = "lab-crystal"
 version = "0.1.0"
 dependencies = [
+ "ai-im-collaboration-model",
  "anyhow",
  "lab-contracts",
  "lab-storage",
@@ -1009,6 +1082,79 @@ dependencies = [
 ]
 
 [[package]]
+name = "lab-research-cli"
+version = "0.1.0"
+dependencies = [
+ "ai-im-host",
+ "anyhow",
+ "chrono",
+ "clap",
+ "lab-agent-backend",
+ "lab-agent-policy",
+ "lab-automation",
+ "lab-budget",
+ "lab-build-cache",
+ "lab-collaboration-experiment",
+ "lab-communication",
+ "lab-config",
+ "lab-delivery",
+ "lab-evolution",
+ "lab-evolution-cli",
+ "lab-freshness",
+ "lab-inputs",
+ "lab-isolation",
+ "lab-knowledge",
+ "lab-lease-heartbeat",
+ "lab-multi-agent",
+ "lab-process",
+ "lab-research-console",
+ "lab-runtime",
+ "lab-software-delivery",
+ "lab-storage",
+ "lab-targets",
+ "lab-task",
+ "lab-workflow",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "lab-research-console"
+version = "0.1.0"
+dependencies = [
+ "ai-im",
+ "ai-im-client",
+ "ai-im-collaboration-model",
+ "ai-im-host",
+ "ai-im-service-registry",
+ "ai-im-storage",
+ "anyhow",
+ "async-stream",
+ "axum",
+ "chrono",
+ "lab-agent-backend",
+ "lab-communication",
+ "lab-config",
+ "lab-contracts",
+ "lab-crystal",
+ "lab-delivery",
+ "lab-evolution-cli",
+ "lab-freshness",
+ "lab-multi-agent",
+ "lab-process",
+ "lab-runtime",
+ "lab-software-verification",
+ "lab-storage",
+ "lab-task",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "lab-runtime"
 version = "0.1.0"
 dependencies = [
@@ -1039,6 +1185,36 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "lab-software-delivery"
+version = "0.1.0"
+dependencies = [
+ "ai-im-client",
+ "ai-im-collaboration-model",
+ "anyhow",
+ "chrono",
+ "lab-config",
+ "lab-contracts",
+ "lab-delivery",
+ "lab-freshness",
+ "lab-process",
+ "lab-runtime",
+ "lab-software-verification",
+ "lab-storage",
+ "lab-task",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "lab-software-verification"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -1490,31 +1666,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
-]
-
-[[package]]
-name = "tokio-stream"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3d06f0b082ba57c26b79407372e57cf2a1e28124f78e9479fe80322cf53420b"
-dependencies = [
- "futures-core",
- "pin-project-lite",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "tokio-util"
-version = "0.7.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e464cf451ba96ebfc6f9b6542f17ee8b8956e33f1e40d9690624e59d7a7f8a4b"
-dependencies = [
- "bytes",
- "futures-core",
- "futures-sink",
- "pin-project-lite",
- "tokio",
 ]
 
 [[package]]

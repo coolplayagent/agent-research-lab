@@ -39,9 +39,9 @@ pub async fn manage(State(web): State<Web>, request: Request) -> Response {
                 .clone()
                 .try_acquire_owned()
                 .context("goal management backpressure")?;
-            let change: crystal::GoalChange =
+            let change: collaboration_model::GoalChange =
                 serde_json::from_slice(&body(request, 192 * 1024).await?)?;
-            if let crystal::GoalChange::Create { goal } = &change {
+            if let collaboration_model::GoalChange::Create { goal } = &change {
                 goal.validate()?;
                 let scenarios =
                     crate::scenarios::configured(&web.scenarios, web.services.as_deref())?;
@@ -99,8 +99,8 @@ pub async fn scenarios(State(web): State<Web>) -> Response {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Discussion {
-    goal: crystal::GoalInput,
-    message: crystal::Publish,
+    goal: collaboration_model::GoalInput,
+    message: collaboration_model::Publish,
 }
 pub async fn discuss(State(web): State<Web>, request: Request) -> Response {
     json_response(

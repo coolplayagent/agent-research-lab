@@ -1,7 +1,8 @@
 //! Ad-hoc group DMs never expire. Expanding the audience forks a conversation;
 //! conversion to a managed group preserves the original log and replay cursors.
-use crate::{model::*, store::Store};
+use crate::store::Store;
 use anyhow::{Result, ensure};
+use collaboration_model::*;
 use rusqlite::params;
 use std::collections::{BTreeMap, BTreeSet};
 impl Store {

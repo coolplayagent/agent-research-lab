@@ -44,6 +44,20 @@ rust_binary(
 test_suite(
     name = "tests",
     tests = [
+        "//crates/software-verification:tests",
+        "//crates/software-delivery:tests",
+        "//crates/service-registry:tests",
+        "//crates/sandbox-service:tests",
+        "//crates/executor-service:tests",
+        "//crates/outcome-service:tests",
+        "//crates/codex-adapter:tests",
+        "//crates/im-host:tests",
+        "//crates/im-client:tests",
+        "//crates/collaboration-model:tests",
+        "//apps/research-console:tests",
+        "//apps/research-cli:tests",
+        "//architecture:tests",
+        "//apps/ai-im:standalone_tests",
         "//app:serde_compatibility_tests",
         "//app:tests",
         "//crates/im-service:tests",
@@ -101,6 +115,20 @@ alias(name = "ai-im", actual = "//crates/im-service:ai-im", visibility = ["//vis
 alias(name = "im-package", actual = "//crates/im-service:package", visibility = ["//visibility:public"])
 
 filegroup(name = "policy_sources", srcs = [
+    "//architecture:policy_sources",
+    "//crates/collaboration-model:policy_sources",
+    "//crates/service-registry:policy_sources",
+    "//crates/im-client:policy_sources",
+    "//crates/im-host:policy_sources",
+    "//crates/codex-adapter:policy_sources",
+    "//crates/outcome-service:policy_sources",
+    "//crates/sandbox-service:policy_sources",
+    "//crates/executor-service:policy_sources",
+    "//apps/research-console:policy_sources",
+    "//apps/research-cli:policy_sources",
+    "//crates/software-verification:policy_sources",
+    "//crates/software-delivery:policy_sources",
+    "//apps/ai-im:policy_sources",
     "//crates/service-workers:policy_sources",
     "//crates/service-api:policy_sources",
     "//crates/im-storage:policy_sources",
@@ -135,6 +163,14 @@ filegroup(name = "policy_sources", srcs = [
     "//crates/workflow:policy_sources",
     "//web/shared:policy_sources",
     "//crates/im-service/web:policy_sources",
-    "//app/src/dashboard/web:policy_sources",
+    "//apps/research-console/src/dashboard/web:policy_sources",
 ], visibility = ["//visibility:public"])
 genrule(name = "source_inventory", srcs = [":policy_sources"], outs = ["source_inventory.txt"], cmd = "printf '%s\n' $(locations :policy_sources) > $@", visibility = ["//visibility:public"])
+
+# Optional execution and knowledge services are installed separately from core collaboration.
+pkg_tar(
+    name = "adapter-package",
+    srcs = ["//crates/service-workers:ai-im-services", "//crates/service-workers:units", "//crates/codex-adapter:ai-im-codex-adapter", "//crates/outcome-service:ai-im-outcome-service"],
+    package_dir = "ai-im-adapters", extension = "tar.gz", mode = "0755",
+    visibility = ["//visibility:public"],
+)

@@ -22,7 +22,7 @@ jobs:
           bazelisk-cache: true
           repository-cache: true
           disk-cache: ${{ github.workflow }}
-      - run: bazel build --lockfile_mode=error //:agent-research-lab //:package
+      - run: bazel build --lockfile_mode=error //:agent-research-lab //:package //:im-package //:adapter-package
       - run: bazel test --lockfile_mode=error //...
       - uses: dtolnay/rust-toolchain@master
         with:

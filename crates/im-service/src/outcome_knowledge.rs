@@ -2,10 +2,10 @@
 use crate::{outcomes::*, transport::*, *};
 use axum::extract::{Request, State};
 use axum::response::Response;
-use contracts::{KnowledgeWriteState, OutcomeErrorCode, OutcomeServiceKind};
-use crystal::{
+use collaboration_model::{
     KnowledgeWrite, KnowledgeWriteInput, KnowledgeWriteResult, OutcomeCommand, OutcomeView,
 };
+use contracts::{KnowledgeWriteState, OutcomeErrorCode, OutcomeServiceKind};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -44,7 +44,7 @@ pub async fn write(State(web): State<Web>, request: Request) -> Response {
         tokio::spawn(async move {
             let _permit = permit;
             let mut shutdown = web.shutdown.subscribe();
-            let result = if service_ready(&web,&service).await.is_err() || write.deadline_ms <= crystal::now_ms() || !currently_accepted(&web, &write).await {
+            let result = if service_ready(&web,&service).await.is_err() || write.deadline_ms <= collaboration_model::now_ms() || !currently_accepted(&web, &write).await {
                 terminal(&write,KnowledgeWriteState::Failed,"Knowledge write was not dispatched")
             } else {
                 let result = tokio::select! {

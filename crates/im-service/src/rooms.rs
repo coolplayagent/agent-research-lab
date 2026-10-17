@@ -15,10 +15,10 @@ use std::convert::Infallible;
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 enum Change {
     Person {
-        person: crystal::Person,
+        person: collaboration_model::Person,
     },
     Send {
-        message: crystal::Publish,
+        message: collaboration_model::Publish,
     },
     Convert {
         group_id: String,
@@ -27,14 +27,14 @@ enum Change {
     },
     Fork {
         source: String,
-        group: crystal::NewGroup,
+        group: collaboration_model::NewGroup,
         history_from: Option<u64>,
     },
     Create {
-        group: crystal::NewGroup,
+        group: collaboration_model::NewGroup,
     },
     Update {
-        change: crystal::GroupChange,
+        change: collaboration_model::GroupChange,
     },
     Membership {
         group_id: String,
@@ -43,7 +43,7 @@ enum Change {
     },
     Presence {
         person_id: String,
-        state: crystal::Presence,
+        state: collaboration_model::Presence,
     },
     Grant {
         person_id: String,

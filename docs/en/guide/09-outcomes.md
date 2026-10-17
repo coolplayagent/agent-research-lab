@@ -36,8 +36,8 @@ Operator APIs are `GET/POST /api/im/outcomes`, `POST /api/im/outcomes/verify`, `
 ## Optional services
 
 ```sh
-bazel build //crates/service-workers:ai-im-outcome-service
-bazel-bin/crates/service-workers/ai-im-outcome-service \
+bazel build //crates/outcome-service:ai-im-outcome-service
+bazel-bin/crates/outcome-service/ai-im-outcome-service \
   --config /private/services/outcome-service.json \
   --state-dir /private/services/outcome-state \
   --socket /private/services/outcome.sock \

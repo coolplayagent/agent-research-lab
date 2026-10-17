@@ -7,16 +7,18 @@ The root Cargo manifest is a virtual workspace; shared dependency versions live
 in `[workspace.dependencies]` and the workspace lockfile. Library package names
 use the `lab-` prefix, while Rust library names retain the existing module names.
 
-`app/` owns argument parsing, command dispatch, process exit behavior and the
-optional systemd service template. Its `main.rs` calls the application service;
-it contains no scheduler or communication implementation. The application library
-re-exports the module crates so existing `agent_research_lab::runtime` and other
-host integration paths remain available.
+`apps/ai-im` is the standalone collaboration application. `apps/research-cli` owns research command parsing and dispatch; `apps/research-console` owns the research console and scenario integration. `app/` retains the original executable, service templates and compatibility exports such as `agent_research_lab::runtime`. Libraries do not depend on these applications.
 
 | Crates | Responsibility |
 | --- | --- |
 | `im-service`, `crystal` | System core: Agent identities, groups, goals, assignments, durable messages, DMs and announcements |
-| `im-storage`, `service-api`, `service-protocol`, `service-workers` | Independent storage, client contracts, versioned service protocol and executor/sandbox workers |
+| `collaboration-model`, `service-api` | Database-independent models, validation and service contracts |
+| `im-client`, `service-protocol` | Storage client and versioned RPC; no client-owned database |
+| `im-storage`, `crystal` | Storage service and domain transactions; sole production database ownership |
+| `service-registry`, `im-host` | Configuration persistence/probes and application/storage composition |
+| `executor-service`, `sandbox-service` | Replaceable execution and bounded sandbox; `service-workers` retains the combined launcher |
+| `codex-adapter`, `outcome-service` | Optional vendor bridge, outcome verification and external knowledge updates |
+| `software-delivery`, `software-verification` | Research software delivery/activation and shared verification parameters; original gates retained |
 | `contracts` | Shared state enums and frontend contract generation |
 | `config`, `task` | Configuration declarations and frozen task/attempt records |
 | `agent-policy`, `agent-backend`, `isolation` | Permissions, execution adapters and Linux process boundaries |
@@ -80,3 +82,11 @@ The durable production database belongs to the storage service. `crystal` implem
 ## Outcome collaboration
 
 Outcome collaboration connects goal paths within topics through immutable publications, explicit references, independent verification and host acceptance. SuperPOD is an optional knowledge binding; replaceable services update external repositories. See [architecture](07-outcomes.md) and [usage](../guide/09-outcomes.md).
+
+## Independently buildable boundaries
+
+- Models and clients do not depend on `crystal`, `im-storage` or SQLite. The HTTP library also excludes storage implementations. `crystal` re-exports the previous model names for Rust callers.
+- `im-host` selects the configured production storage endpoint or explicitly creates an independent embedded development adapter. Both use the same `im-client` request contract.
+- Messages, goals, outcomes and coordination lineage retain their shared transaction boundary for membership, attempt fencing and acceptance consistency. Research execution, prompt evolution and SuperPOD research publication remain optional extensions outside the core package.
+- `//:im-package` contains core collaboration and storage; `//:adapter-package` contains optional services; `//:package` remains the complete research distribution.
+- Bazel analysis tests in `architecture` traverse actual transitive dependencies and package contents. Pre-refactor protocol samples, client transport parity, standalone startup/restart and repository regression tests verify behavior. Semantic review is recorded in `qualitygate/reviews/module-boundaries.md`.

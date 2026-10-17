@@ -38,7 +38,11 @@ pub async fn history(
             web.hub.authorize(&actor, &page.group_id).await?;
             let messages = web
                 .hub
-                .history(&page.group_id, page.sequence, crystal::PAGE_SIZE)
+                .history(
+                    &page.group_id,
+                    page.sequence,
+                    collaboration_model::PAGE_SIZE,
+                )
                 .await?;
             web.hub.authenticate(token(&headers)?).await?;
             web.hub.authorize(&actor, &page.group_id).await?;

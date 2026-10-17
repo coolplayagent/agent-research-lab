@@ -1,9 +1,9 @@
 //! Optional verifier and external knowledge services. Configuration is not execution evidence.
 use crate::*;
-use contracts::{OutcomeKind, OutcomeServiceKind};
-use crystal::{
+use collaboration_model::{
     KnowledgeWrite, KnowledgeWriteResult, Outcome, OutcomeVerification, OutcomeVerificationResult,
 };
+use contracts::{OutcomeKind, OutcomeServiceKind};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -19,10 +19,10 @@ pub struct OutcomeService {
 }
 impl OutcomeService {
     pub fn validate(&self) -> Result<()> {
-        crystal::id(&self.id)?;
+        collaboration_model::id(&self.id)?;
         rpc::endpoint(&self.endpoint)?;
         ensure!(
-            self.protocol_version == crystal::OUTCOME_PROTOCOL_VERSION,
+            self.protocol_version == collaboration_model::OUTCOME_PROTOCOL_VERSION,
             "unsupported outcome service protocol"
         );
         ensure!(
@@ -53,7 +53,7 @@ impl OutcomeService {
         Ok(())
     }
     pub fn digest(&self) -> Result<String> {
-        Ok(storage::digest(&serde_json::to_vec(self)?))
+        Ok(collaboration_model::digest(&serde_json::to_vec(self)?))
     }
 }
 

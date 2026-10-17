@@ -1,0 +1,75 @@
+load(":dependencies.bzl", "dependency_boundary_test")
+
+_RESEARCH = ["//crates/" + name + ":" for name in [
+    "runtime", "config", "task", "communication", "multi-agent", "collaboration-experiment",
+    "evolution", "evolution-cli", "knowledge", "automation", "delivery", "inputs", "freshness",
+    "targets", "agent-backend", "workflow", "software-delivery",
+]] + ["//apps/research-cli:", "//apps/research-console:", "//app:"]
+_DATABASE = ["//crates/crystal:", "//crates/im-storage:", "rusqlite", "libsqlite3"]
+_ADAPTERS = ["//crates/" + name + ":" for name in ["codex-adapter", "outcome-service", "sandbox-service", "executor-service", "service-workers"]]
+
+dependency_boundary_test(
+    name = "model_is_storage_free",
+    subject = "//crates/collaboration-model:collaboration_model",
+    forbidden = _DATABASE + _RESEARCH + ["//crates/storage:", "//crates/service-protocol:", "tokio"],
+    required = ["//crates/contracts:contracts"],
+)
+
+dependency_boundary_test(
+    name = "api_is_implementation_free",
+    subject = "//crates/service-api:service_api",
+    forbidden = _DATABASE + _RESEARCH + _ADAPTERS + ["//crates/im-host:", "//crates/service-registry:", "//crates/storage:"],
+    required = ["//crates/collaboration-model:collaboration_model"],
+)
+
+dependency_boundary_test(
+    name = "client_does_not_own_storage",
+    subject = "//crates/im-client:im_client",
+    forbidden = _DATABASE + _RESEARCH + ["//crates/im-host:", "//crates/storage:"],
+)
+
+dependency_boundary_test(
+    name = "http_does_not_own_storage_or_execution",
+    subject = "//crates/im-service:im_service",
+    forbidden = _DATABASE + _RESEARCH + _ADAPTERS + ["//crates/im-host:"],
+    required = ["//crates/im-client:im_client"],
+)
+
+dependency_boundary_test(
+    name = "core_application_is_independent",
+    subject = "//apps/ai-im:ai-im",
+    forbidden = _RESEARCH + _ADAPTERS,
+    required = ["//crates/im-host:im_host", "//crates/im-service:im_service"],
+)
+
+dependency_boundary_test(
+    name = "core_package_excludes_optional_services",
+    subject = "//:im-package",
+    forbidden = _RESEARCH + _ADAPTERS,
+    required = ["//apps/ai-im:ai-im", "//crates/im-storage:ai-im-storage"],
+)
+
+[dependency_boundary_test(
+    name = name.replace("-", "_") + "_is_replaceable",
+    subject = "//crates/{}:{}".format(name, name.replace("-", "_")),
+    forbidden = _DATABASE + _RESEARCH + ["//crates/im-service:", "//crates/im-host:"] + ["//crates/" + other + ":" for other in ["codex-adapter", "outcome-service", "executor-service", "sandbox-service"] if other != name],
+    required = ["//crates/service-api:service_api"],
+) for name in ["codex-adapter", "outcome-service", "executor-service", "sandbox-service"]]
+
+dependency_boundary_test(
+    name = "research_console_does_not_depend_on_cli",
+    subject = "//apps/research-console:research_console",
+    forbidden = ["//apps/research-cli:", "//app:", "//crates/software-delivery:"],
+)
+
+load("@crates//:defs.bzl", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_test")
+rust_test(
+    name = "wire_compatibility_tests",
+    srcs = ["wire_compatibility.rs"], edition = "2024",
+    compile_data = ["fixtures/wire-4fd42de.json"],
+    deps = ["//crates/collaboration-model:collaboration_model", "//crates/im-client:im_client", "//crates/service-api:service_api"] + all_crate_deps(normal = True, package_name = "crates/service-api"),
+)
+filegroup(name = "policy_sources", srcs = ["wire_compatibility.rs"], visibility = ["//visibility:public"])
+
+test_suite(name = "tests", visibility = ["//visibility:public"])

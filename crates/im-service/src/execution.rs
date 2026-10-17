@@ -1,9 +1,10 @@
 //! Bound execution to the current goal claim. Agent reports never accept a goal.
 use anyhow::{Context, Result, ensure};
+use collaboration_model::{Goal, WorkChange, WorkItem, WorkResult};
 use contracts::{ServiceKind, WorkState};
-use crystal::{Goal, WorkChange, WorkItem, WorkResult};
 use serde_json::json;
-use service_api::{AgentInput, Configuration, ExecutionReceipt, ExecutorRequest, Registry};
+use service_api::{AgentInput, Configuration, ExecutionReceipt, ExecutorRequest};
+use service_registry::Registry;
 use std::{
     collections::BTreeSet,
     io::Read,
@@ -11,7 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 async fn advance(
-    hub: im_storage::Client,
+    hub: im_client::Client,
     config: Configuration,
     scenario: Arc<dyn crate::ScenarioAdapter>,
     goal: Goal,
@@ -63,7 +64,7 @@ async fn advance(
         .await?;
     let result=async {
   let deadline=claimed.work.iter().find(|current|current.id==work.id).and_then(|current|current.deadline_ms).context("claim deadline missing")?;
-  let seconds=seconds.min(deadline.saturating_sub(crystal::now_ms())/1000);
+  let seconds=seconds.min(deadline.saturating_sub(collaboration_model::now_ms())/1000);
   ensure!(seconds>0,"claim execution window exhausted");
   let messages=hub.history_before(&goal.input.group_id,i64::MAX as u64,32).await?;
   let preceding:Vec<_>=goal.work.iter().filter(|prior|prior.id!=work.id).filter_map(|prior|prior.result.as_ref().map(|result|json!({"person_id":prior.person_id,"work_id":prior.id,"attempt":prior.attempt,"succeeded":result.succeeded,"summary":result.summary,"evidence":result.evidence}))).collect();
@@ -90,7 +91,7 @@ async fn advance(
     Ok(())
 }
 pub async fn run(
-    hub: im_storage::Client,
+    hub: im_client::Client,
     registry: Arc<Registry>,
     seconds: u64,
     stop: tokio::sync::watch::Receiver<bool>,
@@ -99,7 +100,7 @@ pub async fn run(
 }
 
 pub async fn run_with_scenarios(
-    hub: im_storage::Client,
+    hub: im_client::Client,
     registry: Arc<Registry>,
     scenarios: Arc<Vec<Arc<dyn crate::ScenarioAdapter>>>,
     seconds: u64,

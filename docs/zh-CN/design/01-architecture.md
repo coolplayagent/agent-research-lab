@@ -8,12 +8,18 @@ AI-IM 负责数字人身份、群聊、持久消息、目标与分工。CLI 研�
 
 每个库在 `crates/` 下有独立 Cargo 与 Bazel 包。根 Cargo 清单为虚拟工作区，共享版本位于 `[workspace.dependencies]` 与锁文件。库包使用 `lab-` 前缀，Rust 库名保持现有模块名。
 
-`app/` 负责参数解析、命令分派、退出行为和可选 systemd 模板；`main.rs` 调用应用服务，不实现调度或通信。应用库重新导出模块，保留 `agent_research_lab::runtime` 等集成路径。
+`apps/ai-im` 是独立协作应用；`apps/research-cli` 负责研究命令解析与分派；`apps/research-console` 负责研究控制台和研究场景接入。`app/` 仅保留原有可执行入口、systemd 模板与 `agent_research_lab::runtime` 等兼容导出。应用按职责装配服务，库不反向依赖应用。
 
 | 模块 | 职责 |
 | --- | --- |
 | `im-service`, `crystal` | 协作核心的身份、群组、目标、分工、消息、私信与公告 |
-| `im-storage`, `service-api`, `service-protocol`, `service-workers` | 独立存储、客户端契约、版本化协议与执行/沙箱服务 |
+| `collaboration-model`, `service-api` | 无数据库依赖的数据模型、验证规则及服务契约 |
+| `im-client`, `service-protocol` | 存储客户端与版本化 RPC；客户端不打开数据库 |
+| `im-storage`, `crystal` | 存储服务及领域事务，独占生产数据库 |
+| `service-registry`, `im-host` | 配置持久化与健康探测；应用启动和存储装配 |
+| `executor-service`, `sandbox-service` | 可替换执行器与有界沙箱；`service-workers` 保留组合启动器 |
+| `codex-adapter`, `outcome-service` | 可选厂商桥接、成果验证及仓外知识库更新 |
+| `software-delivery`, `software-verification` | 研究软件交付/激活及共享验证参数，保留原门禁 |
 | `contracts` | 跨服务共享状态枚举及前端契约生成 |
 | `config`, `task` | 配置声明及冻结的任务、尝试记录 |
 | `agent-policy`, `agent-backend`, `isolation` | 权限、执行适配与 Linux 进程隔离 |
@@ -45,3 +51,11 @@ Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件�
 ## 成果协作
 
 成果协作在主题内以不可变成果、显式引用、独立验证和负责人验收连接目标路径。SuperPOD 为可选知识库绑定；仓外更新经可替换服务执行。见[架构](07-outcomes.md)和[使用指南](../guide/09-outcomes.md)。
+
+## 可独立构建的边界
+
+- 数据契约和存储客户端不依赖 `crystal`、`im-storage` 或 SQLite；HTTP 库也不依赖存储实现。`crystal` 重新导出旧数据类型名称以兼容已有 Rust 调用方。
+- `im-host` 是装配位置：生产模式连接已配置的存储服务；开发模式显式创建独立本地存储适配器。两者使用同一个 `im-client` 请求契约。
+- 消息、目标、成果与主题谱系保留同一存储事务边界，维护成员权限、尝试隔离和验收一致性。研究执行、提示词演化、SuperPOD 研究发布属于可选研究扩展，不进入最小协作包。
+- `//:im-package` 只包含核心应用与存储服务；可选服务单独发布为 `//:adapter-package`。完整研究发行版继续使用 `//:package`。
+- `architecture` 的 Bazel 分析测试遍历真实传递依赖并检查包内容；原版本协议样本、双客户端行为、核心启动/重启及全仓回归共同验证边界。语义评审记录在 `qualitygate/reviews/module-boundaries.md`。

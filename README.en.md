@@ -13,7 +13,7 @@ A multi-Agent research platform centered on the **AI-IM collaboration workspace*
 - **Topics and version evolution**: organize research subjects and version relationships, including branches, provenance and assessment state.
 - **Service configuration**: manage storage, executors, sandboxes and person bindings, distinguishing configuration, health and actual task outcomes.
 
-Core collaboration starts independently; CLI research is optional. Complete research knowledge remains in the existing SuperPOD repository. Private knowledge, credentials and raw experiment runs stay outside this repository.
+Core collaboration starts independently; CLI research is optional. Outcome knowledge stays in external repositories with an optional SuperPOD binding; the existing research extension retains its SuperPOD evidence gates. Private knowledge, credentials and raw experiment runs stay outside this repository.
 
 ## Documentation
 
@@ -23,3 +23,5 @@ Core collaboration starts independently; CLI research is optional. Complete rese
 | [User guides](docs/en/guide/00-index.md) | [Design documentation](docs/en/design/00-index.md) |
 
 Implemented in Rust, with Bazel as the build, test and packaging entrypoint.
+
+Standalone collaboration, optional services and the full research distribution build as `//:im-package`, `//:adapter-package` and `//:package`. SuperPOD is optional for outcome collaboration; the existing research extension retains its required evidence gates. See [application and interface boundaries](docs/en/design/01-architecture.md).

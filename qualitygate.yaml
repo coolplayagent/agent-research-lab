@@ -30,7 +30,7 @@ checks:
     timeout_seconds: 600
   - id: bazel-build
     kind: command
-    argv: [bazel, build, "--lockfile_mode=error", "//:agent-research-lab", "//:package"]
+    argv: [bazel, build, "--lockfile_mode=error", "//:agent-research-lab", "//:package", "//:im-package", "//:adapter-package"]
     timeout_seconds: 900
   - id: bazel-test
     kind: command
@@ -53,6 +53,8 @@ verification_assets:
   - MODULE.bazel.lock
   - BUILD.bazel
   - app/**
+  - apps/**
+  - architecture/**
   - crates/**
   - "**/*.bzl"
   - rust-toolchain.toml

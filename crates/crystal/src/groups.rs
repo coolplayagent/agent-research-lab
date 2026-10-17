@@ -1,6 +1,7 @@
 //! Group lifecycle and membership mutations are committed atomically.
-use crate::{model::*, store::Store};
+use crate::store::Store;
 use anyhow::{Result, ensure};
+use collaboration_model::*;
 use rusqlite::params;
 impl Store {
     pub fn create_group(&mut self, group: &NewGroup) -> Result<Group> {

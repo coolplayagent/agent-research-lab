@@ -35,11 +35,11 @@ fn manual_review_default() -> bool {
 pub trait ScenarioAdapter: Send + Sync {
     fn descriptor(&self) -> Scenario;
     /// Validation is read-only. Durable admission and scheduling follow goal creation.
-    fn validate(&self, goal: &crystal::GoalInput) -> Result<()>;
+    fn validate(&self, goal: &collaboration_model::GoalInput) -> Result<()>;
     /// Optional versioned remote admission. Configuration alone is not health.
     fn admission<'a>(
         &'a self,
-        _goal: &'a crystal::GoalInput,
+        _goal: &'a collaboration_model::GoalInput,
     ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
         Box::pin(async { Ok(()) })
     }
@@ -48,7 +48,11 @@ pub trait ScenarioAdapter: Send + Sync {
     fn uses_agent_protocol(&self) -> bool {
         false
     }
-    fn assignment_ready(&self, _goal: &crystal::Goal, _work: &crystal::WorkItem) -> bool {
+    fn assignment_ready(
+        &self,
+        _goal: &collaboration_model::Goal,
+        _work: &collaboration_model::WorkItem,
+    ) -> bool {
         true
     }
     /// Reconcile scenario-owned evidence or optional delivery/activation hooks.
@@ -57,8 +61,8 @@ pub trait ScenarioAdapter: Send + Sync {
     /// never authorize evaluation, acceptance or activation.
     fn reconcile<'a>(
         &'a self,
-        _hub: &'a im_storage::Client,
-        _run: &'a crystal::EvolutionRun,
+        _hub: &'a im_client::Client,
+        _run: &'a collaboration_model::EvolutionRun,
     ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
         Box::pin(async { Ok(()) })
     }
@@ -71,7 +75,7 @@ impl ScenarioAdapter for Collaboration {
     fn descriptor(&self) -> Scenario {
         Scenario {
             id: "collaboration".into(),
-            protocol_version: crystal::SCENARIO_PROTOCOL_VERSION,
+            protocol_version: collaboration_model::SCENARIO_PROTOCOL_VERSION,
             capabilities: vec![contracts::ScenarioCapability::Execute],
             assignment_roles: vec![],
             execution_seconds: Some(300),
@@ -87,7 +91,7 @@ impl ScenarioAdapter for Collaboration {
     fn uses_agent_protocol(&self) -> bool {
         true
     }
-    fn validate(&self, goal: &crystal::GoalInput) -> Result<()> {
+    fn validate(&self, goal: &collaboration_model::GoalInput) -> Result<()> {
         ensure!(
             goal.parameters.is_null() || goal.parameters == json!({}),
             "generic collaboration has no scenario parameters"
@@ -106,7 +110,7 @@ pub fn default_scenarios() -> Arc<Vec<Arc<dyn ScenarioAdapter>>> {
 
 pub(crate) fn configured(
     builtins: &Arc<Vec<Arc<dyn ScenarioAdapter>>>,
-    registry: Option<&service_api::Registry>,
+    registry: Option<&service_registry::Registry>,
 ) -> Result<Arc<Vec<Arc<dyn ScenarioAdapter>>>> {
     let Some(registry) = registry else {
         return Ok(builtins.clone());

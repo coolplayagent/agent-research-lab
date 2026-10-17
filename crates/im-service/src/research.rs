@@ -39,7 +39,7 @@ pub async fn change(State(web): State<Web>, request: Request) -> Response {
     json_response(
         async {
             intent(request.headers(), web.addr, "manage-research")?;
-            let change: crystal::ResearchChange =
+            let change: collaboration_model::ResearchChange =
                 serde_json::from_slice(&body(request, 32 * 1024).await?)?;
             web.hub.research_change(change).await
         }

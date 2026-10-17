@@ -16,10 +16,10 @@ pub struct ScenarioRegistration {
 
 impl ScenarioRegistration {
     pub fn validate(&self) -> Result<()> {
-        crystal::id(&self.id)?;
+        collaboration_model::id(&self.id)?;
         rpc::endpoint(&self.endpoint)?;
         ensure!(
-            self.protocol_version == crystal::SCENARIO_PROTOCOL_VERSION,
+            self.protocol_version == collaboration_model::SCENARIO_PROTOCOL_VERSION,
             "unsupported scenario protocol version"
         );
         ensure!(
@@ -65,14 +65,14 @@ pub struct ScenarioHandshake {
 pub enum ScenarioRequest {
     Probe,
     Validate {
-        goal: Box<crystal::GoalInput>,
+        goal: Box<collaboration_model::GoalInput>,
     },
     /// The request identity is stable for one run revision. External side effects
     /// must use that identity durably and reconcile uncertain outcomes on retry.
     Reconcile {
         request_id: String,
-        run: Box<crystal::EvolutionRun>,
-        goal: Box<crystal::Goal>,
+        run: Box<collaboration_model::EvolutionRun>,
+        goal: Box<collaboration_model::Goal>,
     },
 }
 
@@ -91,7 +91,7 @@ pub struct ScenarioReconciliation {
     pub revision: u64,
     pub goal_revision: u64,
     pub goal_attempts: BTreeMap<String, u32>,
-    pub change: Option<crystal::EvolutionChange>,
+    pub change: Option<collaboration_model::EvolutionChange>,
 }
 
 pub async fn probe_scenario(registration: &ScenarioRegistration) -> Result<ScenarioHandshake> {

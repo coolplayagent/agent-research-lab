@@ -18,11 +18,9 @@ mod outcome_knowledge;
 mod outcomes;
 mod research;
 mod rooms;
-mod server;
 pub mod transport;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
-pub use server::{serve, serve_with_local_operator};
 /// Bind one advertised interface address; remote management always requires credentials.
 pub fn validate_listen(listen: SocketAddr, local_operator: bool) -> Result<()> {
     ensure!(

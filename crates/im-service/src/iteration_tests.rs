@@ -1,20 +1,20 @@
 //! Deterministic non-code execution fixtures exercise the production coordinator
 //! and versioned executor transport. No fixture adapter is registered in hosts.
 use crate::*;
+use collaboration_model::{
+    CandidateEvaluation, EvidencePins, EvolutionAction, EvolutionChange, EvolutionInput,
+    EvolutionRun, EvolutionRunInput, ResearchChange, ResearchSubject, ResearchTopic,
+};
 use contracts::{
     CandidateState, EvaluationState, GoalState, IterationState, RoundState, SubjectKind,
     TopicState, WorkState,
-};
-use crystal::{
-    CandidateEvaluation, EvidencePins, EvolutionAction, EvolutionChange, EvolutionInput,
-    EvolutionRun, EvolutionRunInput, ResearchChange, ResearchSubject, ResearchTopic,
 };
 use service_api::{AgentOutput, ExecutionReceipt, ExecutorRequest};
 
 struct Fixture {
     root: tempfile::TempDir,
-    hub: im_storage::Client,
-    registry: Arc<service_api::Registry>,
+    hub: im_client::Client,
+    registry: Arc<service_registry::Registry>,
     workers: Vec<tokio::task::JoinHandle<()>>,
 }
 impl Drop for Fixture {
@@ -28,9 +28,8 @@ impl Drop for Fixture {
 impl Fixture {
     async fn new() -> Self {
         let root = tempfile::tempdir().unwrap();
-        let hub: im_storage::Client = crystal::Hub::open(&root.path().join("store"))
-            .unwrap()
-            .into();
+        let hub: im_client::Client =
+            im_storage::client(crystal::Hub::open(&root.path().join("store")).unwrap());
         hub.register_operator().await.unwrap();
         hub.register(vec![
             "proposer-a".into(),
@@ -39,7 +38,7 @@ impl Fixture {
         ])
         .await
         .unwrap();
-        hub.create_group(crystal::NewGroup {
+        hub.create_group(collaboration_model::NewGroup {
             id: "designs".into(),
             title: "Capacity plans".into(),
             topic: "Compare structured plans".into(),
@@ -91,7 +90,7 @@ impl Fixture {
         })
         .await
         .unwrap();
-        let registry = Arc::new(service_api::Registry::open(root.path()).unwrap());
+        let registry = Arc::new(service_registry::Registry::open(root.path()).unwrap());
         let mut config = registry.configuration();
         let executor = config
             .services
@@ -240,7 +239,7 @@ impl Fixture {
                         acceptance: "Independent measured score is at least two".into(),
                         assignments: ["proposer-a", "proposer-b", "reviewer"]
                             .into_iter()
-                            .map(|person| crystal::AssignmentInput {
+                            .map(|person| collaboration_model::AssignmentInput {
                                 person_id: person.into(),
                                 instruction: format!("Perform the {person} role"),
                             })
@@ -257,7 +256,7 @@ impl Fixture {
             .unwrap()
     }
 
-    async fn completed_execution(&self, run: &EvolutionRun) -> crystal::Goal {
+    async fn completed_execution(&self, run: &EvolutionRun) -> collaboration_model::Goal {
         tokio::time::timeout(Duration::from_secs(12), async {
             loop {
                 let goal = crate::iteration::current_goal(&self.hub, run)
@@ -430,7 +429,7 @@ async fn non_code_three_agent_iteration_executes_feedback_and_recovers_without_p
             stop.send_replace(true);
             execution.await.unwrap();
             stop.send_replace(false);
-            let registry = Arc::new(service_api::Registry::open(fixture.root.path()).unwrap());
+            let registry = Arc::new(service_registry::Registry::open(fixture.root.path()).unwrap());
             execution = tokio::spawn(crate::execution::run_with_scenarios(
                 fixture.hub.clone(),
                 registry,
@@ -619,7 +618,7 @@ async fn guarded_scenario_rejects_manual_evidence_and_acceptance_at_the_http_han
             descriptor.manual_review = false;
             descriptor
         }
-        fn validate(&self, goal: &crystal::GoalInput) -> Result<()> {
+        fn validate(&self, goal: &collaboration_model::GoalInput) -> Result<()> {
             goal.validate()
         }
     }
@@ -649,7 +648,7 @@ async fn guarded_scenario_rejects_manual_evidence_and_acceptance_at_the_http_han
             max_seconds: 60,
         },
         EvolutionAction::Activate {
-            activation: crystal::CandidateActivation {
+            activation: collaboration_model::CandidateActivation {
                 state: contracts::ActivationState::Active,
                 reference: "claimed".into(),
                 evidence: json!({"claim":true}),

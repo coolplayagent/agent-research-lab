@@ -7,6 +7,8 @@
 每个 crate 在 Cargo 与 Bazel 中声明依赖，依赖版本来自工作区锁文件。Bazel 是构建、测试和打包入口；`//:tests` 汇总测试，`//:agent-research-lab` 生成 `bazel-bin/agent-research-lab`，`//:package` 生成包含双语文档的发布包。可用 `bazel test //crates/communication:tests` 定位单模块回归。
 
 ```sh
+bazel build --lockfile_mode=error //:ai-im //:im-package
+bazel build --lockfile_mode=error //:adapter-package
 bazel build --lockfile_mode=error //:agent-research-lab //:package
 ```
 
@@ -31,9 +33,9 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 Node 22.22.1 与 TypeScript 5.9.3 由 Bazel 固定。提交的 `dist/` 用于 Rust 嵌入和 Cargo 检查；Bazel 校验它们与 TypeScript 编译结果一致。修改后重新生成：
 
 ```sh
-bazel build //crates/im-service/web:compiled //app/src/dashboard/web:compiled
+bazel build //crates/im-service/web:compiled //apps/research-console/src/dashboard/web:compiled
 install -m 644 bazel-bin/crates/im-service/web/compiled/*.js crates/im-service/web/dist/
-install -m 644 bazel-bin/app/src/dashboard/web/compiled/*.js app/src/dashboard/web/dist/
+install -m 644 bazel-bin/apps/research-console/src/dashboard/web/compiled/*.js apps/research-console/src/dashboard/web/dist/
 bazel test --lockfile_mode=error //...
 ```
 
@@ -50,3 +52,11 @@ bazel test --lockfile_mode=error //...
 ## 原生批次集成测试
 
 真实 owner 回归为显式启用的 Bazel 测试。将 `LAB_WORKFLOW_BIN` 指向被测 CLI 0.2.0 运行时，对 `//crates/runtime:tests` 使用 `--test_arg=batch::tests --test_arg=--ignored`。独立 `//app:enqueue_batch_cli_tests` 还需 `LAB_CLI_BIN`，通过隔离的 GitHub/fetch 获取夹具验证真实 CLI 与新鲜度收集器。这些测试仅创建自有临时存储，不运行模型。
+
+## 应用与依赖边界
+
+独立协作使用 `//:im-package`，可选执行与知识服务使用 `//:adapter-package`，完整研究发行版使用 `//:package`。Cargo 工作区默认成员为 `apps/ai-im`，发布仍通过 Bazel。研究 CLI 和控制台分别位于 `apps/research-cli`、`apps/research-console`；`app/` 保留原有可执行入口和 Rust 集成导出。
+
+`bazel test //architecture:tests //apps/ai-im:standalone_tests` 检查实际传递构建依赖、发布包内容、重构前协议样本，以及无研究配置的核心启动与重启。存储测试对照嵌入式和远程客户端的交付、幂等、Unicode 内容及成员撤权。上述检查均由 `bazel test //...` 执行。
+
+Rust 调用方从 `collaboration_model` 引用数据类型，通过 `im_client::Client` 访问存储，通过 `service_registry::Registry` 管理宿主配置。应用装配使用 `im_host` 选择生产服务端点或独立的开发存储。外部适配器依赖 `service_api`，不得依赖存储实现。HTTP/RPC 格式、数据库结构及持久证据绑定保持不变；原有 Bazel 可执行目标和输出路径保留。

@@ -26,8 +26,8 @@ pub struct Adapter {
 }
 impl Adapter {
     pub fn validate(&self) -> Result<()> {
-        crystal::id(&self.id)?;
-        crystal::id(&self.executor_id)?;
+        collaboration_model::id(&self.id)?;
+        collaboration_model::id(&self.executor_id)?;
         ensure!(
             (1..=3600).contains(&self.max_seconds),
             "adapter time limit must be 1..3600 seconds"
@@ -97,7 +97,7 @@ pub struct AgentInput {
     pub objective: String,
     pub acceptance: String,
     pub instruction: String,
-    pub messages: Vec<crystal::Message>,
+    pub messages: Vec<collaboration_model::Message>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

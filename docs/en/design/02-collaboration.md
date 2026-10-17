@@ -82,7 +82,7 @@ storage service owns its live database; clients use its API and event streams.
 The domain crate depends on generic storage primitives and does not import research
 configuration or runtime crates.
 `crates/im-service` owns HTTP/SSE, host login, scenario registration, the frontend and standalone host.
-`app/src/dashboard` supplies the optional research application adapter.
+`apps/research-console` supplies the optional research application adapter; `im-host` owns startup composition.
 
 Operator writes use `POST /api/crystal/manage` with a host session,
 `Origin: http://<listen-address>`, `Content-Type: application/json`, and

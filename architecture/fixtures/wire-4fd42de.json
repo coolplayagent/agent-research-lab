@@ -1,0 +1,377 @@
+{
+  "records": [
+    {
+      "input": {
+        "accepted_ms": 42,
+        "group_id": "room",
+        "reply_to": null,
+        "request_id": "publish",
+        "sender_id": "worker",
+        "sequence": 7,
+        "text": "fixture content"
+      },
+      "kind": "message",
+      "wire": "{\"sequence\":7,\"group_id\":\"room\",\"sender_id\":\"worker\",\"request_id\":\"publish\",\"text\":\"fixture content\",\"reply_to\":null,\"accepted_ms\":42}"
+    },
+    {
+      "input": {
+        "id": "room",
+        "members": [
+          "worker",
+          "operator"
+        ],
+        "title": "Room",
+        "topic": "Topic"
+      },
+      "kind": "group",
+      "wire": "{\"id\":\"room\",\"title\":\"Room\",\"topic\":\"Topic\",\"private\":false,\"kind\":\"conversation\",\"members\":[\"worker\",\"operator\"]}"
+    },
+    {
+      "input": {
+        "acceptance": "Independent verification",
+        "assignments": [
+          {
+            "instruction": "Measure",
+            "person_id": "worker"
+          }
+        ],
+        "group_id": "room",
+        "id": "goal",
+        "max_seconds": 60,
+        "objective": "Find evidence",
+        "scenario": "collaboration",
+        "title": "Goal"
+      },
+      "kind": "goal",
+      "wire": "{\"id\":\"goal\",\"group_id\":\"room\",\"title\":\"Goal\",\"objective\":\"Find evidence\",\"acceptance\":\"Independent verification\",\"scenario\":\"collaboration\",\"parameters\":null,\"assignments\":[{\"person_id\":\"worker\",\"instruction\":\"Measure\"}],\"max_seconds\":60}"
+    },
+    {
+      "input": {
+        "input": {
+          "attempt": {
+            "attempt": 1,
+            "claim_id": "replace-with-current-claim",
+            "goal_id": "goal-example",
+            "work_id": "work-0"
+          },
+          "conditions": "Replace with applicability conditions and limitations",
+          "evidence": [
+            {
+              "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "path": "reports/evidence.json",
+              "repository": "source-repository",
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "goal_id": "goal-example",
+          "id": "outcome-example",
+          "kind": "finding",
+          "knowledge": null,
+          "pins": {
+            "policy": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "prompt": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "source": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "superpod": null
+          },
+          "references": [],
+          "summary": "Replace with the conclusion supported by the evidence",
+          "supersedes": null,
+          "title": "A reproducible finding",
+          "topic_id": "topic-example"
+        },
+        "operation": "publish"
+      },
+      "kind": "outcome_command",
+      "wire": "{\"operation\":\"publish\",\"input\":{\"id\":\"outcome-example\",\"topic_id\":\"topic-example\",\"goal_id\":\"goal-example\",\"kind\":\"finding\",\"title\":\"A reproducible finding\",\"summary\":\"Replace with the conclusion supported by the evidence\",\"conditions\":\"Replace with applicability conditions and limitations\",\"evidence\":[{\"repository\":\"source-repository\",\"commit\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"path\":\"reports/evidence.json\",\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}],\"references\":[],\"supersedes\":null,\"attempt\":{\"goal_id\":\"goal-example\",\"work_id\":\"work-0\",\"attempt\":1,\"claim_id\":\"replace-with-current-claim\"},\"pins\":{\"source\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"prompt\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"policy\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"superpod\":null},\"knowledge\":null}}"
+    },
+    {
+      "input": {
+        "operation": "topic",
+        "topic": {
+          "group_id": "room",
+          "id": "topic",
+          "objective": "Compare",
+          "revision": 0,
+          "state": "active",
+          "title": "Topic"
+        }
+      },
+      "kind": "coordination",
+      "wire": "{\"operation\":\"topic\",\"topic\":{\"id\":\"topic\",\"group_id\":\"room\",\"title\":\"Topic\",\"objective\":\"Compare\",\"state\":\"active\",\"revision\":0}}"
+    },
+    {
+      "input": {
+        "operation": "probe"
+      },
+      "kind": "storage_request",
+      "wire": "{\"operation\":\"probe\"}"
+    },
+    {
+      "input": {
+        "change": {
+          "goal": {
+            "acceptance": "Independent verification",
+            "assignments": [
+              {
+                "instruction": "Measure",
+                "person_id": "worker"
+              }
+            ],
+            "group_id": "room",
+            "id": "goal",
+            "max_seconds": 60,
+            "objective": "Find evidence",
+            "scenario": "collaboration",
+            "title": "Goal"
+          },
+          "operation": "create"
+        },
+        "operation": "change_goal"
+      },
+      "kind": "storage_request",
+      "wire": "{\"operation\":\"change_goal\",\"change\":{\"operation\":\"create\",\"goal\":{\"id\":\"goal\",\"group_id\":\"room\",\"title\":\"Goal\",\"objective\":\"Find evidence\",\"acceptance\":\"Independent verification\",\"scenario\":\"collaboration\",\"parameters\":null,\"assignments\":[{\"person_id\":\"worker\",\"instruction\":\"Measure\"}],\"max_seconds\":60}}}"
+    },
+    {
+      "input": {
+        "input": {
+          "group_id": "room",
+          "request_id": "message",
+          "text": "fixture content"
+        },
+        "operation": "publish",
+        "token": "synthetic-token"
+      },
+      "kind": "storage_request",
+      "wire": "{\"operation\":\"publish\",\"token\":\"synthetic-token\",\"input\":{\"group_id\":\"room\",\"request_id\":\"message\",\"text\":\"fixture content\",\"reply_to\":null}}"
+    },
+    {
+      "input": {
+        "actor": "worker",
+        "group": "room",
+        "operation": "subscribe"
+      },
+      "kind": "storage_request",
+      "wire": "{\"operation\":\"subscribe\",\"actor\":\"worker\",\"group\":\"room\"}"
+    },
+    {
+      "input": {
+        "operation": "changes"
+      },
+      "kind": "storage_request",
+      "wire": "{\"operation\":\"changes\"}"
+    },
+    {
+      "input": {
+        "command": {
+          "input": {
+            "attempt": {
+              "attempt": 1,
+              "claim_id": "replace-with-current-claim",
+              "goal_id": "goal-example",
+              "work_id": "work-0"
+            },
+            "conditions": "Replace with applicability conditions and limitations",
+            "evidence": [
+              {
+                "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "path": "reports/evidence.json",
+                "repository": "source-repository",
+                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            ],
+            "goal_id": "goal-example",
+            "id": "outcome-example",
+            "kind": "finding",
+            "knowledge": null,
+            "pins": {
+              "policy": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "prompt": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "source": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "superpod": null
+            },
+            "references": [],
+            "summary": "Replace with the conclusion supported by the evidence",
+            "supersedes": null,
+            "title": "A reproducible finding",
+            "topic_id": "topic-example"
+          },
+          "operation": "publish"
+        },
+        "operation": "outcomes",
+        "token": null
+      },
+      "kind": "storage_request",
+      "wire": "{\"operation\":\"outcomes\",\"token\":null,\"command\":{\"operation\":\"publish\",\"input\":{\"id\":\"outcome-example\",\"topic_id\":\"topic-example\",\"goal_id\":\"goal-example\",\"kind\":\"finding\",\"title\":\"A reproducible finding\",\"summary\":\"Replace with the conclusion supported by the evidence\",\"conditions\":\"Replace with applicability conditions and limitations\",\"evidence\":[{\"repository\":\"source-repository\",\"commit\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"path\":\"reports/evidence.json\",\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}],\"references\":[],\"supersedes\":null,\"attempt\":{\"goal_id\":\"goal-example\",\"work_id\":\"work-0\",\"attempt\":1,\"claim_id\":\"replace-with-current-claim\"},\"pins\":{\"source\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"prompt\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"policy\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"superpod\":null},\"knowledge\":null}}}"
+    },
+    {
+      "input": {
+        "change": {
+          "operation": "topic",
+          "topic": {
+            "group_id": "room",
+            "id": "topic",
+            "objective": "Compare",
+            "revision": 0,
+            "state": "active",
+            "title": "Topic"
+          }
+        },
+        "operation": "research_change"
+      },
+      "kind": "storage_request",
+      "wire": "{\"operation\":\"research_change\",\"change\":{\"operation\":\"topic\",\"topic\":{\"id\":\"topic\",\"group_id\":\"room\",\"title\":\"Topic\",\"objective\":\"Compare\",\"state\":\"active\",\"revision\":0}}}"
+    },
+    {
+      "input": {
+        "acceptance": "Score",
+        "assignments": [
+          {
+            "instruction": "Measure",
+            "person_id": "worker"
+          }
+        ],
+        "baseline_version_id": "baseline",
+        "group_id": "room",
+        "id": "run",
+        "max_rounds": 2,
+        "max_seconds": 60,
+        "objective": "Improve",
+        "scenario_id": "plan-comparison",
+        "subject_id": "subject",
+        "title": "Plans",
+        "total_budget_seconds": 120
+      },
+      "kind": "iteration",
+      "wire": "{\"id\":\"run\",\"group_id\":\"room\",\"subject_id\":\"subject\",\"scenario_id\":\"plan-comparison\",\"title\":\"Plans\",\"objective\":\"Improve\",\"acceptance\":\"Score\",\"assignments\":[{\"person_id\":\"worker\",\"instruction\":\"Measure\"}],\"baseline_version_id\":\"baseline\",\"parameters\":null,\"max_rounds\":2,\"max_seconds\":60,\"total_budget_seconds\":120}"
+    },
+    {
+      "input": {
+        "created_ms": 42,
+        "generation": 0,
+        "input": {
+          "goal_id": null,
+          "id": "node",
+          "parents": [],
+          "pins": {},
+          "reference": "source/ref",
+          "subject_id": "subject",
+          "version": "v1"
+        }
+      },
+      "kind": "lineage",
+      "wire": "{\"input\":{\"id\":\"node\",\"subject_id\":\"subject\",\"parents\":[],\"version\":\"v1\",\"reference\":\"source/ref\",\"goal_id\":null,\"pins\":{\"source\":null,\"prompt\":null,\"policy\":null,\"superpod\":null}},\"generation\":0,\"created_ms\":42}"
+    },
+    {
+      "input": {
+        "acceptance": "Evidence",
+        "attempt": 1,
+        "goal_id": "goal",
+        "instruction": "Inspect",
+        "messages": [
+          {
+            "accepted_ms": 42,
+            "group_id": "room",
+            "reply_to": null,
+            "request_id": "publish",
+            "sender_id": "worker",
+            "sequence": 7,
+            "text": "fixture content"
+          }
+        ],
+        "objective": "Measure",
+        "person_id": "worker",
+        "protocol_version": 1,
+        "request_id": "claim",
+        "work_id": "work-0"
+      },
+      "kind": "agent_input",
+      "wire": "{\"protocol_version\":1,\"request_id\":\"claim\",\"person_id\":\"worker\",\"goal_id\":\"goal\",\"work_id\":\"work-0\",\"attempt\":1,\"objective\":\"Measure\",\"acceptance\":\"Evidence\",\"instruction\":\"Inspect\",\"messages\":[{\"sequence\":7,\"group_id\":\"room\",\"sender_id\":\"worker\",\"request_id\":\"publish\",\"text\":\"fixture content\",\"reply_to\":null,\"accepted_ms\":42}]}"
+    },
+    {
+      "input": {
+        "adapters": [
+          {
+            "agent": "cc",
+            "command": [],
+            "enabled": false,
+            "env_names": [],
+            "executor_id": "executor",
+            "id": "cc",
+            "max_seconds": 1800,
+            "network": true,
+            "protocol": "json_stdio_v1",
+            "read_only_paths": []
+          },
+          {
+            "agent": "codex",
+            "command": [],
+            "enabled": false,
+            "env_names": [],
+            "executor_id": "executor",
+            "id": "codex",
+            "max_seconds": 1800,
+            "network": true,
+            "protocol": "json_stdio_v1",
+            "read_only_paths": []
+          },
+          {
+            "agent": "hds",
+            "command": [],
+            "enabled": false,
+            "env_names": [],
+            "executor_id": "executor",
+            "id": "hds",
+            "max_seconds": 1800,
+            "network": true,
+            "protocol": "json_stdio_v1",
+            "read_only_paths": []
+          },
+          {
+            "agent": "pi",
+            "command": [],
+            "enabled": false,
+            "env_names": [],
+            "executor_id": "executor",
+            "id": "pi",
+            "max_seconds": 1800,
+            "network": true,
+            "protocol": "json_stdio_v1",
+            "read_only_paths": []
+          }
+        ],
+        "bindings": {},
+        "outcome_bindings": {},
+        "outcome_services": [],
+        "revision": 0,
+        "scenarios": [],
+        "services": [
+          {
+            "enabled": true,
+            "endpoint": "/example/state/private/services/storage.sock",
+            "id": "storage",
+            "kind": "storage",
+            "sandbox_id": null
+          },
+          {
+            "enabled": true,
+            "endpoint": "/example/state/private/services/executor.sock",
+            "id": "executor",
+            "kind": "executor",
+            "sandbox_id": "sandbox"
+          },
+          {
+            "enabled": true,
+            "endpoint": "/example/state/private/services/sandbox.sock",
+            "id": "sandbox",
+            "kind": "sandbox",
+            "sandbox_id": null
+          }
+        ],
+        "storage_id": null
+      },
+      "kind": "configuration",
+      "wire": "{\"revision\":0,\"storage_id\":null,\"services\":[{\"id\":\"storage\",\"kind\":\"storage\",\"endpoint\":\"/example/state/private/services/storage.sock\",\"enabled\":true,\"sandbox_id\":null},{\"id\":\"executor\",\"kind\":\"executor\",\"endpoint\":\"/example/state/private/services/executor.sock\",\"enabled\":true,\"sandbox_id\":\"sandbox\"},{\"id\":\"sandbox\",\"kind\":\"sandbox\",\"endpoint\":\"/example/state/private/services/sandbox.sock\",\"enabled\":true,\"sandbox_id\":null}],\"adapters\":[{\"id\":\"cc\",\"agent\":\"cc\",\"protocol\":\"json_stdio_v1\",\"enabled\":false,\"executor_id\":\"executor\",\"command\":[],\"env_names\":[],\"read_only_paths\":[],\"network\":true,\"max_seconds\":1800},{\"id\":\"codex\",\"agent\":\"codex\",\"protocol\":\"json_stdio_v1\",\"enabled\":false,\"executor_id\":\"executor\",\"command\":[],\"env_names\":[],\"read_only_paths\":[],\"network\":true,\"max_seconds\":1800},{\"id\":\"hds\",\"agent\":\"hds\",\"protocol\":\"json_stdio_v1\",\"enabled\":false,\"executor_id\":\"executor\",\"command\":[],\"env_names\":[],\"read_only_paths\":[],\"network\":true,\"max_seconds\":1800},{\"id\":\"pi\",\"agent\":\"pi\",\"protocol\":\"json_stdio_v1\",\"enabled\":false,\"executor_id\":\"executor\",\"command\":[],\"env_names\":[],\"read_only_paths\":[],\"network\":true,\"max_seconds\":1800}],\"bindings\":{},\"scenarios\":[],\"outcome_services\":[],\"outcome_bindings\":{}}"
+    }
+  ],
+  "source_commit": "4fd42de092b8af96913c7df64de0c0b82e9123d0"
+}

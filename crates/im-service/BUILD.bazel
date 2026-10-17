@@ -10,30 +10,23 @@ rust_library(
     compile_data = ["//crates/im-service/web:assets", "//crates/im-service/web:checked"],
     edition = "2024",
     aliases = aliases(),
-    deps = ["//web/shared:web_assets", "//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/crystal:crystal", "//crates/service-api:service_api", "//crates/im-storage:im_storage", "//crates/storage:storage"] + all_crate_deps(normal = True),
+    deps = ["//web/shared:web_assets", "//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/collaboration-model:collaboration_model", "//crates/service-api:service_api", "//crates/im-client:im_client", "//crates/service-registry:service_registry", "//crates/storage:storage"] + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
 )
-rust_binary(
-    name = "ai-im",
-    srcs = ["src/main.rs"],
-    edition = "2024",
-    aliases = aliases(),
-    deps = [":im_service", "//crates/storage:storage"] + all_crate_deps(normal = True),
-    proc_macro_deps = all_crate_deps(proc_macro = True),
-    visibility = ["//visibility:public"],
-)
+# Preserve the historical binary output path without adding a dependency to the HTTP library.
+rust_binary(name = "ai-im", srcs = ["//apps/ai-im:src/main.rs"], crate_root = "//apps/ai-im:src/main.rs", edition = "2024", deps = ["//crates/im-host:im_host", "//crates/storage:storage"] + all_crate_deps(normal = True, package_name = "apps/ai-im"), proc_macro_deps = all_crate_deps(proc_macro = True, package_name = "apps/ai-im"), visibility = ["//visibility:public"])
 rust_test(
     name = "tests",
     crate = ":im_service",
     aliases = aliases(normal_dev = True, proc_macro_dev = True),
-    deps = all_crate_deps(normal_dev = True),
+    deps = ["//crates/crystal:crystal", "//crates/im-storage:im_storage"] + all_crate_deps(normal_dev = True),
     proc_macro_deps = all_crate_deps(proc_macro_dev = True),
     visibility = ["//visibility:public"],
 )
 pkg_tar(
     name = "package",
-    srcs = [":ai-im", "//crates/im-storage:ai-im-storage", "//crates/im-storage:units", "//crates/service-workers:ai-im-services", "//crates/service-workers:ai-im-outcome-service", "//crates/service-workers:ai-im-codex-adapter", "//crates/service-workers:units", "systemd/ai-im.service"],
+    srcs = ["//apps/ai-im:ai-im", "//crates/im-storage:ai-im-storage", "//crates/im-storage:units", "systemd/ai-im.service"],
     package_dir = "ai-im",
     extension = "tar.gz",
     mode = "0755",

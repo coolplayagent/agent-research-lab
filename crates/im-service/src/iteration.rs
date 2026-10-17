@@ -5,8 +5,10 @@ use axum::{
     extract::{Query, Request, State},
     response::Response,
 };
+use collaboration_model::{
+    EvolutionAction, EvolutionChange, EvolutionRun, EvolutionRunInput, GoalInput,
+};
 use contracts::{ActivationState, IterationState, RoundState, ScenarioCapability};
-use crystal::{EvolutionAction, EvolutionChange, EvolutionRun, EvolutionRunInput, GoalInput};
 use serde::Deserialize;
 use serde_json::json;
 use std::{
@@ -43,7 +45,7 @@ fn adapter(scenarios: &[Arc<dyn ScenarioAdapter>], id: &str) -> Result<Arc<dyn S
         .clone();
     let descriptor = adapter.descriptor();
     ensure!(
-        descriptor.protocol_version == crystal::SCENARIO_PROTOCOL_VERSION,
+        descriptor.protocol_version == collaboration_model::SCENARIO_PROTOCOL_VERSION,
         "scenario protocol mismatch"
     );
     ensure!(
@@ -65,14 +67,17 @@ async fn validate(scenarios: &[Arc<dyn ScenarioAdapter>], goal: GoalInput) -> Re
     Ok(())
 }
 
-pub async fn current_goal(hub: &im_storage::Client, run: &EvolutionRun) -> Result<crystal::Goal> {
+pub async fn current_goal(
+    hub: &im_client::Client,
+    run: &EvolutionRun,
+) -> Result<collaboration_model::Goal> {
     let id = &run.rounds.last().context("iteration has no round")?.goal_id;
     let mut after = String::new();
     loop {
         let page = hub
             .goals(&run.input.group_id, &run.input.scenario_id, &after, false)
             .await?;
-        let goals: Vec<crystal::Goal> = serde_json::from_value(page["goals"].clone())?;
+        let goals: Vec<collaboration_model::Goal> = serde_json::from_value(page["goals"].clone())?;
         if let Some(goal) = goals.into_iter().find(|goal| goal.input.id == *id) {
             return Ok(goal);
         }
@@ -165,7 +170,7 @@ pub async fn manage(State(web): State<Web>, request: Request) -> Response {
 }
 
 /// A paused run leaves already claimed work bounded, while blocking new claims.
-pub async fn suspended_goals(hub: &im_storage::Client) -> Result<BTreeSet<String>> {
+pub async fn suspended_goals(hub: &im_client::Client) -> Result<BTreeSet<String>> {
     let mut goals = BTreeSet::new();
     let mut after = String::new();
     loop {
@@ -186,7 +191,7 @@ pub async fn suspended_goals(hub: &im_storage::Client) -> Result<BTreeSet<String
 
 /// One revision-fenced reconciliation is safe to repeat after process recovery.
 pub async fn advance(
-    hub: &im_storage::Client,
+    hub: &im_client::Client,
     scenarios: &[Arc<dyn ScenarioAdapter>],
     run: EvolutionRun,
 ) -> Result<()> {
@@ -219,7 +224,7 @@ pub async fn advance(
 }
 
 pub async fn run(
-    hub: im_storage::Client,
+    hub: im_client::Client,
     scenarios: Arc<Vec<Arc<dyn ScenarioAdapter>>>,
     seconds: u64,
     stop: tokio::sync::watch::Receiver<bool>,
@@ -228,9 +233,9 @@ pub async fn run(
 }
 
 pub async fn run_with_registry(
-    hub: im_storage::Client,
+    hub: im_client::Client,
     scenarios: Arc<Vec<Arc<dyn ScenarioAdapter>>>,
-    registry: Option<Arc<service_api::Registry>>,
+    registry: Option<Arc<service_registry::Registry>>,
     seconds: u64,
     mut stop: tokio::sync::watch::Receiver<bool>,
 ) {
