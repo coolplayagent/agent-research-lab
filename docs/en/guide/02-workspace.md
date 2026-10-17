@@ -32,4 +32,4 @@ Hover over the crystal to highlight activity, select members or click the sphere
 
 Create a topic by selecting an existing group by name; edits preserve ownership. Archived topics have read-only subjects and graphs. Filter, paginate, zoom or select nodes by keyboard to inspect goals, results and evidence. Nodes/parent edges are append-only; unassessed references never appear accepted.
 
-The `/apps/research/` inspector provides sessions, execution preferences, memory and detailed task records. See the [research guide](04-research.md).
+The `/apps/console/` inspector provides sessions, execution preferences, memory and detailed task records. See the [research guide](04-research.md).

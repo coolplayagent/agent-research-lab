@@ -1,0 +1,21 @@
+[package]
+name = "outcome-hub-collaboration-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "collaboration_store"
+
+[dependencies]
+collaboration_model.workspace = true
+contracts.workspace = true
+anyhow.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+storage.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

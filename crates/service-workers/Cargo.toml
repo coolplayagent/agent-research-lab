@@ -1,5 +1,5 @@
 [package]
-name = "ai-im-service-workers"
+name = "outcome-hub-service-workers"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -20,3 +20,11 @@ tempfile.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[[bin]]
+name = "ai-im-services"
+path = "src/legacy_main.rs"
+
+[[bin]]
+name = "outcome-hub-services"
+path = "src/main.rs"

@@ -1,5 +1,5 @@
 [package]
-name = "lab-software-delivery"
+name = "outcome-hub-software-delivery"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -19,7 +19,7 @@ process.workspace = true
 storage.workspace = true
 contracts.workspace = true
 collaboration_model.workspace = true
-im_client.workspace = true
+collaboration_client.workspace = true
 software_verification.workspace = true
 runtime.workspace = true
 

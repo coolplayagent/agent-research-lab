@@ -1,0 +1,36 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+exports_files([
+    "Cargo.toml",
+], visibility = ["//visibility:public"])
+
+rust_library(
+    name = "inputs",
+    crate_name = "inputs",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = glob(["src/fixtures/*"]),
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    aliases = aliases(),
+    deps = ["//crates/native-effects:native_effects",
+        "//crates/execution-config:config",
+        "//crates/delivery-adapters:delivery",
+        "//crates/source-freshness:freshness",
+        "//crates/process:process",
+        "//crates/filesystem-store:storage",
+    ] + all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+)
+
+rust_test(
+    name = "tests",
+    crate = ":inputs",
+    aliases = aliases(normal_dev = True, proc_macro_dev = True),
+    deps = all_crate_deps(normal_dev = True),
+    proc_macro_deps = all_crate_deps(proc_macro_dev = True),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])

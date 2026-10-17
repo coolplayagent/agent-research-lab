@@ -108,8 +108,8 @@ struct UnitProof {
     next_artifact_sha256: String,
 }
 
-fn storage_client(prepared: &Prepared) -> Result<im_client::Client> {
-    im_client::Client::remote(
+fn storage_client(prepared: &Prepared) -> Result<collaboration_client::Client> {
+    collaboration_client::Client::remote(
         prepared
             .policy
             .storage_socket
@@ -918,7 +918,7 @@ fn platform_start(prepared: &Prepared) -> Result<()> {
                 .storage_socket
                 .as_ref()
                 .context("platform storage socket required")?;
-            let client = im_client::Client::remote(socket.clone())?;
+            let client = collaboration_client::Client::remote(socket.clone())?;
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()?;

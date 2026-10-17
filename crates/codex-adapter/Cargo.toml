@@ -1,5 +1,5 @@
 [package]
-name = "ai-im-codex-adapter"
+name = "outcome-hub-codex-adapter"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -18,3 +18,11 @@ process.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[[bin]]
+name = "ai-im-codex-adapter"
+path = "src/legacy_main.rs"
+
+[[bin]]
+name = "outcome-hub-codex-adapter"
+path = "src/main.rs"

@@ -1,0 +1,10 @@
+[package]
+name = "outcome-hub-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[lib]
+name = "outcome_hub_web"
+
+[dependencies]
+web_assets.workspace = true

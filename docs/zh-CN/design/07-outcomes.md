@@ -41,7 +41,7 @@ flowchart TB
   K --> E[SuperPOD 或其他仓外知识库]
 ```
 
-`contracts` 是生命周期枚举的唯一来源，前端契约由其生成。`crystal` 实现领域事务；生产数据库由 `im-storage` 独占。`im-service` 提供权限、自动验证调度和界面 API；其他服务通过版本化私有 Unix socket 通信。开发用嵌入存储使用同一客户端契约和独立本地数据目录。
+`contracts` 是生命周期枚举的唯一来源，前端契约由其生成。`collaboration-store` 实现领域事务；生产数据库由 `collaboration-storage-service` 独占。`collaboration-api` 提供权限、自动验证调度和界面 API；其他服务通过版本化私有 Unix socket 通信。开发用嵌入存储使用同一客户端契约和独立本地数据目录。
 
 核心启动无需研究 CLI、SuperPOD、验证服务或知识库绑定。没有验证器时仍可发布、发现和引用，状态保持未验证。服务配置包含端点、启用状态、协议版本、成果类型、依赖和时限；配置成功、协议健康和实际验证通过分别表达。按主题、成果类型绑定自动验证器，按主题可选绑定知识库。
 

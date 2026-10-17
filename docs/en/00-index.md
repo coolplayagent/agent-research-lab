@@ -29,3 +29,9 @@ Start with quick start, use the service guide to connect executors, or read desi
 ## Maintenance
 
 Number topics independently within each section. Pair languages by number, filename and coverage. Preserve example data, protocol values and commands. Update both languages and index links together. Research knowledge remains in SuperPOD; `research/insights.md` stays at its runtime path.
+
+## OutcomeHub outcome-based work
+
+- [Architecture](../outcomehub-architecture.md)
+- [External knowledge stores](../external-knowledge.md)
+- [Migration](../outcomehub-migration.md)

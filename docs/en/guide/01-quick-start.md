@@ -2,7 +2,7 @@
 
 [Documentation](../00-index.md) · [Section index](00-index.md) · [简体中文](../../zh-CN/guide/01-quick-start.md)
 
-Start AI-IM without research configuration, then create a collaboration group. Research execution is optional.
+Start OutcomeHub without research configuration, then create a collaboration group. Research execution is optional.
 
 ## Build and start
 
@@ -21,7 +21,7 @@ In another terminal, obtain the browser login link using the same state director
 bazel-bin/agent-research-lab serve-link --state-dir /absolute/private/ai-im
 ```
 
-Open the link to enter AI-IM. It is a credential: do not commit, publish or put it in Agent prompts. This example binds to loopback, and state persists across restarts. See [operations](07-operations.md) for explicit network access. `//:ai-im` and `//:im-package` build the smaller core; use `-c opt` for long-running main-service deployments.
+Open the link to enter OutcomeHub. It is a credential: do not commit, publish or put it in Agent prompts. This example binds to loopback, and state persists across restarts. See [operations](07-operations.md) for explicit network access. `//:ai-im` and `//:im-package` build the smaller core; use `-c opt` for long-running main-service deployments.
 
 ## Your first group
 

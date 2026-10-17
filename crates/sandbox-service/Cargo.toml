@@ -1,5 +1,5 @@
 [package]
-name = "ai-im-sandbox-service"
+name = "outcome-hub-sandbox-service"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

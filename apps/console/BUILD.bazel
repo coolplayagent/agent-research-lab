@@ -1,0 +1,14 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test", "rust_binary")
+exports_files(["Cargo.toml"], visibility = ["//visibility:public"])
+rust_library(
+    name = "outcome_hub_console", crate_name = "outcome_hub_console",
+    srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
+    crate_root = "src/lib.rs", edition = "2024", aliases = aliases(),
+    compile_data = glob(["src/dashboard/fixtures/*"]) + ["//web/console:assets", "//web/console:checked"],
+    deps = ["//web/console:console_web", "//crates/collaboration-host:collaboration_host", "//crates/collaboration-store:collaboration_store", "//crates/collaboration-storage-service:collaboration_storage_service", "//crates/service-registry:service_registry", "//crates/collaboration-client:collaboration_client", "//crates/contracts:contracts", "//crates/collaboration-api:collaboration_api", "//crates/collaboration-model:collaboration_model", "//crates/agent-backend:agent_backend", "//crates/collaboration-proposals:communication", "//crates/execution-config:config", "//crates/delivery-adapters:delivery", "//crates/prompt-evolution-cli:evolution_cli", "//crates/source-freshness:freshness", "//crates/agent-teams:multi_agent", "//crates/process:process", "//crates/execution-runtime:runtime", "//crates/filesystem-store:storage", "//crates/execution-model:task", "//crates/software-verification:software_verification"] + all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+)
+rust_test(name = "tests", crate = ":outcome_hub_console", aliases = aliases(normal_dev = True, proc_macro_dev = True), deps = [] + all_crate_deps(normal_dev = True), proc_macro_deps = all_crate_deps(proc_macro_dev = True), visibility = ["//visibility:public"])
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "src/dashboard/*.html", "src/dashboard/*.css"], allow_empty = True), visibility = ["//visibility:public"])

@@ -24,6 +24,10 @@ pub struct Configuration {
     pub outcome_services: Vec<OutcomeService>,
     #[serde(default)]
     pub outcome_bindings: BTreeMap<String, OutcomeServicesBinding>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub knowledge_groups: BTreeMap<String, KnowledgeTarget>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub knowledge_goals: BTreeMap<String, KnowledgeTarget>,
 }
 impl Configuration {
     pub fn defaults(state: &Path) -> Self {
@@ -66,6 +70,8 @@ impl Configuration {
             scenarios: vec![],
             outcome_services: vec![],
             outcome_bindings: BTreeMap::new(),
+            knowledge_groups: BTreeMap::new(),
+            knowledge_goals: BTreeMap::new(),
         }
     }
     pub fn service(&self, id: &str, kind: ServiceKind) -> Result<&Service> {
@@ -162,6 +168,21 @@ impl Configuration {
                     "outcome dependency disabled"
                 );
             }
+        }
+        ensure!(
+            self.knowledge_groups.len() <= 2048 && self.knowledge_goals.len() <= 4096,
+            "knowledge_binding_limit"
+        );
+        for (scope, target) in self.knowledge_groups.iter().chain(&self.knowledge_goals) {
+            collaboration_model::id(scope)?;
+            collaboration_model::id(&target.repository)?;
+            ensure!(
+                self.outcome_services
+                    .iter()
+                    .any(|s| s.id == target.service_id
+                        && s.kind == contracts::OutcomeServiceKind::Knowledge),
+                "invalid knowledge binding"
+            );
         }
         for (topic, binding) in &self.outcome_bindings {
             collaboration_model::id(topic)?;

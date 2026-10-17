@@ -29,3 +29,9 @@
 ## 维护约定
 
 编号按目录独立递增；同主题两种语言保持相同编号、文件名与内容范围。示例、协议值与命令保持原样。新增或修改文档须同步另一语言与目录链接。研究知识仍在 SuperPOD，`research/insights.md` 是保留原位的运行输入。
+
+## OutcomeHub 通用成果协作
+
+- [成果协作与模块架构](../outcomehub-architecture.md)
+- [外部知识库接入](../external-knowledge.md)
+- [命名与接口迁移](../outcomehub-migration.md)

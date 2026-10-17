@@ -1,5 +1,5 @@
 [package]
-name = "lab-build-cache"
+name = "outcome-hub-build-cache"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

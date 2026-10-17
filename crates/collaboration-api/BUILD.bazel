@@ -1,0 +1,36 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_binary", "rust_test")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+exports_files(["Cargo.toml"])
+rust_library(
+    name = "collaboration_api",
+    crate_name = "collaboration_api",
+    srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
+    crate_root = "src/lib.rs",
+    compile_data = ["//web/outcome-hub:assets", "//web/outcome-hub:checked"],
+    edition = "2024",
+    aliases = aliases(),
+    deps = ["//crates/knowledge-client:knowledge_client", "//crates/knowledge-model:knowledge_model", "//web/outcome-hub:outcome_hub_web", "//web/shared:web_assets", "//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/collaboration-model:collaboration_model", "//crates/service-api:service_api", "//crates/collaboration-client:collaboration_client", "//crates/service-registry:service_registry", "//crates/filesystem-store:storage"] + all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+)
+# Preserve the historical binary output path without adding a dependency to the HTTP library.
+rust_binary(name = "ai-im", srcs = ["//apps/outcome-hub:src/main.rs"], crate_root = "//apps/outcome-hub:src/main.rs", edition = "2024", deps = ["//crates/collaboration-host:collaboration_host", "//crates/filesystem-store:storage"] + all_crate_deps(normal = True, package_name = "apps/outcome-hub"), proc_macro_deps = all_crate_deps(proc_macro = True, package_name = "apps/outcome-hub"), visibility = ["//visibility:public"])
+rust_test(
+    name = "tests",
+    crate = ":collaboration_api",
+    aliases = aliases(normal_dev = True, proc_macro_dev = True),
+    deps = ["//crates/collaboration-store:collaboration_store", "//crates/collaboration-storage-service:collaboration_storage_service"] + all_crate_deps(normal_dev = True),
+    proc_macro_deps = all_crate_deps(proc_macro_dev = True),
+    visibility = ["//visibility:public"],
+)
+pkg_tar(
+    name = "package",
+    srcs = ["//apps/outcome-hub:outcome-hub", "//crates/collaboration-storage-service:outcome-hub-storage", "//deploy/systemd:outcome-hub.service", "//apps/outcome-hub:ai-im", "//crates/collaboration-storage-service:ai-im-storage", "//crates/collaboration-storage-service:units", "//deploy/systemd:ai-im.service"],
+    package_dir = "outcome-hub",
+    extension = "tar.gz",
+    mode = "0755",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])

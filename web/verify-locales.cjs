@@ -60,7 +60,7 @@ function checkCalls(source, messages) {
   }
   const inventory = read("source_inventory.txt").trim().split("\n");
   let count = 0;
-  for (const [directory, html] of [["crates/im-service/web", "crates/im-service/web/index.html"], ["apps/research-console/src/dashboard/web", "apps/research-console/src/dashboard/index.html"]]) {
+  for (const [directory, html] of [["web/outcome-hub", "web/outcome-hub/index.html"], ["web/console", "web/console/index.html"]]) {
     const messages = {...shared, ...catalog(`${directory}/src/locales/zh-CN.ts`)};
     for (const file of inventory.filter(p => p.startsWith(directory + "/src/") && p.endsWith(".ts") && !p.includes("/locales/"))) {
       const errors = checkCalls(parse(file, read(file)), messages);

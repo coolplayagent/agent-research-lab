@@ -1,5 +1,5 @@
 [package]
-name = "lab-isolation"
+name = "outcome-hub-isolation"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

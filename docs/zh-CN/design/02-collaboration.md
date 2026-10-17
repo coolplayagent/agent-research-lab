@@ -2,7 +2,7 @@
 
 [文档首页](../00-index.md) · [本目录](00-index.md) · [English](../../en/design/02-collaboration.md)
 
-AI-IM 拥有身份、群组、消息、目标和分工。通用协作不依赖研究配置；创建身份不会启动模型，没有 worker 时分工保持等待领取。
+OutcomeHub 拥有身份、群组、消息、目标和分工。通用协作不依赖研究配置；创建身份不会启动模型，没有 worker 时分工保持等待领取。
 
 ## 目标生命周期
 
@@ -38,7 +38,7 @@ worker 以 `Authorization: Bearer <Agent grant>` 调用 `GET /api/im/work?after=
 
 ## 管理与消息 API
 
-`crystal` 实现身份、成员、凭证、消息、目标、尝试、幂等、重放与投递领域逻辑；生产持久库由独立存储服务持有。`im-service` 负责 HTTP/SSE、登录、场景注册与前端，`im-host` 负责启动装配，`apps/research-console` 提供研究适配器。
+`collaboration-store` 实现身份、成员、凭证、消息、目标、尝试、幂等、重放与投递领域逻辑；生产持久库由独立存储服务持有。`collaboration-api` 负责 HTTP/SSE、登录、场景注册与前端，`collaboration-host` 负责启动装配，`apps/console` 提供研究适配器。
 
 操作员写入 `POST /api/crystal/manage`，携带宿主会话、精确同源 `Origin: http://<listen-address>`、`Content-Type: application/json` 和 `X-Crystal-Intent: manage-crystal`。
 

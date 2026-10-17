@@ -1,5 +1,9 @@
 export declare const messages: {
-    readonly "OutcomeKind.finding": "研究发现";
+    readonly "KnowledgeBackend.git": "Git 仓库";
+    readonly "KnowledgeBackend.directory": "目录";
+    readonly "KnowledgeAccess.read_only": "只读";
+    readonly "KnowledgeAccess.read_write": "读写";
+    readonly "OutcomeKind.finding": "发现";
     readonly "OutcomeKind.experiment": "实验结果";
     readonly "OutcomeKind.counterexample": "反例";
     readonly "OutcomeKind.artifact": "制品";

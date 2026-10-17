@@ -1,6 +1,6 @@
 [workspace]
-members = ["app", "apps/*", "crates/*", "web/shared"]
-default-members = ["apps/ai-im"]
+members = ["apps/*", "crates/*", "web/*"]
+default-members = ["apps/outcome-hub"]
 resolver = "3"
 
 [workspace.package]
@@ -9,22 +9,22 @@ edition = "2024"
 license = "MIT"
 
 [workspace.dependencies]
-research_cli = { package = "lab-research-cli", path = "apps/research-cli" }
-research_console = { package = "lab-research-console", path = "apps/research-console" }
-software_delivery = { package = "lab-software-delivery", path = "crates/software-delivery" }
-software_verification = { package = "lab-software-verification", path = "crates/software-verification" }
-executor_service = { package = "ai-im-executor-service", path = "crates/executor-service" }
-sandbox_service = { package = "ai-im-sandbox-service", path = "crates/sandbox-service" }
-outcome_service = { package = "ai-im-outcome-service", path = "crates/outcome-service" }
-codex_adapter = { package = "ai-im-codex-adapter", path = "crates/codex-adapter" }
-im_host = { package = "ai-im-host", path = "crates/im-host" }
-im_client = { package = "ai-im-client", path = "crates/im-client" }
-service_registry = { package = "ai-im-service-registry", path = "crates/service-registry" }
-collaboration_model = { package = "ai-im-collaboration-model", path = "crates/collaboration-model" }
-service_workers = { package = "ai-im-service-workers", path = "crates/service-workers" }
-service_api = { package = "ai-im-service-api", path = "crates/service-api" }
-im_storage = { package = "ai-im-storage", path = "crates/im-storage" }
-service_protocol = { package = "ai-im-service-protocol", path = "crates/service-protocol" }
+outcome_hub_cli = { package = "outcome-hub-cli", path = "apps/cli" }
+outcome_hub_console = { package = "outcome-hub-console", path = "apps/console" }
+software_delivery = { package = "outcome-hub-software-delivery", path = "crates/software-delivery" }
+software_verification = { package = "outcome-hub-software-verification", path = "crates/software-verification" }
+executor_service = { package = "outcome-hub-executor-service", path = "crates/executor-service" }
+sandbox_service = { package = "outcome-hub-sandbox-service", path = "crates/sandbox-service" }
+outcome_service = { package = "outcome-hub-outcome-service", path = "crates/outcome-service" }
+codex_adapter = { package = "outcome-hub-codex-adapter", path = "crates/codex-adapter" }
+collaboration_host = { package = "outcome-hub-collaboration-host", path = "crates/collaboration-host" }
+collaboration_client = { package = "outcome-hub-collaboration-client", path = "crates/collaboration-client" }
+service_registry = { package = "outcome-hub-service-registry", path = "crates/service-registry" }
+collaboration_model = { package = "outcome-hub-collaboration-model", path = "crates/collaboration-model" }
+service_workers = { package = "outcome-hub-service-workers", path = "crates/service-workers" }
+service_api = { package = "outcome-hub-service-api", path = "crates/service-api" }
+collaboration_storage_service = { package = "outcome-hub-collaboration-storage-service", path = "crates/collaboration-storage-service" }
+service_protocol = { package = "outcome-hub-service-protocol", path = "crates/service-protocol" }
 anyhow = "1"
 async-stream = "0.3"
 axum = "0.8.9"
@@ -41,31 +41,45 @@ serde_json = "1"
 sha2 = "0.10"
 toml = "0.8"
 tempfile = "3"
-agent_backend = { package = "lab-agent-backend", path = "crates/agent-backend" }
-agent_policy = { package = "lab-agent-policy", path = "crates/agent-policy" }
-automation = { package = "lab-automation", path = "crates/automation" }
-budget = { package = "lab-budget", path = "crates/budget" }
-build_cache = { package = "lab-build-cache", path = "crates/build-cache" }
-collaboration_experiment = { package = "lab-collaboration-experiment", path = "crates/collaboration-experiment" }
-web_assets = { package = "ai-im-web-assets", path = "web/shared" }
-im_service = { package = "ai-im", path = "crates/im-service" }
-contracts = { package = "lab-contracts", path = "crates/contracts" }
-crystal = { package = "lab-crystal", path = "crates/crystal" }
-communication = { package = "lab-communication", path = "crates/communication" }
-config = { package = "lab-config", path = "crates/config" }
-delivery = { package = "lab-delivery", path = "crates/delivery" }
-evolution = { package = "lab-evolution", path = "crates/evolution" }
-evolution_cli = { package = "lab-evolution-cli", path = "crates/evolution-cli" }
-freshness = { package = "lab-freshness", path = "crates/freshness" }
-inputs = { package = "lab-inputs", path = "crates/inputs" }
-isolation = { package = "lab-isolation", path = "crates/isolation" }
-knowledge = { package = "lab-knowledge", path = "crates/knowledge" }
-lease_heartbeat = { package = "lab-lease-heartbeat", path = "crates/lease-heartbeat" }
-multi_agent = { package = "lab-multi-agent", path = "crates/multi-agent" }
-native_effects = { package = "lab-native-effects", path = "crates/native-effects" }
-process = { package = "lab-process", path = "crates/process" }
-runtime = { package = "lab-runtime", path = "crates/runtime" }
-storage = { package = "lab-storage", path = "crates/storage" }
-targets = { package = "lab-targets", path = "crates/targets" }
-task = { package = "lab-task", path = "crates/task" }
-workflow = { package = "lab-workflow", path = "crates/workflow" }
+agent_backend = { package = "outcome-hub-agent-backend", path = "crates/agent-backend" }
+agent_policy = { package = "outcome-hub-agent-policy", path = "crates/agent-policy" }
+automation = { package = "outcome-hub-delivery-outbox", path = "crates/delivery-outbox" }
+budget = { package = "outcome-hub-execution-budget", path = "crates/execution-budget" }
+build_cache = { package = "outcome-hub-build-cache", path = "crates/build-cache" }
+collaboration_experiment = { package = "outcome-hub-collaboration-evaluation", path = "crates/collaboration-evaluation" }
+web_assets = { package = "outcome-hub-web-assets", path = "web/shared" }
+collaboration_api = { package = "outcome-hub-collaboration-api", path = "crates/collaboration-api" }
+contracts = { package = "outcome-hub-contracts", path = "crates/contracts" }
+collaboration_store = { package = "outcome-hub-collaboration-store", path = "crates/collaboration-store" }
+communication = { package = "outcome-hub-collaboration-proposals", path = "crates/collaboration-proposals" }
+config = { package = "outcome-hub-execution-config", path = "crates/execution-config" }
+delivery = { package = "outcome-hub-delivery-adapters", path = "crates/delivery-adapters" }
+evolution = { package = "outcome-hub-prompt-evolution", path = "crates/prompt-evolution" }
+evolution_cli = { package = "outcome-hub-prompt-evolution-cli", path = "crates/prompt-evolution-cli" }
+freshness = { package = "outcome-hub-source-freshness", path = "crates/source-freshness" }
+inputs = { package = "outcome-hub-execution-inputs", path = "crates/execution-inputs" }
+isolation = { package = "outcome-hub-isolation", path = "crates/isolation" }
+knowledge = { package = "outcome-hub-knowledge-publication", path = "crates/knowledge-publication" }
+lease_heartbeat = { package = "outcome-hub-lease-heartbeat", path = "crates/lease-heartbeat" }
+multi_agent = { package = "outcome-hub-agent-teams", path = "crates/agent-teams" }
+native_effects = { package = "outcome-hub-native-effects", path = "crates/native-effects" }
+process = { package = "outcome-hub-process", path = "crates/process" }
+runtime = { package = "outcome-hub-execution-runtime", path = "crates/execution-runtime" }
+storage = { package = "outcome-hub-filesystem-store", path = "crates/filesystem-store" }
+targets = { package = "outcome-hub-execution-targets", path = "crates/execution-targets" }
+task = { package = "outcome-hub-execution-model", path = "crates/execution-model" }
+workflow = { package = "outcome-hub-workflow-adapter", path = "crates/workflow-adapter" }
+
+outcome_hub_web = { package = "outcome-hub-web", path = "web/outcome-hub" }
+
+console_web = { package = "outcome-hub-console-web", path = "web/console" }
+
+knowledge_model = { package = "outcome-hub-knowledge-model", path = "crates/knowledge-model" }
+
+knowledge_client = { package = "outcome-hub-knowledge-client", path = "crates/knowledge-client" }
+
+knowledge_git = { package = "outcome-hub-knowledge-git", path = "crates/knowledge-git" }
+
+knowledge_directory = { package = "outcome-hub-knowledge-directory", path = "crates/knowledge-directory" }
+
+knowledge_service = { package = "outcome-hub-knowledge-service", path = "crates/knowledge-service" }

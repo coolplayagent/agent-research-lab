@@ -1,0 +1,52 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+exports_files([
+    "Cargo.toml",
+], visibility = ["//visibility:public"])
+
+rust_library(
+    name = "runtime",
+    crate_name = "runtime",
+    srcs = glob(["src/**/*.rs"]),
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    aliases = aliases(),
+    compile_data = ["//:prompt_assets"],
+    deps = ["//crates/native-effects:native_effects",
+        "//crates/contracts:contracts",
+        "//crates/agent-backend:agent_backend",
+        "//crates/agent-policy:agent_policy",
+        "//crates/delivery-outbox:automation",
+        "//crates/execution-budget:budget",
+        "//crates/build-cache:build_cache",
+        "//crates/collaboration-proposals:communication",
+        "//crates/execution-config:config",
+        "//crates/prompt-evolution-cli:evolution_cli",
+        "//crates/prompt-evolution:evolution",
+        "//crates/source-freshness:freshness",
+        "//crates/execution-inputs:inputs",
+        "//crates/isolation:isolation",
+        "//crates/lease-heartbeat:lease_heartbeat",
+        "//crates/agent-teams:multi_agent",
+        "//crates/process:process",
+        "//crates/filesystem-store:storage",
+        "//crates/execution-targets:targets",
+        "//crates/execution-model:task",
+        "//crates/workflow-adapter:workflow",
+    ] + all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+)
+
+rust_test(
+    name = "tests",
+    crate = ":runtime",
+    aliases = aliases(normal_dev = True, proc_macro_dev = True),
+    data = ["fixtures/completion-workflow.sh"],
+    deps = all_crate_deps(normal_dev = True),
+    proc_macro_deps = all_crate_deps(proc_macro_dev = True),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs", "src/**/*.ts", "*.html", "src/dashboard/*.html"], exclude = ["tests/fixtures/**"], allow_empty = True), visibility = ["//visibility:public"])

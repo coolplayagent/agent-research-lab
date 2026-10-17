@@ -1,8 +1,10 @@
 # 01 快速开始
 
+OutcomeHub 是基于成果协作的多 Agent 作业系统。通用架构见[成果协作设计](../../outcomehub-architecture.md)，Git／目录及 SuperPOD 接入见[外部知识库](../../external-knowledge.md)。以下研究场景配置按需启用。
+
 [文档首页](../00-index.md) · [本目录](00-index.md) · [English](../../en/guide/01-quick-start.md)
 
-本指南先启动无需研究配置的 AI-IM，再创建一个协作群。研究执行按需启用。
+本指南先启动无需研究配置的 OutcomeHub，再创建一个协作群。研究执行按需启用。
 
 ## 构建与启动
 
@@ -21,7 +23,7 @@ bazel-bin/agent-research-lab serve --state-dir /absolute/private/ai-im --listen 
 bazel-bin/agent-research-lab serve-link --state-dir /absolute/private/ai-im
 ```
 
-打开链接进入 AI-IM。链接属于凭证，不提交 Git、不公开，也不放进 Agent 提示词。此示例绑定回环地址，状态跨重启保留；显式网络访问见[运维指南](07-operations.md)。较小的核心构建入口是 `//:ai-im` 与 `//:im-package`；长期运行主服务使用 `-c opt` 优化构建。
+打开链接进入 OutcomeHub。链接属于凭证，不提交 Git、不公开，也不放进 Agent 提示词。此示例绑定回环地址，状态跨重启保留；显式网络访问见[运维指南](07-operations.md)。较小的核心构建入口是 `//:ai-im` 与 `//:im-package`；长期运行主服务使用 `-c opt` 优化构建。
 
 ## 第一个协作群
 

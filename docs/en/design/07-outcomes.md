@@ -41,7 +41,7 @@ flowchart TB
   K --> E[SuperPOD or another external knowledge repository]
 ```
 
-`contracts` owns lifecycle enums and generates frontend contracts. `crystal` owns domain transactions within `im-storage`; other services use its API. `im-service` supplies authorization, verification dispatch and UI APIs. Services communicate over versioned private Unix sockets. The development embedded adapter uses the same client contract and a separate local store.
+`contracts` owns lifecycle enums and generates frontend contracts. `collaboration-store` owns domain transactions within `collaboration-storage-service`; other services use its API. `collaboration-api` supplies authorization, verification dispatch and UI APIs. Services communicate over versioned private Unix sockets. The development embedded adapter uses the same client contract and a separate local store.
 
 Core collaboration starts without research CLI configuration, SuperPOD, a verifier or knowledge binding. Publishing, discovery and referencing remain available without verification services; unverified outcomes cannot be accepted. Service settings track endpoint, enabled state, protocol, supported kinds, dependencies and deadline. Configuration, protocol health and actual task results remain distinct. Automatic verification is bound by topic and outcome kind; knowledge binding is optional per topic.
 

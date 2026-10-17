@@ -23,7 +23,7 @@ fn extracted_contracts_keep_original_wire_bytes_and_defaults() {
             "goal" => wire::<collaboration_model::GoalInput>(input),
             "outcome_command" => wire::<collaboration_model::OutcomeCommand>(input),
             "coordination" => wire::<collaboration_model::ResearchChange>(input),
-            "storage_request" => wire::<im_client::Request>(input),
+            "storage_request" => wire::<collaboration_client::Request>(input),
             "iteration" => wire::<collaboration_model::EvolutionRunInput>(input),
             "lineage" => wire::<collaboration_model::EvolutionNode>(input),
             "agent_input" => wire::<service_api::AgentInput>(input),

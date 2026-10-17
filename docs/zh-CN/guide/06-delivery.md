@@ -20,7 +20,7 @@ bazel-bin/agent-research-lab --config local.toml automation tick
 | `knowledge_publish` | `knowledge::PublishReportRequest` | 提交、推送并创建审查后的 SuperPOD PR |
 | `knowledge_refresh` | `knowledge::IndexRefreshRequest` | 更新/轮询精确 SuperPOD 索引目标 |
 
-JSON 请求契约由 `crates/delivery/src/lib.rs` 和 `crates/knowledge/src/lib.rs` 的公开 Rust 类型定义。队列保存不可变哈希请求与持久结果，相同请求复用已有状态。索引任务可停留在 `waiting`，未知写入结果转为 `needs_reconciliation`。核对真实远程、工作树或安装状态后，可用 `automation reconcile-retry --id OPERATION_DIGEST` 重试；失败的发布门禁仍须满足。
+JSON 请求契约由 `crates/delivery-adapters/src/lib.rs` 和 `crates/knowledge-publication/src/lib.rs` 的公开 Rust 类型定义。队列保存不可变哈希请求与持久结果，相同请求复用已有状态。索引任务可停留在 `waiting`，未知写入结果转为 `needs_reconciliation`。核对真实远程、工作树或安装状态后，可用 `automation reconcile-retry --id OPERATION_DIGEST` 重试；失败的发布门禁仍须满足。
 
 发布操作要求 `outbox/evidence` 中的哈希证据文件：真实完整 Qualitygate 报告、将报告与代码/提示词/策略/SuperPOD 绑定的宿主快照回执、不同评估者的结果回执。安装快照还绑定包与二进制哈希，仅有布尔通过标记不够。当前上游默认分支绑定及技能清单哈希也必须具备，晋级/发布在执行前再次在线检查。旧回执不能授权新发布，不得伪造证据。
 

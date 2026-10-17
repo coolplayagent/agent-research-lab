@@ -1,5 +1,5 @@
 [package]
-name = "ai-im-web-assets"
+name = "outcome-hub-web-assets"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

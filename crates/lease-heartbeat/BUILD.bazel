@@ -13,10 +13,10 @@ rust_library(
     edition = "2024",
     aliases = aliases(),
     deps = [
-        "//crates/config:config",
+        "//crates/execution-config:config",
         "//crates/process:process",
-        "//crates/storage:storage",
-        "//crates/workflow:workflow",
+        "//crates/filesystem-store:storage",
+        "//crates/workflow-adapter:workflow",
     ] + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],

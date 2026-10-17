@@ -1,5 +1,5 @@
 [package]
-name = "lab-agent-backend"
+name = "outcome-hub-agent-backend"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

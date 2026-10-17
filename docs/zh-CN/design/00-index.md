@@ -9,3 +9,9 @@
 - [05 研究证据与版本谱系](05-evidence.md)
 - [06 前端模块、共享契约与国际化](06-frontend.md)
 - [07 基于成果的协作架构](07-outcomes.md)
+
+## OutcomeHub 通用成果协作
+
+- [成果协作与模块架构](../../outcomehub-architecture.md)
+- [外部知识库接入](../../external-knowledge.md)
+- [命名与接口迁移](../../outcomehub-migration.md)

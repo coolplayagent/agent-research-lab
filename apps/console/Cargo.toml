@@ -1,0 +1,40 @@
+[package]
+name = "outcome-hub-console"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[lib]
+name = "outcome_hub_console"
+[dependencies]
+console_web.workspace = true
+async-stream.workspace = true
+collaboration_host.workspace = true
+collaboration_store.workspace = true
+collaboration_storage_service.workspace = true
+service_registry.workspace = true
+collaboration_client.workspace = true
+contracts.workspace = true
+collaboration_api.workspace = true
+axum.workspace = true
+collaboration_model.workspace = true
+tokio.workspace = true
+libc.workspace = true
+agent_backend.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+communication.workspace = true
+config.workspace = true
+delivery.workspace = true
+evolution_cli.workspace = true
+freshness.workspace = true
+multi_agent.workspace = true
+process.workspace = true
+runtime.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+storage.workspace = true
+task.workspace = true
+software_verification.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -4,7 +4,7 @@
 
 ## Build entrypoints
 
-Each crate declares dependencies in Cargo and Bazel, using the workspace lockfile. Bazel is the build, test and packaging entrypoint. `//:tests` aggregates tests, `//:agent-research-lab` produces `bazel-bin/agent-research-lab`, and `//:package` produces the distributable with bilingual docs. Use `bazel test //crates/communication:tests` for a focused module regression.
+Each crate declares dependencies in Cargo and Bazel, using the workspace lockfile. Bazel is the build, test and packaging entrypoint. `//:tests` aggregates tests, `//:agent-research-lab` produces `bazel-bin/agent-research-lab`, and `//:package` produces the distributable with bilingual docs. Use `bazel test //crates/collaboration-proposals:tests` for a focused module regression.
 
 ```sh
 bazel build --lockfile_mode=error //:ai-im //:im-package
@@ -30,9 +30,9 @@ After an attempt ends and no worker/reconciliation still uses it, its `runs/<run
 Pinned Node 22.22.1 and TypeScript 5.9.3 compile through Bazel. Checked-in `dist/` supports Rust embedding/Cargo linting, and Bazel rejects drift from TypeScript compilation. Regenerate after edits:
 
 ```sh
-bazel build //crates/im-service/web:compiled //apps/research-console/src/dashboard/web:compiled
-install -m 644 bazel-bin/crates/im-service/web/compiled/*.js crates/im-service/web/dist/
-install -m 644 bazel-bin/apps/research-console/src/dashboard/web/compiled/*.js apps/research-console/src/dashboard/web/dist/
+bazel build //web/outcome-hub:compiled //web/console:compiled
+install -m 644 bazel-bin/web/outcome-hub/compiled/*.js web/outcome-hub/dist/
+install -m 644 bazel-bin/web/console/compiled/*.js web/console/dist/
 bazel test --lockfile_mode=error //...
 ```
 
@@ -49,16 +49,16 @@ Match filenames/numbers between Chinese and English, updating both languages and
 ## Native batch integration tests
 
 The real-owner regressions are explicit opt-in Bazel tests. Set `LAB_WORKFLOW_BIN`
-to the tested CLI 0.2.0 runtime and run `//crates/runtime:tests` with
+to the tested CLI 0.2.0 runtime and run `//crates/execution-runtime:tests` with
 `--test_arg=batch::tests --test_arg=--ignored`. The separate
-`//app:enqueue_batch_cli_tests` also requires `LAB_CLI_BIN`; it exercises the real
+`//apps/cli:enqueue_batch_cli_tests` also requires `LAB_CLI_BIN`; it exercises the real
 CLI and freshness collector using isolated GitHub/fetch acquisition fixtures.
 These tests create only owned temporary stores and never run models.
 
 ## Application and dependency boundaries
 
-Use `//:im-package` for standalone collaboration, `//:adapter-package` for optional execution/knowledge services, and `//:package` for the complete research distribution. `apps/ai-im` is the Cargo workspace default; Bazel remains the release entrypoint. Research CLI and console code live in `apps/research-cli` and `apps/research-console`; `app/` preserves the original executable and Rust integration exports.
+Use `//:im-package` for standalone collaboration, `//:adapter-package` for optional execution/knowledge services, and `//:package` for the complete research distribution. `apps/outcome-hub` is the Cargo workspace default; Bazel remains the release entrypoint. Research CLI and console code live in `apps/cli` and `apps/console`; The old facade is merged into `apps/cli/`; old command names remain compatible.
 
-`bazel test //architecture:tests //apps/ai-im:standalone_tests` verifies actual transitive build/package dependencies, pre-refactor wire samples and core startup/restart without research configuration. Storage tests compare embedded and remote delivery, idempotency, Unicode content and membership revocation. All checks also run under `bazel test //...`.
+`bazel test //architecture:tests //apps/outcome-hub:standalone_tests` verifies actual transitive build/package dependencies, pre-refactor wire samples and core startup/restart without research configuration. Storage tests compare embedded and remote delivery, idempotency, Unicode content and membership revocation. All checks also run under `bazel test //...`.
 
-Rust callers use `collaboration_model` for data, `im_client::Client` for storage access and `service_registry::Registry` for host configuration. Composition roots use `im_host` to select production endpoints or the separate embedded development store. External adapters depend on `service_api`; they must not depend on the storage implementation. HTTP/RPC payloads, database schema and stored evidence pins are unchanged. Existing Bazel executable targets and output paths are retained.
+Rust callers use `collaboration_model` for data, `collaboration_client::Client` for storage access and `service_registry::Registry` for host configuration. Composition roots use `collaboration_host` to select production endpoints or the separate embedded development store. External adapters depend on `service_api`; they must not depend on the storage implementation. HTTP/RPC payloads, database schema and stored evidence pins are unchanged. Existing Bazel executable targets and output paths are retained.

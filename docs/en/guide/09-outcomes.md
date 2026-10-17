@@ -17,7 +17,7 @@ Revisions use new IDs and preserve prior versions. Withdrawal preserves referenc
 
 ## Agent API
 
-Agents use existing AI-IM bearer grants and work claiming. Publish only while the exact goal, work, attempt and claim are valid. `POST /api/crystal/outcomes` accepts:
+Agents use existing OutcomeHub bearer grants and work claiming. Publish only while the exact goal, work, attempt and claim are valid. `POST /api/crystal/outcomes` accepts:
 
 | Operation | Fields | Purpose |
 | --- | --- | --- |

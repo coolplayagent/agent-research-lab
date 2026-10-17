@@ -1,0 +1,13 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test", "rust_binary")
+exports_files(["Cargo.toml"], visibility = ["//visibility:public"])
+rust_library(
+    name = "collaboration_store", crate_name = "collaboration_store",
+    srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
+    crate_root = "src/lib.rs", edition = "2024", aliases = aliases(),
+    deps = ["//crates/collaboration-model:collaboration_model", "//crates/contracts:contracts", "//crates/filesystem-store:storage"] + all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+)
+rust_test(name = "tests", crate = ":collaboration_store", aliases = aliases(normal_dev = True, proc_macro_dev = True), deps = [] + all_crate_deps(normal_dev = True), proc_macro_deps = all_crate_deps(proc_macro_dev = True), visibility = ["//visibility:public"])
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "src/dashboard/*.html", "src/dashboard/*.css"], allow_empty = True), visibility = ["//visibility:public"])

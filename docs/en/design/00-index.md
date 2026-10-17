@@ -9,3 +9,9 @@
 - [05 Research evidence and version lineage](05-evidence.md)
 - [06 Frontend modules, shared contracts and localization](06-frontend.md)
 - [07 Outcome collaboration architecture](07-outcomes.md)
+
+## OutcomeHub outcome-based work
+
+- [Architecture](../../outcomehub-architecture.md)
+- [External knowledge stores](../../external-knowledge.md)
+- [Migration](../../outcomehub-migration.md)

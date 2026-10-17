@@ -1,0 +1,28 @@
+[package]
+name = "outcome-hub-knowledge-service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[lib]
+name = "knowledge_service"
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+contracts.workspace = true
+collaboration_model.workspace = true
+knowledge_model.workspace = true
+knowledge_git.workspace = true
+knowledge_directory.workspace = true
+service_api.workspace = true
+service_protocol.workspace = true
+storage.workspace = true
+tokio.workspace = true
+clap.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[[bin]]
+name = "outcome-hub-knowledge"
+path = "src/main.rs"

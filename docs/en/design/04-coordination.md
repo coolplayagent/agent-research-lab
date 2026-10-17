@@ -4,8 +4,8 @@
 
 The controller separates durable scheduling, interchangeable execution backends,
 and shared research proposals. The Rust entry points are independent crates in
-`crates/runtime`, `crates/agent-backend`, `crates/multi-agent`, and
-`crates/communication`; `app/` composes them into the CLI and application service.
+`crates/execution-runtime`, `crates/agent-backend`, `crates/agent-teams`, and
+`crates/collaboration-proposals`; `apps/cli/` composes them into the CLI and application service.
 Bazel builds and tests each crate. The current production controller admits at most eight worker
 processes; a logical topology containing 10,000 agents does not raise that limit.
 
@@ -44,7 +44,7 @@ Ordinary research may opt into shared communication through host configuration; 
 This creates new frozen task identities. Historical tasks retain their original
 configuration, prompt and replay semantics. Formal collaboration pilots and
 holdouts do not opt into the board. Host-authored tasks may declare a
-`communication` object with `id`, optional `cell`, `topics`, and `query`;
+`collaboration-proposals` object with `id`, optional `cell`, `topics`, and `query`;
 agent-generated follow-up text cannot assign itself a different team.
 
 The host derives the actual cohort from the team/cell and frozen research inputs,
@@ -130,7 +130,7 @@ research round; the public project keeps concise reusable lessons only.
 
 ## Research file-board protocol v1
 
-The following is the optional research proposal board, separate from AI-IM's durable conversation API. Its message TTL does not expire temporary group DMs, and @ text on a board does not trigger the composer's discussion action.
+The following is the optional research proposal board, separate from OutcomeHub's durable conversation API. Its message TTL does not expire temporary group DMs, and @ text on a board does not trigger the composer's discussion action.
 
 The host receives/validates/distributes public, direct and directed-group proposals. Directed conversations export only to the sender and recipients. Tool execution, scheduling and authority remain host-owned. Publication neither verifies findings nor grants tools, creates tasks, triggers replies, changes workflow terminal state or updates knowledge. Reviewed durable knowledge is published serially to SuperPOD.
 

@@ -1,5 +1,5 @@
 [package]
-name = "ai-im-collaboration-model"
+name = "outcome-hub-collaboration-model"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

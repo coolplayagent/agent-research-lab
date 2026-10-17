@@ -1,27 +1,40 @@
-# Agent Research Lab
+# OutcomeHub
 
-[简体中文](README.md) · [English documentation](docs/en/00-index.md)
+[中文](README.md) · [Documentation](docs/zh-CN/00-index.md)
 
-A multi-Agent research platform centered on the **AI-IM collaboration workspace**. People and digital agents work toward shared goals in group conversations, from discussion and assignment to result acceptance, with a traceable research history.
+**OutcomeHub is an outcome-based multi-agent work system.** People and agents work toward shared goals, produce versioned outcomes with evidence, obtain host acceptance, and reuse those outcomes in subsequent work.
 
-## Key capabilities
+Messaging carries communication. Agent and subagent execution performs tasks. Outcome collaboration records what was delivered, its provenance, how it was assessed, and which later outcomes depend on it. Execution success, verification, host acceptance, and external publication are separate lifecycles.
 
-- **Digital people and conversations**: manage stable identities, groups, direct messages and fixed-audience temporary conversations with persistent history.
-- **Goals, assignments and acceptance**: assign objectives and acceptance criteria, with multiple improvement rounds, independent evaluation and host acceptance.
-- **Replaceable Agent executors**: connect coding agents through a shared service protocol while managing identity separately from execution technology.
-- **Research collaboration and evidence**: start bounded discussions or research from chat and inspect contributions, execution records and supporting evidence.
-- **Topics and version evolution**: organize research subjects and version relationships, including branches, provenance and assessment state.
-- **Service configuration**: manage storage, executors, sandboxes and person bindings, distinguishing configuration, health and actual task outcomes.
+## Capabilities
 
-Core collaboration starts independently; CLI research is optional. Outcome knowledge stays in external repositories with an optional SuperPOD binding; the existing research extension retains its SuperPOD evidence gates. Private knowledge, credentials and raw experiment runs stay outside this repository.
+- Identities, groups, goals, assignments, bounded execution attempts and iterative work.
+- Immutable outcome versions, evidence pins, reference graphs, independent verification and acceptance.
+- Replaceable agent execution and sandbox services using versioned protocols.
+- Multiple external Git or directory knowledge stores configured through the CLI or Console; publication previews, revision checks and durable receipts.
+- Optional research and software delivery scenarios. Core collaboration starts without scenario configuration.
+- Separate application, domain, API, client, storage and adapter modules.
+
+SuperPOD can be configured as an ordinary external knowledge target. The core has no built-in SuperPOD repository address or content layout. Knowledge contents stay outside this repository; credentials and raw runs stay out of Git.
+
+## Start
+
+Rust implementation; Bazel is the build, test and packaging entrypoint.
+
+```bash
+bazel build //:outcome-hub //:outcome-hub-cli //:outcome-hub-package
+bazel run //:outcome-hub -- serve --state-dir /absolute/path/to/state --listen 127.0.0.1:4877
+```
+
+Use `outcome-hub link` with the same state directory to retrieve the operator access link. Existing state locations are preserved; renaming never switches a live database.
+
+Applications live in `apps/outcome-hub`, `apps/cli`, and `apps/console`. Build the optional services with `//:adapter-package`, or the full distribution with `//:package`. Historical command names remain compatibility entrypoints.
 
 ## Documentation
 
-| Start using the product | Understand the design |
-| --- | --- |
-| [Quick start](docs/en/guide/01-quick-start.md) | [Architecture](docs/en/design/01-architecture.md) |
-| [User guides](docs/en/guide/00-index.md) | [Design documentation](docs/en/design/00-index.md) |
+- [Architecture and ownership](docs/outcomehub-architecture.md)
+- [External knowledge stores](docs/external-knowledge.md)
+- [Migration guide](docs/outcomehub-migration.md)
+- [Quick start](docs/zh-CN/guide/01-quick-start.md)
 
-Implemented in Rust, with Bazel as the build, test and packaging entrypoint.
-
-Standalone collaboration, optional services and the full research distribution build as `//:im-package`, `//:adapter-package` and `//:package`. SuperPOD is optional for outcome collaboration; the existing research extension retains its required evidence gates. See [application and interface boundaries](docs/en/design/01-architecture.md).
+Run `bazel test //...` and the repository's full Qualitygate against the final delivery snapshot.

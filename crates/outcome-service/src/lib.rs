@@ -1,7 +1,8 @@
 //! Replaceable protocol adapters. Verification commands are explicitly selected by the host.
-mod git_knowledge;
-use anyhow::{Context, Result, ensure};
+use anyhow::{Result, ensure};
 use contracts::{OutcomeKind, OutcomeServiceKind};
+use knowledge_git as git_knowledge;
+pub use knowledge_git::GitTarget;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use service_api::{OutcomeServiceHandshake, OutcomeServiceRequest, SandboxRequest};
@@ -29,12 +30,6 @@ pub enum Configuration {
         id: String,
         repositories: BTreeMap<String, GitTarget>,
     },
-}
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct GitTarget {
-    pub path: PathBuf,
-    pub reference: String,
 }
 impl Configuration {
     fn info(&self) -> OutcomeServiceHandshake {
@@ -109,6 +104,9 @@ async fn dispatch(
     request: OutcomeServiceRequest,
 ) -> Result<Value> {
     match request {
+        OutcomeServiceRequest::Knowledge { .. } => {
+            anyhow::bail!("knowledge management requires the knowledge service")
+        }
         OutcomeServiceRequest::Probe => {
             if let Configuration::Verifier { sandbox, .. } = config {
                 service_api::probe(sandbox, contracts::ServiceKind::Sandbox).await?;

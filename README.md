@@ -1,27 +1,55 @@
-# Agent Research Lab
+# OutcomeHub
 
 [English](README.en.md) · [中文文档](docs/zh-CN/00-index.md)
 
-以 **AI-IM 协作工作区**为核心的多 Agent 研究平台。让人和数字人在群聊中围绕共同目标协作，从讨论、分工到结果验收，保留可追溯的研究过程。
+**OutcomeHub 是一个基于成果协作的多 Agent 作业系统。** 人与多个 Agent 围绕共同目标分工执行，将产出沉淀为带版本、来源证据、验收记录和复用关系的成果，持续推进后续作业。
+
+## 成果是协作的基本单元
+
+| 能力 | 解决的问题 |
+| --- | --- |
+| 消息协作 | 参与者如何交流、通知与讨论 |
+| Agent / subagents 执行 | 谁来执行任务，如何调度与隔离运行 |
+| 成果协作 | 交付了什么、证据是什么、谁验收了、后续任务如何复用 |
+
+一个作业可以包含多个目标和执行尝试。消息、Agent 返回文本和执行成功都不会自动成为已验收成果；系统分别记录执行、验证、验收与外部发布状态。
 
 ## 关键能力
 
-- **数字人与群聊**：管理稳定身份、群组、私信和固定成员的临时会话，保留消息与协作历史。
-- **目标、分工与验收**：把目标和验收标准分配给成员，支持多轮迭代、独立评估和主持人验收。
-- **可替换的 Agent 执行器**：通过统一服务协议接入编码 Agent，将数字人身份与执行技术分开管理。
-- **研究协作与证据追踪**：从群聊发起有界讨论或研究，查看成员贡献、执行记录和关联证据。
-- **研究主题与版本演化**：围绕主题管理研究对象和版本关系，查看分支、来源与评估状态。
-- **服务配置管理**：集中管理存储、执行器、沙箱及数字人绑定，分别展示配置、健康和实际任务结果。
+- **多 Agent 作业**：稳定身份、群组、目标、分工、执行尝试隔离、迭代与主持人验收。
+- **成果与证据**：不可变成果版本、来源与策略绑定、引用关系、独立验证、验收和发布回执。
+- **可替换执行器**：通过统一版本协议接入编码 Agent，执行器与沙箱独立部署。
+- **外部知识库**：通过 CLI 或 Console 配置多个 Git 仓库及目录知识库，预览变更后向选定目标发布，处理基线冲突与回执核对。
+- **可选场景**：研究、软件交付等通过适配模块接入，核心协作无需场景配置即可启动。
+- **模块解耦**：应用、领域模型、API、客户端、存储服务、执行适配器和知识库适配器职责独立。
 
-核心协作可独立启动，CLI 研究按需启用。成果知识保留在仓外知识库，SuperPOD 为可选绑定；原有研究扩展保留其 SuperPOD 证据门禁。本仓库不保存私有知识、凭证或实验原始记录。
+**SuperPOD 是用户可配置的外部知识库实例。** 核心不依赖 SuperPOD，不内置其仓库地址，也不在本项目复制知识正文。凭据、原始运行数据及机器配置不进入 Git。
+
+## 开始使用
+
+使用 Rust 实现，Bazel 是构建、测试与打包入口。
+
+```bash
+bazel build //:outcome-hub //:outcome-hub-cli //:outcome-hub-package
+bazel run //:outcome-hub -- serve --state-dir /absolute/path/to/state --listen 127.0.0.1:4877
+```
+
+服务默认要求操作者认证；通过同一状态目录执行 `outcome-hub link` 获取本机访问链接。兼容既有数据目录，不因更名自动搬迁数据库。
+
+| 应用 | 源码目录 | 用途 |
+| --- | --- | --- |
+| OutcomeHub | `apps/outcome-hub` | 核心成果协作工作区 |
+| CLI | `apps/cli` | 作业管理、知识库管理与可选场景操作 |
+| Console | `apps/console` | 操作面板与可选场景集成 |
+
+独立核心、可选服务和完整发行包分别通过 `//:outcome-hub-package`、`//:adapter-package`、`//:package` 构建。旧命令和根级 Bazel 入口保留兼容。
 
 ## 文档
 
-| 开始使用 | 了解设计 |
-| --- | --- |
-| [快速开始](docs/zh-CN/guide/01-quick-start.md) | [总体架构](docs/zh-CN/design/01-architecture.md) |
-| [使用文档目录](docs/zh-CN/guide/00-index.md) | [设计文档目录](docs/zh-CN/design/00-index.md) |
+- [快速开始](docs/zh-CN/guide/01-quick-start.md)
+- [成果协作与模块架构](docs/outcomehub-architecture.md)
+- [Git、目录和 SuperPOD 知识库接入](docs/external-knowledge.md)
+- [名称与接口迁移](docs/outcomehub-migration.md)
+- [使用文档目录](docs/zh-CN/guide/00-index.md) · [设计文档目录](docs/zh-CN/design/00-index.md)
 
-项目使用 Rust 实现，以 Bazel 作为构建、测试和打包入口。
-
-独立协作、可选服务和完整研究发行版分别通过 `//:im-package`、`//:adapter-package`、`//:package` 构建。应用模块与接口边界见[总体架构](docs/zh-CN/design/01-architecture.md)。
+验证入口：`bazel test //...`。交付前还需针对最终快照运行仓库配置的完整 Qualitygate。

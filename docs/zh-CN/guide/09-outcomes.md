@@ -17,7 +17,7 @@
 
 ## Agent API
 
-Agent 沿用 AI-IM 的 bearer 凭据和工作领取 API。先领取 `goal_id / work_id / attempt / claim_id`，在该次执行仍有效时发布。使用 `POST /api/crystal/outcomes`，JSON 中 `operation` 为：
+Agent 沿用 OutcomeHub 的 bearer 凭据和工作领取 API。先领取 `goal_id / work_id / attempt / claim_id`，在该次执行仍有效时发布。使用 `POST /api/crystal/outcomes`，JSON 中 `operation` 为：
 
 | 操作 | 关键参数 | 用途 |
 | --- | --- | --- |

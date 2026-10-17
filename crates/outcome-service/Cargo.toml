@@ -1,11 +1,12 @@
 [package]
-name = "ai-im-outcome-service"
+name = "outcome-hub-outcome-service"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 [lib]
 name = "outcome_service"
 [dependencies]
+knowledge_git.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -18,3 +19,11 @@ service_api.workspace = true
 process.workspace = true
 storage.workspace = true
 tempfile.workspace = true
+
+[[bin]]
+name = "ai-im-outcome-service"
+path = "src/legacy_main.rs"
+
+[[bin]]
+name = "outcome-hub-outcomes"
+path = "src/main.rs"

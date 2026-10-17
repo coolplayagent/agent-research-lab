@@ -22,7 +22,7 @@ Operations use `{"kind":"…","request":{…}}`.
 | `knowledge_publish` | `knowledge::PublishReportRequest` | Commit/push/create a reviewed SuperPOD PR |
 | `knowledge_refresh` | `knowledge::IndexRefreshRequest` | Update/poll an exact SuperPOD index target |
 
-Public Rust types in `crates/delivery/src/lib.rs` and `crates/knowledge/src/lib.rs` define requests. The queue stores immutable hashed requests and durable results, reusing identical requests. Index jobs may remain `waiting`; uncertain writes become `needs_reconciliation`. Reconcile the real remote, worktree or installation before `automation reconcile-retry --id OPERATION_DIGEST`; publication gates still apply.
+Public Rust types in `crates/delivery-adapters/src/lib.rs` and `crates/knowledge-publication/src/lib.rs` define requests. The queue stores immutable hashed requests and durable results, reusing identical requests. Index jobs may remain `waiting`; uncertain writes become `needs_reconciliation`. Reconcile the real remote, worktree or installation before `automation reconcile-retry --id OPERATION_DIGEST`; publication gates still apply.
 
 Publication needs hashed files in `outbox/evidence`: a real complete Qualitygate report, host snapshot receipt binding it to code/prompt/policy/SuperPOD and a distinct evaluator’s receipt. Installation also binds package/binary hashes; boolean pass flags are insufficient. Current upstream-default and skill-manifest identities are required and checked online again before promotion/publication. Old receipts cannot authorize new releases; never fabricate evidence.
 

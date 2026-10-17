@@ -1,0 +1,16 @@
+[package]
+name = "outcome-hub-knowledge-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[lib]
+name = "knowledge_client"
+[dependencies]
+anyhow.workspace = true
+serde_json.workspace = true
+knowledge_model.workspace = true
+service_api.workspace = true
+service_protocol.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

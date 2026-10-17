@@ -1,65 +1,65 @@
 load(":dependencies.bzl", "dependency_boundary_test")
 
-_RESEARCH = ["//crates/" + name + ":" for name in [
-    "runtime", "config", "task", "communication", "multi-agent", "collaboration-experiment",
-    "evolution", "evolution-cli", "knowledge", "automation", "delivery", "inputs", "freshness",
-    "targets", "agent-backend", "workflow", "software-delivery",
-]] + ["//apps/research-cli:", "//apps/research-console:", "//app:"]
-_DATABASE = ["//crates/crystal:", "//crates/im-storage:", "rusqlite", "libsqlite3"]
-_ADAPTERS = ["//crates/" + name + ":" for name in ["codex-adapter", "outcome-service", "sandbox-service", "executor-service", "service-workers"]]
+_OPTIONAL_SCENARIOS = ["//crates/" + name + ":" for name in [
+    "execution-runtime", "execution-config", "execution-model", "collaboration-proposals", "agent-teams", "collaboration-evaluation",
+    "prompt-evolution", "prompt-evolution-cli", "knowledge-publication", "delivery-outbox", "delivery-adapters", "execution-inputs", "source-freshness",
+    "execution-targets", "agent-backend", "workflow-adapter", "software-delivery",
+]] + ["//apps/cli:", "//apps/console:", "//apps/cli:"]
+_DATABASE = ["//crates/collaboration-store:", "//crates/collaboration-storage-service:", "rusqlite", "libsqlite3"]
+_ADAPTERS = ["//crates/" + name + ":" for name in ["codex-adapter", "outcome-service", "sandbox-service", "executor-service", "service-workers", "knowledge-service", "knowledge-git", "knowledge-directory"]]
 
 dependency_boundary_test(
     name = "model_is_storage_free",
     subject = "//crates/collaboration-model:collaboration_model",
-    forbidden = _DATABASE + _RESEARCH + ["//crates/storage:", "//crates/service-protocol:", "tokio"],
+    forbidden = _DATABASE + _OPTIONAL_SCENARIOS + ["//crates/filesystem-store:", "//crates/service-protocol:", "tokio"],
     required = ["//crates/contracts:contracts"],
 )
 
 dependency_boundary_test(
     name = "api_is_implementation_free",
     subject = "//crates/service-api:service_api",
-    forbidden = _DATABASE + _RESEARCH + _ADAPTERS + ["//crates/im-host:", "//crates/service-registry:", "//crates/storage:"],
+    forbidden = _DATABASE + _OPTIONAL_SCENARIOS + _ADAPTERS + ["//crates/collaboration-host:", "//crates/service-registry:", "//crates/filesystem-store:"],
     required = ["//crates/collaboration-model:collaboration_model"],
 )
 
 dependency_boundary_test(
     name = "client_does_not_own_storage",
-    subject = "//crates/im-client:im_client",
-    forbidden = _DATABASE + _RESEARCH + ["//crates/im-host:", "//crates/storage:"],
+    subject = "//crates/collaboration-client:collaboration_client",
+    forbidden = _DATABASE + _OPTIONAL_SCENARIOS + ["//crates/collaboration-host:", "//crates/filesystem-store:"],
 )
 
 dependency_boundary_test(
     name = "http_does_not_own_storage_or_execution",
-    subject = "//crates/im-service:im_service",
-    forbidden = _DATABASE + _RESEARCH + _ADAPTERS + ["//crates/im-host:"],
-    required = ["//crates/im-client:im_client"],
+    subject = "//crates/collaboration-api:collaboration_api",
+    forbidden = _DATABASE + _OPTIONAL_SCENARIOS + _ADAPTERS + ["//crates/collaboration-host:"],
+    required = ["//crates/collaboration-client:collaboration_client"],
 )
 
 dependency_boundary_test(
     name = "core_application_is_independent",
-    subject = "//apps/ai-im:ai-im",
-    forbidden = _RESEARCH + _ADAPTERS,
-    required = ["//crates/im-host:im_host", "//crates/im-service:im_service"],
+    subject = "//apps/outcome-hub:ai-im",
+    forbidden = _OPTIONAL_SCENARIOS + _ADAPTERS,
+    required = ["//crates/collaboration-host:collaboration_host", "//crates/collaboration-api:collaboration_api"],
 )
 
 dependency_boundary_test(
     name = "core_package_excludes_optional_services",
     subject = "//:im-package",
-    forbidden = _RESEARCH + _ADAPTERS,
-    required = ["//apps/ai-im:ai-im", "//crates/im-storage:ai-im-storage"],
+    forbidden = _OPTIONAL_SCENARIOS + _ADAPTERS,
+    required = ["//apps/outcome-hub:ai-im", "//crates/collaboration-storage-service:ai-im-storage"],
 )
 
 [dependency_boundary_test(
     name = name.replace("-", "_") + "_is_replaceable",
     subject = "//crates/{}:{}".format(name, name.replace("-", "_")),
-    forbidden = _DATABASE + _RESEARCH + ["//crates/im-service:", "//crates/im-host:"] + ["//crates/" + other + ":" for other in ["codex-adapter", "outcome-service", "executor-service", "sandbox-service"] if other != name],
+    forbidden = _DATABASE + _OPTIONAL_SCENARIOS + ["//crates/collaboration-api:", "//crates/collaboration-host:"] + ["//crates/" + other + ":" for other in ["codex-adapter", "outcome-service", "executor-service", "sandbox-service"] if other != name],
     required = ["//crates/service-api:service_api"],
 ) for name in ["codex-adapter", "outcome-service", "executor-service", "sandbox-service"]]
 
 dependency_boundary_test(
-    name = "research_console_does_not_depend_on_cli",
-    subject = "//apps/research-console:research_console",
-    forbidden = ["//apps/research-cli:", "//app:", "//crates/software-delivery:"],
+    name = "console_does_not_depend_on_cli",
+    subject = "//apps/console:outcome_hub_console",
+    forbidden = ["//apps/cli:", "//apps/cli:", "//crates/software-delivery:"],
 )
 
 load("@crates//:defs.bzl", "all_crate_deps")
@@ -68,8 +68,33 @@ rust_test(
     name = "wire_compatibility_tests",
     srcs = ["wire_compatibility.rs"], edition = "2024",
     compile_data = ["fixtures/wire-4fd42de.json"],
-    deps = ["//crates/collaboration-model:collaboration_model", "//crates/im-client:im_client", "//crates/service-api:service_api"] + all_crate_deps(normal = True, package_name = "crates/service-api"),
+    deps = ["//crates/collaboration-model:collaboration_model", "//crates/collaboration-client:collaboration_client", "//crates/service-api:service_api"] + all_crate_deps(normal = True, package_name = "crates/service-api"),
 )
 filegroup(name = "policy_sources", srcs = ["wire_compatibility.rs"], visibility = ["//visibility:public"])
 
 test_suite(name = "tests", visibility = ["//visibility:public"])
+
+dependency_boundary_test(
+    name = "knowledge_model_is_storage_free",
+    subject = "//crates/knowledge-model:knowledge_model",
+    forbidden = _DATABASE + _OPTIONAL_SCENARIOS + ["//crates/filesystem-store:", "//crates/knowledge-git:", "//crates/knowledge-directory:", "//crates/knowledge-service:"],
+    required = ["//crates/contracts:contracts"],
+)
+dependency_boundary_test(
+    name = "knowledge_client_is_implementation_free",
+    subject = "//crates/knowledge-client:knowledge_client",
+    forbidden = _DATABASE + _OPTIONAL_SCENARIOS + ["//crates/filesystem-store:", "//crates/knowledge-git:", "//crates/knowledge-directory:", "//crates/knowledge-service:"],
+    required = ["//crates/knowledge-model:knowledge_model", "//crates/service-protocol:service_protocol"],
+)
+dependency_boundary_test(
+    name = "knowledge_service_is_replaceable",
+    subject = "//crates/knowledge-service:knowledge_service",
+    forbidden = _DATABASE + _OPTIONAL_SCENARIOS + ["//crates/collaboration-api:", "//crates/collaboration-host:"],
+    required = ["//crates/knowledge-model:knowledge_model"],
+)
+dependency_boundary_test(
+    name = "directory_adapter_is_independent_of_git",
+    subject = "//crates/knowledge-directory:knowledge_directory",
+    forbidden = _DATABASE + _OPTIONAL_SCENARIOS + ["//crates/knowledge-git:", "//crates/knowledge-service:", "//crates/collaboration-api:"],
+    required = ["//crates/knowledge-model:knowledge_model"],
+)

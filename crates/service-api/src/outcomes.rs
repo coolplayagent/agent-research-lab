@@ -85,6 +85,9 @@ pub struct OutcomeServiceHandshake {
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum OutcomeServiceRequest {
     Probe,
+    Knowledge {
+        request: knowledge_model::Request,
+    },
     /// A verifier reads pinned inputs and returns evidence; it cannot accept a goal.
     Verify {
         run: OutcomeVerification,

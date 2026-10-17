@@ -1,42 +1,44 @@
 # 01 Architecture
 
+OutcomeHub is an outcome-based multi-agent work system. See the [current ownership model](../../outcomehub-architecture.md) and [external knowledge configuration](../../external-knowledge.md). Research integrations described below are optional scenarios.
+
 [Documentation](../00-index.md) · [Section index](00-index.md) · [简体中文](../../zh-CN/design/01-architecture.md)
 
 Each library module has its own Cargo package and Bazel package under `crates/`.
 The root Cargo manifest is a virtual workspace; shared dependency versions live
 in `[workspace.dependencies]` and the workspace lockfile. Library package names
-use the `lab-` prefix, while Rust library names retain the existing module names.
+use the `outcome-hub-` prefix, while Rust library names retain the existing module names.
 
-`apps/ai-im` is the standalone collaboration application. `apps/research-cli` owns research command parsing and dispatch; `apps/research-console` owns the research console and scenario integration. `app/` retains the original executable, service templates and compatibility exports such as `agent_research_lab::runtime`. Libraries do not depend on these applications.
+`apps/outcome-hub` is the standalone collaboration application. `apps/cli` owns research command parsing and dispatch; `apps/console` owns the research console and scenario integration. The old `app/` facade is merged into `apps/cli/`; service templates live in `deploy/systemd/`. Libraries do not depend on these applications.
 
 | Crates | Responsibility |
 | --- | --- |
-| `im-service`, `crystal` | System core: Agent identities, groups, goals, assignments, durable messages, DMs and announcements |
+| `collaboration-api`, `collaboration-store` | System core: Agent identities, groups, goals, assignments, durable messages, DMs and announcements |
 | `collaboration-model`, `service-api` | Database-independent models, validation and service contracts |
-| `im-client`, `service-protocol` | Storage client and versioned RPC; no client-owned database |
-| `im-storage`, `crystal` | Storage service and domain transactions; sole production database ownership |
-| `service-registry`, `im-host` | Configuration persistence/probes and application/storage composition |
+| `collaboration-client`, `service-protocol` | Storage client and versioned RPC; no client-owned database |
+| `collaboration-storage-service`, `collaboration-store` | Storage service and domain transactions; sole production database ownership |
+| `service-registry`, `collaboration-host` | Configuration persistence/probes and application/storage composition |
 | `executor-service`, `sandbox-service` | Replaceable execution and bounded sandbox; `service-workers` retains the combined launcher |
 | `codex-adapter`, `outcome-service` | Optional vendor bridge, outcome verification and external knowledge updates |
 | `software-delivery`, `software-verification` | Research software delivery/activation and shared verification parameters; original gates retained |
 | `contracts` | Shared state enums and frontend contract generation |
-| `config`, `task` | Configuration declarations and frozen task/attempt records |
+| `execution-config`, `execution-model` | Configuration declarations and frozen task/attempt records |
 | `agent-policy`, `agent-backend`, `isolation` | Permissions, execution adapters and Linux process boundaries |
-| `runtime`, `workflow`, `lease-heartbeat`, `budget` | Scheduling, durable execution, leases and daily accounting |
-| `communication`, `multi-agent`, `collaboration-experiment` | Shared proposals, host membership and bounded collaboration experiments |
-| `evolution`, `evolution-cli` | Prompt definitions, evaluation and explicit promotion workflows |
-| `freshness`, `inputs` | Current source/skill verification and frozen research inputs |
-| `delivery`, `knowledge`, `automation` | Reviewed installation/publication, SuperPOD updates and durable operation queues |
-| `targets`, `build-cache` | Disposable CLI targets and isolated build prerequisites |
+| `execution-runtime`, `workflow-adapter`, `lease-heartbeat`, `execution-budget` | Scheduling, durable execution, leases and daily accounting |
+| `collaboration-proposals`, `agent-teams`, `collaboration-evaluation` | Shared proposals, host membership and bounded collaboration experiments |
+| `prompt-evolution`, `prompt-evolution-cli` | Prompt definitions, evaluation and explicit promotion workflows |
+| `source-freshness`, `execution-inputs` | Current source/skill verification and frozen research inputs |
+| `delivery-adapters`, `knowledge-publication`, `delivery-outbox` | Reviewed installation/publication, external knowledge publication and durable operation queues |
+| `execution-targets`, `build-cache` | Disposable CLI targets and isolated build prerequisites |
 | `native-effects` | Native filesystem-effect observation, policy and reservation evidence |
-| `process`, `storage` | Bounded subprocesses and host filesystem primitives |
+| `process`, `filesystem-store` | Bounded subprocesses and host filesystem primitives |
 
-`agent-research-lab serve` starts the standalone AI-IM system without research
+`outcome-hub-cli serve` starts the standalone OutcomeHub system without research
 configuration. `--config` enables the optional research scenario in the same service.
 The smaller `ai-im` binary packages the same core for hosts that only need the
 Agent work API. See [Identity, conversations and goals](02-collaboration.md).
 
-Goals and assignments belong to `crystal`, share the durable message writer and
+Goals and assignments belong to `collaboration-store`, share the durable message writer and
 produce transactional group progress messages. Agent credentials can claim and
 submit only their own assignments. Successful submissions do not complete a goal;
 the host explicitly accepts it. Deadline/claim fencing survives restarts. Active
@@ -57,7 +59,7 @@ Configuration owns backend declarations and team settings. It validates those
 declarations without invoking an execution adapter. Environment-name validation
 lives with agent policy, so isolation does not depend on backend execution.
 
-The `task` crate owns `Task`, `Job` and `Launch`. These are data bindings consumed
+The `execution-model` crate owns `Task`, `Job` and `Launch`. These are data bindings consumed
 by orchestration, not a second scheduler. Communication owns the frozen
 `LaunchContext`; multi-agent coordination derives membership through
 `TeamMembership` using the host's frozen job. This keeps the coordination crate
@@ -66,7 +68,7 @@ independent of the runtime implementation.
 The runtime owns admission, attempts, durable settlement and recovery. The
 collaboration experiment crate may call its explicit host APIs to enqueue frozen
 inputs; it cannot redefine execution or communication authority. Application
-composition depends on these libraries; none of them depends on `app/`.
+composition depends on these libraries; none of them depends on applications.
 
 Moving types between crates must preserve JSON field order, serde defaults,
 omission rules, enum tags and identity hashing. The compatibility regression uses
@@ -77,7 +79,7 @@ New crate paths are not a migration of existing private task records.
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.
 
-The durable production database belongs to the storage service. `crystal` implements its domain behavior; API consumers do not open the live database. `contracts` owns shared state enums, and `service-protocol` defines replaceable service messages.
+The durable production database belongs to the storage service. `collaboration-store` implements its domain behavior; API consumers do not open the live database. `contracts` owns shared state enums, and `service-protocol` defines replaceable service messages.
 
 ## Outcome collaboration
 
@@ -85,8 +87,8 @@ Outcome collaboration connects goal paths within topics through immutable public
 
 ## Independently buildable boundaries
 
-- Models and clients do not depend on `crystal`, `im-storage` or SQLite. The HTTP library also excludes storage implementations. `crystal` re-exports the previous model names for Rust callers.
-- `im-host` selects the configured production storage endpoint or explicitly creates an independent embedded development adapter. Both use the same `im-client` request contract.
+- Models and clients do not depend on `collaboration-store`, `collaboration-storage-service` or SQLite. The HTTP library also excludes storage implementations. `collaboration-store` re-exports the previous model names for Rust callers.
+- `collaboration-host` selects the configured production storage endpoint or explicitly creates an independent embedded development adapter. Both use the same `collaboration-client` request contract.
 - Messages, goals, outcomes and coordination lineage retain their shared transaction boundary for membership, attempt fencing and acceptance consistency. Research execution, prompt evolution and SuperPOD research publication remain optional extensions outside the core package.
 - `//:im-package` contains core collaboration and storage; `//:adapter-package` contains optional services; `//:package` remains the complete research distribution.
 - Bazel analysis tests in `architecture` traverse actual transitive dependencies and package contents. Pre-refactor protocol samples, client transport parity, standalone startup/restart and repository regression tests verify behavior. Semantic review is recorded in `qualitygate/reviews/module-boundaries.md`.

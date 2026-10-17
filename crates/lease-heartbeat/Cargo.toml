@@ -1,5 +1,5 @@
 [package]
-name = "lab-lease-heartbeat"
+name = "outcome-hub-lease-heartbeat"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

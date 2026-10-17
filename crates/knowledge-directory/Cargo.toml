@@ -1,0 +1,19 @@
+[package]
+name = "outcome-hub-knowledge-directory"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[lib]
+name = "knowledge_directory"
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+contracts.workspace = true
+collaboration_model.workspace = true
+knowledge_model.workspace = true
+storage.workspace = true
+libc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

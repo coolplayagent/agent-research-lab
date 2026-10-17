@@ -2,7 +2,7 @@
 
 [Documentation](../00-index.md) · [Section index](00-index.md) · [简体中文](../../zh-CN/design/03-services.md)
 
-AI-IM can run with an embedded store for development, or a separately deployed
+OutcomeHub can run with an embedded store for development, or a separately deployed
 `ai-im-storage` service. Select the storage service in system settings; switching
 requires a core restart and a prepared target database. No live migration or
 fallback to another database is implicit. The storage process is the sole SQLite
@@ -42,7 +42,7 @@ conversation data. It returns exactly one JSON document on stdout:
 
 Use stderr for diagnostics. The executor checks version, request identity and
 output bounds, and returns hashes binding the input, adapter configuration and
-output. AI-IM submits that receipt under the current fenced claim. Successful
+output. OutcomeHub submits that receipt under the current fenced claim. Successful
 agent output remains a submission until the host accepts the group goal. Existing
 research scenarios retain their independent evidence and promotion gates.
 

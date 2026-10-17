@@ -1,5 +1,5 @@
 [package]
-name = "lab-software-verification"
+name = "outcome-hub-software-verification"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

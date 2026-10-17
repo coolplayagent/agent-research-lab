@@ -3,228 +3,6 @@
 version = 4
 
 [[package]]
-name = "agent-research-lab"
-version = "0.1.0"
-dependencies = [
- "lab-process",
- "lab-research-cli",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "ai-im"
-version = "0.1.0"
-dependencies = [
- "ai-im-client",
- "ai-im-collaboration-model",
- "ai-im-service-api",
- "ai-im-service-protocol",
- "ai-im-service-registry",
- "ai-im-storage",
- "ai-im-web-assets",
- "anyhow",
- "async-stream",
- "axum",
- "lab-contracts",
- "lab-crystal",
- "lab-storage",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-app"
-version = "0.1.0"
-dependencies = [
- "ai-im-host",
- "anyhow",
- "clap",
- "lab-storage",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-client"
-version = "0.1.0"
-dependencies = [
- "ai-im-collaboration-model",
- "ai-im-service-protocol",
- "anyhow",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-codex-adapter"
-version = "0.1.0"
-dependencies = [
- "ai-im-service-api",
- "ai-im-service-protocol",
- "anyhow",
- "clap",
- "lab-process",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "ai-im-collaboration-model"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-contracts",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
-name = "ai-im-executor-service"
-version = "0.1.0"
-dependencies = [
- "ai-im-service-api",
- "ai-im-service-protocol",
- "anyhow",
- "lab-contracts",
- "lab-storage",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-host"
-version = "0.1.0"
-dependencies = [
- "ai-im",
- "ai-im-client",
- "ai-im-service-api",
- "ai-im-service-registry",
- "ai-im-storage",
- "anyhow",
- "axum",
- "lab-contracts",
- "lab-crystal",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-outcome-service"
-version = "0.1.0"
-dependencies = [
- "ai-im-collaboration-model",
- "ai-im-service-api",
- "ai-im-service-protocol",
- "anyhow",
- "clap",
- "lab-contracts",
- "lab-process",
- "lab-storage",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-sandbox-service"
-version = "0.1.0"
-dependencies = [
- "ai-im-service-api",
- "anyhow",
- "lab-contracts",
- "lab-process",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-service-api"
-version = "0.1.0"
-dependencies = [
- "ai-im-collaboration-model",
- "ai-im-service-protocol",
- "anyhow",
- "lab-contracts",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-service-protocol"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-contracts",
- "libc",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-service-registry"
-version = "0.1.0"
-dependencies = [
- "ai-im-service-api",
- "ai-im-service-protocol",
- "anyhow",
- "lab-contracts",
- "lab-storage",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-service-workers"
-version = "0.1.0"
-dependencies = [
- "ai-im-executor-service",
- "ai-im-sandbox-service",
- "ai-im-service-api",
- "ai-im-service-protocol",
- "anyhow",
- "clap",
- "lab-contracts",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-storage"
-version = "0.1.0"
-dependencies = [
- "ai-im-client",
- "ai-im-service-protocol",
- "anyhow",
- "clap",
- "lab-contracts",
- "lab-crystal",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "ai-im-web-assets"
-version = "0.1.0"
-
-[[package]]
 name = "android_system_properties"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -793,492 +571,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lab-agent-backend"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "lab-agent-policy",
- "lab-config",
- "lab-isolation",
- "lab-native-effects",
- "lab-process",
- "lab-storage",
- "lab-task",
- "libc",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lab-agent-policy"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde_json",
-]
-
-[[package]]
-name = "lab-automation"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "lab-contracts",
- "lab-delivery",
- "lab-knowledge",
- "lab-storage",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
-]
-
-[[package]]
-name = "lab-budget"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "lab-build-cache"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-isolation",
- "lab-native-effects",
- "lab-process",
- "lab-storage",
- "libc",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "toml",
-]
-
-[[package]]
-name = "lab-collaboration-experiment"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-config",
- "lab-contracts",
- "lab-evolution",
- "lab-evolution-cli",
- "lab-inputs",
- "lab-process",
- "lab-runtime",
- "lab-storage",
- "lab-workflow",
- "libc",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lab-communication"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-config",
- "lab-contracts",
- "lab-native-effects",
- "lab-storage",
- "libc",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lab-config"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-agent-policy",
- "serde",
- "toml",
-]
-
-[[package]]
-name = "lab-contracts"
-version = "0.1.0"
-dependencies = [
- "libc",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "lab-crystal"
-version = "0.1.0"
-dependencies = [
- "ai-im-collaboration-model",
- "anyhow",
- "lab-contracts",
- "lab-storage",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "lab-delivery"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-contracts",
- "lab-freshness",
- "lab-process",
- "lab-storage",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
-]
-
-[[package]]
-name = "lab-evolution"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
-]
-
-[[package]]
-name = "lab-evolution-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-delivery",
- "lab-evolution",
- "lab-freshness",
- "lab-storage",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lab-freshness"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "lab-config",
- "lab-process",
- "lab-storage",
- "libc",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
-]
-
-[[package]]
-name = "lab-inputs"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-config",
- "lab-delivery",
- "lab-freshness",
- "lab-native-effects",
- "lab-process",
- "lab-storage",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lab-isolation"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-agent-policy",
- "lab-native-effects",
- "libc",
- "tempfile",
- "toml",
-]
-
-[[package]]
-name = "lab-knowledge"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "lab-contracts",
- "lab-delivery",
- "lab-process",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
-]
-
-[[package]]
-name = "lab-lease-heartbeat"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-config",
- "lab-process",
- "lab-storage",
- "lab-workflow",
- "libc",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lab-multi-agent"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-communication",
- "lab-config",
- "lab-storage",
- "lab-task",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lab-native-effects"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-contracts",
- "libc",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lab-process"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-contracts",
- "lab-native-effects",
- "libc",
- "tempfile",
-]
-
-[[package]]
-name = "lab-research-cli"
-version = "0.1.0"
-dependencies = [
- "ai-im-host",
- "anyhow",
- "chrono",
- "clap",
- "lab-agent-backend",
- "lab-agent-policy",
- "lab-automation",
- "lab-budget",
- "lab-build-cache",
- "lab-collaboration-experiment",
- "lab-communication",
- "lab-config",
- "lab-delivery",
- "lab-evolution",
- "lab-evolution-cli",
- "lab-freshness",
- "lab-inputs",
- "lab-isolation",
- "lab-knowledge",
- "lab-lease-heartbeat",
- "lab-multi-agent",
- "lab-process",
- "lab-research-console",
- "lab-runtime",
- "lab-software-delivery",
- "lab-storage",
- "lab-targets",
- "lab-task",
- "lab-workflow",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "lab-research-console"
-version = "0.1.0"
-dependencies = [
- "ai-im",
- "ai-im-client",
- "ai-im-collaboration-model",
- "ai-im-host",
- "ai-im-service-registry",
- "ai-im-storage",
- "anyhow",
- "async-stream",
- "axum",
- "chrono",
- "lab-agent-backend",
- "lab-communication",
- "lab-config",
- "lab-contracts",
- "lab-crystal",
- "lab-delivery",
- "lab-evolution-cli",
- "lab-freshness",
- "lab-multi-agent",
- "lab-process",
- "lab-runtime",
- "lab-software-verification",
- "lab-storage",
- "lab-task",
- "libc",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "lab-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "lab-agent-backend",
- "lab-agent-policy",
- "lab-automation",
- "lab-budget",
- "lab-build-cache",
- "lab-communication",
- "lab-config",
- "lab-contracts",
- "lab-evolution",
- "lab-evolution-cli",
- "lab-freshness",
- "lab-inputs",
- "lab-isolation",
- "lab-lease-heartbeat",
- "lab-multi-agent",
- "lab-native-effects",
- "lab-process",
- "lab-storage",
- "lab-targets",
- "lab-task",
- "lab-workflow",
- "libc",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lab-software-delivery"
-version = "0.1.0"
-dependencies = [
- "ai-im-client",
- "ai-im-collaboration-model",
- "anyhow",
- "chrono",
- "lab-config",
- "lab-contracts",
- "lab-delivery",
- "lab-freshness",
- "lab-process",
- "lab-runtime",
- "lab-software-verification",
- "lab-storage",
- "lab-task",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "lab-software-verification"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "lab-storage"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "fs2",
- "lab-native-effects",
- "libc",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
-]
-
-[[package]]
-name = "lab-targets"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "lab-agent-backend",
- "lab-agent-policy",
- "lab-config",
- "lab-contracts",
- "lab-isolation",
- "lab-native-effects",
- "lab-process",
- "lab-storage",
- "lab-workflow",
- "libc",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lab-task"
-version = "0.1.0"
-dependencies = [
- "lab-communication",
- "lab-config",
- "lab-inputs",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "lab-workflow"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lab-contracts",
- "lab-native-effects",
- "lab-process",
- "lab-storage",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.190"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1356,6 +648,801 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
+
+[[package]]
+name = "outcome-hub"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "outcome-hub-collaboration-host",
+ "outcome-hub-filesystem-store",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-agent-backend"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "libc",
+ "outcome-hub-agent-policy",
+ "outcome-hub-execution-config",
+ "outcome-hub-execution-model",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-isolation",
+ "outcome-hub-native-effects",
+ "outcome-hub-process",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-agent-policy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+]
+
+[[package]]
+name = "outcome-hub-agent-teams"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-collaboration-proposals",
+ "outcome-hub-execution-config",
+ "outcome-hub-execution-model",
+ "outcome-hub-filesystem-store",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-build-cache"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-isolation",
+ "outcome-hub-native-effects",
+ "outcome-hub-process",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
+name = "outcome-hub-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "outcome-hub-agent-backend",
+ "outcome-hub-agent-policy",
+ "outcome-hub-agent-teams",
+ "outcome-hub-build-cache",
+ "outcome-hub-collaboration-evaluation",
+ "outcome-hub-collaboration-host",
+ "outcome-hub-collaboration-proposals",
+ "outcome-hub-console",
+ "outcome-hub-delivery-adapters",
+ "outcome-hub-delivery-outbox",
+ "outcome-hub-execution-budget",
+ "outcome-hub-execution-config",
+ "outcome-hub-execution-inputs",
+ "outcome-hub-execution-model",
+ "outcome-hub-execution-runtime",
+ "outcome-hub-execution-targets",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-isolation",
+ "outcome-hub-knowledge-client",
+ "outcome-hub-knowledge-model",
+ "outcome-hub-knowledge-publication",
+ "outcome-hub-lease-heartbeat",
+ "outcome-hub-process",
+ "outcome-hub-prompt-evolution",
+ "outcome-hub-prompt-evolution-cli",
+ "outcome-hub-service-api",
+ "outcome-hub-service-protocol",
+ "outcome-hub-software-delivery",
+ "outcome-hub-source-freshness",
+ "outcome-hub-workflow-adapter",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-codex-adapter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "outcome-hub-process",
+ "outcome-hub-service-api",
+ "outcome-hub-service-protocol",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-collaboration-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "axum",
+ "outcome-hub-collaboration-client",
+ "outcome-hub-collaboration-model",
+ "outcome-hub-collaboration-storage-service",
+ "outcome-hub-collaboration-store",
+ "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-knowledge-client",
+ "outcome-hub-knowledge-model",
+ "outcome-hub-service-api",
+ "outcome-hub-service-protocol",
+ "outcome-hub-service-registry",
+ "outcome-hub-web",
+ "outcome-hub-web-assets",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-collaboration-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-collaboration-model",
+ "outcome-hub-service-protocol",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-collaboration-evaluation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "outcome-hub-contracts",
+ "outcome-hub-execution-config",
+ "outcome-hub-execution-inputs",
+ "outcome-hub-execution-runtime",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-process",
+ "outcome-hub-prompt-evolution",
+ "outcome-hub-prompt-evolution-cli",
+ "outcome-hub-workflow-adapter",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-collaboration-host"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "outcome-hub-collaboration-api",
+ "outcome-hub-collaboration-client",
+ "outcome-hub-collaboration-storage-service",
+ "outcome-hub-collaboration-store",
+ "outcome-hub-contracts",
+ "outcome-hub-service-api",
+ "outcome-hub-service-registry",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-collaboration-model"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-contracts",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "outcome-hub-collaboration-proposals"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "outcome-hub-contracts",
+ "outcome-hub-execution-config",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-native-effects",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-collaboration-storage-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "outcome-hub-collaboration-client",
+ "outcome-hub-collaboration-store",
+ "outcome-hub-contracts",
+ "outcome-hub-service-protocol",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-collaboration-store"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-collaboration-model",
+ "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-console"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "axum",
+ "chrono",
+ "libc",
+ "outcome-hub-agent-backend",
+ "outcome-hub-agent-teams",
+ "outcome-hub-collaboration-api",
+ "outcome-hub-collaboration-client",
+ "outcome-hub-collaboration-host",
+ "outcome-hub-collaboration-model",
+ "outcome-hub-collaboration-proposals",
+ "outcome-hub-collaboration-storage-service",
+ "outcome-hub-collaboration-store",
+ "outcome-hub-console-web",
+ "outcome-hub-contracts",
+ "outcome-hub-delivery-adapters",
+ "outcome-hub-execution-config",
+ "outcome-hub-execution-model",
+ "outcome-hub-execution-runtime",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-process",
+ "outcome-hub-prompt-evolution-cli",
+ "outcome-hub-service-registry",
+ "outcome-hub-software-verification",
+ "outcome-hub-source-freshness",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-console-web"
+version = "0.1.0"
+
+[[package]]
+name = "outcome-hub-contracts"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "outcome-hub-delivery-adapters"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-process",
+ "outcome-hub-source-freshness",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-delivery-outbox"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "outcome-hub-contracts",
+ "outcome-hub-delivery-adapters",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-knowledge-publication",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-execution-budget"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "outcome-hub-execution-config"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-agent-policy",
+ "serde",
+ "toml",
+]
+
+[[package]]
+name = "outcome-hub-execution-inputs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-delivery-adapters",
+ "outcome-hub-execution-config",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-native-effects",
+ "outcome-hub-process",
+ "outcome-hub-source-freshness",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-execution-model"
+version = "0.1.0"
+dependencies = [
+ "outcome-hub-collaboration-proposals",
+ "outcome-hub-execution-config",
+ "outcome-hub-execution-inputs",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "outcome-hub-execution-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "libc",
+ "outcome-hub-agent-backend",
+ "outcome-hub-agent-policy",
+ "outcome-hub-agent-teams",
+ "outcome-hub-build-cache",
+ "outcome-hub-collaboration-proposals",
+ "outcome-hub-contracts",
+ "outcome-hub-delivery-outbox",
+ "outcome-hub-execution-budget",
+ "outcome-hub-execution-config",
+ "outcome-hub-execution-inputs",
+ "outcome-hub-execution-model",
+ "outcome-hub-execution-targets",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-isolation",
+ "outcome-hub-lease-heartbeat",
+ "outcome-hub-native-effects",
+ "outcome-hub-process",
+ "outcome-hub-prompt-evolution",
+ "outcome-hub-prompt-evolution-cli",
+ "outcome-hub-source-freshness",
+ "outcome-hub-workflow-adapter",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-execution-targets"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "libc",
+ "outcome-hub-agent-backend",
+ "outcome-hub-agent-policy",
+ "outcome-hub-contracts",
+ "outcome-hub-execution-config",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-isolation",
+ "outcome-hub-native-effects",
+ "outcome-hub-process",
+ "outcome-hub-workflow-adapter",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-executor-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-service-api",
+ "outcome-hub-service-protocol",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-filesystem-store"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "fs2",
+ "libc",
+ "outcome-hub-native-effects",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-isolation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "outcome-hub-agent-policy",
+ "outcome-hub-native-effects",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
+name = "outcome-hub-knowledge-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-knowledge-model",
+ "outcome-hub-service-api",
+ "outcome-hub-service-protocol",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-knowledge-directory"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "outcome-hub-collaboration-model",
+ "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-knowledge-model",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-knowledge-git"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-collaboration-model",
+ "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-knowledge-model",
+ "outcome-hub-process",
+ "outcome-hub-service-api",
+ "outcome-hub-service-protocol",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-knowledge-model"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-collaboration-model",
+ "outcome-hub-contracts",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-knowledge-publication"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "outcome-hub-contracts",
+ "outcome-hub-delivery-adapters",
+ "outcome-hub-process",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-knowledge-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "outcome-hub-collaboration-model",
+ "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-knowledge-directory",
+ "outcome-hub-knowledge-git",
+ "outcome-hub-knowledge-model",
+ "outcome-hub-service-api",
+ "outcome-hub-service-protocol",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-lease-heartbeat"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "outcome-hub-execution-config",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-process",
+ "outcome-hub-workflow-adapter",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-native-effects"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "outcome-hub-contracts",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-outcome-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "outcome-hub-collaboration-model",
+ "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-knowledge-git",
+ "outcome-hub-process",
+ "outcome-hub-service-api",
+ "outcome-hub-service-protocol",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-process"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "outcome-hub-contracts",
+ "outcome-hub-native-effects",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-prompt-evolution"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-prompt-evolution-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-delivery-adapters",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-prompt-evolution",
+ "outcome-hub-source-freshness",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-sandbox-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-contracts",
+ "outcome-hub-process",
+ "outcome-hub-service-api",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-service-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-collaboration-model",
+ "outcome-hub-contracts",
+ "outcome-hub-knowledge-model",
+ "outcome-hub-service-protocol",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-service-protocol"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "outcome-hub-contracts",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-service-registry"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-service-api",
+ "outcome-hub-service-protocol",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-service-workers"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "outcome-hub-contracts",
+ "outcome-hub-executor-service",
+ "outcome-hub-sandbox-service",
+ "outcome-hub-service-api",
+ "outcome-hub-service-protocol",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-software-delivery"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "outcome-hub-collaboration-client",
+ "outcome-hub-collaboration-model",
+ "outcome-hub-contracts",
+ "outcome-hub-delivery-adapters",
+ "outcome-hub-execution-config",
+ "outcome-hub-execution-model",
+ "outcome-hub-execution-runtime",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-process",
+ "outcome-hub-software-verification",
+ "outcome-hub-source-freshness",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "outcome-hub-software-verification"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "outcome-hub-source-freshness"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "libc",
+ "outcome-hub-execution-config",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-process",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-web"
+version = "0.1.0"
+dependencies = [
+ "outcome-hub-web-assets",
+]
+
+[[package]]
+name = "outcome-hub-web-assets"
+version = "0.1.0"
+
+[[package]]
+name = "outcome-hub-workflow-adapter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-native-effects",
+ "outcome-hub-process",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
 
 [[package]]
 name = "percent-encoding"

@@ -36,7 +36,7 @@ a bounded group-history snapshot in their prompt. Existing source, prompt, polic
 SuperPOD, tool and isolation gates remain authoritative. The service schedules only
 these goal-linked task IDs, with no automatic unrelated seed or publication outbox.
 Results and pinned evidence return to the same goal for host acceptance. Execution
-preferences and historical records remain accessible through `/apps/research/`.
+preferences and historical records remain accessible through `/apps/console/`.
 That page is an inspector for the scenario, not an external application launcher.
 Research failure/unknown status never automatically completes an IM goal. Scenario
 health is exposed alongside the scenario catalog.
@@ -76,13 +76,13 @@ Composer mentions atomically commit the user message and a bounded discussion go
 
 ## Interfaces and modules
 
-`crates/crystal` implements identity, group lifecycle, membership, credentials,
+`crates/collaboration-store` implements identity, group lifecycle, membership, credentials,
 durable messages, goals, assignments, idempotence, replay and delivery. The production
 storage service owns its live database; clients use its API and event streams.
 The domain crate depends on generic storage primitives and does not import research
 configuration or runtime crates.
-`crates/im-service` owns HTTP/SSE, host login, scenario registration, the frontend and standalone host.
-`apps/research-console` supplies the optional research application adapter; `im-host` owns startup composition.
+`crates/collaboration-api` owns HTTP/SSE, host login, scenario registration, the frontend and standalone host.
+`apps/console` supplies the optional research application adapter; `collaboration-host` owns startup composition.
 
 Operator writes use `POST /api/crystal/manage` with a host session,
 `Origin: http://<listen-address>`, `Content-Type: application/json`, and

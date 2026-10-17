@@ -14,7 +14,7 @@
 
 ## 可重算谱系
 
-`evolution lineage REQUEST.json --output STATE/evolution/lineage.json` 基于既有 `PromptRegistry` 生成可重算回执。请求包含 `registry_file` 和 `study`；后者带有 `task_kind`、固定的 `policy_version` / `superpod_commit`、宿主冻结的 `expected` 快照绑定、开发观测 `observations`、待评估/扩展项及评估预算。研究观察应用的**系统设置 → 群体演化**投影已校验回执，不暴露提示词正文或试验输入；AI-IM 右侧版本演化展示当前群关联主题的版本与评估状态。
+`evolution lineage REQUEST.json --output STATE/evolution/lineage.json` 基于既有 `PromptRegistry` 生成可重算回执。请求包含 `registry_file` 和 `study`；后者带有 `task_kind`、固定的 `policy_version` / `superpod_commit`、宿主冻结的 `expected` 快照绑定、开发观测 `observations`、待评估/扩展项及评估预算。研究观察应用的**系统设置 → 群体演化**投影已校验回执，不暴露提示词正文或试验输入；OutcomeHub 右侧版本演化展示当前群关联主题的版本与评估状态。
 
 报告区分策略自身表现和后代汇总表现，对重组谱系共享后代去重，未完成工作也计入预算。验证/保留集观测、变化绑定和重复试验会被拒绝。这是受 HGM 启发的谱系诊断，不是 HGM Thompson sampling 调度器复现。候选激活继续受评估、保留集隔离、晋级、发布和安装门禁约束；策略分支不会创建新数字人身份或共享可变实验记忆。
 

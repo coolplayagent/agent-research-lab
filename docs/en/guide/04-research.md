@@ -50,9 +50,9 @@ bazel-bin/agent-research-lab --config local.toml serve --listen 127.0.0.1:8090 -
 bazel-bin/agent-research-lab --config local.toml serve-link
 ```
 
-AI-IM remains the home page. The adapter discovers configured people by stable ID and preserves their IM names. Create a group and choose CLI research, a configured repository and members in the goal form. Admission failure marks the scenario unavailable and retains bounded private diagnostics in `private/im-admission/`; the UI shows stable status/result codes. Each assignment becomes an immutable, read-only Job; source/prompt/policy/SuperPOD evidence returns to the group. Host acceptance and existing implementation/publication gates remain required.
+OutcomeHub remains the home page. The adapter discovers configured people by stable ID and preserves their IM names. Create a group and choose CLI research, a configured repository and members in the goal form. Admission failure marks the scenario unavailable and retains bounded private diagnostics in `private/im-admission/`; the UI shows stable status/result codes. Each assignment becomes an immutable, read-only Job; source/prompt/policy/SuperPOD evidence returns to the group. Host acceptance and existing implementation/publication gates remain required.
 
-`/apps/research/` inspects these tasks, historical runs and research-person settings. IM owns conversations, members and goals.
+`/apps/console/` inspects these tasks, historical runs and research-person settings. IM owns conversations, members and goals.
 
 ## People, execution preferences and sessions
 

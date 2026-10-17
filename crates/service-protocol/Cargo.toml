@@ -1,5 +1,5 @@
 [package]
-name = "ai-im-service-protocol"
+name = "outcome-hub-service-protocol"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

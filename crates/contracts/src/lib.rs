@@ -47,6 +47,8 @@ macro_rules! states {
 }
 
 states! {
+    KnowledgeBackend { Git => "git", Directory => "directory" }
+    KnowledgeAccess { ReadOnly => "read_only", ReadWrite => "read_write" }
     PullRequestState { Open => "OPEN", Closed => "CLOSED", Merged => "MERGED" }
     ReviewState { Approved => "APPROVED", ChangesRequested => "CHANGES_REQUESTED", Dismissed => "DISMISSED", Pending => "PENDING", Commented => "COMMENTED", Unknown => "UNKNOWN" }
     CheckState { Completed => "COMPLETED", InProgress => "IN_PROGRESS", Queued => "QUEUED", Pending => "PENDING", Waiting => "WAITING", Requested => "REQUESTED" }

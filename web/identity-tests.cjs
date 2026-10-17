@@ -19,7 +19,7 @@ assert.equal(values.size, 128);
 for (const value of values) assert.match(value, format);
 assert.equal(insecureCrypto.randomUUID, undefined, "The helper must not patch the browser global");
 
-const { MessageDrafts } = load("crates/im-service/web/src/message-drafts.ts", { "/assets/shared/identity.js": identity });
+const { MessageDrafts } = load("web/outcome-hub/src/message-drafts.ts", { "/assets/shared/identity.js": identity });
 const drafts = new MessageDrafts(), draft = { text: "Message from an HTTP interface", reply: null };
 const first = drafts.begin("group", draft);
 assert.match(first.request_id, format);
@@ -35,7 +35,7 @@ class Element {
   addEventListener() {}
 }
 const document = { createElement: tag => new Element(tag), body: new Element("body") };
-const forms = load("crates/im-service/web/src/forms.ts", {
+const forms = load("web/outcome-hub/src/forms.ts", {
   "/assets/shared/identity.js": identity,
   "./settings-guard.js": { allowSettingsLeave: () => true, savedSettings: () => {} },
   "./feedback.js": { busy: () => () => {} }, "./i18n.js": { t: key => key },

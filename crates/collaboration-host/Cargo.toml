@@ -1,0 +1,18 @@
+[package]
+name = "outcome-hub-collaboration-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[lib]
+name = "collaboration_host"
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+axum.workspace = true
+contracts.workspace = true
+collaboration_api.workspace = true
+collaboration_storage_service.workspace = true
+collaboration_client.workspace = true
+service_api.workspace = true
+service_registry.workspace = true
+collaboration_store.workspace = true

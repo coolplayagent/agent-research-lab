@@ -5,7 +5,7 @@ rust_library(
     name = "executor_service", crate_name = "executor_service",
     srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
     crate_root = "src/lib.rs", edition = "2024", aliases = aliases(),
-    deps = ["//crates/contracts:contracts", "//crates/service-api:service_api", "//crates/service-protocol:service_protocol", "//crates/storage:storage"] + all_crate_deps(normal = True),
+    deps = ["//crates/contracts:contracts", "//crates/service-api:service_api", "//crates/service-protocol:service_protocol", "//crates/filesystem-store:storage"] + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
 )

@@ -14,7 +14,7 @@ rust_library(
     aliases = aliases(),
     deps = ["//crates/native-effects:native_effects",
         "//crates/process:process",
-        "//crates/storage:storage",
+        "//crates/filesystem-store:storage",
     ] + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],

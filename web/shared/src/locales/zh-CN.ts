@@ -1,5 +1,10 @@
 export const messages = {
-  "OutcomeKind.finding": "研究发现",
+  "KnowledgeBackend.git": "Git 仓库",
+  "KnowledgeBackend.directory": "目录",
+  "KnowledgeAccess.read_only": "只读",
+  "KnowledgeAccess.read_write": "读写",
+
+  "OutcomeKind.finding": "发现",
   "OutcomeKind.experiment": "实验结果",
   "OutcomeKind.counterexample": "反例",
   "OutcomeKind.artifact": "制品",

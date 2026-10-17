@@ -11,3 +11,9 @@
 - [07 部署、维护与诊断](07-operations.md)
 - [08 开发、测试与验证](08-development.md)
 - [09 使用成果协作](09-outcomes.md)
+
+## OutcomeHub 通用成果协作
+
+- [成果协作与模块架构](../../outcomehub-architecture.md)
+- [外部知识库接入](../../external-knowledge.md)
+- [命名与接口迁移](../../outcomehub-migration.md)

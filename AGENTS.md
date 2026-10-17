@@ -1,4 +1,6 @@
-# Agent Research Lab
+# OutcomeHub
+
+OutcomeHub is an outcome-based multi-agent work system. AI-IM below is its historical collaboration-core name.
 
 Implement in Rust; Bazel is the build, test and packaging entrypoint.
 Knowledge contents belong to external knowledge repositories. SuperPOD is an optional binding; core collaboration must start without it and may update other external knowledge stores through explicit adapters.
@@ -65,7 +67,7 @@ dependencies and Agent bindings. Validate references and configuration revisions
 Storage endpoint changes require a deliberate restart against prepared data;
 never silently replace a live store. Preserve the existing research evidence gates.
 
-## Research coordination and lineage
+## Coordination and lineage
 
 Keep research topics and subject/version lineage as coordination metadata linked
 to collaboration groups and goals. Knowledge contents remain in the bound external repository, including SuperPOD when selected.

@@ -3,7 +3,7 @@ load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test", "rust_binary")
 exports_files(["Cargo.toml"], visibility = ["//visibility:public"])
 rust_library(
     name = "service_workers", crate_name = "service_workers",
-    srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
+    srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs", "src/legacy_main.rs"]),
     crate_root = "src/lib.rs", edition = "2024", aliases = aliases(),
     deps = ["//crates/sandbox-service:sandbox_service", "//crates/executor-service:executor_service", "//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/service-api:service_api"] + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
@@ -12,8 +12,10 @@ rust_library(
 rust_test(name = "tests", crate = ":service_workers", aliases = aliases(normal_dev = True, proc_macro_dev = True), deps = [] + all_crate_deps(normal_dev = True), proc_macro_deps = all_crate_deps(proc_macro_dev = True), visibility = ["//visibility:public"])
 filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "src/dashboard/*.html", "src/dashboard/*.css"], allow_empty = True), visibility = ["//visibility:public"])
 rust_binary(name = "ai-im-services", srcs = ["src/main.rs"], edition = "2024", deps = [":service_workers"] + ["//crates/sandbox-service:sandbox_service", "//crates/executor-service:executor_service", "//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/service-api:service_api"] + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])
-filegroup(name = "units", srcs = glob(["systemd/*.service"]), visibility = ["//visibility:public"])
+filegroup(name = "units", srcs = ["//deploy/systemd:worker_units"], visibility = ["//visibility:public"])
 # Preserve the historical binary output path using the same adapter entrypoint.
-rust_binary(name = "ai-im-codex-adapter", srcs = ["//crates/codex-adapter:src/main.rs"], crate_root = "//crates/codex-adapter:src/main.rs", edition = "2024", deps = ["//crates/codex-adapter:codex_adapter", "//crates/storage:storage"] + all_crate_deps(normal = True, package_name = "crates/codex-adapter"), proc_macro_deps = all_crate_deps(proc_macro = True, package_name = "crates/codex-adapter"), visibility = ["//visibility:public"])
+rust_binary(name = "ai-im-codex-adapter", srcs = ["//crates/codex-adapter:src/main.rs"], crate_root = "//crates/codex-adapter:src/main.rs", edition = "2024", deps = ["//crates/codex-adapter:codex_adapter", "//crates/filesystem-store:storage"] + all_crate_deps(normal = True, package_name = "crates/codex-adapter"), proc_macro_deps = all_crate_deps(proc_macro = True, package_name = "crates/codex-adapter"), visibility = ["//visibility:public"])
 # Preserve the historical binary output path using the same adapter entrypoint.
-rust_binary(name = "ai-im-outcome-service", srcs = ["//crates/outcome-service:src/main.rs"], crate_root = "//crates/outcome-service:src/main.rs", edition = "2024", deps = ["//crates/outcome-service:outcome_service", "//crates/storage:storage"] + all_crate_deps(normal = True, package_name = "crates/outcome-service"), proc_macro_deps = all_crate_deps(proc_macro = True, package_name = "crates/outcome-service"), visibility = ["//visibility:public"])
+rust_binary(name = "ai-im-outcome-service", srcs = ["//crates/outcome-service:src/main.rs"], crate_root = "//crates/outcome-service:src/main.rs", edition = "2024", deps = ["//crates/outcome-service:outcome_service", "//crates/filesystem-store:storage"] + all_crate_deps(normal = True, package_name = "crates/outcome-service"), proc_macro_deps = all_crate_deps(proc_macro = True, package_name = "crates/outcome-service"), visibility = ["//visibility:public"])
+
+rust_binary(name = "outcome-hub-services", srcs = ["src/main.rs"], edition = "2024", deps = [":service_workers"] + ["//crates/sandbox-service:sandbox_service", "//crates/executor-service:executor_service", "//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/service-api:service_api"] + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])

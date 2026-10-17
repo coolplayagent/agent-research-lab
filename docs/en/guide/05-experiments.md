@@ -89,7 +89,7 @@ These retained design references inform the protocol, not evidence of this proje
 
 ## Policy lineage receipts
 
-`evolution lineage REQUEST.json --output STATE/evolution/lineage.json` uses `PromptRegistry` to produce a recomputable receipt. The request has `registry_file` and `study`: `task_kind`, fixed `policy_version`/`superpod_commit`, frozen `expected` bindings, development `observations`, evaluation/expansion candidates and budget. The research inspector's population-evolution settings show validated receipts without prompt bodies or trial inputs; AI-IM shows versions for the selected group's topic.
+`evolution lineage REQUEST.json --output STATE/evolution/lineage.json` uses `PromptRegistry` to produce a recomputable receipt. The request has `registry_file` and `study`: `task_kind`, fixed `policy_version`/`superpod_commit`, frozen `expected` bindings, development `observations`, evaluation/expansion candidates and budget. The research inspector's population-evolution settings show validated receipts without prompt bodies or trial inputs; OutcomeHub shows versions for the selected group's topic.
 
 Reports distinguish policy performance from descendant aggregates, deduplicate shared descendants and charge unfinished work. Validation/holdout observations, changed bindings and repeated trials fail. This is HGM-inspired diagnosis, not HGM Thompson sampling reproduction. Activation still requires evaluation, holdout, promotion, publication and installation gates; branches do not create identities or share mutable experiment memory.
 

@@ -1,5 +1,5 @@
 [package]
-name = "lab-agent-policy"
+name = "outcome-hub-agent-policy"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

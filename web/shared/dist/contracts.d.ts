@@ -1,3 +1,13 @@
+export declare const KnowledgeBackend: {
+    readonly Git: "git";
+    readonly Directory: "directory";
+};
+export type KnowledgeBackend = (typeof KnowledgeBackend)[keyof typeof KnowledgeBackend];
+export declare const KnowledgeAccess: {
+    readonly ReadOnly: "read_only";
+    readonly ReadWrite: "read_write";
+};
+export type KnowledgeAccess = (typeof KnowledgeAccess)[keyof typeof KnowledgeAccess];
 export declare const PullRequestState: {
     readonly Open: "OPEN";
     readonly Closed: "CLOSED";

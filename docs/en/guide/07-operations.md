@@ -4,7 +4,7 @@
 
 ## Service deployment
 
-Before using the optional user template `app/systemd/agent-research-lab.service`, adjust executable, working-directory and private-configuration paths for the host. Builds do not install or enable services. Run one unified core per state directory; deploy storage/executor/sandbox according to the [service guide](03-services.md). Stop old services before upgrades, retain the old binary and a consistent database backup, install a verified artifact and restart. Reverting across schema versions also requires the matching database backup; never open a newer database with an old binary.
+Before using the optional user template `deploy/systemd/agent-research-lab.service`, adjust executable, working-directory and private-configuration paths for the host. Builds do not install or enable services. Run one unified core per state directory; deploy storage/executor/sandbox according to the [service guide](03-services.md). Stop old services before upgrades, retain the old binary and a consistent database backup, install a verified artifact and restart. Reverting across schema versions also requires the matching database backup; never open a newer database with an old binary.
 
 ## Local experiment targets
 
@@ -58,7 +58,7 @@ bazel-bin/agent-research-lab crystal-bench --state /private/new-hot-run \
   --mode hot --people 10000 --messages 100 --rate 10
 ```
 
-These use real loopback TCP/SSE and SQLite transactions. They report publish acknowledgement and recipient-delivery P50/P95/P99, sample counts, queue/replay/rejection counts and payload sizes. They do not start 10,000 models or cover browser rendering, sustained SLA, partitions or power loss. Keep state, credentials and raw receipts outside Git; source-bound final measurements belong in SuperPOD.
+These use real loopback TCP/SSE and SQLite transactions. They report publish acknowledgement and recipient-delivery P50/P95/P99, sample counts, queue/replay/rejection counts and payload sizes. They do not start 10,000 models or cover browser rendering, sustained SLA, partitions or power loss. Keep state, credentials and raw receipts outside Git; source-bound final measurements belong in the selected external knowledge store.
 
 ## Local operator and network access
 
