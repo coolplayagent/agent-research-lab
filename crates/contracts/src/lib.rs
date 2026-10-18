@@ -60,6 +60,9 @@ states! {
     SandboxExecutionState { Completed => "completed", Running => "running", Failed => "failed" }
     SourceAccessStatus { DownloadedVerified => "downloaded-verified", OnlineOnly => "online-only", AccessGated => "access-gated", NotFound => "not-found", Candidate => "candidate" }
     FindingKind { Measured => "measured", ExternalClaim => "external_claim", Inference => "inference", Unknown => "unknown" }
+    DatasetPartition { Development => "development", Validation => "validation", Holdout => "holdout" }
+    TrialVariant { Baseline => "baseline", Candidate => "candidate" }
+    PromptEvaluationKind { Promotion => "promotion", Novelty => "novelty" }
     ContentIntegrityState { Complete => "complete", Degraded => "degraded" }
     TopicState { Active => "active", Archived => "archived" }
     OutcomeKind { Finding => "finding", Experiment => "experiment", Counterexample => "counterexample", Artifact => "artifact" }

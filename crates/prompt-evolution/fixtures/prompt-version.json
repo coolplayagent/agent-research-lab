@@ -1,0 +1,1 @@
+{"version":"87703261bf3de4c21700322ee00c8fd151f6569726197b6238e59a7c00b791b0","definition":{"parent_versions":["a-parent","b-parent"],"role":"researcher","task_kind":"long_horizon","content":"保留原始输入。\nRésumé: compare evidence.","change_reason":"验证 / verification","failure_conditions":["不丢失用户数据","critical regression"]},"created_at":"2026-10-18T00:00:00Z"}

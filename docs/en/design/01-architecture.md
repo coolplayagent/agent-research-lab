@@ -232,6 +232,23 @@ wire reports do not depend on execution. A ready marker only avoids repeated
 cache preparation: build tools still verify artifacts, and evaluation/effect gates
 remain independent. See the [cache boundary review](../../../qualitygate/reviews/cache-boundaries.md).
 
+## Prompt evolution domain model
+
+`prompt-evolution` keeps its public model and evaluation entry points at the
+crate root. `registry` owns immutable prompt versions, ancestry and portfolio
+membership; lineage diagnostics use its read-only archive view. `protocol` owns
+snapshot/observation/decision records. Shared `DatasetPartition`, `TrialVariant`
+and `PromptEvaluationKind` live in `contracts`; historical Rust aliases and wire
+values remain available, with TypeScript generated through Bazel.
+
+`pairing` validates complete current holdout pairs, `metrics` computes pure pooled
+summaries, and `evaluation` applies the existing promotion/novelty gates.
+`exploration` owns replay-resistant budget windows, `quarantine` owns rule
+proposals without policy-adoption authority, and `holdout` checks path separation.
+`identity` supplies deterministic payload digests. Decisions remain advisory;
+host receipts, isolation permissions and delivery gates still establish authority.
+See the [prompt model review](../../../qualitygate/reviews/prompt-model-boundaries.md).
+
 ## Documentation and build assets
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.

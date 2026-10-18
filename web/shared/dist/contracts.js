@@ -83,6 +83,19 @@ export const FindingKind = {
     Inference: "inference",
     Unknown: "unknown",
 };
+export const DatasetPartition = {
+    Development: "development",
+    Validation: "validation",
+    Holdout: "holdout",
+};
+export const TrialVariant = {
+    Baseline: "baseline",
+    Candidate: "candidate",
+};
+export const PromptEvaluationKind = {
+    Promotion: "promotion",
+    Novelty: "novelty",
+};
 export const ContentIntegrityState = {
     Complete: "complete",
     Degraded: "degraded",

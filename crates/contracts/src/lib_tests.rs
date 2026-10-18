@@ -62,3 +62,50 @@ fn publication_domains_preserve_their_distinct_wire_values() {
     assert_eq!(FindingKind::parse("unknown").unwrap(), FindingKind::Unknown);
     assert!(ContentIntegrityState::parse("downloaded-verified").is_err());
 }
+
+#[test]
+fn research_evaluation_domains_preserve_distinct_wire_values() {
+    for (wire, state) in [
+        ("development", DatasetPartition::Development),
+        ("validation", DatasetPartition::Validation),
+        ("holdout", DatasetPartition::Holdout),
+    ] {
+        assert_eq!(DatasetPartition::parse(wire).unwrap(), state);
+        assert_eq!(
+            serde_json::to_string(&state).unwrap(),
+            format!("\"{wire}\"")
+        );
+    }
+    for (wire, state) in [
+        ("baseline", TrialVariant::Baseline),
+        ("candidate", TrialVariant::Candidate),
+    ] {
+        assert_eq!(TrialVariant::parse(wire).unwrap(), state);
+        assert_eq!(
+            serde_json::to_string(&state).unwrap(),
+            format!("\"{wire}\"")
+        );
+    }
+    for (wire, state) in [
+        ("promotion", PromptEvaluationKind::Promotion),
+        ("novelty", PromptEvaluationKind::Novelty),
+    ] {
+        assert_eq!(PromptEvaluationKind::parse(wire).unwrap(), state);
+        assert_eq!(
+            serde_json::to_string(&state).unwrap(),
+            format!("\"{wire}\"")
+        );
+    }
+    assert!(DatasetPartition::parse("candidate").is_err());
+    assert!(TrialVariant::parse("holdout").is_err());
+    assert!(PromptEvaluationKind::parse("approved").is_err());
+    for value in [
+        serde_json::json!("future_state"),
+        serde_json::Value::Null,
+        serde_json::json!(true),
+    ] {
+        assert!(DatasetPartition::from_value(&value).is_none());
+        assert!(TrialVariant::from_value(&value).is_none());
+        assert!(PromptEvaluationKind::from_value(&value).is_none());
+    }
+}

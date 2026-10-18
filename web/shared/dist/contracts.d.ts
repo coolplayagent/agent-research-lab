@@ -95,6 +95,22 @@ export declare const FindingKind: {
     readonly Unknown: "unknown";
 };
 export type FindingKind = (typeof FindingKind)[keyof typeof FindingKind];
+export declare const DatasetPartition: {
+    readonly Development: "development";
+    readonly Validation: "validation";
+    readonly Holdout: "holdout";
+};
+export type DatasetPartition = (typeof DatasetPartition)[keyof typeof DatasetPartition];
+export declare const TrialVariant: {
+    readonly Baseline: "baseline";
+    readonly Candidate: "candidate";
+};
+export type TrialVariant = (typeof TrialVariant)[keyof typeof TrialVariant];
+export declare const PromptEvaluationKind: {
+    readonly Promotion: "promotion";
+    readonly Novelty: "novelty";
+};
+export type PromptEvaluationKind = (typeof PromptEvaluationKind)[keyof typeof PromptEvaluationKind];
 export declare const ContentIntegrityState: {
     readonly Complete: "complete";
     readonly Degraded: "degraded";

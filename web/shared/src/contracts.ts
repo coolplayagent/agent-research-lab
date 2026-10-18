@@ -96,6 +96,22 @@ export const FindingKind = {
   Unknown: "unknown",
 } as const;
 export type FindingKind = (typeof FindingKind)[keyof typeof FindingKind];
+export const DatasetPartition = {
+  Development: "development",
+  Validation: "validation",
+  Holdout: "holdout",
+} as const;
+export type DatasetPartition = (typeof DatasetPartition)[keyof typeof DatasetPartition];
+export const TrialVariant = {
+  Baseline: "baseline",
+  Candidate: "candidate",
+} as const;
+export type TrialVariant = (typeof TrialVariant)[keyof typeof TrialVariant];
+export const PromptEvaluationKind = {
+  Promotion: "promotion",
+  Novelty: "novelty",
+} as const;
+export type PromptEvaluationKind = (typeof PromptEvaluationKind)[keyof typeof PromptEvaluationKind];
 export const ContentIntegrityState = {
   Complete: "complete",
   Degraded: "degraded",

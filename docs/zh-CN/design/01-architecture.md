@@ -105,6 +105,12 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 
 `metadata` 验证注册表和归档元数据，仅读取指定 tar 成员，不执行依赖声明；`rust_toolchain`、`python_toolchain` 选择主机工具链的字面量哈希；`files` 负责有界常规文件读取和路径约束。依赖从调度入口指向选择器和共享机制，报告数据不依赖执行逻辑。就绪标记只避免重复缓存准备，构建工具仍会验证产物，评估和副作用门禁保持独立。参见[缓存边界审阅](../../../qualitygate/reviews/cache-boundaries.md)。
 
+## 提示词演化领域模型
+
+`prompt-evolution` 在 crate 根保留公开模型和评估入口。`registry` 管理不可变提示词版本、祖先关系和策略组合，谱系诊断通过只读归档接口访问数据；`protocol` 保存快照、观测与决策记录。`DatasetPartition`、`TrialVariant`、`PromptEvaluationKind` 统一来自 `contracts`，原 Rust 别名和序列化值保持可用，前端契约通过 Bazel 生成。
+
+`pairing` 验证完整且绑定当前快照的留出集配对；`metrics` 计算纯统计汇总；`evaluation` 执行原有晋升与新能力门禁。`exploration` 管理防重复计数的预算窗口，`quarantine` 保存没有自动采纳权限的规则提案，`holdout` 校验路径隔离，`identity` 提供确定性摘要。模型决策仍为建议，主机回执、隔离权限和交付门禁继续决定实际授权。参见[提示词模型边界审阅](../../../qualitygate/reviews/prompt-model-boundaries.md)。
+
 ## 构建资产
 
 Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件获取外部依赖。提示词、JSON 示例、桌面资产是显式编译输入，主发布包包含双语文档。命令见[开发与验证](../guide/08-development.md)。

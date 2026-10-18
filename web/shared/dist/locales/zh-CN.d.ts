@@ -201,6 +201,13 @@ export declare const messages: {
     readonly "FindingKind.external_claim": "外部主张";
     readonly "FindingKind.inference": "推断";
     readonly "FindingKind.unknown": "未知";
+    readonly "DatasetPartition.development": "开发集";
+    readonly "DatasetPartition.validation": "验证集";
+    readonly "DatasetPartition.holdout": "留出集";
+    readonly "TrialVariant.baseline": "基线变体";
+    readonly "TrialVariant.candidate": "候选变体";
+    readonly "PromptEvaluationKind.promotion": "晋升评估";
+    readonly "PromptEvaluationKind.novelty": "新能力评估";
     readonly "ContentIntegrityState.complete": "完整";
     readonly "ContentIntegrityState.degraded": "完整性受损";
     readonly "TopicState.active": "进行中";

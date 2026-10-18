@@ -8,6 +8,7 @@ license.workspace = true
 name = "evolution_cli"
 
 [dependencies]
+contracts.workspace = true
 anyhow.workspace = true
 delivery.workspace = true
 evolution.workspace = true

@@ -1306,6 +1306,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "outcome-hub-contracts",
  "serde",
  "serde_json",
  "sha2",
@@ -1317,6 +1318,7 @@ name = "outcome-hub-prompt-evolution-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "outcome-hub-contracts",
  "outcome-hub-delivery-adapters",
  "outcome-hub-filesystem-store",
  "outcome-hub-prompt-evolution",

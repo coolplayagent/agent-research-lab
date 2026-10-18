@@ -1,4 +1,5 @@
 use super::*;
+use crate::{PromptDefinition, PromptVersion, Variant};
 fn register(r: &mut PromptRegistry, name: &str, parents: Vec<String>) -> String {
     r.register(
         PromptVersion::new(PromptDefinition {

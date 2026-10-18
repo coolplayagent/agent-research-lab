@@ -78,12 +78,7 @@ pub struct NoveltyRequest {
     pub ablations: Vec<AblationStudy>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EvaluationKind {
-    Promotion,
-    Novelty,
-}
+pub use contracts::PromptEvaluationKind as EvaluationKind;
 
 /// Full host receipt enables downstream consumers to recompute the gate instead
 /// of trusting an `approved` field, including after a controller restart.

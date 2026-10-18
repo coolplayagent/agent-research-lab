@@ -1,6 +1,14 @@
 //! HGM-inspired clade diagnostics over the existing immutable prompt archive.
 //! This report neither samples a scheduler policy nor authorizes promotion.
-use super::*;
+use crate::{
+    identity::{digest, nonempty},
+    protocol::{SnapshotBinding, TrialObservation},
+    registry::PromptRegistry,
+};
+use anyhow::{Context, Result, ensure};
+use contracts::DatasetPartition;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 const MAX_VERSIONS: usize = 2048;
 const MAX_OBSERVATIONS: usize = 100_000;
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,7 +70,7 @@ fn hex(value: &str, length: usize) -> bool {
 }
 pub fn diagnose(registry: &PromptRegistry, study: &Study) -> Result<Report> {
     ensure!(
-        registry.versions.len() <= MAX_VERSIONS,
+        registry.versions().len() <= MAX_VERSIONS,
         "lineage archive exceeds diagnostic bound"
     );
     registry.validate()?;
@@ -84,9 +92,9 @@ pub fn diagnose(registry: &PromptRegistry, study: &Study) -> Result<Report> {
         "evaluation budget exceeds bound"
     );
     let versions: BTreeSet<_> = registry
-        .versions
+        .versions()
         .iter()
-        .filter(|(_, p)| p.definition.task_kind == study.task_kind)
+        .filter(|(_, p)| p.definition().task_kind == study.task_kind)
         .map(|(id, _)| id.clone())
         .collect();
     ensure!(!versions.is_empty(), "no strategies for this task kind");
@@ -159,7 +167,7 @@ pub fn diagnose(registry: &PromptRegistry, study: &Study) -> Result<Report> {
     );
     let mut children = BTreeMap::<&str, Vec<&str>>::new();
     for version in &versions {
-        for parent in &registry.versions[version].definition.parent_versions {
+        for parent in &registry.versions()[version].definition().parent_versions {
             children.entry(parent).or_default().push(version);
         }
     }
@@ -184,7 +192,7 @@ pub fn diagnose(registry: &PromptRegistry, study: &Study) -> Result<Report> {
             .iter()
             .filter(|t| t.success && !t.critical_regression)
             .count();
-        let prompt = &registry.versions[version].definition;
+        let prompt = registry.versions()[version].definition();
         let duration_ms = own.iter().try_fold(0u64, |s, t| {
             s.checked_add(t.duration_ms).context("duration overflow")
         })?;
