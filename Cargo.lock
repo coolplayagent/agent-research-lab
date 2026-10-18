@@ -824,6 +824,7 @@ dependencies = [
  "outcome-hub-contracts",
  "outcome-hub-execution-config",
  "outcome-hub-execution-inputs",
+ "outcome-hub-execution-model",
  "outcome-hub-execution-runtime",
  "outcome-hub-filesystem-store",
  "outcome-hub-process",

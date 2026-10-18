@@ -20,6 +20,7 @@ rust_library(
         "//crates/execution-inputs:inputs",
         "//crates/process:process",
         "//crates/execution-runtime:runtime",
+        "//crates/execution-model:task",
         "//crates/filesystem-store:storage",
         "//crates/workflow-adapter:workflow",
     ] + all_crate_deps(normal = True),

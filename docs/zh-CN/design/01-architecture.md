@@ -75,6 +75,12 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 
 该 crate 经 `execution-model` 读取原生任务记录，经 `collaboration-client` 访问持久迭代状态，不依赖研究调度器或协作存储实现。Bazel 分析测试检查其传递依赖，防止重新引入这些实现依赖。
 
+## 研究协作评估
+
+`collaboration-evaluation` 在 crate 根保留既有数据类型和 `execute` 入口。`planning` 冻结并验证配对任务 DAG，`registration` 单独调用运行时注册，`collection` 读取已提交观测；`protocol` 直接从 `execution-model` 引入任务数据。
+
+`bindings`、`cards`、`citations`、`adjudication` 分别校验任务与回执绑定、工作者卡片引用、固定版本来源和独立宿主判断。`metrics` 只生成汇总，`usage` 读取有界诊断轨迹；`identity` 仅归一化新鲜度观测时间，`artifacts` 管理不可变私有文件。工作流状态别名经 `workflow-adapter::parse_run_state` 转为共享 `WorkflowState`，收集器保留报告中的原始状态，并将未知观测计为未完成。汇总、工作者提案和诊断轨迹均不能授权晋升或知识发布。详见[评估边界评审](../../../qualitygate/reviews/evaluation-boundaries.md)。
+
 ## 构建资产
 
 Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件获取外部依赖。提示词、JSON 示例、桌面资产是显式编译输入，主发布包包含双语文档。命令见[开发与验证](../guide/08-development.md)。

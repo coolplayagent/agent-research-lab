@@ -148,6 +148,23 @@ iteration state through `collaboration-client`; it does not depend on the resear
 scheduler or collaboration storage implementation. A Bazel analysis test checks
 that boundary across its transitive dependencies.
 
+## Research collaboration evaluation
+
+`collaboration-evaluation` keeps its existing records and `execute` entry point
+at the crate root. `planning` freezes and validates the paired task DAG;
+`registration` alone calls runtime registration; `collection` reads committed
+observations. `protocol` imports task data directly from `execution-model`.
+
+`bindings`, `cards`, `citations` and `adjudication` separately enforce job/receipt
+identity, worker-card references, pinned source evidence and independent host
+judgments. `metrics` builds a pure summary, while `usage` reads bounded diagnostic
+traces. `identity` normalizes only freshness timestamps, and `artifacts` owns
+immutable private files. Workflow observation aliases are parsed by
+`workflow-adapter::parse_run_state` into the shared `WorkflowState`; the collector
+preserves raw report states and counts unknown observations as incomplete.
+No summary, worker proposal or diagnostic trace authorizes promotion or knowledge
+publication. See the [evaluation boundary review](../../../qualitygate/reviews/evaluation-boundaries.md).
+
 ## Documentation and build assets
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.

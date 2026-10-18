@@ -13,8 +13,10 @@ use std::{
 
 mod checked_acquire;
 mod observation;
+mod run_state;
 pub use checked_acquire::CheckedAcquireError;
 pub use observation::{ObservationError, RegistrationProof};
+pub use run_state::parse_run_state;
 
 static FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
