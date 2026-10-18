@@ -267,6 +267,25 @@ validates retained selections and resolves runtime prompts without mutation.
 The original research gates and required SuperPOD pins remain in force. See the
 [host adapter review](../../../qualitygate/reviews/prompt-cli-boundaries.md).
 
+## Source and skill freshness
+
+`source-freshness` exposes the existing host API through a small facade.
+`protocol` owns retained snapshot/manifest records, `identity` validates authorized
+repositories and immutable bindings, and `client` owns bounded command transport.
+`remote` captures and rechecks the actual default branch without moving user work;
+`releases` distinguishes a verified absent release from a failed query. `skills`
+validates complete manifests and attempt-bound installed bytes, `files` owns the
+canonical tree hash and bounded reads, and `source_gate` verifies exact-commit
+Qualitygate proof for source-built tools.
+
+Qualitygate profiles, scopes, decisions and snapshot modes are separate shared
+`contracts` domains, generated for frontend consumers through Bazel. Source-skill
+and delivery adapters parse those domains at their external boundary; unknown
+values cannot grant authority. Their policies remain distinct: source overrides
+require full, nonempty, complete diff evidence at the exact commit in delivery/task
+scope; release delivery retains its existing historical repository scope support.
+See the [freshness boundary review](../../../qualitygate/reviews/freshness-boundaries.md).
+
 ## Documentation and build assets
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.

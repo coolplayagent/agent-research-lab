@@ -70,6 +70,31 @@ export const VerificationVerdict = {
   Fail: "fail",
 } as const;
 export type VerificationVerdict = (typeof VerificationVerdict)[keyof typeof VerificationVerdict];
+export const QualitygateProfile = {
+  Quick: "quick",
+  Full: "full",
+} as const;
+export type QualitygateProfile = (typeof QualitygateProfile)[keyof typeof QualitygateProfile];
+export const QualitygateScope = {
+  Repository: "repository",
+  Delivery: "delivery",
+  Task: "task",
+  Path: "path",
+} as const;
+export type QualitygateScope = (typeof QualitygateScope)[keyof typeof QualitygateScope];
+export const QualitygateDecision = {
+  Pass: "pass",
+  Fail: "fail",
+  Incomplete: "incomplete",
+} as const;
+export type QualitygateDecision = (typeof QualitygateDecision)[keyof typeof QualitygateDecision];
+export const QualitygateSnapshotMode = {
+  Diff: "diff",
+  Staged: "staged",
+  Worktree: "worktree",
+  Mr: "mr",
+} as const;
+export type QualitygateSnapshotMode = (typeof QualitygateSnapshotMode)[keyof typeof QualitygateSnapshotMode];
 export const SandboxSessionState = {
   Ready: "ready",
   Stopped: "stopped",

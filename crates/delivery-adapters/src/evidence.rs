@@ -1,6 +1,7 @@
 //! Validate host evidence and exact source, prompt, policy and knowledge bindings.
 use crate::validation::{validate_commit, validate_digest};
 use anyhow::{Context, Result, ensure};
+use contracts::{QualitygateDecision, QualitygateProfile, QualitygateScope};
 use freshness::{RemoteClient, RemoteSnapshot, SkillsManifest};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -96,14 +97,22 @@ impl ReleaseEvidence {
         );
         let qualitygate = self.qualitygate_report.read()?;
         ensure!(
-            qualitygate["profile"] == "full"
-                && ["repository", "delivery", "task"]
-                    .contains(&qualitygate["scope"].as_str().unwrap_or("")),
+            QualitygateProfile::from_value(&qualitygate["profile"])
+                == Some(QualitygateProfile::Full)
+                && matches!(
+                    QualitygateScope::from_value(&qualitygate["scope"]),
+                    Some(
+                        QualitygateScope::Repository
+                            | QualitygateScope::Delivery
+                            | QualitygateScope::Task
+                    )
+                ),
             "Qualitygate report must cover a full delivery, task or repository scope"
         );
         ensure!(
             qualitygate["gate"]["complete"] == true
-                && qualitygate["gate"]["decision"] == contracts::VerificationVerdict::Pass.as_str(),
+                && QualitygateDecision::from_value(&qualitygate["gate"]["decision"])
+                    == Some(QualitygateDecision::Pass),
             "Qualitygate report is incomplete or failed"
         );
         ensure!(

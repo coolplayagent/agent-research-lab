@@ -109,3 +109,36 @@ fn research_evaluation_domains_preserve_distinct_wire_values() {
         assert!(PromptEvaluationKind::from_value(&value).is_none());
     }
 }
+
+#[test]
+fn external_qualitygate_domains_keep_wire_values_and_fail_on_unknown_inputs() {
+    for (name, values) in [
+        ("QualitygateProfile", vec!["quick", "full"]),
+        (
+            "QualitygateScope",
+            vec!["repository", "delivery", "task", "path"],
+        ),
+        ("QualitygateDecision", vec!["pass", "fail", "incomplete"]),
+        (
+            "QualitygateSnapshotMode",
+            vec!["diff", "staged", "worktree", "mr"],
+        ),
+    ] {
+        assert_eq!(catalog()[name], serde_json::json!(values));
+    }
+    assert_eq!(
+        QualitygateDecision::parse("incomplete").unwrap(),
+        QualitygateDecision::Incomplete
+    );
+    assert!(VerificationVerdict::parse("incomplete").is_err());
+    for value in [
+        serde_json::json!("future"),
+        serde_json::json!(true),
+        serde_json::Value::Null,
+    ] {
+        assert!(QualitygateProfile::from_value(&value).is_none());
+        assert!(QualitygateScope::from_value(&value).is_none());
+        assert!(QualitygateDecision::from_value(&value).is_none());
+        assert!(QualitygateSnapshotMode::from_value(&value).is_none());
+    }
+}

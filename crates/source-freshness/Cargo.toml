@@ -8,6 +8,7 @@ license.workspace = true
 name = "freshness"
 
 [dependencies]
+contracts.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
 config.workspace = true

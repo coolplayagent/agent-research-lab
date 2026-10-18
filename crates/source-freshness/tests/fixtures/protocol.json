@@ -1,0 +1,24 @@
+{
+  "remote": {
+    "repository": "coolplayagent/example",
+    "default_branch": "feature/验证",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "checked_at": "2026-10-09T00:00:00Z"
+  },
+  "branch_url": "feature%2F%E9%AA%8C%E8%AF%81",
+  "skills": {
+    "schema_version": 1,
+    "skills": [{
+      "name": "fixture-skill",
+      "repository": "coolplayagent/example",
+      "installed_path": "/host/技能",
+      "runtime_path": "/host/技能/cli",
+      "tree_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "runtime_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "release_tag": "版本-v1",
+      "release_id": 42,
+      "source_commit": null,
+      "checked_at": "2026-10-09T00:00:00Z"
+    }]
+  }
+}

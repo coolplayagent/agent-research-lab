@@ -56,6 +56,10 @@ states! {
     MergeabilityState { Mergeable => "MERGEABLE", Conflicting => "CONFLICTING", Unknown => "UNKNOWN" }
     MergeQueueState { Clean => "CLEAN", Blocked => "BLOCKED", Behind => "BEHIND", Dirty => "DIRTY", Draft => "DRAFT", HasHooks => "HAS_HOOKS", Unknown => "UNKNOWN", Unstable => "UNSTABLE" }
     VerificationVerdict { Pass => "pass", Fail => "fail" }
+    QualitygateProfile { Quick => "quick", Full => "full" }
+    QualitygateScope { Repository => "repository", Delivery => "delivery", Task => "task", Path => "path" }
+    QualitygateDecision { Pass => "pass", Fail => "fail", Incomplete => "incomplete" }
+    QualitygateSnapshotMode { Diff => "diff", Staged => "staged", Worktree => "worktree", Mr => "mr" }
     SandboxSessionState { Ready => "ready", Stopped => "stopped" }
     SandboxExecutionState { Completed => "completed", Running => "running", Failed => "failed" }
     SourceAccessStatus { DownloadedVerified => "downloaded-verified", OnlineOnly => "online-only", AccessGated => "access-gated", NotFound => "not-found", Candidate => "candidate" }

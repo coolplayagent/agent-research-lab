@@ -1436,6 +1436,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "libc",
+ "outcome-hub-contracts",
  "outcome-hub-execution-config",
  "outcome-hub-filesystem-store",
  "outcome-hub-process",

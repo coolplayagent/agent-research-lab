@@ -117,6 +117,12 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 
 `candidates` 注册不可变提示词、验证策略组合、隔离规则提案，不选择稳定策略；`lineage` 输出可复算诊断。`exploration` 验证整批回执后才写预算；`promotion` 负责稳定选择写入，在幂等返回前验证远端与技能新鲜度，并在新写入前再次验证；`selection` 校验已保存选择，只读解析运行时提示词。既有研究门禁与必需的 SuperPOD 绑定保持不变。参见[主机适配层边界审阅](../../../qualitygate/reviews/prompt-cli-boundaries.md)。
 
+## 源码与技能新鲜度
+
+`source-freshness` 通过精简入口保留原主机 API。`protocol` 保存快照和技能清单，`identity` 校验授权仓库与不可变绑定，`client` 执行有界命令；`remote` 捕获并复查实际默认分支，不移动用户工作；`releases` 区分已确认不存在的发布版和查询失败；`skills` 验证完整清单及任务尝试期间的安装字节，`files` 管理规范目录摘要与有界读取，`source_gate` 校验源码构建工具的精确提交 Qualitygate 证据。
+
+Qualitygate 检查配置、范围、决策和快照模式分别定义在共享 `contracts`，通过 Bazel 生成前端契约。源码技能和交付适配器在外部边界解析这些类型，未知值不能授予权限。两处策略保持独立：源码覆盖要求精确提交上完整、非空、无待执行项的差异检查，范围限交付或任务；发布交付继续兼容原有仓库范围。参见[新鲜度边界审阅](../../../qualitygate/reviews/freshness-boundaries.md)。
+
 ## 构建资产
 
 Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件获取外部依赖。提示词、JSON 示例、桌面资产是显式编译输入，主发布包包含双语文档。命令见[开发与验证](../guide/08-development.md)。

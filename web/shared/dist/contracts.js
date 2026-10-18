@@ -61,6 +61,27 @@ export const VerificationVerdict = {
     Pass: "pass",
     Fail: "fail",
 };
+export const QualitygateProfile = {
+    Quick: "quick",
+    Full: "full",
+};
+export const QualitygateScope = {
+    Repository: "repository",
+    Delivery: "delivery",
+    Task: "task",
+    Path: "path",
+};
+export const QualitygateDecision = {
+    Pass: "pass",
+    Fail: "fail",
+    Incomplete: "incomplete",
+};
+export const QualitygateSnapshotMode = {
+    Diff: "diff",
+    Staged: "staged",
+    Worktree: "worktree",
+    Mr: "mr",
+};
 export const SandboxSessionState = {
     Ready: "ready",
     Stopped: "stopped",

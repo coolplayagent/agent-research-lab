@@ -69,6 +69,31 @@ export declare const VerificationVerdict: {
     readonly Fail: "fail";
 };
 export type VerificationVerdict = (typeof VerificationVerdict)[keyof typeof VerificationVerdict];
+export declare const QualitygateProfile: {
+    readonly Quick: "quick";
+    readonly Full: "full";
+};
+export type QualitygateProfile = (typeof QualitygateProfile)[keyof typeof QualitygateProfile];
+export declare const QualitygateScope: {
+    readonly Repository: "repository";
+    readonly Delivery: "delivery";
+    readonly Task: "task";
+    readonly Path: "path";
+};
+export type QualitygateScope = (typeof QualitygateScope)[keyof typeof QualitygateScope];
+export declare const QualitygateDecision: {
+    readonly Pass: "pass";
+    readonly Fail: "fail";
+    readonly Incomplete: "incomplete";
+};
+export type QualitygateDecision = (typeof QualitygateDecision)[keyof typeof QualitygateDecision];
+export declare const QualitygateSnapshotMode: {
+    readonly Diff: "diff";
+    readonly Staged: "staged";
+    readonly Worktree: "worktree";
+    readonly Mr: "mr";
+};
+export type QualitygateSnapshotMode = (typeof QualitygateSnapshotMode)[keyof typeof QualitygateSnapshotMode];
 export declare const SandboxSessionState: {
     readonly Ready: "ready";
     readonly Stopped: "stopped";
