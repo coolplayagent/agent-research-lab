@@ -192,6 +192,15 @@ export declare const messages: {
     readonly "SandboxExecutionState.completed": "已完成";
     readonly "SandboxExecutionState.running": "运行中";
     readonly "SandboxExecutionState.failed": "失败";
+    readonly "SourceAccessStatus.downloaded-verified": "已下载并验证";
+    readonly "SourceAccessStatus.online-only": "仅在线可用";
+    readonly "SourceAccessStatus.access-gated": "访问受限";
+    readonly "SourceAccessStatus.not-found": "未找到";
+    readonly "SourceAccessStatus.candidate": "候选来源";
+    readonly "FindingKind.measured": "实测结果";
+    readonly "FindingKind.external_claim": "外部主张";
+    readonly "FindingKind.inference": "推断";
+    readonly "FindingKind.unknown": "未知";
     readonly "ContentIntegrityState.complete": "完整";
     readonly "ContentIntegrityState.degraded": "完整性受损";
     readonly "TopicState.active": "进行中";

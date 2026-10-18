@@ -180,6 +180,24 @@ are rejected; an explicit null review decision retains its existing meaning.
 `protocol`, `validation` and `host` hold wire records, shared input checks and
 bounded commands. See the [delivery adapter review](../../../qualitygate/reviews/delivery-adapter-boundaries.md).
 
+## External knowledge publication
+
+`knowledge-publication` retains its public report and publication APIs at the
+crate root. `report` owns payloads and deterministic Markdown; `validation`
+checks reviewed content, evidence bindings, citations and local source archives.
+`protocol` holds explicit repository layouts and request/receipt records.
+`FindingKind` and `SourceAccessStatus` come from `contracts`, preserving their
+existing wire values and generating frontend contracts through Bazel.
+
+`preparation` writes the isolated contribution. `snapshot` binds every allowed
+path, deletion and file digest to the reviewed baseline. `publication` rechecks
+that manifest before committing and pushing the exact head for a PR. `host`
+owns bounded Git/knowledge CLI calls; `index_refresh` submits at most one update
+and requires an exact, fresh, complete index observation. Unknown source states
+fail on input; unknown integrity states never imply readiness. Core collaboration
+does not require this optional research adapter or an external knowledge binding.
+See the [publication boundary review](../../../qualitygate/reviews/knowledge-publication-boundaries.md).
+
 ## Documentation and build assets
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.

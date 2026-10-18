@@ -35,3 +35,30 @@ fn installation_journal_values_remain_distinct_from_service_activation() {
     assert!(InstallationPhase::parse("future_phase").is_err());
     assert!(ActivationPhase::parse("activated").is_err());
 }
+
+#[test]
+fn publication_domains_preserve_their_distinct_wire_values() {
+    assert_eq!(
+        SourceAccessStatus::ALL
+            .iter()
+            .map(|value| value.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "downloaded-verified",
+            "online-only",
+            "access-gated",
+            "not-found",
+            "candidate"
+        ]
+    );
+    assert_eq!(
+        FindingKind::ALL
+            .iter()
+            .map(|value| value.as_str())
+            .collect::<Vec<_>>(),
+        ["measured", "external_claim", "inference", "unknown"]
+    );
+    assert!(SourceAccessStatus::parse("unknown").is_err());
+    assert_eq!(FindingKind::parse("unknown").unwrap(), FindingKind::Unknown);
+    assert!(ContentIntegrityState::parse("downloaded-verified").is_err());
+}

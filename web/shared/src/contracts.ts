@@ -81,6 +81,21 @@ export const SandboxExecutionState = {
   Failed: "failed",
 } as const;
 export type SandboxExecutionState = (typeof SandboxExecutionState)[keyof typeof SandboxExecutionState];
+export const SourceAccessStatus = {
+  DownloadedVerified: "downloaded-verified",
+  OnlineOnly: "online-only",
+  AccessGated: "access-gated",
+  NotFound: "not-found",
+  Candidate: "candidate",
+} as const;
+export type SourceAccessStatus = (typeof SourceAccessStatus)[keyof typeof SourceAccessStatus];
+export const FindingKind = {
+  Measured: "measured",
+  ExternalClaim: "external_claim",
+  Inference: "inference",
+  Unknown: "unknown",
+} as const;
+export type FindingKind = (typeof FindingKind)[keyof typeof FindingKind];
 export const ContentIntegrityState = {
   Complete: "complete",
   Degraded: "degraded",

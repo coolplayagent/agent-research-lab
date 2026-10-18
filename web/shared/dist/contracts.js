@@ -70,6 +70,19 @@ export const SandboxExecutionState = {
     Running: "running",
     Failed: "failed",
 };
+export const SourceAccessStatus = {
+    DownloadedVerified: "downloaded-verified",
+    OnlineOnly: "online-only",
+    AccessGated: "access-gated",
+    NotFound: "not-found",
+    Candidate: "candidate",
+};
+export const FindingKind = {
+    Measured: "measured",
+    ExternalClaim: "external_claim",
+    Inference: "inference",
+    Unknown: "unknown",
+};
 export const ContentIntegrityState = {
     Complete: "complete",
     Degraded: "degraded",

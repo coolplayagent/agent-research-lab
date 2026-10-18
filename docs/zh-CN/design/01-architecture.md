@@ -87,6 +87,12 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 
 `github` 负责远端观测和解码，`pull_requests` 负责 PR 创建与复用，`merge_gate` 判断证据是否满足门禁，`merge` 在绑定 PR 头提交的合并前重新获取观测。未知 PR 状态以及缺失或格式错误的审批结论会失败；明确的 `null` 保持原有语义。`protocol`、`validation`、`host` 分别承载协议记录、通用输入校验和有界命令。详见[交付适配器评审](../../../qualitygate/reviews/delivery-adapter-boundaries.md)。
 
+## 外部知识发布
+
+`knowledge-publication` 在 crate 根保留公开报告和发布 API。`report` 负责报告数据与确定性的 Markdown 渲染；`validation` 校验内容审阅、证据绑定、引用和本地来源归档；`protocol` 保存明确的仓库布局及请求、回执。`FindingKind` 和 `SourceAccessStatus` 统一来自 `contracts`，保留原序列化值，并通过 Bazel 生成前端契约。
+
+`preparation` 在隔离工作树准备贡献；`snapshot` 将允许的路径、删除项和文件摘要绑定到审阅基线；`publication` 在提交、推送精确 head 和创建 PR 前重新核验清单。`host` 执行有界 Git 与知识 CLI 调用；`index_refresh` 至多提交一次更新，只接受精确、新鲜且完整的索引观测。未知来源状态在输入时拒绝，未知完整性状态不能表示就绪。该研究适配器及外部知识绑定仍为可选项，核心协作不依赖它们。参见[发布边界审阅](../../../qualitygate/reviews/knowledge-publication-boundaries.md)。
+
 ## 构建资产
 
 Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件获取外部依赖。提示词、JSON 示例、桌面资产是显式编译输入，主发布包包含双语文档。命令见[开发与验证](../guide/08-development.md)。

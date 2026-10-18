@@ -66,7 +66,7 @@ fn changed_pending_provenance_is_quarantined_without_starving_next_entry() {
                 resource: relative,
                 sha256: Some(delivery::file_sha256(&source).unwrap()),
                 retrieved_at: "2026-10-09T12:00:00+08:00".into(),
-                access_status: "downloaded-verified".into(),
+                access_status: knowledge::SourceAccessStatus::DownloadedVerified,
             }],
             findings: vec![knowledge::Finding {
                 kind: knowledge::FindingKind::Inference,

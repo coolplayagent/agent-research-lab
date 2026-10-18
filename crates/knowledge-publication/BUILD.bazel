@@ -25,6 +25,7 @@ rust_test(
     name = "tests",
     crate = ":knowledge",
     data = ["fixtures/index-refresh.sh"],
+    compile_data = ["fixtures/report-wire.json", "fixtures/report-rendered.md"],
     aliases = aliases(normal_dev = True, proc_macro_dev = True),
     deps = all_crate_deps(normal_dev = True),
     proc_macro_deps = all_crate_deps(proc_macro_dev = True),

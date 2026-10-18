@@ -80,6 +80,21 @@ export declare const SandboxExecutionState: {
     readonly Failed: "failed";
 };
 export type SandboxExecutionState = (typeof SandboxExecutionState)[keyof typeof SandboxExecutionState];
+export declare const SourceAccessStatus: {
+    readonly DownloadedVerified: "downloaded-verified";
+    readonly OnlineOnly: "online-only";
+    readonly AccessGated: "access-gated";
+    readonly NotFound: "not-found";
+    readonly Candidate: "candidate";
+};
+export type SourceAccessStatus = (typeof SourceAccessStatus)[keyof typeof SourceAccessStatus];
+export declare const FindingKind: {
+    readonly Measured: "measured";
+    readonly ExternalClaim: "external_claim";
+    readonly Inference: "inference";
+    readonly Unknown: "unknown";
+};
+export type FindingKind = (typeof FindingKind)[keyof typeof FindingKind];
 export declare const ContentIntegrityState: {
     readonly Complete: "complete";
     readonly Degraded: "degraded";
