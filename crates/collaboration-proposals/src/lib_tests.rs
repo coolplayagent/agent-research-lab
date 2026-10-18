@@ -1,7 +1,10 @@
 use super::*;
+use anyhow::Result;
+use native_effects::fs::{self, File, OpenOptions};
+use std::{collections::BTreeSet, ffi::CString, path::Path};
 use std::{io::Read, process::Command, time::Instant};
 
-fn member(cohort: u64, task: &str, run: &str) -> HostMember {
+pub(super) fn member(cohort: u64, task: &str, run: &str) -> HostMember {
     HostMember {
         cohort_id: format!("{cohort:064x}"),
         task_id: task.into(),
@@ -9,7 +12,7 @@ fn member(cohort: u64, task: &str, run: &str) -> HostMember {
         authority_sha256: "a".repeat(64),
     }
 }
-fn proposal(id: &str) -> Proposal {
+pub(super) fn proposal(id: &str) -> Proposal {
     Proposal {
         schema_version: 1,
         id: id.into(),
@@ -21,7 +24,7 @@ fn proposal(id: &str) -> Proposal {
         recipients: vec![],
     }
 }
-fn write(endpoint: &Endpoint, slot: usize, p: &Proposal) {
+pub(super) fn write(endpoint: &Endpoint, slot: usize, p: &Proposal) {
     storage::write(&endpoint.outbox.join(format!("{slot:02}.json")), p).unwrap();
 }
 fn messages(board: &Board, m: &HostMember, now: u64) -> Vec<Message> {
@@ -32,7 +35,7 @@ fn messages(board: &Board, m: &HostMember, now: u64) -> Vec<Message> {
         .map(|v| serde_json::from_value(v["message"].clone()).unwrap())
         .collect()
 }
-fn selection() -> Selection {
+pub(super) fn selection() -> Selection {
     Selection {
         topics: vec!["recovery".into()],
         query: String::new(),
@@ -54,7 +57,7 @@ fn observer_history_does_not_mutate_authority_or_revive_expired_context() {
     board.revoke_run(&sender, "unconfirmed", 102).unwrap();
     // A new worker proposal must stay unconsumed when only the observer reads.
     write(&endpoint, 1, &proposal("unconsumed"));
-    let before = fs::read(board.state_path(&sender.cohort_id)).unwrap();
+    let before = fs::read(board.store.state_path(&sender.cohort_id)).unwrap();
     let observer = Board::open(temp.path()).unwrap();
     let history = observer
         .inspect(&sender.cohort_id, 101 + TTL_SECONDS)
@@ -75,7 +78,7 @@ fn observer_history_does_not_mutate_authority_or_revive_expired_context() {
     );
     assert_eq!(
         before,
-        fs::read(board.state_path(&sender.cohort_id)).unwrap()
+        fs::read(board.store.state_path(&sender.cohort_id)).unwrap()
     );
 }
 
@@ -278,7 +281,7 @@ fn bounded_reply_chain_lifecycle_and_untrusted_context_do_not_change_actions() {
     assert!(context.text.starts_with("UNTRUSTED"));
     assert!(context.text.contains("@everyone"));
     assert!(context.message_ids.contains(&root));
-    assert_eq!(board.load(&a.cohort_id).unwrap().members.len(), 2);
+    assert_eq!(board.store.load(&a.cohort_id).unwrap().members.len(), 2);
     assert!(board.close_cohort(&a.cohort_id, 105).is_err());
     board.revoke_run(&a, "workflow_failed", 106).unwrap();
     board.revoke_run(&a, "workflow_failed", 107).unwrap();
@@ -320,13 +323,13 @@ fn crash_process_after_commit_before_view_recovers_exactly_once() {
     assert_eq!(exit.code(), Some(91));
     let stale: serde_json::Value = storage::read(&e.view.join("board.json")).unwrap();
     assert!(stale["messages"].as_array().unwrap().is_empty());
-    let before = board.load(&m.cohort_id).unwrap();
+    let before = board.store.load(&m.cohort_id).unwrap();
     assert_eq!(before.messages.len(), 1);
     drop(board);
     let recovered = Board::new(temp.path()).unwrap();
     let r = recovered.poll(&m.cohort_id, 102).unwrap();
     assert_eq!(r.accepted, 0);
-    let after = recovered.load(&m.cohort_id).unwrap();
+    let after = recovered.store.load(&m.cohort_id).unwrap();
     assert_eq!(before.messages[0].id, after.messages[0].id);
     assert_eq!(before.messages[0].expires_at, after.messages[0].expires_at);
     assert_eq!(after.members[0].accepted, 1);
@@ -338,7 +341,7 @@ fn crash_process_after_commit_before_view_recovers_exactly_once() {
         1
     );
     // An initialized authority disappearing is corruption, never a fresh empty board.
-    fs::remove_file(recovered.state_path(&m.cohort_id)).unwrap();
+    fs::remove_file(recovered.store.state_path(&m.cohort_id)).unwrap();
     assert!(recovered.register(&m, 103).is_err());
 }
 #[test]
@@ -349,6 +352,7 @@ fn crash_child() {
     let board = Board::new(Path::new(&path)).unwrap();
     if std::env::var_os("COMMUNICATION_RESERVATION_CRASH").is_some() {
         board
+            .store
             .reserve_run(&member(1, "task", "reserved-run"), false)
             .unwrap();
         std::process::exit(92);
@@ -376,7 +380,12 @@ fn global_capacity_duplicate_at_full_and_task_limits_survive_expiry() {
         board.poll(&members[0].0.cohort_id, 101).unwrap();
     }
     assert_eq!(
-        board.load(&members[0].0.cohort_id).unwrap().messages.len(),
+        board
+            .store
+            .load(&members[0].0.cohort_id)
+            .unwrap()
+            .messages
+            .len(),
         256
     );
     write(&members[0].1, 8, &proposal("c0"));
@@ -403,7 +412,10 @@ fn global_capacity_duplicate_at_full_and_task_limits_survive_expiry() {
             b.poll(&m.cohort_id, 100 + i).unwrap();
         }
     }
-    assert_eq!(b.load(&format!("{:064x}", 2)).unwrap().messages.len(), 16);
+    assert_eq!(
+        b.store.load(&format!("{:064x}", 2)).unwrap().messages.len(),
+        16
+    );
     let r = b.poll(&format!("{:064x}", 2), 3703).unwrap();
     assert_eq!(r.task_quota_exhausted, vec!["same-task"]);
 }
@@ -423,7 +435,7 @@ fn cohort_capacity_has_typed_errors_and_corruption_is_not_capacity() {
         CapacityKind::RetainedCohorts
     );
     let m = member(0, "task", "r0");
-    fs::write(board.state_path(&m.cohort_id), b"{").unwrap();
+    fs::write(board.store.state_path(&m.cohort_id), b"{").unwrap();
     let err = board.register(&m, 102).unwrap_err();
     assert!(err.downcast_ref::<CapacityExhausted>().is_none());
 }
@@ -446,7 +458,7 @@ fn run_reservation_survives_interruption_and_shards_have_independent_locks() {
     assert!(board.register(&wrong, 100).is_err());
     let e = board.register(&a, 100).unwrap();
     write(&e, 0, &proposal("reserved"));
-    let lock = board.lock(&a.cohort_id).unwrap();
+    let lock = board.store.lock(&a.cohort_id).unwrap();
     let other = HostMember {
         cohort_id: "ab".repeat(32),
         ..member(2, "other", "independent-run")
@@ -470,15 +482,18 @@ fn successful_terminal_drains_late_outbox_once_without_revision_churn() {
     let m = member(1, "late", "late-run");
     let e = board.register(&m, 100).unwrap();
     write(&e, 15, &proposal("last-moment"));
-    let cursor = board.load(&m.cohort_id).unwrap().cursor;
+    let cursor = board.store.load(&m.cohort_id).unwrap().cursor;
     board.complete_run(&m, &"b".repeat(64), 101).unwrap();
-    let state = fs::read(board.state_path(&m.cohort_id)).unwrap();
+    let state = fs::read(board.store.state_path(&m.cohort_id)).unwrap();
     let view = fs::read(e.view.join("board.json")).unwrap();
     assert_eq!(messages(&board, &m, 101).len(), 1);
-    assert_eq!(board.load(&m.cohort_id).unwrap().cursor, cursor);
+    assert_eq!(board.store.load(&m.cohort_id).unwrap().cursor, cursor);
     write(&e, 0, &proposal("after-terminal"));
     board.complete_run(&m, &"b".repeat(64), 102).unwrap();
-    assert_eq!(fs::read(board.state_path(&m.cohort_id)).unwrap(), state);
+    assert_eq!(
+        fs::read(board.store.state_path(&m.cohort_id)).unwrap(),
+        state
+    );
     assert_eq!(fs::read(e.view.join("board.json")).unwrap(), view);
     fs::remove_file(e.view.join("board.json")).unwrap();
     board.complete_run(&m, &"b".repeat(64), 103).unwrap();

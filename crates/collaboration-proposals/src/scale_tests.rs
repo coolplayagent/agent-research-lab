@@ -1,5 +1,6 @@
 //! Real filesystem load, synthetic logical identities: no workers or model calls.
 use super::*;
+use crate::limits::MAX_STATE_BYTES;
 use std::{io::Read, time::Instant};
 
 fn proposal(agent: usize, slot: usize) -> Proposal {

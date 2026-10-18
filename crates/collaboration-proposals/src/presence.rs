@@ -1,6 +1,25 @@
 //! Host-owned IM availability and bounded delivery queues. Delivery is not a read ACK.
-use super::*;
+use crate::{
+    audience::visible_to,
+    authority::{Cohort, MemberRecord},
+    files::directory,
+    protocol::HostMember,
+};
+use anyhow::{Context, Result, ensure};
+use contracts::OriginState;
+use native_effects::fs::File;
+use serde::{Deserialize, Serialize};
 use std::io::{Seek, SeekFrom};
+use std::{
+    collections::BTreeSet,
+    ffi::CString,
+    io::Read,
+    os::{
+        fd::{AsRawFd, FromRawFd},
+        unix::fs::MetadataExt,
+    },
+    path::Path,
+};
 
 pub use contracts::Presence;
 

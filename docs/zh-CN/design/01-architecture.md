@@ -61,6 +61,12 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 这些模块保留已有 runtime 函数路径、序列化记录和研究门禁。批量注册与执行共享提示词渲染，人员与任务记忆共享检查点格式。生产模块显式声明依赖，单元测试位于兄弟 `*_tests.rs` 文件。[本地语义评审](../../../qualitygate/reviews/runtime-boundaries.md)记录了职责、保留的权限校验及验证范围。
 [调度阶段评审](../../../qualitygate/reviews/scheduler-phases.md)记录了后续控制器状态拆分及对应行为回归。
 
+## 研究提案板边界
+
+`collaboration-proposals` 的 crate 根保留公开 `Board` 和协议类型。内部 `board` 协调宿主操作并持有分片锁，单个 `store` 拥有权限路径、运行身份预留和派生视图发布；`authority` 在记录参与读写授权前完成校验。
+
+`protocol` 负责协议记录和语法校验，`admission` 消费有界 outbox 槽位，`audience` 共用可见性与回复受众规则。`projection` 从已验证记录生成视图与冻结上下文，`presence` 维护宿主拥有的投递生命周期，`files` 负责锚定目录下的有界读取，`limits` 定义既有配额与容量错误。v1 序列化、消息身份、研究提案 TTL、配额和退役标记均保留。详见[提案边界评审](../../../qualitygate/reviews/proposal-boundaries.md)。
+
 ## 构建资产
 
 Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件获取外部依赖。提示词、JSON 示例、桌面资产是显式编译输入，主发布包包含双语文档。命令见[开发与验证](../guide/08-development.md)。

@@ -112,6 +112,22 @@ records ownership, unchanged authority checks and verification limits.
 The [scheduler phase review](../../../qualitygate/reviews/scheduler-phases.md)
 records the later separation of controller state and its behavioral regressions.
 
+## Research proposal board
+
+`collaboration-proposals` keeps its public `Board` and protocol types at the crate
+root. Internally, `board` coordinates host operations and retains the shard lock;
+one `store` owns authority paths, run reservations and derived view publication.
+`authority` validates retained records before they can authorize a read or write.
+
+`protocol` owns request/response records and syntactic validation, `admission`
+consumes bounded outbox slots, and `audience` supplies the shared visibility and
+reply rules. `projection` renders views and frozen context from validated records;
+`presence` retains the host-owned delivery lifecycle. `files` owns anchored,
+bounded filesystem reads, while `limits` defines existing quotas and capacity errors.
+These modules preserve v1 serialization and message identities. Proposal TTLs,
+quotas and retirement markers retain their existing research semantics. See the
+[proposal boundary review](../../../qualitygate/reviews/proposal-boundaries.md).
+
 ## Documentation and build assets
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.
