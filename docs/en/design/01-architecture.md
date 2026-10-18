@@ -215,6 +215,23 @@ continue other work. Interrupted or failed effects still require explicit host
 reconciliation; a timer only retries pending index refresh observations. See the
 [outbox boundary review](../../../qualitygate/reviews/outbox-boundaries.md).
 
+## Private dependency cache preparation
+
+`build-cache` preserves its public preparation API and performance-marker format.
+`preparation` owns input binding and the final marker; `report` owns metrics and
+resumable-deadline diagnostics. `cargo` selects public locked crates and sparse
+index entries, while `bazel` selects reachable CAS hashes and a pinned Bazelisk
+binary. Both use one `copying::Seeder` for retained-file budgets, deadline checks,
+checksum verification and atomic private copies.
+
+`metadata` verifies registry/archive inputs and reads named tar members without
+executing dependency declarations. `rust_toolchain` and `python_toolchain` select
+literal host toolchain hashes; `files` owns bounded regular-file reads and path
+confinement. Imports flow from orchestration to selectors and shared mechanisms;
+wire reports do not depend on execution. A ready marker only avoids repeated
+cache preparation: build tools still verify artifacts, and evaluation/effect gates
+remain independent. See the [cache boundary review](../../../qualitygate/reviews/cache-boundaries.md).
+
 ## Documentation and build assets
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.

@@ -1,47 +1,10 @@
 use super::*;
-use std::os::unix::fs::{MetadataExt, symlink};
-
-fn fixture() -> (
-    tempfile::TempDir,
-    PathBuf,
-    PathBuf,
-    PathBuf,
-    PathBuf,
-    String,
-) {
-    let temp = tempfile::tempdir().unwrap();
-    let worktree = temp.path().join("worktree");
-    let logs = temp.path().join("logs");
-    let cargo = temp.path().join("cargo");
-    let cache = temp.path().join("cache");
-    fs::create_dir_all(&worktree).unwrap();
-    let digest = storage::digest(b"public archive");
-    fs::write(worktree.join("Cargo.lock"), format!("version = 4\n[[package]]\nname = 'example'\nversion = '1.0.0'\nsource = '{REGISTRY}'\nchecksum = '{digest}'\n")).unwrap();
-    fs::write(worktree.join("MODULE.bazel"), "module(name = 'fixture')\n").unwrap();
-    let registry = "index.crates.io-fixture";
-    let archive = cargo
-        .join("registry/cache")
-        .join(registry)
-        .join("example-1.0.0.crate");
-    checked_directory(archive.parent().unwrap(), true).unwrap();
-    fs::write(&archive, b"public archive").unwrap();
-    let index = cargo
-        .join("registry/index")
-        .join(registry)
-        .join(".cache/ex/am/example");
-    checked_directory(index.parent().unwrap(), true).unwrap();
-    fs::write(index, b"public sparse index").unwrap();
-    fs::write(cargo.join("credentials.toml"), "credential-sentinel").unwrap();
-    fs::write(cargo.join("config.toml"), "configuration-sentinel").unwrap();
-    fs::write(cargo.join(".package-cache"), "host-lock-sentinel").unwrap();
-    let cas = cache
-        .join("bazel/_bazel_fixture/cache/repos/v1/content_addressable/sha256")
-        .join(&digest);
-    checked_directory(&cas, true).unwrap();
-    fs::write(cas.join("file"), b"public archive").unwrap();
-    fs::write(cas.join("id-ignored"), "unrelated canonical metadata").unwrap();
-    (temp, worktree, logs, cargo, cache, digest)
-}
+use crate::{MAX_BYTES, REGISTRY, test_support::fixture};
+use native_effects::fs::{self, File};
+use std::{
+    os::unix::fs::{MetadataExt, symlink},
+    time::Duration,
+};
 
 #[test]
 fn private_copies_exclude_credentials_locks_and_unrelated_metadata() {
@@ -141,61 +104,6 @@ fn malformed_lockfiles_return_errors_without_panicking() {
 }
 
 #[test]
-fn resuming_verifies_existing_files_and_keeps_them_in_the_total_budget() {
-    let (_temp, worktree, logs, cargo, cache, _) = fixture();
-    let mut seed = Seeder {
-        started: Instant::now(),
-        report: SeedReport::default(),
-    };
-    let archive = cargo.join("registry/cache/index.crates.io-fixture/example-1.0.0.crate");
-    let destination =
-        logs.join("home/.cargo/registry/cache/index.crates.io-fixture/example-1.0.0.crate");
-    let checksum = storage::digest(b"public archive");
-    seed.copy(&archive, &destination, Some(&checksum), false)
-        .unwrap();
-    let inode = fs::metadata(&destination).unwrap().ino();
-    seed.started = Instant::now() - Duration::from_secs(56);
-    assert!(deferred(
-        &seed
-            .copy(&archive, &destination, Some(&checksum), false)
-            .unwrap_err()
-    ));
-    let report = prepare_from(&worktree, &logs, Some(&cargo), Some(&cache)).unwrap();
-    assert_eq!(report.reused_files, 1);
-    assert_eq!(report.retained_files, 3);
-    assert_eq!(fs::metadata(&destination).unwrap().ino(), inode);
-    seed.started = Instant::now();
-    seed.report.retained_bytes = MAX_BYTES;
-    assert!(
-        seed.copy(&archive, &destination, Some(&checksum), false)
-            .unwrap_err()
-            .to_string()
-            .contains("budget")
-    );
-    seed.report.retained_bytes = 0;
-    seed.report.retained_files = MAX_FILES;
-    assert!(
-        seed.copy(&archive, &destination, Some(&checksum), false)
-            .unwrap_err()
-            .to_string()
-            .contains("budget")
-    );
-    fs::write(&destination, "damaged private cache").unwrap();
-    let report = prepare_from(&worktree, &logs, Some(&cargo), Some(&cache)).unwrap();
-    assert!(report.copied_files > 0);
-    assert_eq!(fs::read(&destination).unwrap(), b"public archive");
-}
-
-#[test]
-fn registry_integrity_decoding_rejects_invalid_padding() {
-    assert_eq!(
-        decode_sha256("47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=").unwrap(),
-        storage::digest(b"")
-    );
-    assert!(decode_sha256("47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFV=").is_err());
-}
-
-#[test]
 fn symlink_destinations_and_source_archives_cannot_escape() {
     let (temp, worktree, logs, cargo, cache, _) = fixture();
     checked_directory(&logs, true).unwrap();
@@ -220,61 +128,6 @@ fn expired_budget_never_creates_a_ready_marker() {
 }
 
 #[test]
-fn python_metadata_selects_only_the_default_exact_host_runtime() {
-    let module = "python.defaults(\n python_version = \"3.11\",\n)";
-    let expected = "a".repeat(64);
-    let other = "b".repeat(64);
-    let versions = format!(
-        r#"TOOL_VERSIONS = {{
-    "3.11.14": {{
-        "sha256": {{
-            "x86_64-unknown-linux-gnu": "{expected}",
-            "aarch64-unknown-linux-gnu": "{other}",
-        }},
-    }},
-    "3.12.1": {{
-        "sha256": {{
-            "x86_64-unknown-linux-gnu": "{other}",
-        }},
-    }},
-}}
-MINOR_MAPPING = {{
-    "3.11": "3.11.14",
-    "3.12": "3.12.1",
-}}
-"#
-    );
-    assert_eq!(
-        python_default_hash(module, &versions, "x86_64-unknown-linux-gnu").unwrap(),
-        expected
-    );
-    assert!(python_default_hash(module, &versions, "unknown-platform").is_err());
-    assert!(
-        python_default_hash(
-            "python.defaults(python_version = dynamic())",
-            &versions,
-            "x86_64-unknown-linux-gnu"
-        )
-        .is_err()
-    );
-}
-
-#[test]
-fn bootstrap_metadata_only_imports_literal_archive_hashes() {
-    let expected = "a".repeat(64);
-    let ignored = "b".repeat(64);
-    let metadata = format!(
-        "sha256 = \"{expected}\",\n# sha256 = \"{ignored}\",\nname = \"{ignored}\",\nsha256 = lookup(\"{ignored}\"),\n"
-    );
-    let mut hashes = BTreeSet::new();
-    literal_archive_hashes(&metadata, &mut hashes).unwrap();
-    assert_eq!(hashes, BTreeSet::from([expected]));
-    let patch = serde_json::json!({"patches": {"fix.patch": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}});
-    json_hashes(&patch, &mut hashes).unwrap();
-    assert!(hashes.contains(&"0".repeat(64)));
-}
-
-#[test]
 #[ignore = "requires installed Rust/Bazel caches and real bubblewrap; LAB_BUILD_CACHE_PROOF selects output"]
 fn actual_seeded_build_in_agent_namespace() {
     let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -282,7 +135,7 @@ fn actual_seeded_build_in_agent_namespace() {
         .canonicalize()
         .unwrap();
     assert!(source.join("MODULE.bazel").is_file());
-    assert!(source.join("app/Cargo.toml").is_file());
+    assert!(source.join("apps/cli/Cargo.toml").is_file());
     let proof =
         PathBuf::from(std::env::var("LAB_BUILD_CACHE_PROOF").expect("LAB_BUILD_CACHE_PROOF"));
     assert!(!proof.exists(), "proof directory must be new");
@@ -329,4 +182,27 @@ fn actual_seeded_build_in_agent_namespace() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[test]
+fn readiness_binds_every_declared_input_and_rejects_unknown_marker_schema() {
+    let (_temp, worktree, logs, _cargo, _cache, _) = fixture();
+    for name in [
+        "Cargo.lock",
+        "MODULE.bazel",
+        "MODULE.bazel.lock",
+        ".bazelversion",
+        "rust-toolchain.toml",
+    ] {
+        let path = worktree.join(name);
+        fs::write(&path, "frozen input").unwrap();
+        prepare_from(&worktree, &logs, None, None).unwrap();
+        assert!(ready(&worktree, &logs).unwrap());
+        fs::write(&path, "changed input").unwrap();
+        assert!(!ready(&worktree, &logs).unwrap(), "{name}");
+    }
+    let mut report = prepare_from(&worktree, &logs, None, None).unwrap();
+    report.schema_version = 2;
+    storage::write(&logs.join("build-cache-seed.json"), &report).unwrap();
+    assert!(!ready(&worktree, &logs).unwrap());
 }

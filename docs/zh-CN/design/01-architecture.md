@@ -99,6 +99,12 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 
 `queue` 每次调度至多执行一个操作，并在调用适配器前持久化运行意图。`dispatch` 根据类型化索引、合并回执判断结果，同时保留原始 JSON 观测。无效的不可变请求会保留原始字节并转入待对账状态，不执行外部操作，后续调度可以继续处理其他条目。中断或失败的外部操作仍须主机显式对账；定时重试只用于尚未就绪的索引刷新。参见[交付队列边界审阅](../../../qualitygate/reviews/outbox-boundaries.md)。
 
+## 私有依赖缓存准备
+
+`build-cache` 保留公开准备 API 与性能标记格式。`preparation` 负责输入绑定和最终标记；`report` 保存指标与可恢复的截止时间诊断。`cargo` 选择锁定的公开 crate 和稀疏索引条目，`bazel` 选择可达的 CAS 哈希和固定版本的 Bazelisk 二进制。两者共用 `copying::Seeder` 管理保留文件预算、截止时间、校验和及原子私有副本。
+
+`metadata` 验证注册表和归档元数据，仅读取指定 tar 成员，不执行依赖声明；`rust_toolchain`、`python_toolchain` 选择主机工具链的字面量哈希；`files` 负责有界常规文件读取和路径约束。依赖从调度入口指向选择器和共享机制，报告数据不依赖执行逻辑。就绪标记只避免重复缓存准备，构建工具仍会验证产物，评估和副作用门禁保持独立。参见[缓存边界审阅](../../../qualitygate/reviews/cache-boundaries.md)。
+
 ## 构建资产
 
 Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件获取外部依赖。提示词、JSON 示例、桌面资产是显式编译输入，主发布包包含双语文档。命令见[开发与验证](../guide/08-development.md)。
