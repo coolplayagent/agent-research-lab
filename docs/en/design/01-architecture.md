@@ -249,6 +249,24 @@ proposals without policy-adoption authority, and `holdout` checks path separatio
 host receipts, isolation permissions and delivery gates still establish authority.
 See the [prompt model review](../../../qualitygate/reviews/prompt-model-boundaries.md).
 
+## Prompt evolution host adapter
+
+`prompt-evolution-cli` retains its public API, strict JSON records and command
+names. `dispatch` normalizes paths and routes each command; `protocol` owns request
+records. `evaluation` shares ordered host context preparation across promotion
+and novelty evaluation, while `receipts` owns canonical evidence recomputation
+and source/skills digest binding. `files` rejects unknown nested JSON keys;
+`paths` owns host/exposed-store separation and destination checks.
+
+`candidates` registers immutable prompts, validates portfolios and quarantines
+rule proposals without selecting a stable strategy. `lineage` emits recomputable
+diagnostics. `exploration` validates every receipt in a batch before writing its
+budget. `promotion` owns stable selection writes and rechecks upstream/skills
+freshness before an idempotent return and again before a new write; `selection`
+validates retained selections and resolves runtime prompts without mutation.
+The original research gates and required SuperPOD pins remain in force. See the
+[host adapter review](../../../qualitygate/reviews/prompt-cli-boundaries.md).
+
 ## Documentation and build assets
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.

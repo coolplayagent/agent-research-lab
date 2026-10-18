@@ -111,6 +111,12 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 
 `pairing` 验证完整且绑定当前快照的留出集配对；`metrics` 计算纯统计汇总；`evaluation` 执行原有晋升与新能力门禁。`exploration` 管理防重复计数的预算窗口，`quarantine` 保存没有自动采纳权限的规则提案，`holdout` 校验路径隔离，`identity` 提供确定性摘要。模型决策仍为建议，主机回执、隔离权限和交付门禁继续决定实际授权。参见[提示词模型边界审阅](../../../qualitygate/reviews/prompt-model-boundaries.md)。
 
+## 提示词演化主机适配层
+
+`prompt-evolution-cli` 保留公开 API、严格 JSON 结构和命令名称。`dispatch` 归一化路径并分派命令，`protocol` 保存请求记录；`evaluation` 为晋升评估和新能力评估共用按顺序执行的主机上下文准备，`receipts` 负责规范证据复算及源码、技能摘要绑定。`files` 拒绝未知嵌套字段，`paths` 管理主机与暴露存储的路径隔离和输出检查。
+
+`candidates` 注册不可变提示词、验证策略组合、隔离规则提案，不选择稳定策略；`lineage` 输出可复算诊断。`exploration` 验证整批回执后才写预算；`promotion` 负责稳定选择写入，在幂等返回前验证远端与技能新鲜度，并在新写入前再次验证；`selection` 校验已保存选择，只读解析运行时提示词。既有研究门禁与必需的 SuperPOD 绑定保持不变。参见[主机适配层边界审阅](../../../qualitygate/reviews/prompt-cli-boundaries.md)。
+
 ## 构建资产
 
 Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件获取外部依赖。提示词、JSON 示例、桌面资产是显式编译输入，主发布包包含双语文档。命令见[开发与验证](../guide/08-development.md)。
