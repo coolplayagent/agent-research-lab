@@ -1510,9 +1510,5 @@ pub struct LaunchContext {
 }
 
 #[cfg(test)]
-#[path = "tests.rs"]
+#[path = "lib_tests.rs"]
 mod tests;
-
-#[cfg(test)]
-#[path = "scale_tests.rs"]
-mod scale_tests;

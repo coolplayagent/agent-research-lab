@@ -8,7 +8,7 @@ exports_files([
 rust_library(
     name = "contracts",
     crate_name = "contracts",
-    srcs = ["src/lib.rs", "src/filesystem.rs"],
+    srcs = ["src/lib.rs", "src/lib_tests.rs", "src/filesystem.rs"],
     crate_root = "src/lib.rs",
     edition = "2024",
     aliases = aliases(),

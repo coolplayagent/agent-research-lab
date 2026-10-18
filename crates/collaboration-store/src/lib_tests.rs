@@ -266,3 +266,18 @@ async fn oversized_history_cursor_rejects_without_disabling_storage() {
             .durable
     );
 }
+
+#[path = "messaging_tests.rs"]
+mod messaging_tests;
+
+#[path = "goal_tests.rs"]
+mod goal_tests;
+
+#[path = "coordination_tests.rs"]
+mod coordination_tests;
+
+#[path = "iteration_tests.rs"]
+mod iteration_tests;
+
+#[path = "outcome_tests.rs"]
+mod outcome_tests;

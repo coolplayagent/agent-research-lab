@@ -6,7 +6,7 @@ thread_local! {
     static DIRECT_AGENT_FIXTURE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-pub(super) fn direct_agent_fixture() -> bool {
+pub(crate) fn direct_agent_fixture() -> bool {
     DIRECT_AGENT_FIXTURE.get()
 }
 

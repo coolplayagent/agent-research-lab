@@ -303,4 +303,5 @@ pub async fn serve(id: &str, state: &Path, socket: &Path, seconds: u64) -> Resul
     Ok(())
 }
 #[cfg(test)]
+#[path = "lib_tests.rs"]
 mod tests;

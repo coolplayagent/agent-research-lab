@@ -620,19 +620,5 @@ impl Drop for Subscription {
 }
 
 #[cfg(test)]
+#[path = "lib_tests.rs"]
 mod tests;
-
-#[cfg(test)]
-mod messaging_tests;
-
-#[cfg(test)]
-mod goal_tests;
-
-#[cfg(test)]
-mod coordination_tests;
-
-#[cfg(test)]
-mod iteration_tests;
-
-#[cfg(test)]
-mod outcome_tests;

@@ -362,10 +362,5 @@ pub fn serve(
 }
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod tests;
-
-#[cfg(test)]
-mod transport_tests;
-
-#[cfg(test)]
-mod research_scenario_tests;

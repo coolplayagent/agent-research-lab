@@ -460,3 +460,12 @@ async fn canonical_routes_preserve_operator_and_actor_authority() {
     );
     h.close().await;
 }
+
+#[path = "goal_tests.rs"]
+mod goal_tests;
+
+#[path = "iteration_tests.rs"]
+mod iteration_tests;
+
+#[path = "outcome_tests.rs"]
+mod outcome_tests;

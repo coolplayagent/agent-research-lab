@@ -752,7 +752,7 @@ print(json.dumps(result))
         std::env::current_exe().unwrap().to_str().unwrap(),
         &[
             "--exact".into(),
-            "cohort_tests::freshness_is_reverified_after_all_probes_without_claiming_stale_tasks"
+            "tests::cohort_tests::freshness_is_reverified_after_all_probes_without_claiming_stale_tasks"
                 .into(),
             "--nocapture".into(),
         ],

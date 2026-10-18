@@ -872,3 +872,6 @@ fn public_session_activity_tracks_overlapping_tools_and_partial_lines() {
     std::os::unix::fs::symlink(temp.path().join("private"), &log).unwrap();
     assert!(board.poll_live(&a.cohort_id, &[b], 111).is_err());
 }
+
+#[path = "scale_tests.rs"]
+mod scale_tests;

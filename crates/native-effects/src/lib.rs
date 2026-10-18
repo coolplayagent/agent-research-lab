@@ -13,4 +13,5 @@ pub use context::{
 pub use policy::{FilesystemPolicy, FilesystemRoot};
 
 #[cfg(test)]
+#[path = "lib_tests.rs"]
 mod tests;

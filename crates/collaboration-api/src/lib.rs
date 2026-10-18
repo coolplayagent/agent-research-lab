@@ -83,10 +83,5 @@ fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
 }
 
 #[cfg(test)]
-mod goal_tests;
-#[cfg(test)]
-mod iteration_tests;
-#[cfg(test)]
-mod outcome_tests;
-#[cfg(test)]
+#[path = "lib_tests.rs"]
 mod tests;

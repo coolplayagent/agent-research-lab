@@ -121,4 +121,5 @@ pub fn verify(source: &Path, destination: &Path) -> Result<Manifest> {
     verify_contents(source, destination)
 }
 #[cfg(test)]
+#[path = "lib_tests.rs"]
 mod tests;

@@ -531,4 +531,5 @@ pub(super) fn writeback(c: &Config, job: &Job, receipt: &Value) -> Result<Value>
     memory::writeback(c, job, receipt)
 }
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod tests;

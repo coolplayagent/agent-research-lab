@@ -477,4 +477,5 @@ fn register_batch(
 }
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod tests;

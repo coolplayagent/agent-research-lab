@@ -1,0 +1,2282 @@
+use super::*;
+
+#[test]
+fn partial_communication_registration_recovers_from_private_launch_intent() {
+    let (_temp, c, mut job, _w) = completion_fixture(false, json!([]));
+    let team = multi_agent::TeamBinding {
+        id: "intent-recovery".into(),
+        cell: None,
+        topics: vec!["sdlc".into()],
+        query: String::new(),
+    };
+    job.task.communication = Some(team.clone());
+    let member = team.member(&job).unwrap();
+    let board = communication::Board::new(&c.state_dir).unwrap();
+    let time = now().max(0) as u64;
+    // The host saved intent, then registered, then crashed before receiving context.
+    job.launch = Some(serde_json::from_value(json!({"pid":0,"process_start":"","lease":{},"attempt":{},"log_dir":c.state_dir.join("runs").join(&job.run_id),"communication_member":member})).unwrap());
+    storage::write(&job_path(&c, &job.task.id), &job).unwrap();
+    board.register(&member, time).unwrap();
+    let recovered: Job = storage::read(&job_path(&c, &job.task.id)).unwrap();
+    assert!(recovered.launch.as_ref().unwrap().communication.is_none());
+    revoke_communication(&c, &recovered, recovered.launch.as_ref().unwrap());
+    let first = board.view(&member.cohort_id, now().max(0) as u64).unwrap();
+    assert_eq!(first["members"][0]["origin"]["state"], "revoked");
+    revoke_communication(&c, &recovered, recovered.launch.as_ref().unwrap());
+    assert_eq!(
+        board.view(&member.cohort_id, now().max(0) as u64).unwrap()["revision"],
+        first["revision"]
+    );
+}
+
+#[test]
+fn target_prompt_matches_required_tools() {
+    let c: Config = serde_json::from_value(json!({
+        "schema_version":1,"workspace":"/workspace","state_dir":"/state",
+        "superpod":"/superpod","codex":"unused","workflow":"unused",
+        "daily_seconds":3600,"max_agents":1,"task_timeout_seconds":20,
+        "models":{},"tools":{},"require_latest":false,"skills_manifest":null
+    }))
+    .unwrap();
+    for (tools, desktop, sandbox) in [
+        (vec!["computer-use-cli"], true, false),
+        (vec!["repo-sandbox"], false, true),
+        (vec!["computer-use-cli", "repo-sandbox"], true, true),
+        (vec![], false, false),
+    ] {
+        let task: Task = serde_json::from_value(json!({
+            "id":"target-prompt","role":"research","repository":"superpod",
+            "prompt":"Observe the requested target.","required_tools":tools
+        }))
+        .unwrap();
+        let prompt = rendered_experiment_prompt(&c, &task, None).unwrap();
+        for instruction in [
+            "DISPLAY/XAUTHORITY",
+            "LAB_DESKTOP_WINDOW",
+            "LAB_DESKTOP_TARGET/observed.json",
+            "Do not connect to personal desktops",
+        ] {
+            assert_eq!(
+                prompt.contains(instruction),
+                desktop,
+                "{tools:?}: {instruction}"
+            );
+        }
+        for instruction in [
+            "targets-host.json",
+            "parent directory of RELAY_MEMORY_HOME",
+            "Do not attempt nested sandbox execution",
+        ] {
+            assert_eq!(
+                prompt.contains(instruction),
+                sandbox,
+                "{tools:?}: {instruction}"
+            );
+        }
+        assert!(prompt.contains("next_tasks must be []"));
+    }
+}
+
+pub(super) fn completion_fixture(
+    memory: bool,
+    proposals: Value,
+) -> (tempfile::TempDir, Config, Job, Workflow) {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let repo = root.join("superpod");
+    fs::create_dir(&repo).unwrap();
+    git(&repo, &["init", "-b", "main"]).unwrap();
+    fs::write(repo.join("README.md"), "fixture\n").unwrap();
+    git(&repo, &["add", "README.md"]).unwrap();
+    git(
+        &repo,
+        &[
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-m",
+            "fixture",
+        ],
+    )
+    .unwrap();
+    let commit = git(&repo, &["rev-parse", "HEAD"]).unwrap();
+    let binary = root.join("workflow-fixture");
+    fs::write(&binary, format!(
+            "#!/bin/sh\nif [ \"$1\" = run ] && [ \"$2\" = status ]; then cat '{}'; else printf '%s\\n' '{{\"ok\":true,\"result\":{{}}}}'; fi\n",
+            root.join("authority.json").display()
+        )).unwrap();
+    fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+    let memory_binary = root.join("memory-fixture");
+    fs::write(
+        &memory_binary,
+        format!(
+            "#!/bin/sh\nprintf x >> '{}'\nprintf '%s\\n' '{{\"remembered\":true}}'\n",
+            root.join("memory-calls").display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&memory_binary, fs::Permissions::from_mode(0o700)).unwrap();
+    let c: Config = serde_json::from_value(json!({
+        "schema_version":1,"workspace":root,"state_dir":root.join("state"),
+        "superpod":repo,"codex":"unused","workflow":binary,
+        "daily_seconds":3600,"max_agents":1,"task_timeout_seconds":20,
+        "models":{"research":"fixture","review":"fixture","implement":"fixture"},
+        "tools":{"relay-memory":{"binary":memory_binary,"repository":repo,"probe":[]}},
+        "require_latest":false,"skills_manifest":null
+    }))
+    .unwrap();
+    let job: Job = serde_json::from_value(json!({
+            "task":{"id":"synthesis-recovery","role":"research","repository":"superpod","prompt":"frozen","use_memory":memory},
+            "model":"fixture","source_commit":commit,"superpod_commit":commit,
+            "prompt_digest":"prompt","config_digest":"config","worktree":repo,
+            "run_id":"synthesis-recovery-attempt-1","attempt":1,"last_error":null,"launch":null
+        })).unwrap();
+    let receipt = json!({"receipt_protocol":2,"config_digest":job.config_digest,"agent_report":{"summary":"observed fixture result","findings":[],"sources":[],"limitations":["fake transport only"],"next_tasks":proposals},
+            "source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,
+            "model":job.model,"research_inputs":null,"post_success_protocol":1});
+    storage::write(&root.join("authority.json"), &json!({"ok":true,"result":{"status":"succeeded","frames":{"1":{"nodes":{"task":{"outputs":{"result":serde_json::to_string(&receipt).unwrap()}}}}}}})).unwrap();
+    storage::write(&job_path(&c, &job.task.id), &job).unwrap();
+    let w = workflow(&c);
+    fs::create_dir_all(&w.work_dir).unwrap();
+    (temp, c, job, w)
+}
+
+#[test]
+fn completion_recovery_reconstructs_missing_journal_and_remembers_once() {
+    let (temp, c, mut job, w) = completion_fixture(true, json!([]));
+    job.launch = Some(Launch {
+        pid: 0,
+        process_start: String::new(),
+        lease: json!({"run_id":job.run_id}),
+        attempt: json!({}),
+        log_dir: c.state_dir.join("runs").join(&job.run_id),
+        tools: json!({}),
+        git_dir: String::new(),
+        backend_request_sha256: None,
+        communication: None,
+        communication_gap: None,
+        communication_member: None,
+    });
+    storage::write(&job_path(&c, &job.task.id), &job).unwrap();
+    // Neither a forged log receipt nor a forged memory success is authority.
+    storage::write(
+        &c.state_dir
+            .join("runs")
+            .join(&job.run_id)
+            .join("receipt.json"),
+        &json!({"forged":true}),
+    )
+    .unwrap();
+    storage::write(
+        &c.state_dir
+            .join("runs")
+            .join(&job.run_id)
+            .join("memory-remember.json"),
+        &json!({"forged":true}),
+    )
+    .unwrap();
+    reconcile_orphans(&c, &w).unwrap();
+    let recovered: Job = storage::read(&job_path(&c, &job.task.id)).unwrap();
+    assert!(recovered.launch.is_none());
+    let record: PostSuccess = storage::read(&post_success_path(&c, &job)).unwrap();
+    assert_eq!(record.memory, MemoryWriteback::Pending);
+    assert!(drain_followups(&c, &w).unwrap());
+    assert_eq!(fs::read(temp.path().join("memory-calls")).unwrap(), b"x");
+    reconcile_orphans(&c, &w).unwrap();
+    assert!(!drain_followups(&c, &w).unwrap());
+    assert_eq!(fs::read(temp.path().join("memory-calls")).unwrap(), b"x");
+    assert_eq!(w.status(&job.run_id).unwrap()["status"], "succeeded");
+}
+
+#[test]
+fn completion_recovery_never_repeats_unknown_memory_write() {
+    let (temp, c, job, w) = completion_fixture(true, json!([]));
+    queue_post_success(&c, &w, &job).unwrap();
+    let path = post_success_path(&c, &job);
+    let mut record: PostSuccess = storage::read(&path).unwrap();
+    record.memory = MemoryWriteback::Running;
+    storage::write(&path, &record).unwrap();
+    fs::write(temp.path().join("memory-calls"), "already-applied").unwrap();
+    reconcile_orphans(&c, &w).unwrap();
+    let recovered: PostSuccess = storage::read(&path).unwrap();
+    assert_eq!(recovered.memory, MemoryWriteback::Unknown);
+    assert!(drain_followups(&c, &w).unwrap());
+    assert_eq!(
+        fs::read_to_string(temp.path().join("memory-calls")).unwrap(),
+        "already-applied"
+    );
+    let recovered: Job = storage::read(&job_path(&c, &job.task.id)).unwrap();
+    assert!(
+        recovered
+            .last_error
+            .unwrap()
+            .contains("memory writeback gap")
+    );
+    assert_eq!(w.status(&job.run_id).unwrap()["status"], "succeeded");
+}
+
+#[test]
+fn completion_recovery_replays_followup_admission_without_duplicate_children() {
+    let (_temp, c, job, w) = completion_fixture(
+        false,
+        json!([{
+            "repository":"superpod","role":"review","prompt":"inspect actual frozen evidence",
+            "write":false,"exploratory":false
+        }]),
+    );
+    queue_post_success(&c, &w, &job).unwrap();
+    let receipt = authoritative_success_receipt(&w, &job).unwrap();
+    let dir = c.state_dir.join("runs").join(&job.run_id);
+    admit_followups(&c, &job, &dir, &receipt).unwrap();
+    let path = post_success_path(&c, &job);
+    let mut record: PostSuccess = storage::read(&path).unwrap();
+    record.followups = FollowupAdmission::Running;
+    storage::write(&path, &record).unwrap();
+    assert_eq!(jobs(&c).unwrap().len(), 2);
+    assert!(drain_followups(&c, &w).unwrap());
+    assert_eq!(jobs(&c).unwrap().len(), 2);
+    let record: PostSuccess = storage::read(&path).unwrap();
+    assert_eq!(record.followups, FollowupAdmission::Done);
+    assert!(!drain_followups(&c, &w).unwrap());
+}
+
+#[test]
+fn mixed_followups_keep_original_indices_and_replay_without_role_escalation() {
+    let (_temp, c, job, w) = completion_fixture(
+        false,
+        json!([
+            {"repository":"superpod","role":"research","prompt":"requires a write","write":true,"exploratory":false},
+            {"repository":"superpod","role":"review","prompt":"inspect evidence","write":false,"exploratory":false},
+            {"repository":"superpod","role":"review","prompt":"malformed missing fields"}
+        ]),
+    );
+    queue_post_success(&c, &w, &job).unwrap();
+    assert!(drain_followups(&c, &w).unwrap());
+    let path = post_success_path(&c, &job);
+    let mut record: PostSuccess = storage::read(&path).unwrap();
+    assert_eq!(record.followups, FollowupAdmission::Done);
+    assert_eq!(
+        record
+            .followup_rejections
+            .iter()
+            .map(|r| r.index)
+            .collect::<Vec<_>>(),
+        vec![0, 2]
+    );
+    let expected = format!(
+        "followup-{}-1",
+        &storage::digest(job.run_id.as_bytes())[..16]
+    );
+    assert_eq!(record.followup_queued, vec![expected.clone()]);
+    let child: Job = storage::read(&job_path(&c, &expected)).unwrap();
+    assert_eq!(child.task.role, "review");
+    assert!(!child.task.write);
+    assert!(
+        child.task.required_tools.is_empty(),
+        "legacy proposals default to no tool requirement"
+    );
+    assert_eq!(jobs(&c).unwrap().len(), 2);
+    // A crash after child creation but before parent-journal settlement
+    // cannot renumber the child or discard the invalid proposal's reason.
+    record.followups = FollowupAdmission::Running;
+    record.followup_queued.clear();
+    record.followup_rejections.clear();
+    storage::write(&path, &record).unwrap();
+    assert!(drain_followups(&c, &w).unwrap());
+    let replayed: PostSuccess = storage::read(&path).unwrap();
+    assert_eq!(replayed.followup_queued, vec![expected]);
+    assert_eq!(replayed.followup_rejections.len(), 2);
+    assert_eq!(jobs(&c).unwrap().len(), 2);
+}
+
+#[test]
+fn gui_followup_binds_explicit_tools_and_rejects_invalid_siblings() {
+    let (_temp, mut c, job, w) = completion_fixture(
+        false,
+        json!([
+            {"repository":"superpod","role":"review","prompt":"unknown tool","write":false,"exploratory":false,"required_tools":["unknown-cli"]},
+            {"repository":"superpod","role":"research","prompt":"observe the owned GUI and sandbox evidence","write":false,"exploratory":true,"required_tools":["computer-use-cli","repo-sandbox"]},
+            {"repository":"superpod","role":"review","prompt":"duplicate binding","write":false,"exploratory":false,"required_tools":["computer-use-cli","computer-use-cli"]}
+        ]),
+    );
+    // Keep the unused generated transport executable busy throughout the positive case.
+    // This models a writable executable, not an owner transaction or the historic holder.
+    let private_script_writer = fs::OpenOptions::new()
+        .write(true)
+        .open(&c.workflow)
+        .unwrap();
+    let busy_error = w.status(&job.run_id).unwrap_err();
+    let io_error = busy_error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<std::io::Error>())
+        .expect("the generated executable must fail with an I/O error");
+    assert_eq!(io_error.raw_os_error(), Some(26));
+    let fixture = if let Some(runfiles) = std::env::var_os("TEST_SRCDIR") {
+        PathBuf::from(runfiles)
+            .join(std::env::var_os("TEST_WORKSPACE").expect("Bazel test workspace"))
+            .join("crates/execution-runtime/fixtures/completion-workflow.sh")
+    } else {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/completion-workflow.sh")
+    };
+    c.workflow = fixture.canonicalize().unwrap();
+    let w = workflow(&c);
+    let binding = c.tools["relay-memory"].clone();
+    c.tools.insert("computer-use-cli".into(), binding.clone());
+    c.tools.insert("repo-sandbox".into(), binding);
+    let receipt = authoritative_success_receipt(&w, &job).unwrap();
+    let dir = c.state_dir.join("runs").join(&job.run_id);
+    let report = admit_followups(&c, &job, &dir, &receipt).unwrap();
+    assert_eq!(report.queued.len(), 1);
+    assert_eq!(
+        report
+            .rejected
+            .iter()
+            .map(|item| item.index)
+            .collect::<Vec<_>>(),
+        vec![0, 2]
+    );
+    assert!(report.rejected[0].reason.contains("unknown required tool"));
+    assert!(
+        report.rejected[1]
+            .reason
+            .contains("duplicate required tool")
+    );
+    let child: Job = storage::read(&job_path(&c, &report.queued[0])).unwrap();
+    assert_eq!(
+        child.task.required_tools,
+        ["computer-use-cli", "repo-sandbox"]
+    );
+    assert!(!child.task.write);
+    assert!(
+        rendered_task_prompt(&c, &child.task)
+            .unwrap()
+            .contains("Owned target experiment")
+    );
+    let schema = report_schema(&c, &job.task);
+    for branch in schema["properties"]["next_tasks"]["items"]["anyOf"]
+        .as_array()
+        .unwrap()
+    {
+        assert!(
+            branch["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("required_tools"))
+        );
+        assert_eq!(branch["properties"]["required_tools"]["maxItems"], 7);
+        assert_eq!(
+            branch["properties"]["required_tools"]["items"]["enum"],
+            json!(["computer-use-cli", "relay-memory", "repo-sandbox"])
+        );
+    }
+    let replay = admit_followups(&c, &job, &dir, &receipt).unwrap();
+    assert_eq!(replay.queued, report.queued);
+    assert_eq!(jobs(&c).unwrap().len(), 2);
+    drop(private_script_writer);
+}
+
+#[test]
+fn followup_authority_depth_and_schema_are_consistent() {
+    let (_temp, c, mut job, w) = completion_fixture(
+        false,
+        json!([
+            {"repository":"superpod","role":"review","prompt":"independent review","write":false,"exploratory":false},
+            {"repository":"superpod","role":"implement","prompt":"nested implementation","write":true,"exploratory":false}
+        ]),
+    );
+    let receipt = authoritative_success_receipt(&w, &job).unwrap();
+    let dir = c.state_dir.join("runs").join(&job.run_id);
+    job.task.depth = 3;
+    let report = admit_followups(&c, &job, &dir, &receipt).unwrap();
+    assert!(report.queued.is_empty());
+    assert_eq!(report.rejected.len(), 2);
+    assert_eq!(
+        report_schema(&c, &job.task)["properties"]["next_tasks"]["maxItems"],
+        0
+    );
+    job.task.depth = 0;
+    job.task.id = "independent-research".into();
+    let report = admit_followups(&c, &job, &dir, &receipt).unwrap();
+    assert!(report.queued.is_empty());
+    assert_eq!(report.rejected.len(), 2);
+    assert!(followup_instructions(&job.task).contains("next_tasks must be []"));
+    assert_eq!(
+        report_schema(&c, &job.task)["properties"]["next_tasks"]["maxItems"],
+        0
+    );
+    // Implementation receives review authority only, even if its ID happens
+    // to carry the synthesis prefix.
+    job.task.id = "synthesis-recovery".into();
+    job.task.role = "implement".into();
+    let report = admit_followups(&c, &job, &dir, &receipt).unwrap();
+    assert_eq!(report.queued.len(), 1);
+    assert_eq!(report.rejected[0].index, 1);
+    let items = report_schema(&c, &job.task)["properties"]["next_tasks"]["items"].clone();
+    assert_eq!(items["properties"]["role"]["enum"], json!(["review"]));
+    assert_eq!(items["properties"]["write"]["enum"], json!([false]));
+    let proposal: NextTask =
+        serde_json::from_value(receipt["agent_report"]["next_tasks"][0].clone()).unwrap();
+    assert!(validate_proposal(&c, &job.task, 3, &proposal).is_err());
+}
+
+#[test]
+fn unmigrated_followup_journal_is_rejected_without_automatic_replay() {
+    let (_temp, c, job, w) = completion_fixture(false, json!([]));
+    queue_post_success(&c, &w, &job).unwrap();
+    let path = post_success_path(&c, &job);
+    let mut old: Value = storage::read(&path).unwrap();
+    old.as_object_mut().unwrap().remove("followup_queued");
+    old.as_object_mut().unwrap().remove("followup_rejections");
+    old["followups"] = json!("blocked");
+    old["followup_error"] = json!("historical proposal requires host review");
+    storage::write(&path, &old).unwrap();
+    assert!(storage::read::<PostSuccess>(&path).is_err());
+    assert!(queue_post_success(&c, &w, &job).is_err());
+    assert_eq!(storage::read::<Value>(&path).unwrap(), old);
+}
+
+#[test]
+fn startup_rejects_retired_completion_before_execution() {
+    let (_temp, c, job, _w) = completion_fixture(false, json!([]));
+    let path = post_success_path(&c, &job);
+    storage::write(&path, &json!({"task_id":job.task.id,"run_id":job.run_id})).unwrap();
+    let before = fs::read(&path).unwrap();
+    assert!(validate_state(&c).is_err());
+    assert_eq!(fs::read(&path).unwrap(), before);
+}
+
+#[test]
+fn controller_status_distinguishes_ready_blocked_dependencies_and_live_process() {
+    let (_temp, _c, mut parent, _w) = completion_fixture(false, json!([]));
+    let mut child = parent.clone();
+    child.task.id = "waiting-child".into();
+    child.task.dependencies = vec![parent.task.id.clone()];
+    let ready = json!({"status":ExecutionState::Running,"frames":{"1":{"nodes":{"task":{"state":{"state":"task_ready"}}}}}});
+    let mut states = BTreeMap::from([
+        (
+            parent.task.id.clone(),
+            WorkflowStatusObservation::from_value(&ready),
+        ),
+        (
+            child.task.id.clone(),
+            WorkflowStatusObservation::from_value(&ready),
+        ),
+    ]);
+    let classify = |job: &Job,
+                    parent: &Job,
+                    child: &Job,
+                    states: &BTreeMap<String, WorkflowStatusObservation>| {
+        let indexed = BTreeMap::from([
+            (parent.task.id.clone(), parent),
+            (child.task.id.clone(), child),
+        ]);
+        controller_state(job, &indexed, states, false, &mut BTreeSet::new())
+    };
+    assert_eq!(
+        classify(&parent, &parent, &child, &states).0,
+        ExecutionState::Ready
+    );
+    assert_eq!(
+        classify(&child, &parent, &child, &states).0,
+        ExecutionState::WaitingDependencies
+    );
+    parent.last_error = Some("latest baseline changed; enqueue a new experiment".into());
+    assert_eq!(
+        classify(&parent, &parent, &child, &states).0,
+        ExecutionState::Blocked
+    );
+    let blocked = classify(&child, &parent, &child, &states);
+    assert_eq!(blocked.0, ExecutionState::Blocked);
+    assert!(blocked.1.unwrap().contains("latest baseline changed"));
+    parent.last_error = None;
+    parent.launch = Some(Launch {
+        pid: std::process::id(),
+        process_start: process_start(std::process::id()).unwrap(),
+        lease: json!({}),
+        attempt: json!({}),
+        log_dir: PathBuf::new(),
+        tools: json!({}),
+        git_dir: String::new(),
+        backend_request_sha256: None,
+        communication: None,
+        communication_gap: None,
+        communication_member: None,
+    });
+    assert_eq!(
+        classify(&parent, &parent, &child, &states).0,
+        ExecutionState::Running
+    );
+    parent.launch.as_mut().unwrap().process_start = "not-the-retained-process".into();
+    assert_eq!(
+        classify(&parent, &parent, &child, &states).0,
+        ExecutionState::NeedsReconciliation
+    );
+    parent.launch = None;
+    states.insert(
+        parent.task.id.clone(),
+        WorkflowStatusObservation::from_value(&json!({"status":WorkflowState::Succeeded})),
+    );
+    assert_eq!(
+        classify(&child, &parent, &child, &states).0,
+        ExecutionState::Ready
+    );
+}
+
+#[test]
+fn summary_matches_detailed_controller_counts_without_losing_blockers() {
+    let (_temp, c, base, w) = completion_fixture(false, json!([]));
+    fs::remove_file(job_path(&c, &base.task.id)).unwrap();
+    fs::write(
+        &c.workflow,
+        "#!/bin/sh\nset -eu\n[ \"$1 $2\" = 'run status' ]\ncat \"$4.json\"\n",
+    )
+    .unwrap();
+    let ready = json!({"status":WorkflowState::Running,"frames":{"1":{"nodes":{"task":{"state":{"state":WorkflowNodeState::TaskReady}}}}}});
+    let cases = [
+        ("ready", Some(ready.clone()), vec![], ExecutionState::Ready),
+        (
+            "success",
+            Some(json!({"status":WorkflowState::Succeeded})),
+            vec![],
+            ExecutionState::Succeeded,
+        ),
+        (
+            "failed",
+            Some(json!({"status":WorkflowState::Failed})),
+            vec![],
+            ExecutionState::Failed,
+        ),
+        (
+            "cancelled",
+            Some(json!({"status":WorkflowState::Cancelled})),
+            vec![],
+            ExecutionState::Failed,
+        ),
+        (
+            "future",
+            Some(json!({"status":"future_workflow_state"})),
+            vec![],
+            ExecutionState::Unknown,
+        ),
+        ("unavailable", None, vec![], ExecutionState::Unknown),
+        (
+            "waiting",
+            Some(ready.clone()),
+            vec!["ready"],
+            ExecutionState::WaitingDependencies,
+        ),
+        (
+            "blocked-failed",
+            Some(ready.clone()),
+            vec!["failed"],
+            ExecutionState::Blocked,
+        ),
+        (
+            "blocked-future",
+            Some(ready.clone()),
+            vec!["future"],
+            ExecutionState::Blocked,
+        ),
+        (
+            "blocked-unavailable",
+            Some(ready.clone()),
+            vec!["unavailable"],
+            ExecutionState::Blocked,
+        ),
+        (
+            "missing-dependency",
+            Some(ready.clone()),
+            vec!["absent"],
+            ExecutionState::Blocked,
+        ),
+        (
+            "cycle-a",
+            Some(ready.clone()),
+            vec!["cycle-b"],
+            ExecutionState::Blocked,
+        ),
+        (
+            "cycle-b",
+            Some(ready.clone()),
+            vec!["cycle-a"],
+            ExecutionState::Blocked,
+        ),
+        (
+            "workflow-paused",
+            Some(json!({"status":WorkflowState::Running,"pause":{}})),
+            vec![],
+            ExecutionState::Paused,
+        ),
+        (
+            "stale-launch",
+            Some(ready.clone()),
+            vec![],
+            ExecutionState::NeedsReconciliation,
+        ),
+        (
+            "live-launch",
+            Some(ready.clone()),
+            vec![],
+            ExecutionState::Running,
+        ),
+        (
+            "retry",
+            Some(ready.clone()),
+            vec![],
+            ExecutionState::RetryWait,
+        ),
+        (
+            "last-error",
+            Some(ready.clone()),
+            vec![],
+            ExecutionState::Blocked,
+        ),
+        (
+            "no-ready-task",
+            Some(json!({"status":WorkflowState::Running})),
+            vec![],
+            ExecutionState::NeedsReconciliation,
+        ),
+        (
+            "known-unknown",
+            Some(json!({"status":WorkflowState::Unknown})),
+            vec![],
+            ExecutionState::NeedsReconciliation,
+        ),
+        (
+            "missing-status",
+            Some(json!({})),
+            vec![],
+            ExecutionState::Unknown,
+        ),
+    ];
+    for (id, state, dependencies, _) in &cases {
+        let mut job = base.clone();
+        job.task.id = (*id).into();
+        job.run_id = format!("{id}-attempt-1");
+        job.task.dependencies = dependencies.iter().map(|id| (*id).into()).collect();
+        if matches!(*id, "stale-launch" | "live-launch") {
+            job.launch = Some(Launch {
+                pid: std::process::id(),
+                process_start: if *id == "live-launch" {
+                    process_start(std::process::id()).unwrap()
+                } else {
+                    "different-process-identity".into()
+                },
+                lease: json!({}),
+                attempt: json!({}),
+                log_dir: PathBuf::new(),
+                tools: json!({}),
+                git_dir: String::new(),
+                backend_request_sha256: None,
+                communication: None,
+                communication_gap: None,
+                communication_member: None,
+            });
+        }
+        if *id == "retry" {
+            job.retry_after = Some(now() + 60);
+        }
+        if *id == "last-error" {
+            job.last_error = Some("baseline needs review".into());
+        }
+        storage::write(&job_path(&c, id), &job).unwrap();
+        if let Some(state) = state {
+            storage::write(
+                &w.work_dir.join(format!("{}.json", job.run_id)),
+                &json!({"ok":true,"result":state}),
+            )
+            .unwrap();
+        }
+    }
+    let budget = json!({"budget":{"days":{"1":17},"active_since":null},"main_seconds":17});
+    storage::write(&c.state_dir.join("budget.json"), &budget).unwrap();
+    for paused in [false, true] {
+        pause(&c, paused).unwrap();
+        let detailed = status(&c).unwrap();
+        let summary = status_summary(&c).unwrap();
+        let mut expected = BTreeMap::<ExecutionState, usize>::new();
+        for (id, _, _, state) in &cases {
+            let state = if paused && matches!(*id, "ready" | "no-ready-task" | "known-unknown") {
+                ExecutionState::Paused
+            } else {
+                *state
+            };
+            let row = detailed["jobs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["id"] == *id)
+                .unwrap();
+            assert_eq!(row["state"], json!(state), "{id}, paused={paused}");
+            *expected.entry(state).or_default() += 1;
+        }
+        assert_eq!(detailed["summary"], json!(expected));
+        assert_eq!(
+            summary,
+            json!({"paused":paused,"summary":expected,"total_jobs":cases.len(),"details_included":false,"budget":budget})
+        );
+        assert_eq!(detailed["budget"], summary["budget"]);
+        assert_eq!(detailed["paused"], summary["paused"]);
+        assert!(detailed.get("total_jobs").is_none());
+        assert!(detailed.get("details_included").is_none());
+        let unavailable = detailed["jobs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["id"] == "unavailable")
+            .unwrap();
+        assert!(unavailable["error"].as_str().is_some());
+    }
+}
+
+#[test]
+fn summary_omits_large_workflow_receipts_and_handles_an_empty_store() {
+    let (temp, c, job, _w) = completion_fixture(false, json!([]));
+    let path = temp.path().join("authority.json");
+    let mut authority: Value = storage::read(&path).unwrap();
+    let payload = "frozen-prompt-and-receipt-body".repeat(40000);
+    authority["result"]["inputs"] = json!({"prompt":payload});
+    authority["result"]["frames"]["1"]["nodes"]["task"]["outputs"]["result"] = json!(payload);
+    storage::write(&path, &authority).unwrap();
+    let detailed = status(&c).unwrap();
+    let summary = status_summary(&c).unwrap();
+    assert_eq!(summary["summary"], detailed["summary"]);
+    assert_eq!(summary["summary"][ExecutionState::Succeeded.as_str()], 1);
+    assert_eq!(detailed["jobs"][0]["status"], authority["result"]);
+    assert!(serde_json::to_vec(&detailed).unwrap().len() > 2_000_000);
+    let encoded = serde_json::to_string(&summary).unwrap();
+    assert!(encoded.len() < 1024);
+    assert!(!encoded.contains("frozen-prompt-and-receipt-body"));
+    assert_eq!(summary.as_object().unwrap().len(), 5);
+    assert!(summary.get("jobs").is_none());
+    fs::remove_file(job_path(&c, &job.task.id)).unwrap();
+    assert_eq!(
+        status_summary(&c).unwrap(),
+        json!({"paused":false,"summary":{},"total_jobs":0,"details_included":false,"budget":{}})
+    );
+}
+
+#[test]
+fn completion_recovery_defers_budget_exhaustion_then_reuses_partial_child() {
+    let (_temp, c, job, w) = completion_fixture(
+        false,
+        json!([{
+            "repository":"superpod","role":"review","prompt":"bounded follow-up",
+            "write":false,"exploratory":false
+        }]),
+    );
+    queue_post_success(&c, &w, &job).unwrap();
+    let original = fs::read_to_string(&c.workflow).unwrap();
+    let slow = original.replacen(
+        "#!/bin/sh\n",
+        "#!/bin/sh\nif [ \"$1\" = run ] && [ \"$2\" = init ]; then sleep 5; fi\n",
+        1,
+    );
+    fs::write(&c.workflow, slow).unwrap();
+    {
+        let _deadline = process::deadline_scope(Duration::from_millis(300));
+        assert!(drain_followups(&c, &w).unwrap());
+        assert!(process::deadline_exhausted());
+    }
+    let record: PostSuccess = storage::read(&post_success_path(&c, &job)).unwrap();
+    assert_eq!(record.followups, FollowupAdmission::Pending);
+    assert_eq!(jobs(&c).unwrap().len(), 2);
+    fs::write(&c.workflow, original).unwrap();
+    assert!(drain_followups(&c, &w).unwrap());
+    let record: PostSuccess = storage::read(&post_success_path(&c, &job)).unwrap();
+    assert_eq!(record.followups, FollowupAdmission::Done);
+    assert!(record.followup_error.is_none());
+    assert_eq!(jobs(&c).unwrap().len(), 2);
+}
+
+#[test]
+fn completion_recovery_rejects_unmigrated_journal() {
+    let (temp, c, job, w) = completion_fixture(true, json!([]));
+    let authority = temp.path().join("authority.json");
+    let mut state: Value = storage::read(&authority).unwrap();
+    let output = &mut state["result"]["frames"]["1"]["nodes"]["task"]["outputs"]["result"];
+    let mut receipt: Value = serde_json::from_str(output.as_str().unwrap()).unwrap();
+    receipt
+        .as_object_mut()
+        .unwrap()
+        .remove("post_success_protocol");
+    *output = json!(serde_json::to_string(&receipt).unwrap());
+    storage::write(&authority, &state).unwrap();
+    assert!(reconcile_orphans(&c, &w).is_err());
+    assert!(queue_post_success(&c, &w, &job).is_err());
+    assert!(!post_success_path(&c, &job).exists());
+    assert!(!temp.path().join("memory-calls").exists());
+}
+
+#[test]
+fn memory_checkpoint_bounds_unicode_and_escaping_without_copying_provenance() {
+    let (_temp, _c, job, _w) = completion_fixture(false, json!([]));
+    let receipt = json!({
+        "agent_report": {
+            "summary":"Verify\"latest\"source\\path\n\u{0001}".repeat(1000),
+            "findings":vec!["Independent counterexamples needed.".repeat(200); 8],
+            "limitations":vec!["External evaluation remains incomplete.".repeat(200); 7],
+            "sources":["source-payload-must-stay-out".repeat(1000)],
+            "next_tasks":[]
+        },
+        "research_inputs":{"repositories":{},"skills":{},"insights":"provenance-must-stay-out".repeat(30000)},
+        "tools":{"payload":"tool-payload-must-stay-out".repeat(1000)}
+    });
+    let encoded = memory_checkpoint(&job, &receipt).unwrap();
+    assert!(encoded.len() <= 4096);
+    let checkpoint: Value = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(
+        checkpoint["receipt_sha256"],
+        storage::digest(&serde_json::to_vec(&receipt).unwrap())
+    );
+    assert_eq!(checkpoint["source_commit"], job.source_commit);
+    assert_eq!(checkpoint["prompt_digest"], job.prompt_digest);
+    assert_eq!(checkpoint["run_id"], job.run_id);
+    assert_eq!(checkpoint["truncated"], true);
+    assert!(checkpoint["summary"].as_str().unwrap().ends_with('…'));
+    assert_eq!(checkpoint["findings"].as_array().unwrap().len(), 3);
+    assert_eq!(checkpoint["limitations"].as_array().unwrap().len(), 2);
+    for field in ["research_inputs", "tools", "sources", "next_tasks"] {
+        assert!(checkpoint.get(field).is_none());
+    }
+    for marker in [
+        "provenance-must-stay-out",
+        "source-payload-must-stay-out",
+        "tool-payload-must-stay-out",
+    ] {
+        assert!(!encoded.contains(marker));
+    }
+    let concise = json!({"agent_report":{"summary":"Preserve the entire conclusion.","findings":["Original evidence available."],"sources":[],"limitations":["Independent review required."]}});
+    let concise: Value = serde_json::from_str(&memory_checkpoint(&job, &concise).unwrap()).unwrap();
+    assert_eq!(concise["summary"], "Preserve the entire conclusion.");
+    assert_eq!(concise["truncated"], false);
+    let prompt = remember_prompt(&"Continue research context.".repeat(500));
+    assert!(prompt.chars().count() <= 512);
+    assert!(prompt.ends_with('…'));
+    assert_eq!(remember_prompt("Continue research"), "Continue research");
+}
+
+#[test]
+fn task_scope_rejects_invalid_files_missing_dependencies_and_configuration_drift() {
+    let (temp, mut c, mut job, _) = completion_fixture(false, json!([]));
+    for name in [
+        "workflow-cli",
+        "relay-knowledge",
+        "into-markdown",
+        "qualitygate-cli",
+        "computer-use-cli",
+        "repo-sandbox",
+    ] {
+        c.tools.insert(name.into(), c.tools["relay-memory"].clone());
+    }
+    job.config_digest = storage::digest(&serde_json::to_vec(&c).unwrap());
+    storage::write(&job_path(&c, &job.task.id), &job).unwrap();
+    let path = c.state_dir.join("private/scope.json");
+    storage::write(&path, &vec![job.task.id.clone()]).unwrap();
+    let scope = TaskScope::load(&c, &path).unwrap();
+    assert_eq!(scope.ids, BTreeSet::from([job.task.id.clone()]));
+    for (continuous, seconds, seed) in [(true, 30, false), (false, 30, true), (false, 0, false)] {
+        assert!(
+            run_scoped(&c, continuous, seconds, seed, Some(&path))
+                .unwrap_err()
+                .to_string()
+                .contains("scoped runs")
+        );
+    }
+    for ids in [
+        vec![],
+        vec![job.task.id.clone(), job.task.id.clone()],
+        vec!["missing".into()],
+        vec!["../escape".into()],
+        vec!["x".into(); 257],
+    ] {
+        storage::write(&path, &ids).unwrap();
+        assert!(TaskScope::load(&c, &path).is_err());
+    }
+    storage::write(&path, &vec![job.task.id.clone()]).unwrap();
+    let mut drifted = c.clone();
+    drifted.task_timeout_seconds += 1;
+    assert!(
+        TaskScope::load(&drifted, &path)
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("configuration")
+    );
+    job.task.dependencies = vec!["excluded".into()];
+    storage::write(&job_path(&c, &job.task.id), &job).unwrap();
+    assert!(TaskScope::load(&c, &path).is_err());
+    let outside = temp.path().join("outside.json");
+    storage::write(&outside, &vec![job.task.id.clone()]).unwrap();
+    assert!(TaskScope::load(&c, &outside).is_err());
+    let linked = c.state_dir.join("private/linked.json");
+    std::os::unix::fs::symlink(&outside, &linked).unwrap();
+    assert!(TaskScope::load(&c, &linked).is_err());
+    fs::write(&path, vec![b' '; 64 * 1024 + 1]).unwrap();
+    assert!(TaskScope::load(&c, &path).is_err());
+}
+
+#[test]
+fn frozen_attempt_limits_preserve_legacy_serialization_and_stop_retries() {
+    let (temp, c, mut job, _) = completion_fixture(false, json!([]));
+    job.task.write = false;
+    let legacy = serde_json::to_value(&job.task).unwrap();
+    assert!(legacy.get("max_attempts").is_none());
+    assert_eq!(attempt_limit(&job.task), 3);
+    for attempt in 1..=3 {
+        job.attempt = attempt;
+        defer_read_retry(&mut job, "observed failure".into());
+        assert_eq!(job.retry_after.is_some(), attempt < 3);
+    }
+    job.attempt = 1;
+    job.task.max_attempts = Some(1);
+    defer_read_retry(&mut job, "observed failure".into());
+    assert!(job.retry_after.is_none());
+    assert!(prepare_retry(&c, &mut job).is_err());
+    assert_eq!(job.attempt, 1);
+    for limit in [0, 4] {
+        job.task.id = format!("invalid-{limit}");
+        job.task.max_attempts = Some(limit);
+        assert!(enqueue_with_inputs(&c, job.task.clone(), None).is_err());
+    }
+    drop(temp);
+}
+#[test]
+#[ignore = "set LAB_MEMORY_BIN for actual bounded Chinese checkpoint writeback and retrieval"]
+fn real_memory_concise_chinese_checkpoint_excludes_provenance() {
+    let binary = std::env::var("LAB_MEMORY_BIN").expect("LAB_MEMORY_BIN");
+    let (temp, mut c, mut job, _w) = completion_fixture(true, json!([]));
+    c.tools.get_mut("relay-memory").unwrap().binary = binary.into();
+    job.task.prompt =
+        "Continue I005 long-running research, verify source and retain open questions.".repeat(30);
+    let receipt = json!({
+        "agent_report":{
+            "summary":"Research checkpoint: latest source verified; next test I005 counterexamples.",
+            "findings":["Research conclusions must cite frozen source and original evidence."],
+            "sources":["full-source-detail-not-copied"],
+            "limitations":["Independent evaluation incomplete; no capability improvement established."],
+            "next_tasks":[]
+        },
+        "research_inputs":{"insights":"large-provenance-not-copied".repeat(30000)},
+        "tools":{"runtime":"large-tool-detail-not-copied".repeat(1000)}
+    });
+    let checkpoint = memory_checkpoint(&job, &receipt).unwrap();
+    assert!(checkpoint.len() <= 4096);
+    assert!(!checkpoint.contains("large-provenance-not-copied"));
+    let started = std::time::Instant::now();
+    let remembered = memory_call(
+        &c,
+        &job,
+        &temp.path().join("writeback"),
+        "remember",
+        Some(&checkpoint),
+    )
+    .unwrap();
+    let elapsed = started.elapsed();
+    assert!(elapsed < Duration::from_secs(20));
+    assert_eq!(remembered["response"], checkpoint);
+    assert!(remembered["prompt"].as_str().unwrap().chars().count() <= 512);
+    assert!(remembered["prompt"].as_str().unwrap().ends_with('…'));
+    job.task.prompt =
+        "Continue I005 research, restore the latest source checkpoint and open counterexamples."
+            .into();
+    let prepared = memory_call(&c, &job, &temp.path().join("retrieval"), "prepare", None).unwrap();
+    // The CLI intentionally returns only bounded response excerpts. Match
+    // the exact committed event and its retained Chinese evidence text.
+    assert!(
+        prepared["recent_events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|event| event["id"] == remembered["id"]
+                && event["response"].as_str().is_some_and(|text| text.contains(
+                    "Research conclusions must cite frozen source and original evidence."
+                )))
+    );
+    eprintln!(
+        "real concise Chinese memory writeback completed in {elapsed:?}; {} bytes",
+        checkpoint.len()
+    );
+}
+
+#[test]
+fn retained_worker_cleanup_uses_start_identity_without_cli_or_budget() {
+    let (temp, mut c, mut job, _w) = completion_fixture(false, json!([]));
+    c.workflow = PathBuf::from("/bin/false");
+    storage::write(&c.state_dir.join("paused"), &json!({"paused":true})).unwrap();
+    let mut process = Process::spawn(
+        "/bin/sleep",
+        &["30".into()],
+        temp.path(),
+        &temp.path().join("sleep-logs"),
+        Duration::from_secs(30),
+        &[],
+        None,
+    )
+    .unwrap();
+    let start = process_start(process.pid()).unwrap();
+    job.launch = Some(Launch {
+        pid: process.pid(),
+        process_start: format!("{start}-mismatch"),
+        lease: json!({}),
+        attempt: json!({}),
+        log_dir: temp.path().join("sleep-logs"),
+        tools: json!({}),
+        git_dir: String::new(),
+        backend_request_sha256: None,
+        communication: None,
+        communication_gap: None,
+        communication_member: None,
+    });
+    storage::write(&job_path(&c, &job.task.id), &job).unwrap();
+    kill_retained_workers(&c).unwrap();
+    assert!(process.poll().unwrap().is_none());
+    job.launch.as_mut().unwrap().process_start = start;
+    storage::write(&job_path(&c, &job.task.id), &job).unwrap();
+    kill_retained_workers(&c).unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    loop {
+        if let Some(status) = process.poll().unwrap() {
+            assert!(!status.success());
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[test]
+fn identifiers_cannot_escape_state() {
+    assert!(safe_id("../../secrets").is_err());
+    assert!(safe_id("research-123").is_ok());
+}
+
+#[test]
+fn prerequisite_deadline_defers_without_rejecting_or_claiming_the_task() {
+    let (temp, c, job, _) = completion_fixture(false, json!([]));
+    let initial = fs::read(job_path(&c, &job.task.id)).unwrap();
+    let mut ledger = Ledger::default();
+    let window = RunWindow {
+        started: now(),
+        max_seconds: 30,
+    };
+    let started = std::time::Instant::now();
+    let deferred = {
+        let _deadline = process::deadline_scope(Duration::from_millis(80));
+        prepare_prerequisite(&c, &mut ledger, window, true, || {
+            process::capture(
+                "/bin/sleep",
+                &["2".into()],
+                temp.path(),
+                Duration::from_secs(2),
+            )
+        })
+        .unwrap()
+    };
+    assert!(deferred.is_none());
+    assert!(started.elapsed() < Duration::from_secs(1));
+    assert_eq!(initial, fs::read(job_path(&c, &job.task.id)).unwrap());
+    assert_eq!(
+        prepare_prerequisite(&c, &mut ledger, window, false, || Ok(42)).unwrap(),
+        Some(42),
+        "an unclaimed task remains eligible after the transient deadline"
+    );
+    assert!(
+        prepare_prerequisite::<()>(&c, &mut ledger, window, false, || {
+            bail!("actual tool unavailable")
+        })
+        .is_err(),
+        "a real capability failure must remain visible"
+    );
+}
+#[test]
+fn process_identity_is_stable_for_current_process() {
+    let a = process_start(std::process::id()).unwrap();
+    assert_eq!(a, process_start(std::process::id()).unwrap());
+}
+#[test]
+fn report_schema_rejects_false_evidence_types() {
+    assert!(
+        validate_report(&json!({"summary":"ok","findings":[false],"sources":[],"limitations":[]}))
+            .is_err()
+    );
+    assert!(
+        validate_report(&json!({"summary":"ok","findings":[],"sources":[],"limitations":[]}))
+            .is_ok()
+    );
+}
+
+#[test]
+fn automatic_candidate_excludes_secrets_and_formal_gates() {
+    for path in [
+        ".env",
+        "nested/auth.json",
+        ".github/workflows/ci.yml",
+        "qualitygate.yaml",
+        "qualitygate/rules/custom.yaml",
+        "qualitygate/reviews/source.md",
+        "private/answers.json",
+        "cert.pem",
+    ] {
+        assert!(forbidden_candidate_path(path), "{path}");
+    }
+    assert!(!forbidden_candidate_path("src/parser.rs"));
+}
+#[cfg(unix)]
+pub(super) fn scheduler_fixture() -> (tempfile::TempDir, Config) {
+    use std::collections::BTreeMap;
+    use std::os::unix::fs::PermissionsExt;
+    let binary = std::env::var("LAB_WORKFLOW_BIN").expect("LAB_WORKFLOW_BIN");
+    let temp = tempfile::tempdir().unwrap();
+    let repo = temp.path().join("superpod");
+    fs::create_dir(&repo).unwrap();
+    git(&repo, &["init", "-b", "main"]).unwrap();
+    fs::write(repo.join("README.md"), "fixture repository\n").unwrap();
+    git(&repo, &["add", "README.md"]).unwrap();
+    git(
+        &repo,
+        &[
+            "-c",
+            "user.name=Lab Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-m",
+            "fixture",
+        ],
+    )
+    .unwrap();
+    let fake = temp.path().join("fake-codex");
+    fs::write(&fake,r#"#!/bin/sh
+output=''
+sandbox=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o) shift; output="$1" ;;
+    -s) shift; sandbox="$1" ;;
+  esac
+  shift
+done
+prompt=$(cat)
+case "$prompt" in *SLOW_PARALLEL*) date +%s%N; sleep 3; date +%s%N ;; esac
+case "$prompt" in *EIGHT_PARALLEL*) date +%s%N; sleep 20; date +%s%N ;; *AFTER_EIGHT*) date +%s%N; date +%s%N ;; esac
+case "$prompt" in *FAIL_READ*) exit 7 ;; esac
+case "$prompt" in *implement\ tested\ candidate*|*MALFORMED*) printf 'actual fixture write' > candidate.txt ;; esac
+case "$prompt" in
+  *MALFORMED*) printf '{"summary":"malformed"}' > "$output" ;;
+  *PROPOSE_FOLLOWUP*) printf '{"summary":"fixture proposal","findings":[],"sources":[],"limitations":["fake only"],"next_tasks":[{"repository":"superpod","role":"review","prompt":"bounded independent review","write":false,"exploratory":false}]}' > "$output" ;;
+  *BAD_PROPOSAL*) printf '{"summary":"invalid proposal","findings":[],"sources":[],"limitations":["fake only"],"next_tasks":[{"repository":"../../secrets","role":"implement","prompt":"invalid","write":true,"exploratory":false}]}' > "$output" ;;
+  *) printf '{"summary":"fixture output","findings":["fake provider only"],"sources":[],"limitations":["not a research result"]}' > "$output" ;;
+esac
+printf '{"type":"fixture.completed"}\n'
+"#).unwrap();
+    fs::set_permissions(&fake, fs::Permissions::from_mode(0o700)).unwrap();
+    let tools = [
+        "workflow-cli",
+        "relay-knowledge",
+        "into-markdown",
+        "qualitygate-cli",
+        "computer-use-cli",
+        "relay-memory",
+        "repo-sandbox",
+    ]
+    .into_iter()
+    .map(|name| {
+        (
+            name.into(),
+            config::Tool {
+                binary: PathBuf::from("/bin/true"),
+                repository: repo.clone(),
+                probe: vec![],
+            },
+        )
+    })
+    .collect();
+    let mut c = Config {
+        require_latest: false,
+        skills_manifest: None,
+        schema_version: 1,
+        workspace: temp.path().into(),
+        state_dir: temp.path().join("state"),
+        superpod: repo,
+        codex: fake.to_str().unwrap().into(),
+        multi_agent: None,
+        agent_backends: BTreeMap::new(),
+        role_backends: BTreeMap::new(),
+        backend_models: BTreeMap::new(),
+        workflow: binary.into(),
+        daily_seconds: 3600,
+        max_agents: 2,
+        task_timeout_seconds: 20,
+        models: BTreeMap::from([
+            ("research".into(), "fake-research".into()),
+            ("review".into(), "fake-review".into()),
+            ("implement".into(), "fake-implement".into()),
+        ]),
+        tools,
+    };
+    if let Ok(binary) = std::env::var("LAB_MEMORY_BIN") {
+        c.tools.get_mut("relay-memory").unwrap().binary = binary.into();
+    }
+    (temp, c)
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "real workflow/bwrap with explicit fake JSON bridge; set LAB_WORKFLOW_BIN"]
+fn actual_workflow_json_bridge_contract_and_process_lifetime() {
+    use std::os::unix::fs::PermissionsExt;
+    let (temp, mut c) = scheduler_fixture();
+    let bridge = temp.path().join("fake-json-bridge");
+    fs::write(&bridge, r#"#!/usr/bin/python3
+import hashlib, json, os, pathlib, sys, time
+raw = sys.stdin.buffer.read()
+r = json.loads(raw)
+assert r['schema_version'] == 1
+assert 'OPENAI_API_KEY' not in os.environ and 'CODEX_HOME' not in os.environ
+out = pathlib.Path(r['result_path'])
+mode = r['request_id'].split('-attempt-')[0]
+report = {'summary':'explicit fake bridge only','findings':[],'sources':[],'limitations':['protocol fixture, not model research'],'next_tasks':[]}
+if r['permissions']['worktree_write']:
+    pathlib.Path(r['worktree'], 'candidate.txt').write_text('fixture bridge candidate')
+if r.get('bindings', {}).get('probe'): report = {'ok':True}
+if mode in ['timeout', 'pause', 'detached-exit']:
+    if os.fork() == 0:
+        os.setsid()
+        while True:
+            with open(out.parent / 'child-counter', 'a') as f: f.write('x')
+            time.sleep(0.03)
+    while not (out.parent / 'child-counter').exists(): time.sleep(0.01)
+    if mode != 'detached-exit': time.sleep(30)
+if mode == 'malformed-write': out.write_text('{'); sys.exit(0)
+if mode == 'missing': sys.exit(0)
+if mode == 'fifo': os.mkfifo(out); sys.exit(0)
+if mode == 'oversize': out.write_text(' ' * (1024*1024+1)); sys.exit(0)
+digest = hashlib.sha256(raw).hexdigest()
+if mode == 'request-tamper':
+    (out.parent / 'bridge-request.json').write_text('modified')
+    digest = hashlib.sha256(b'modified').hexdigest()
+out.write_text(json.dumps({'schema_version':1,'request_sha256':digest,'report':report}))
+"#).unwrap();
+    fs::set_permissions(&bridge, fs::Permissions::from_mode(0o700)).unwrap();
+    let spec = agent_backend::BackendSpec::JsonProcess {
+        program: bridge,
+        args: vec![],
+        env_allowlist: vec![],
+        capabilities: agent_backend::Capabilities {
+            structured_result: true,
+            read_workspace: true,
+            write_workspace: true,
+            tool_execution: true,
+            desktop: false,
+        },
+    };
+    c.agent_backends.insert("fixture-bridge".into(), spec);
+    for role in ["research", "implement", "review"] {
+        c.role_backends.insert(role.into(), "fixture-bridge".into());
+    }
+    let probe = agent_backend::probe(&c, "review", &c.models["review"]).unwrap();
+    assert_eq!(probe["probe"], "isolated_json_contract");
+    assert_eq!(probe["provider_compatibility"], "unverified");
+    let w = workflow(&c);
+    for mode in [
+        "success",
+        "write-success",
+        "malformed-write",
+        "missing",
+        "fifo",
+        "oversize",
+        "request-tamper",
+        "detached-exit",
+        "timeout",
+        "pause",
+    ] {
+        let write = mode.contains("write");
+        let task:Task=serde_json::from_value(json!({"id":mode,"role":if write {"implement"} else {"research"},"repository":"superpod","prompt":"Run the explicit protocol fixture only.","write":write,"max_attempts":1})).unwrap();
+        let mut job = enqueue(&c, task).unwrap();
+        let (mut worker, mut heartbeat) =
+            launch(&c, &w, &mut job, if mode == "timeout" { 2 } else { 15 }).unwrap();
+        let logs = c.state_dir.join("runs").join(&job.run_id);
+        let frozen: Job = storage::read(&job_path(&c, mode)).unwrap();
+        assert!(
+            frozen.launch.unwrap().backend_request_sha256.is_some(),
+            "host must freeze digest before spawn"
+        );
+        let started = std::time::Instant::now();
+        let observation = loop {
+            assert!(
+                started.elapsed() < Duration::from_secs(10),
+                "backend process failed to terminate: {mode}"
+            );
+            if mode == "pause" && logs.join("child-counter").exists() {
+                fs::write(c.state_dir.join("paused"), "fixture pause").unwrap();
+            }
+            match worker.poll() {
+                Ok(Some(exit)) => {
+                    break ExitObservation {
+                        success: exit.success(),
+                        code: exit.code(),
+                        reason: None,
+                    };
+                }
+                Ok(None) => std::thread::sleep(Duration::from_millis(30)),
+                Err(error) => {
+                    break ExitObservation {
+                        success: false,
+                        code: None,
+                        reason: Some(error.to_string()),
+                    };
+                }
+            }
+        };
+        // Resume only this private fixture; production state is never used.
+        let _ = fs::remove_file(c.state_dir.join("paused"));
+        job.launch.as_mut().unwrap().lease = heartbeat.stop().unwrap();
+        let accepted = settle_with_heartbeat(&w, &job, &observation, None).unwrap();
+        let expected = matches!(mode, "success" | "write-success" | "detached-exit");
+        assert_eq!(accepted, expected, "{mode}");
+        assert_eq!(
+            WorkflowState::from_value(&w.status(&job.run_id).unwrap()["status"])
+                == Some(WorkflowState::Succeeded),
+            expected,
+            "{mode}"
+        );
+        w.verify(&job.run_id).unwrap();
+        if expected {
+            let receipt = authoritative_success_receipt(&w, &job).unwrap();
+            assert_eq!(
+                receipt["backend"],
+                serde_json::to_value(&job.backend).unwrap()
+            );
+            assert_eq!(
+                receipt["backend_request_sha256"],
+                json!(job.launch.as_ref().unwrap().backend_request_sha256)
+            );
+        }
+        if logs.join("child-counter").exists() {
+            let before = fs::read(logs.join("child-counter")).unwrap();
+            std::thread::sleep(Duration::from_millis(150));
+            assert_eq!(
+                before,
+                fs::read(logs.join("child-counter")).unwrap(),
+                "detached child survived: {mode}"
+            );
+        }
+        assert_eq!(job.attempt, 1);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "real workflow, bwrap and relay-memory; set LAB_WORKFLOW_BIN and LAB_MEMORY_BIN; fake providers only"]
+fn digital_person_uses_different_executors_without_rebinding_history_or_memory() {
+    use std::os::unix::fs::PermissionsExt;
+    let (temp, mut c) = scheduler_fixture();
+    assert!(std::env::var_os("LAB_MEMORY_BIN").is_some());
+    let bridge = temp.path().join("person-bridge");
+    fs::write(&bridge, r#"#!/usr/bin/python3
+import hashlib, json, pathlib, sys
+raw = sys.stdin.buffer.read()
+r = json.loads(raw)
+assert r['model'] == 'bridge-model'
+assert r['bindings']['digital_person']['id'].startswith('person-')
+assert r['bindings']['digital_person']['session_id'] == 'person-second'
+assert r['bindings']['digital_person']['execution_id'] == r['request_id']
+assert 'PERSON_EXECUTION_CONTINUITY_2741' in r['prompt']
+assert not r['permissions']['worktree_write']
+report = {'summary':'explicit executor continuity fixture','findings':['same person across technical executors'],'sources':[],'limitations':['fake provider, not research quality'],'next_tasks':[]}
+pathlib.Path(r['result_path']).write_text(json.dumps({'schema_version':1,'request_sha256':hashlib.sha256(raw).hexdigest(),'report':report}))
+print(json.dumps({'type':'session.activity','kind':'message','text':'The same persona continues research.'}))
+"#).unwrap();
+    fs::set_permissions(&bridge, fs::Permissions::from_mode(0o700)).unwrap();
+    c.agent_backends.insert(
+        "person-bridge".into(),
+        config::BackendSpec::JsonProcess {
+            program: bridge,
+            args: vec![],
+            env_allowlist: vec![],
+            capabilities: config::Capabilities {
+                structured_result: true,
+                read_workspace: true,
+                ..Default::default()
+            },
+        },
+    );
+    c.backend_models
+        .insert("person-bridge".into(), vec!["bridge-model".into()]);
+    let person = people::change(
+        &c,
+        people::Change::Create {
+            name: "InsightAction".into(),
+            role: "designer".into(),
+            kind: people::Kind::Fixed,
+            soul: "Respond to peers with curiosity and care.".into(),
+            purpose: "Research continuity across execution technologies".into(),
+        },
+    )
+    .unwrap();
+    people::remember_note(
+        &c,
+        &person.id,
+        "continuity-note",
+        "PERSON_EXECUTION_CONTINUITY_2741: Preserve identity and memory across executors.",
+    )
+    .unwrap();
+    let task = |id: &str, role: &str| {
+        serde_json::from_value::<Task>(json!({"id":id,"role":role,"repository":"superpod","prompt":"PERSON_EXECUTION_CONTINUITY_2741 Continue researching cross-technology persona memory continuity.","persona_id":person.id,"max_attempts":1})).unwrap()
+    };
+    let first_task = task("person-first", "research");
+    let first = enqueue(&c, first_task.clone()).unwrap();
+    let original = serde_json::to_value(&first).unwrap();
+    people::change(
+        &c,
+        people::Change::ConfigureExecution {
+            id: person.id.clone(),
+            revision: person.revision,
+            execution: Some(task::ExecutionPreference {
+                backend: Some("person-bridge".into()),
+                model: Some("bridge-model".into()),
+            }),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        serde_json::to_value(enqueue(&c, first_task).unwrap()).unwrap(),
+        original
+    );
+    let second = enqueue(&c, task("person-second", "review")).unwrap();
+    assert!(first.backend.is_none());
+    assert_eq!(first.model, "fake-research");
+    assert_eq!(second.backend.as_ref().unwrap().id, "person-bridge");
+    assert_eq!(second.model, "bridge-model");
+    for job in [&first, &second] {
+        assert_eq!(job.persona.as_ref().unwrap().id, person.id);
+        assert!(
+            job.persona
+                .as_ref()
+                .unwrap()
+                .memory
+                .as_ref()
+                .unwrap()
+                .context
+                .contains("PERSON_EXECUTION_CONTINUITY_2741")
+        );
+        assert!(!job.task.write);
+        agent_backend::verify_job(&c, job).unwrap();
+    }
+    let mut forbidden = second.task.clone();
+    forbidden.write = true;
+    assert!(agent_backend::freeze_selected(&c, &forbidden, Some("person-bridge")).is_err());
+    let mut changed = second.clone();
+    changed.model = "fake-research".into();
+    assert!(agent_backend::verify_job(&c, &changed).is_err());
+    let w = workflow(&c);
+    for mut job in [first, second] {
+        let (mut worker, mut heartbeat) = launch(&c, &w, &mut job, 15).unwrap();
+        let start = std::time::Instant::now();
+        let exit = loop {
+            assert!(start.elapsed() < Duration::from_secs(20));
+            if let Some(exit) = worker.poll().unwrap() {
+                break exit;
+            }
+            std::thread::sleep(Duration::from_millis(30));
+        };
+        job.launch.as_mut().unwrap().lease = heartbeat.stop().unwrap();
+        assert!(
+            settle_with_heartbeat(
+                &w,
+                &job,
+                &ExitObservation {
+                    success: exit.success(),
+                    code: exit.code(),
+                    reason: None
+                },
+                None
+            )
+            .unwrap()
+        );
+        let receipt = authoritative_success_receipt(&w, &job).unwrap();
+        people::writeback(&c, &job, &receipt).unwrap();
+        w.verify(&job.run_id).unwrap();
+    }
+    let directory = people::directory(&c).unwrap();
+    assert_eq!(directory.tasks["person-first"], person.id);
+    assert_eq!(directory.tasks["person-second"], person.id);
+    let memory =
+        people::inspect_memory(&c, &person.id, "PERSON_EXECUTION_CONTINUITY_2741").unwrap();
+    assert_eq!(memory["stats"]["event_count"], 3);
+    people::change(
+        &c,
+        people::Change::ConfigureExecution {
+            id: person.id.clone(),
+            revision: directory.people[&person.id].revision,
+            execution: None,
+        },
+    )
+    .unwrap();
+    let mut author = task("person-author", "implement");
+    author.write = true;
+    enqueue(&c, author).unwrap();
+    let mut self_review = task("person-self-review", "review");
+    self_review.dependencies = vec!["person-author".into()];
+    assert!(
+        enqueue(&c, self_review)
+            .unwrap_err()
+            .to_string()
+            .contains("different digital person")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "real workflow and bwrap with explicit fake Codex; set LAB_WORKFLOW_BIN"]
+fn scoped_run_preserves_historical_followups_and_executes_only_selected_dag() {
+    let (_temp, mut c) = scheduler_fixture();
+    let task = |id: &str, prompt: &str, dependencies: Vec<String>| Task {
+        persona_id: None,
+        id: id.into(),
+        role: "research".into(),
+        repository: "superpod".into(),
+        prompt: prompt.into(),
+        prompt_version: None,
+        communication: None,
+        max_attempts: Some(1),
+        use_memory: false,
+        depth: 0,
+        write: false,
+        exploratory: false,
+        dependencies,
+        required_tools: vec![],
+    };
+    let old = enqueue(&c, task("synthesis-history", "PROPOSE_FOLLOWUP", vec![])).unwrap();
+    let history_scope = c.state_dir.join("private/history.json");
+    storage::write(&history_scope, &vec![old.task.id.clone()]).unwrap();
+    let started = std::time::Instant::now();
+    let historical_result = run_scoped(&c, false, 30, false, Some(&history_scope)).unwrap();
+    assert!(
+        started.elapsed() < Duration::from_secs(25),
+        "pending scope-deferred proposal must not spin until budget exhaustion"
+    );
+    assert_eq!(
+        historical_result["task_scope"]["deferred_followup_runs"],
+        json!([old.run_id])
+    );
+    let original_journal = fs::read(post_success_path(&c, &old)).unwrap();
+    let historical_record: PostSuccess = serde_json::from_slice(&original_journal).unwrap();
+    assert_eq!(historical_record.followups, FollowupAdmission::Pending);
+    assert_eq!(jobs(&c).unwrap().len(), 1);
+    let outside = enqueue(
+        &c,
+        task("outside-pending", "independent excluded task", vec![]),
+    )
+    .unwrap();
+    c.task_timeout_seconds += 1; // A new pilot config must not consume the old cohort's proposals.
+    let first = enqueue(&c, task("selected-first", "bounded evidence", vec![])).unwrap();
+    let second = enqueue(
+        &c,
+        task(
+            "selected-second",
+            "combine supplied evidence",
+            vec![first.task.id.clone()],
+        ),
+    )
+    .unwrap();
+    let proposal = enqueue(&c, task("synthesis-selected", "PROPOSE_FOLLOWUP", vec![])).unwrap();
+    let scope_file = c.state_dir.join("private/selected.json");
+    storage::write(
+        &scope_file,
+        &vec![
+            first.task.id.clone(),
+            second.task.id.clone(),
+            proposal.task.id.clone(),
+        ],
+    )
+    .unwrap();
+    // An unrelated outbox marker must remain untouched by this bounded run.
+    let outbox = c.state_dir.join("outbox/unrelated.json");
+    storage::write(&outbox, &json!({"private_fixture":"do not process"})).unwrap();
+    let outbox_before = fs::read(&outbox).unwrap();
+    let started = std::time::Instant::now();
+    let result = run_scoped(&c, false, 30, false, Some(&scope_file)).unwrap();
+    assert!(started.elapsed() < Duration::from_secs(25));
+    let w = workflow(&c);
+    for job in [&first, &second, &proposal] {
+        assert_eq!(w.status(&job.run_id).unwrap()["status"], "succeeded");
+        w.verify(&job.run_id).unwrap();
+    }
+    assert_eq!(
+        fs::read(post_success_path(&c, &old)).unwrap(),
+        original_journal
+    );
+    assert_eq!(fs::read(outbox).unwrap(), outbox_before);
+    assert!(
+        !c.state_dir.join("outbox/states").exists(),
+        "scope must not initialize or consume unrelated automation"
+    );
+    assert!(!c.state_dir.join("runs").join(&outside.run_id).exists());
+    assert_eq!(w.status(&outside.run_id).unwrap()["status"], "running");
+    assert_eq!(
+        jobs(&c).unwrap().len(),
+        5,
+        "no historical or selected follow-up may be admitted"
+    );
+    let record: PostSuccess = storage::read(&post_success_path(&c, &proposal)).unwrap();
+    assert_eq!(record.followups, FollowupAdmission::Pending);
+    assert_eq!(
+        result["task_scope"]["deferred_followup_runs"],
+        json!([proposal.run_id])
+    );
+    let prompt = fs::read_to_string(
+        c.state_dir
+            .join("runs")
+            .join(&second.run_id)
+            .join("prompt.txt"),
+    )
+    .unwrap();
+    assert!(prompt.contains("Completed dependency reports") && prompt.contains(&first.task.id));
+    // Scope deferral is reversible without repairing or rewriting the journal.
+    assert!(drain_followups(&c, &w).unwrap());
+    assert_eq!(jobs(&c).unwrap().len(), 6);
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "set LAB_WORKFLOW_BIN for real durable workflow and bwrap with explicit fake Codex; optional LAB_PROTOCOL_EVIDENCE_DIR preserves receipts"]
+fn eight_workers_respect_capacity_and_completed_dependency_barrier() {
+    let (_temp, mut c) = scheduler_fixture();
+    c.max_agents = 8;
+    c.task_timeout_seconds = 45;
+    let independent: Vec<String> = (0..10).map(|n| format!("parallel-{n:02}")).collect();
+    let prerequisites = independent[..8].to_vec();
+    for id in independent
+        .iter()
+        .chain(std::iter::once(&"after-eight".into()))
+    {
+        let dependent = id == "after-eight";
+        enqueue(
+            &c,
+            Task {
+                persona_id: None,
+                id: id.clone(),
+                role: if dependent { "review" } else { "research" }.into(),
+                repository: "superpod".into(),
+                prompt: if dependent {
+                    "AFTER_EIGHT"
+                } else {
+                    "EIGHT_PARALLEL"
+                }
+                .into(),
+                prompt_version: None,
+                communication: None,
+                max_attempts: None,
+                use_memory: false,
+                depth: 0,
+                write: false,
+                exploratory: false,
+                dependencies: if dependent {
+                    prerequisites.clone()
+                } else {
+                    vec![]
+                },
+                required_tools: vec![],
+            },
+        )
+        .unwrap();
+    }
+    run(&c, false, 100).unwrap();
+    let evidence = std::env::var_os("LAB_PROTOCOL_EVIDENCE_DIR").map(PathBuf::from);
+    if let Some(path) = &evidence {
+        fs::create_dir_all(path).unwrap();
+    }
+    let w = workflow(&c);
+    let mut intervals = BTreeMap::new();
+    let mut receipts = BTreeMap::new();
+    for job in jobs(&c).unwrap() {
+        assert_eq!(job.attempt, 1);
+        assert!(job.last_error.is_none() && job.launch.is_none(), "{job:?}");
+        assert_eq!(w.status(&job.run_id).unwrap()["status"], "succeeded");
+        receipts.insert(job.task.id.clone(), w.verify(&job.run_id).unwrap());
+        let dir = c.state_dir.join("runs").join(&job.run_id);
+        let stdout = fs::read_to_string(dir.join("process/stdout.jsonl")).unwrap();
+        let times: Vec<u128> = stdout.lines().filter_map(|s| s.parse().ok()).collect();
+        assert_eq!(times.len(), 2, "{stdout}");
+        intervals.insert(job.task.id.clone(), [times[0], times[1]]);
+        if let Some(path) = &evidence {
+            let task_dir = path.join(&job.task.id);
+            fs::create_dir_all(&task_dir).unwrap();
+            storage::write(&task_dir.join("job.json"), &job).unwrap();
+            for file in [
+                "prompt.txt",
+                "result.json",
+                "agent-permissions.json",
+                "process/stdout.jsonl",
+                "process/stderr.log",
+            ] {
+                let source = dir.join(file);
+                if source.is_file() {
+                    std::fs::copy(&source, task_dir.join(source.file_name().unwrap())).unwrap();
+                }
+            }
+        }
+    }
+    let mut events = Vec::new();
+    for (id, times) in &intervals {
+        events.push((times[0], 1_i32, id));
+        events.push((times[1], -1_i32, id));
+    }
+    events.sort();
+    let mut active = 0;
+    let mut peak = 0;
+    for (_, change, _) in &events {
+        active += change;
+        peak = peak.max(active);
+    }
+    let last_prerequisite = prerequisites
+        .iter()
+        .map(|id| intervals[id][1])
+        .max()
+        .unwrap();
+    let summary = json!({"provider":"explicit fake Codex; real workflow and bwrap", "max_agents":c.max_agents,"measured_peak":peak,"intervals_ns":intervals,"launch_and_finish_events_ns":events,"last_prerequisite_finish_ns":last_prerequisite,"workflow_verification":receipts,"limits":"Protocol concurrency and dependency evidence only; no model quality, token or cost result."});
+    if let Some(path) = &evidence {
+        storage::write(&path.join("protocol.json"), &summary).unwrap();
+    }
+    println!("{summary}");
+    assert_eq!(
+        peak, 8,
+        "must fill all eight slots without admitting a ninth worker"
+    );
+    assert_eq!(active, 0);
+    assert!(intervals["after-eight"][0] >= last_prerequisite);
+    let dependent: Job = storage::read(&job_path(&c, "after-eight")).unwrap();
+    let prompt = fs::read_to_string(
+        c.state_dir
+            .join("runs")
+            .join(dependent.run_id)
+            .join("prompt.txt"),
+    )
+    .unwrap();
+    for id in prerequisites {
+        assert!(
+            prompt.contains(&id),
+            "missing completed dependency report: {id}"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "set LAB_WORKFLOW_BIN and LAB_SANDBOX_BIN for real workflow/sandbox with explicit fake Codex"]
+fn sandbox_write_claim_waits_for_idle_without_serializing_ordinary_workers() {
+    let (_temp, mut c) = scheduler_fixture();
+    c.max_agents = 3;
+    c.tools.get_mut("repo-sandbox").unwrap().binary = std::env::var("LAB_SANDBOX_BIN")
+        .expect("LAB_SANDBOX_BIN")
+        .into();
+    for (id, write) in [
+        ("a-read", false),
+        ("b-read", false),
+        ("c-sandbox-write", true),
+    ] {
+        enqueue(
+            &c,
+            Task {
+                persona_id: None,
+                id: id.into(),
+                role: if write { "implement" } else { "research" }.into(),
+                repository: "superpod".into(),
+                prompt: if write {
+                    "implement tested candidate"
+                } else {
+                    "SLOW_PARALLEL"
+                }
+                .into(),
+                prompt_version: None,
+                communication: None,
+                max_attempts: None,
+                use_memory: false,
+                depth: 0,
+                write,
+                exploratory: false,
+                dependencies: vec![],
+                required_tools: if write {
+                    vec!["repo-sandbox".into()]
+                } else {
+                    vec![]
+                },
+            },
+        )
+        .unwrap();
+    }
+    run(&c, false, 30).unwrap();
+    let w = workflow(&c);
+    let mut intervals = vec![];
+    for id in ["a-read", "b-read", "c-sandbox-write"] {
+        let job: Job = storage::read(&job_path(&c, id)).unwrap();
+        assert_eq!(job.attempt, 1, "preparation must not consume a task retry");
+        assert!(job.last_error.is_none() && job.launch.is_none(), "{job:?}");
+        assert_eq!(w.status(&job.run_id).unwrap()["status"], "succeeded");
+        w.verify(&job.run_id).unwrap();
+        if !job.task.write {
+            let output = fs::read_to_string(
+                c.state_dir
+                    .join("runs")
+                    .join(&job.run_id)
+                    .join("process/stdout.jsonl"),
+            )
+            .unwrap();
+            let times: Vec<u128> = output.lines().filter_map(|s| s.parse().ok()).collect();
+            assert_eq!(times.len(), 2, "{output}");
+            intervals.push(times);
+        } else {
+            let lease: Value = storage::read(
+                &w.work_dir
+                    .join("host-leases")
+                    .join(format!("{}.json", job.run_id)),
+            )
+            .unwrap();
+            let acquired = lease["issued_at_unix_ms"].as_u64().unwrap() as u128 * 1_000_000;
+            assert!(
+                intervals.iter().all(|times| acquired >= times[1]),
+                "sandbox write was claimed while another worker was active"
+            );
+            let proof: Value = storage::read(
+                &c.state_dir
+                    .join("runs")
+                    .join(&job.run_id)
+                    .join("targets-host.json"),
+            )
+            .unwrap();
+            assert_eq!(proof["verified"], true);
+            assert_eq!(proof["down"]["status"], "stopped");
+            assert!(job.worktree.join("candidate.txt").is_file());
+        }
+    }
+    assert!(
+        intervals[0][0] < intervals[1][1] && intervals[1][0] < intervals[0][1],
+        "ordinary workers should still overlap"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "set LAB_WORKFLOW_BIN to test the real durable runtime with an explicit fake Codex provider"]
+fn actual_workflow_fake_codex_completion_and_failure() {
+    let (_temp, c) = scheduler_fixture();
+    let task = |id: &str, write: bool, prompt: &str, dependencies: Vec<String>| Task {
+        persona_id: None,
+        id: id.into(),
+        role: if write {
+            "implement".into()
+        } else {
+            "research".into()
+        },
+        repository: "superpod".into(),
+        prompt: prompt.into(),
+        prompt_version: None,
+        communication: None,
+        max_attempts: None,
+        use_memory: false,
+        depth: 0,
+        write,
+        exploratory: false,
+        dependencies,
+        required_tools: vec![],
+    };
+    enqueue(&c, task("research", false, "independent research", vec![])).unwrap();
+    enqueue(&c, task("critic", false, "independent critique", vec![])).unwrap();
+    enqueue(
+        &c,
+        task(
+            "implementation",
+            true,
+            "implement tested candidate",
+            vec!["research".into(), "critic".into()],
+        ),
+    )
+    .unwrap();
+    run(&c, false, 30).unwrap();
+    let w = workflow(&c);
+    for id in ["research", "critic", "implementation"] {
+        let job: Job = storage::read(&job_path(&c, id)).unwrap();
+        assert_eq!(w.status(&job.run_id).unwrap()["status"], "succeeded");
+        assert!(job.launch.is_none());
+        w.verify(&job.run_id).unwrap();
+    }
+    let prompt =
+        fs::read_to_string(c.state_dir.join("runs/implementation-attempt-1/prompt.txt")).unwrap();
+    assert!(prompt.contains("Completed dependency reports") && prompt.contains("fixture output"));
+    let mut review = task(
+        "candidate-review",
+        false,
+        "independently review frozen candidate",
+        vec!["implementation".into()],
+    );
+    review.role = "review".into();
+    let review = enqueue(&c, review).unwrap();
+    assert!(review.baseline_commit.is_some());
+    assert_ne!(
+        review.source_commit,
+        review.baseline_commit.as_ref().unwrap().as_str()
+    );
+    assert!(review.worktree.join("candidate.txt").exists());
+    run(&c, false, 30).unwrap();
+    assert_eq!(w.status(&review.run_id).unwrap()["status"], "succeeded");
+    enqueue(&c, task("malformed-write", true, "MALFORMED", vec![])).unwrap();
+    run(&c, false, 30).unwrap();
+    let job: Job = storage::read(&job_path(&c, "malformed-write")).unwrap();
+    assert!(job.last_error.is_some() && job.launch.is_none());
+    assert_ne!(w.status(&job.run_id).unwrap()["status"], "succeeded");
+    assert!(job.worktree.join("candidate.txt").exists());
+    w.verify(&job.run_id).unwrap();
+    enqueue(
+        &c,
+        task("synthesis-fixture", false, "PROPOSE_FOLLOWUP", vec![]),
+    )
+    .unwrap();
+    enqueue(&c, task("synthesis-invalid", false, "BAD_PROPOSAL", vec![])).unwrap();
+    run(&c, false, 30).unwrap();
+    let parent: Job = storage::read(&job_path(&c, "synthesis-fixture")).unwrap();
+    let followups: Value = storage::read(
+        &c.state_dir
+            .join("runs")
+            .join(&parent.run_id)
+            .join("followups.json"),
+    )
+    .unwrap();
+    let child: Job =
+        storage::read(&job_path(&c, followups["queued"][0].as_str().unwrap())).unwrap();
+    assert_eq!(child.task.depth, 1);
+    assert_eq!(w.status(&child.run_id).unwrap()["status"], "succeeded");
+    let invalid: Job = storage::read(&job_path(&c, "synthesis-invalid")).unwrap();
+    assert_eq!(w.status(&invalid.run_id).unwrap()["status"], "succeeded");
+    let rejected: FollowupReport = storage::read(
+        &c.state_dir
+            .join("runs")
+            .join(invalid.run_id)
+            .join("followups.json"),
+    )
+    .unwrap();
+    assert!(rejected.queued.is_empty());
+    assert_eq!(rejected.rejected.len(), 1);
+    if std::env::var("LAB_MEMORY_BIN").is_ok() {
+        let version = evolution::PromptVersion::new(evolution::PromptDefinition {
+            parent_versions: vec![],
+            role: "research".into(),
+            task_kind: "fixture".into(),
+            content: "Registered alternate strategy".into(),
+            change_reason: "fixture".into(),
+            failure_conditions: vec!["missing evidence".into()],
+        })
+        .unwrap();
+        let mut registry = evolution::PromptRegistry::default();
+        let version = registry.register(version).unwrap();
+        storage::write(&c.state_dir.join("evolution/prompts.json"), &registry).unwrap();
+        for id in ["memory-baseline", "memory-candidate"] {
+            let mut memory = task(id, false, "remember fixture constraints", vec![]);
+            memory.use_memory = true;
+            memory.prompt_version = Some(version.clone());
+            enqueue(&c, memory).unwrap();
+        }
+        run(&c, false, 60).unwrap();
+        for id in ["memory-baseline", "memory-candidate"] {
+            let job: Job = storage::read(&job_path(&c, id)).unwrap();
+            assert_eq!(
+                w.status(&job.run_id).unwrap()["status"],
+                "succeeded",
+                "job: {job:?}"
+            );
+            let dir = c.state_dir.join("runs").join(&job.run_id);
+            assert!(dir.join("memory-prepare.json").exists());
+            assert!(dir.join("memory-remember.json").exists());
+            assert!(
+                c.state_dir
+                    .join("task-memory")
+                    .join(id)
+                    .join("memory.sqlite")
+                    .exists()
+            );
+            assert!(
+                fs::read_to_string(dir.join("prompt.txt"))
+                    .unwrap()
+                    .contains("Registered alternate strategy")
+            );
+        }
+    }
+    let mut once = task("failed-once", false, "FAIL_READ", vec![]);
+    once.max_attempts = Some(1);
+    enqueue(&c, once).unwrap();
+    enqueue(&c, task("failed-read", false, "FAIL_READ", vec![])).unwrap();
+    run(&c, false, 30).unwrap();
+    let job: Job = storage::read(&job_path(&c, "failed-read")).unwrap();
+    assert_eq!(job.attempt, 3);
+    assert!(job.retry_after.is_none());
+    assert_eq!(w.status(&job.run_id).unwrap()["status"], "failed");
+    let once: Job = storage::read(&job_path(&c, "failed-once")).unwrap();
+    assert_eq!(once.attempt, 1);
+    assert!(once.retry_after.is_none());
+    assert_eq!(w.status(&once.run_id).unwrap()["status"], "failed");
+    assert!(!c.state_dir.join("runs/failed-once-attempt-2").exists());
+    assert!(retry(&c, "failed-once").is_err());
+}
+#[test]
+#[ignore = "set LAB_MEMORY_BIN for real per-experiment memory continuity"]
+fn real_memory_survives_attempt_change_and_isolates_experiments() {
+    let binary = std::env::var("LAB_MEMORY_BIN").expect("LAB_MEMORY_BIN");
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let c = Config {
+        require_latest: false,
+        skills_manifest: None,
+        schema_version: 1,
+        workspace: root.into(),
+        state_dir: root.join("state"),
+        superpod: root.join("superpod"),
+        codex: "unused".into(),
+        multi_agent: None,
+        agent_backends: BTreeMap::new(),
+        role_backends: BTreeMap::new(),
+        backend_models: BTreeMap::new(),
+        workflow: root.join("unused"),
+        daily_seconds: 3600,
+        max_agents: 1,
+        task_timeout_seconds: 60,
+        models: Default::default(),
+        tools: std::collections::BTreeMap::from([(
+            "relay-memory".into(),
+            config::Tool {
+                binary: binary.into(),
+                repository: root.into(),
+                probe: vec![],
+            },
+        )]),
+    };
+    let mut job = Job {
+        persona: None,
+        backend: None,
+        task: Task {
+            persona_id: None,
+            id: "memory-baseline".into(),
+            role: "research".into(),
+            repository: "superpod".into(),
+            prompt: "Resume the bounded repository research checkpoint".into(),
+            prompt_version: None,
+            communication: None,
+            max_attempts: None,
+            use_memory: true,
+            depth: 0,
+            write: false,
+            exploratory: false,
+            dependencies: vec![],
+            required_tools: vec![],
+        },
+        model: "fixture".into(),
+        source_commit: "fixture".into(),
+        baseline_commit: None,
+        research_inputs: None,
+        superpod_commit: "fixture".into(),
+        prompt_digest: "fixture".into(),
+        config_digest: "fixture".into(),
+        worktree: root.into(),
+        run_id: "memory-baseline-attempt-1".into(),
+        attempt: 1,
+        last_error: None,
+        launch: None,
+        retry_after: None,
+    };
+    let first = root.join("logs/attempt-1");
+    let prepared = memory_call(&c, &job, &first, "prepare", None).unwrap();
+    assert!(prepared["recent_events"].as_array().unwrap().is_empty());
+    memory_call(
+        &c,
+        &job,
+        &first,
+        "remember",
+        Some("Checkpoint: source inspection completed; continue independent evaluation."),
+    )
+    .unwrap();
+    job.attempt = 2;
+    job.run_id = "memory-baseline-attempt-2".into();
+    let resumed = memory_call(&c, &job, &root.join("logs/attempt-2"), "prepare", None).unwrap();
+    assert!(!resumed["recent_events"].as_array().unwrap().is_empty());
+    job.task.id = "memory-candidate".into();
+    job.run_id = "memory-candidate-attempt-1".into();
+    job.attempt = 1;
+    let separate = memory_call(&c, &job, &root.join("logs/candidate"), "prepare", None).unwrap();
+    assert!(separate["recent_events"].as_array().unwrap().is_empty());
+    for id in ["memory-baseline", "memory-candidate"] {
+        assert!(
+            c.state_dir
+                .join("task-memory")
+                .join(id)
+                .join("memory.sqlite")
+                .exists()
+        );
+    }
+    assert!(!first.join("memory/memory.sqlite").exists());
+}
+
+mod restart_start_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn historical_start_survives_timeout_default_change_without_rebinding() {
+        let temp = tempfile::tempdir().unwrap();
+        let binary = temp.path().join("workflow-fixture");
+        fs::write(
+            &binary,
+            "#!/bin/sh\nprintf '%s\\n' '{\"ok\":true,\"result\":{}}'\n",
+        )
+        .unwrap();
+        fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+        let mut config: Config = serde_json::from_value(json!({
+            "schema_version":1,"workspace":temp.path(),"state_dir":temp.path().join("state"),
+            "superpod":temp.path(),"codex":"unused","workflow":binary,
+            "daily_seconds":3600,"max_agents":1,"task_timeout_seconds":20,
+            "models":{},"tools":{},"require_latest":false,"skills_manifest":null
+        }))
+        .unwrap();
+        let mut job: Job = serde_json::from_value(json!({
+            "task":{"id":"retained","role":"research","repository":"superpod","prompt":"frozen"},
+            "model":"fixture","source_commit":"source","superpod_commit":"knowledge",
+            "prompt_digest":"prompt","config_digest":"config","worktree":temp.path(),
+            "run_id":"retained-attempt-1","attempt":1,"last_error":null,"launch":null
+        }))
+        .unwrap();
+        ensure_started(&config, &job).unwrap();
+        let retained_path = workflow(&config).work_dir.join(format!(
+            "start-{}.json",
+            storage::digest(job.run_id.as_bytes())
+        ));
+        let original = fs::read(&retained_path).unwrap();
+        config.task_timeout_seconds = 90;
+        ensure_started(&config, &job).unwrap();
+        assert_eq!(fs::read(&retained_path).unwrap(), original);
+        let retained: Value = storage::read(&retained_path).unwrap();
+        assert_eq!(retained["bundle"]["capabilities"][0]["timeout_ms"], 20000);
+        job.task.prompt = "changed".into();
+        assert!(ensure_started(&config, &job).is_err());
+        assert_eq!(fs::read(&retained_path).unwrap(), original);
+        job.task.prompt = "frozen".into();
+        fs::write(&retained_path, b"not-json").unwrap();
+        assert!(ensure_started(&config, &job).is_err());
+        assert_eq!(fs::read(&retained_path).unwrap(), b"not-json");
+    }
+}
+
+mod host_budget_tests {
+    use super::*;
+    fn config(root: &Path) -> Config {
+        Config {
+            schema_version: 1,
+            workspace: root.into(),
+            state_dir: root.join("state"),
+            superpod: root.join("superpod"),
+            codex: "unused".into(),
+            multi_agent: None,
+            agent_backends: BTreeMap::new(),
+            role_backends: BTreeMap::new(),
+            backend_models: BTreeMap::new(),
+            workflow: root.join("unused"),
+            daily_seconds: 43200,
+            max_agents: 1,
+            task_timeout_seconds: 60,
+            models: Default::default(),
+            tools: Default::default(),
+            require_latest: false,
+            skills_manifest: None,
+        }
+    }
+    #[test]
+    fn idle_host_effects_respect_pause_and_exhausted_allowances() {
+        let temp = tempfile::tempdir().unwrap();
+        let c = config(temp.path());
+        let mut ledger = load_ledger(&c).unwrap();
+        let window = RunWindow {
+            started: now(),
+            max_seconds: 0,
+        };
+        pause(&c, true).unwrap();
+        assert!(
+            idle_host(&c, &mut ledger, window, || -> Result<()> {
+                panic!("paused effect")
+            })
+            .unwrap()
+            .is_none()
+        );
+        pause(&c, false).unwrap();
+        ledger
+            .budget
+            .days
+            .insert(budget::day(now()), c.daily_seconds);
+        assert!(
+            idle_host(&c, &mut ledger, window, || -> Result<()> {
+                panic!("daily budget effect")
+            })
+            .unwrap()
+            .is_none()
+        );
+        ledger.budget.days.clear();
+        let expired = RunWindow {
+            started: now() - 5,
+            max_seconds: 1,
+        };
+        assert!(
+            idle_host(&c, &mut ledger, expired, || -> Result<()> {
+                panic!("expired effect")
+            })
+            .unwrap()
+            .is_none()
+        );
+    }
+    #[test]
+    fn idle_host_deadline_kills_slow_child_and_charges_failed_work() {
+        let temp = tempfile::tempdir().unwrap();
+        let c = config(temp.path());
+        let mut ledger = load_ledger(&c).unwrap();
+        let started = std::time::Instant::now();
+        let result = idle_host(
+            &c,
+            &mut ledger,
+            RunWindow {
+                started: now(),
+                max_seconds: 1,
+            },
+            || {
+                let persisted: Ledger = storage::read(&c.state_dir.join("budget.json"))?;
+                ensure!(
+                    persisted.budget.active_since.is_some(),
+                    "effect preceded budget journal"
+                );
+                process::capture(
+                    "/bin/sleep",
+                    &["10".into()],
+                    temp.path(),
+                    Duration::from_secs(30),
+                )
+            },
+        );
+        assert!(result.is_err());
+        assert!(started.elapsed() < Duration::from_secs(4));
+        let persisted: Ledger = storage::read(&c.state_dir.join("budget.json")).unwrap();
+        assert!(persisted.budget.active_since.is_none());
+        assert!(persisted.main_seconds >= 1);
+        assert!(persisted.budget.days.values().sum::<u64>() >= 1);
+    }
+}
+
+#[path = "team_tests.rs"]
+mod team_tests;
+
+#[path = "cohort_tests.rs"]
+mod cohort_tests;
+
+#[path = "admission_tests.rs"]
+pub(super) mod admission_tests;
+
+#[path = "filesystem_tests.rs"]
+mod filesystem_tests;

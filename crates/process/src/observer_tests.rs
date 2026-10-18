@@ -88,7 +88,7 @@ enum Fault {
     ReplaceBeforeRetention,
 }
 thread_local! { static FAULT: std::cell::Cell<Fault> = const { std::cell::Cell::new(Fault::None) }; }
-pub(super) fn after_spawn_before_observation(child: &Process) {
+pub(crate) fn after_spawn_before_observation(child: &Process) {
     if FAULT.get() == Fault::WaitBeforeIdentity {
         // Observe actual exit without reaping this exact owned Child. Its exe
         // becomes unavailable while the PID/start and later actual wait remain.
@@ -106,7 +106,7 @@ pub(super) fn after_spawn_before_observation(child: &Process) {
         );
     }
 }
-pub(super) fn before_retention(stdout: &Path, _: &Path) {
+pub(crate) fn before_retention(stdout: &Path, _: &Path) {
     if FAULT.get() == Fault::ReplaceBeforeRetention {
         let original = std::fs::read(stdout).unwrap();
         std::fs::rename(stdout, stdout.with_file_name("stdout.original")).unwrap();
@@ -191,7 +191,7 @@ fn fixture(mode: &str, root: &Path) -> Result<Output> {
         std::env::current_exe()?.to_str().unwrap(),
         &[
             "--exact".into(),
-            "observer_tests::fixture_child".into(),
+            "tests::observer_tests::fixture_child".into(),
             "--nocapture".into(),
         ],
         root,

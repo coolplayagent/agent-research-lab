@@ -69,4 +69,5 @@ fn info() -> rpc::ServiceInfo {
 }
 
 #[cfg(test)]
+#[path = "lib_tests.rs"]
 mod tests;

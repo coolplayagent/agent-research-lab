@@ -235,7 +235,7 @@ fn existing_open_records_distinct_exclusive_failure_and_existing_success() {
     assert_eq!(rows.len(), 2);
     assert!(
         rows.iter()
-            .all(|(r, _)| r.callsite.contains("native-effects/src/tests.rs:")),
+            .all(|(r, _)| r.callsite.starts_with(concat!(file!(), ":"))),
         "{rows:?}"
     );
     assert_eq!(rows[0].1.errno, Some(libc::EEXIST));

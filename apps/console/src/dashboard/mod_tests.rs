@@ -171,3 +171,9 @@ fn bind_test_people(c: &Config, jobs: &[Job]) {
     }
     storage::write(&c.state_dir.join("people/directory.json"), &directory).unwrap();
 }
+
+#[path = "transport_tests.rs"]
+mod transport_tests;
+
+#[path = "research_scenario_tests.rs"]
+mod research_scenario_tests;
