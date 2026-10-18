@@ -8,6 +8,7 @@ license.workspace = true
 name = "task"
 
 [dependencies]
+contracts.workspace = true
 communication.workspace = true
 config.workspace = true
 inputs.workspace = true

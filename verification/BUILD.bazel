@@ -4,7 +4,7 @@ _OPTIONAL_SCENARIOS = ["//crates/" + name + ":" for name in [
     "execution-runtime", "execution-config", "execution-model", "collaboration-proposals", "agent-teams", "collaboration-evaluation",
     "prompt-evolution", "prompt-evolution-cli", "knowledge-publication", "delivery-outbox", "delivery-adapters", "execution-inputs", "source-freshness",
     "execution-targets", "agent-backend", "workflow-adapter", "software-delivery",
-]] + ["//apps/cli:", "//apps/console:", "//apps/cli:"]
+]] + ["//apps/cli:", "//apps/console:", "//apps/migrate:"]
 _DATABASE = ["//crates/collaboration-store:", "//crates/collaboration-storage-service:", "rusqlite", "libsqlite3"]
 _ADAPTERS = ["//crates/" + name + ":" for name in ["codex-adapter", "outcome-service", "sandbox-service", "executor-service", "service-workers", "knowledge-service", "knowledge-git", "knowledge-directory"]]
 
@@ -37,16 +37,16 @@ dependency_boundary_test(
 
 dependency_boundary_test(
     name = "core_application_is_independent",
-    subject = "//apps/outcome-hub:ai-im",
+    subject = "//apps/outcome-hub:outcome-hub",
     forbidden = _OPTIONAL_SCENARIOS + _ADAPTERS,
     required = ["//crates/collaboration-host:collaboration_host", "//crates/collaboration-api:collaboration_api"],
 )
 
 dependency_boundary_test(
     name = "core_package_excludes_optional_services",
-    subject = "//:im-package",
+    subject = "//:outcome-hub-package",
     forbidden = _OPTIONAL_SCENARIOS + _ADAPTERS,
-    required = ["//apps/outcome-hub:ai-im", "//crates/collaboration-storage-service:ai-im-storage"],
+    required = ["//apps/outcome-hub:outcome-hub", "//crates/collaboration-storage-service:outcome-hub-storage"],
 )
 
 [dependency_boundary_test(

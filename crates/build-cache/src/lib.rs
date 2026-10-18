@@ -1153,7 +1153,7 @@ MINOR_MAPPING = {{
         assert!(
             report.cargo_archives > 0 && report.bazel_archives > 0 && report.bazel_binaries > 0
         );
-        let script = "set -eu; cargo clippy --offline --locked --workspace --all-targets -- -D warnings; bazel --batch build --lockfile_mode=error --repository_disable_download //:agent-research-lab //:package";
+        let script = "set -eu; cargo clippy --offline --locked --workspace --all-targets -- -D warnings; bazel --batch build --lockfile_mode=error --repository_disable_download //:outcome-hub-cli //:package";
         let (program, args) = isolation::wrap_agent(
             "/bin/bash",
             &["-c".into(), script.into()],

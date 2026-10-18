@@ -8,7 +8,7 @@ Policies retain immutable parents, role, task families, reasons and failure cond
 
 ```sh
 mkdir -p .lab/evolution
-bazel-bin/agent-research-lab evolution prompt-register \
+bazel-bin/outcome-hub-cli evolution prompt-register \
   examples/evolution/prompt-register.json --output .lab/evolution/prompts.json
 ```
 
@@ -35,7 +35,7 @@ Eight interdependent slots are not eight independent statistical samples. The 32
 Let workers finish naturally and stop the controller before selecting the private configuration, common SuperPOD source and budget. Ordinary enqueue does not stop another controller discovering tasks; batch enqueue is not a global pause. Reuse isolation/state boundaries so a new state directory does not expose existing private data. Example model mappings and the 300-second timeout must match the real controller.
 
 ```sh
-agent-research-lab --config /ABS/pilot.toml collaboration plan examples/collaboration/pilot.json --output /ABS/STATE/private/collaboration/pilot-001
+outcome-hub-cli --config /ABS/pilot.toml collaboration plan examples/collaboration/pilot.json --output /ABS/STATE/private/collaboration/pilot-001
 ```
 
 `plan` checks current sources/skills online and freezes bindings, perspectives, questions, primary hypothesis and DAG. It registers parent-linked immutable prompts without selecting/promoting them. Replay is idempotent; changed source/config/request needs a new experiment ID. Each task must read the declared common SuperPOD files and cite fixed commit/path, file SHA-256, line range and short exact text. Missing resolvable common-knowledge citations make the protocol result invalid.
@@ -47,8 +47,8 @@ Individual `enqueue TASK.json` remains supported; register round-one tasks first
 Retain timeout/failure/invalid output in the planned denominator. Do not select successes or silently retry one arm. Each planned task has `max_attempts=1`, enforced for automatic, recovery and manual retries; unspecified historical tasks retain three attempts. A retry needs a new explained instance. The real watchdog enforces timeouts.
 
 ```sh
-agent-research-lab --config /ABS/pilot.toml collaboration collect /ABS/STATE/private/collaboration/pilot-001/manifest.json --output /ABS/STATE/private/collaboration/pilot-001/collection-001.json
-agent-research-lab --config /ABS/pilot.toml collaboration collect /ABS/STATE/private/collaboration/pilot-001/manifest.json --adjudications /ABS/STATE/private/collaboration/pilot-001/host-grades.json --output /ABS/STATE/private/collaboration/pilot-001/adjudicated-001.json
+outcome-hub-cli --config /ABS/pilot.toml collaboration collect /ABS/STATE/private/collaboration/pilot-001/manifest.json --output /ABS/STATE/private/collaboration/pilot-001/collection-001.json
+outcome-hub-cli --config /ABS/pilot.toml collaboration collect /ABS/STATE/private/collaboration/pilot-001/manifest.json --adjudications /ABS/STATE/private/collaboration/pilot-001/host-grades.json --output /ABS/STATE/private/collaboration/pilot-001/adjudicated-001.json
 ```
 
 Explicit scope filters scheduling and post-success work and skips the global automation outbox. Existing nonempty follow-ups remain pending; scoped tasks proposing more work record `deferred_task_scope` and Pending, to be processed later without the scope. Global old-process cleanup, leases and side-effect recovery still run. The `task_scope` result contains input digest, selected IDs and deferred runs; global status fields still describe the full state directory.

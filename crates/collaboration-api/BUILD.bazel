@@ -14,8 +14,6 @@ rust_library(
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
 )
-# Preserve the historical binary output path without adding a dependency to the HTTP library.
-rust_binary(name = "ai-im", srcs = ["//apps/outcome-hub:src/main.rs"], crate_root = "//apps/outcome-hub:src/main.rs", edition = "2024", deps = ["//crates/collaboration-host:collaboration_host", "//crates/filesystem-store:storage"] + all_crate_deps(normal = True, package_name = "apps/outcome-hub"), proc_macro_deps = all_crate_deps(proc_macro = True, package_name = "apps/outcome-hub"), visibility = ["//visibility:public"])
 rust_test(
     name = "tests",
     crate = ":collaboration_api",
@@ -26,7 +24,7 @@ rust_test(
 )
 pkg_tar(
     name = "package",
-    srcs = ["//apps/outcome-hub:outcome-hub", "//crates/collaboration-storage-service:outcome-hub-storage", "//deploy/systemd:outcome-hub.service", "//apps/outcome-hub:ai-im", "//crates/collaboration-storage-service:ai-im-storage", "//crates/collaboration-storage-service:units", "//deploy/systemd:ai-im.service"],
+    srcs = ["//apps/outcome-hub:outcome-hub", "//crates/collaboration-storage-service:outcome-hub-storage", "//deploy/systemd:outcome-hub.service", "//crates/collaboration-storage-service:units"],
     package_dir = "outcome-hub",
     extension = "tar.gz",
     mode = "0755",

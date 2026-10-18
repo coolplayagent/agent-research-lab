@@ -4,12 +4,12 @@
 
 ## 构建入口
 
-每个 crate 在 Cargo 与 Bazel 中声明依赖，依赖版本来自工作区锁文件。Bazel 是构建、测试和打包入口；`//:tests` 汇总测试，`//:agent-research-lab` 生成 `bazel-bin/agent-research-lab`，`//:package` 生成包含双语文档的发布包。可用 `bazel test //crates/collaboration-proposals:tests` 定位单模块回归。
+每个 crate 在 Cargo 与 Bazel 中声明依赖，依赖版本来自工作区锁文件。Bazel 是构建、测试和打包入口；`//:tests` 汇总测试，`//:outcome-hub-cli` 生成 `bazel-bin/outcome-hub-cli`，`//:package` 生成包含双语文档的发布包。可用 `bazel test //crates/collaboration-proposals:tests` 定位单模块回归。
 
 ```sh
-bazel build --lockfile_mode=error //:ai-im //:im-package
+bazel build --lockfile_mode=error //:outcome-hub //:outcome-hub-package
 bazel build --lockfile_mode=error //:adapter-package
-bazel build --lockfile_mode=error //:agent-research-lab //:package
+bazel build --lockfile_mode=error //:outcome-hub-cli //:package
 ```
 
 ## 验证与缓存
@@ -55,8 +55,8 @@ bazel test --lockfile_mode=error //...
 
 ## 应用与依赖边界
 
-独立协作使用 `//:im-package`，可选执行与知识服务使用 `//:adapter-package`，完整研究发行版使用 `//:package`。Cargo 工作区默认成员为 `apps/outcome-hub`，发布仍通过 Bazel。研究 CLI 和控制台分别位于 `apps/cli`、`apps/console`；原有入口已合并到 `apps/cli/`，旧命令名保留兼容。
+独立协作使用 `//:outcome-hub-package`，可选执行与知识服务使用 `//:adapter-package`，完整研究发行版使用 `//:package`。Cargo 工作区默认成员为 `apps/outcome-hub`，发布仍通过 Bazel。研究 CLI 和控制台分别位于 `apps/cli`、`apps/console`；原有入口已合并到 `apps/cli/`，旧命令名已退役，历史状态通过单独打包的迁移工具转换。
 
-`bazel test //architecture:tests //apps/outcome-hub:standalone_tests` 检查实际传递构建依赖、发布包内容、重构前协议样本，以及无研究配置的核心启动与重启。存储测试对照嵌入式和远程客户端的交付、幂等、Unicode 内容及成员撤权。上述检查均由 `bazel test //...` 执行。
+`bazel test //verification:tests //apps/outcome-hub:standalone_tests` 检查实际传递构建依赖、发布包内容、重构前协议样本，以及无研究配置的核心启动与重启。存储测试对照嵌入式和远程客户端的交付、幂等、Unicode 内容及成员撤权。上述检查均由 `bazel test //...` 执行。
 
 Rust 调用方从 `collaboration_model` 引用数据类型，通过 `collaboration_client::Client` 访问存储，通过 `service_registry::Registry` 管理宿主配置。应用装配使用 `collaboration_host` 选择生产服务端点或独立的开发存储。外部适配器依赖 `service_api`，不得依赖存储实现。HTTP/RPC 格式、数据库结构及持久证据绑定保持不变；原有 Bazel 可执行目标和输出路径保留。

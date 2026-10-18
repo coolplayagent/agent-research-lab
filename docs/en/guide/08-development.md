@@ -4,12 +4,12 @@
 
 ## Build entrypoints
 
-Each crate declares dependencies in Cargo and Bazel, using the workspace lockfile. Bazel is the build, test and packaging entrypoint. `//:tests` aggregates tests, `//:agent-research-lab` produces `bazel-bin/agent-research-lab`, and `//:package` produces the distributable with bilingual docs. Use `bazel test //crates/collaboration-proposals:tests` for a focused module regression.
+Each crate declares dependencies in Cargo and Bazel, using the workspace lockfile. Bazel is the build, test and packaging entrypoint. `//:tests` aggregates tests, `//:outcome-hub-cli` produces `bazel-bin/outcome-hub-cli`, and `//:package` produces the distributable with bilingual docs. Use `bazel test //crates/collaboration-proposals:tests` for a focused module regression.
 
 ```sh
-bazel build --lockfile_mode=error //:ai-im //:im-package
+bazel build --lockfile_mode=error //:outcome-hub //:outcome-hub-package
 bazel build --lockfile_mode=error //:adapter-package
-bazel build --lockfile_mode=error //:agent-research-lab //:package
+bazel build --lockfile_mode=error //:outcome-hub-cli //:package
 bazel test --lockfile_mode=error //...
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
@@ -57,8 +57,8 @@ These tests create only owned temporary stores and never run models.
 
 ## Application and dependency boundaries
 
-Use `//:im-package` for standalone collaboration, `//:adapter-package` for optional execution/knowledge services, and `//:package` for the complete research distribution. `apps/outcome-hub` is the Cargo workspace default; Bazel remains the release entrypoint. Research CLI and console code live in `apps/cli` and `apps/console`; The old facade is merged into `apps/cli/`; old command names remain compatible.
+Use `//:outcome-hub-package` for standalone collaboration, `//:adapter-package` for optional execution/knowledge services, and `//:package` for the complete research distribution. `apps/outcome-hub` is the Cargo workspace default; Bazel remains the release entrypoint. Research CLI and console code live in `apps/cli` and `apps/console`; The old facade is merged into `apps/cli/`; old command names remain compatible.
 
-`bazel test //architecture:tests //apps/outcome-hub:standalone_tests` verifies actual transitive build/package dependencies, pre-refactor wire samples and core startup/restart without research configuration. Storage tests compare embedded and remote delivery, idempotency, Unicode content and membership revocation. All checks also run under `bazel test //...`.
+`bazel test //verification:tests //apps/outcome-hub:standalone_tests` verifies actual transitive build/package dependencies, pre-refactor wire samples and core startup/restart without research configuration. Storage tests compare embedded and remote delivery, idempotency, Unicode content and membership revocation. All checks also run under `bazel test //...`.
 
 Rust callers use `collaboration_model` for data, `collaboration_client::Client` for storage access and `service_registry::Registry` for host configuration. Composition roots use `collaboration_host` to select production endpoints or the separate embedded development store. External adapters depend on `service_api`; they must not depend on the storage implementation. HTTP/RPC payloads, database schema and stored evidence pins are unchanged. Existing Bazel executable targets and output paths are retained.

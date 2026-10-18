@@ -59,5 +59,5 @@ Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件�
 - 数据契约和存储客户端不依赖 `collaboration-store`、`collaboration-storage-service` 或 SQLite；HTTP 库也不依赖存储实现。`collaboration-store` 重新导出旧数据类型名称以兼容已有 Rust 调用方。
 - `collaboration-host` 是装配位置：生产模式连接已配置的存储服务；开发模式显式创建独立本地存储适配器。两者使用同一个 `collaboration-client` 请求契约。
 - 消息、目标、成果与主题谱系保留同一存储事务边界，维护成员权限、尝试隔离和验收一致性。研究执行、提示词演化、SuperPOD 研究发布属于可选研究扩展，不进入最小协作包。
-- `//:im-package` 只包含核心应用与存储服务；可选服务单独发布为 `//:adapter-package`。完整研究发行版继续使用 `//:package`。
+- `//:outcome-hub-package` 只包含核心应用与存储服务；可选服务单独发布为 `//:adapter-package`。完整研究发行版继续使用 `//:package`。
 - `architecture` 的 Bazel 分析测试遍历真实传递依赖并检查包内容；原版本协议样本、双客户端行为、核心启动/重启及全仓回归共同验证边界。语义评审记录在 `qualitygate/reviews/module-boundaries.md`。

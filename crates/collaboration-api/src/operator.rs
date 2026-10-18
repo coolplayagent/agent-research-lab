@@ -120,19 +120,25 @@ pub async fn protect(State(web): State<Web>, request: Request, next: Next) -> Re
             br#"{"error":"Service origin required"}"#.as_slice(),
         );
     }
-    let normalized = crate::routes::legacy_path(request.uri().path());
-    let path = normalized.as_ref();
+    if request
+        .extensions()
+        .get::<axum::extract::MatchedPath>()
+        .is_none()
+    {
+        return next.run(request).await;
+    }
+    let path = request.uri().path();
     let static_get = request.method() == "GET" && crate::assets::contains(path);
     let actor_api = matches!(
         path,
-        "/api/crystal/send"
-            | "/api/crystal/stream"
-            | "/api/crystal/ack"
-            | "/api/crystal/presence"
-            | "/api/crystal/inbox"
-            | "/api/crystal/history"
-            | "/api/im/work"
-            | "/api/crystal/outcomes"
+        "/api/v1/messaging/send"
+            | "/api/v1/messaging/stream"
+            | "/api/v1/messaging/ack"
+            | "/api/v1/messaging/presence"
+            | "/api/v1/messaging/inbox"
+            | "/api/v1/messaging/history"
+            | "/api/v1/collaboration/work"
+            | "/api/v1/agent/outcomes"
     );
     if static_get
         || actor_api

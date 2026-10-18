@@ -3,13 +3,13 @@
 [Documentation](../00-index.md) · [Section index](00-index.md) · [简体中文](../../zh-CN/design/03-services.md)
 
 OutcomeHub can run with an embedded store for development, or a separately deployed
-`ai-im-storage` service. Select the storage service in system settings; switching
+`outcome-hub-storage` service. Select the storage service in system settings; switching
 requires a core restart and a prepared target database. No live migration or
 fallback to another database is implicit. The storage process is the sole SQLite
 owner; the core and research adapter use the same client API and event streams.
 
-`ai-im-services --kind executor` hosts the coding-agent protocol. It delegates
-execution to `ai-im-services --kind sandbox`, whose initial implementation uses
+`outcome-hub-services --kind executor` hosts the coding-agent protocol. It delegates
+execution to `outcome-hub-services --kind sandbox`, whose initial implementation uses
 Bubblewrap namespaces, read-only system files, a disposable workspace, bounded
 tmpfs storage, process groups, time limits and output limits. These are independent
 processes, not mandatory embedded runtimes. The Linux user must be allowed to

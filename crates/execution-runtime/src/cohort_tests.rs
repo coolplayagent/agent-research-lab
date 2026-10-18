@@ -507,7 +507,7 @@ fn dependency_changed_by_later_probe_is_rechecked_before_claim() {
     storage::write(
         &c.workspace.join("states.json"),
         &json!({"parent-attempt-1":{"status":WorkflowState::Succeeded,"frames":{"1":{"nodes":{"task":{"outputs":{"result":serde_json::to_string(&json!({
-            "agent_report":{"summary":"fixture parent","findings":[],"sources":[],"limitations":["offline fixture"],"next_tasks":[]},
+            "receipt_protocol":2,"config_digest":parent.config_digest,"agent_report":{"summary":"fixture parent","findings":[],"sources":[],"limitations":["offline fixture"],"next_tasks":[]},
             "source_commit":parent.source_commit,"superpod_commit":parent.superpod_commit,
             "prompt_digest":parent.prompt_digest,"model":parent.model,"research_inputs":null,"post_success_protocol":1
         })).unwrap()}}}}}}}),
@@ -586,13 +586,17 @@ fn freshness_is_reverified_after_all_probes_without_claiming_stale_tasks() {
         return;
     }
     let (temp, mut c) = fixture();
-    fs::create_dir_all(c.superpod.join("research")).unwrap();
+    fs::create_dir_all(c.superpod.join("knowledge/software/ai-sdlc")).unwrap();
     fs::write(
-        c.superpod.join("research/insights.md"),
+        c.superpod.join("knowledge/software/ai-sdlc/insights.md"),
         "fixture insights\n",
     )
     .unwrap();
-    git(&c.superpod, &["add", "research/insights.md"]).unwrap();
+    git(
+        &c.superpod,
+        &["add", "knowledge/software/ai-sdlc/insights.md"],
+    )
+    .unwrap();
     git(
         &c.superpod,
         &[

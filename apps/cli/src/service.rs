@@ -1,11 +1,8 @@
 //! Application composition and process entrypoint. Durable execution lives in runtime.
-use crate::{
-    cli::{Cli, Commands},
-    config::Config,
-    delivery, knowledge, runtime, storage,
-};
+use crate::cli::{Cli, Commands};
 use anyhow::Result;
 use clap::Parser;
+use config::Config;
 use serde_json::{Value, json};
 
 fn execute(cli: Cli) -> Result<Value> {
@@ -85,15 +82,15 @@ fn execute(cli: Cli) -> Result<Value> {
             action,
             agent_count,
             ..
-        } if action == "simulate" => crate::multi_agent::scale::simulate(agent_count),
+        } if action == "simulate" => multi_agent::scale::simulate(agent_count),
         Commands::SkillDigest { path } => {
-            Ok(json!({"sha256":crate::freshness::skill_tree_digest(&path)?}))
+            Ok(json!({"sha256":freshness::skill_tree_digest(&path)?}))
         }
         Commands::Evolution {
             action,
             input,
             output,
-        } => crate::evolution_cli::execute(&action, &input, output.as_deref()),
+        } => evolution_cli::execute(&action, &input, output.as_deref()),
         Commands::Install { input } => Ok(serde_json::to_value(delivery::install_candidate(
             &storage::read(&input)?,
         )?)?),
@@ -127,7 +124,7 @@ fn execute(cli: Cli) -> Result<Value> {
                     agent_count,
                 } => {
                     if action == "simulate" {
-                        return crate::multi_agent::scale::simulate(agent_count);
+                        return multi_agent::scale::simulate(agent_count);
                     }
                     if action == "backends" {
                         let configured: Vec<_> = c.agent_backends.iter().map(|(id,spec)| json!({"id":id,"declared_capabilities":spec.capabilities(),"compatibility":"requires_adapter_specific_validation"})).collect();
@@ -135,7 +132,7 @@ fn execute(cli: Cli) -> Result<Value> {
                             json!({"default":"codex","role_backends":c.role_backends,"models":c.models,"configured":configured,"max_active_workers":c.max_agents}),
                         );
                     }
-                    let board = crate::communication::Board::new(&c.state_dir)?;
+                    let board = communication::Board::new(&c.state_dir)?;
                     if action == "boards" {
                         return board.cohorts(shard, after.as_deref(), limit);
                     }
@@ -156,10 +153,10 @@ fn execute(cli: Cli) -> Result<Value> {
                     }
                 }
                 Commands::Targets { action, kind } => match action.as_str() {
-                    "prepare" => crate::targets::prepare(&c),
-                    "status" => crate::targets::status(&c),
-                    "verify" => crate::targets::verify(&c, &kind),
-                    "agent-check" => crate::targets::agent_check(&c),
+                    "prepare" => targets::prepare(&c),
+                    "status" => targets::status(&c),
+                    "verify" => targets::verify(&c, &kind),
+                    "agent-check" => targets::agent_check(&c),
                     _ => unreachable!(),
                 },
                 Commands::Collaboration {
@@ -167,7 +164,7 @@ fn execute(cli: Cli) -> Result<Value> {
                     input,
                     output,
                     adjudications,
-                } => crate::collaboration_experiment::execute(
+                } => collaboration_experiment::execute(
                     &c,
                     &action,
                     &input,
@@ -183,7 +180,7 @@ fn execute(cli: Cli) -> Result<Value> {
                     runtime::batch::enqueue(&c, &input, max_seconds)?,
                 )?),
                 Commands::Seed => runtime::seed(&c),
-                Commands::Refresh => Ok(serde_json::to_value(crate::inputs::collect(&c)?)?),
+                Commands::Refresh => Ok(serde_json::to_value(inputs::collect(&c)?)?),
                 Commands::Run {
                     continuous,
                     max_seconds,
@@ -200,16 +197,16 @@ fn execute(cli: Cli) -> Result<Value> {
                 Commands::Automation { action, input, id } => {
                     let outbox = c.state_dir.join("outbox");
                     match action.as_str() {
-                        "enqueue" => Ok(serde_json::to_value(crate::automation::enqueue(
+                        "enqueue" => Ok(serde_json::to_value(automation::enqueue(
                             &outbox,
                             &storage::read(
                                 &input
                                     .ok_or_else(|| anyhow::anyhow!("enqueue requires --input"))?,
                             )?,
                         )?)?),
-                        "tick" => Ok(serde_json::to_value(crate::automation::tick(&outbox)?)?),
+                        "tick" => Ok(serde_json::to_value(automation::tick(&outbox)?)?),
                         "reconcile-retry" => {
-                            Ok(serde_json::to_value(crate::automation::reconcile_retry(
+                            Ok(serde_json::to_value(automation::reconcile_retry(
                                 &outbox,
                                 &id.ok_or_else(|| {
                                     anyhow::anyhow!("reconcile-retry requires --id")
@@ -234,7 +231,7 @@ pub fn run() {
         command,
     } = &cli.command
     {
-        let result = crate::targets::worker(dependencies, output, computer_cli, *verify, command);
+        let result = targets::worker(dependencies, output, computer_cli, *verify, command);
         match result {
             Ok(code) => std::process::exit(code),
             Err(e) => {

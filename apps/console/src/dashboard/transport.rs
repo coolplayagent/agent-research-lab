@@ -75,10 +75,8 @@ pub(super) fn router(web: Web) -> Router {
         .route("/api/session/{id}", get(resource))
         .route("/api/research-process", get(research_process))
         .route("/api/evolution/lineage", get(resource))
-        .route("/apps/research/", get(resource))
         .route("/apps/console/", get(resource))
         .route("/apps/console/{*asset}", get(resource))
-        .route("/apps/research/{*asset}", get(resource))
         .with_state(web);
     collaboration_api::transport::router(core, application)
 }

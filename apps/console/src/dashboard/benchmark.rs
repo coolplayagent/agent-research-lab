@@ -260,7 +260,7 @@ async fn exercise(
             let permit = admission.acquire_owned().await?;
             let mut connection = Events::connect(
                 addr,
-                &format!("/api/crystal/stream?group_id=bench-group-{group:05}&after=0"),
+                &format!("/api/v1/messaging/stream?group_id=bench-group-{group:05}&after=0"),
                 Some(&token),
             )
             .await?;
@@ -315,7 +315,7 @@ async fn exercise(
         let starts = starts.clone();
         let permit = publishing.clone().acquire_owned().await?;
         sends.spawn(async move {let _permit=permit;let start=Instant::now();starts.lock().unwrap()[n]=Some(start);
-            let value=request(addr,"/api/crystal/send",Some(&token),Some(&json!({"group_id":format!("bench-group-{group:05}"),"request_id":format!("load-{n}"),"text":"x".repeat(256)}))).await?;
+            let value=request(addr,"/api/v1/messaging/send",Some(&token),Some(&json!({"group_id":format!("bench-group-{group:05}"),"request_id":format!("load-{n}"),"text":"x".repeat(256)}))).await?;
             ensure!(value["durable"]==true && value["duplicate"]==false,"invalid storage receipt");Ok::<_,anyhow::Error>(start.elapsed().as_secs_f64()*1000.0)});
     }
     while let Some(result) = sends.join_next().await {

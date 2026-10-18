@@ -1,15 +1,12 @@
 //! Durable JSON and host identity compatibility with the actual pre-split library.
 //! Fixtures are synthetic; their outputs were captured from commit abe6720, not
 //! derived from the crate implementation under test. See fixture provenance.
-use outcome_hub_cli::{
-    communication::HostMember,
-    config::Config,
-    multi_agent::{TeamBinding, TeamMembership},
-    runtime::{Job, Launch, Task},
-    storage,
-};
+use communication::HostMember;
+use config::{Config, TeamBinding};
+use multi_agent::TeamMembership;
 use serde::{Serialize, de::DeserializeOwned};
 use std::collections::BTreeMap;
+use task::{Job, Launch, Task};
 
 fn digests() -> BTreeMap<String, String> {
     serde_json::from_str(include_str!("fixtures/serde-abe6720/digests.json")).unwrap()

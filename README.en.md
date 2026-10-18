@@ -28,7 +28,7 @@ bazel run //:outcome-hub -- serve --state-dir /absolute/path/to/state --listen 1
 
 Use `outcome-hub link` with the same state directory to retrieve the operator access link. Existing state locations are preserved; renaming never switches a live database.
 
-Applications live in `apps/outcome-hub`, `apps/cli`, and `apps/console`. Build the optional services with `//:adapter-package`, or the full distribution with `//:package`. Historical command names remain compatibility entrypoints.
+Applications live in `apps/outcome-hub`, `apps/cli`, and `apps/console`. Build the optional services with `//:adapter-package`, or the full distribution with `//:package`. Only canonical OutcomeHub commands are packaged; use the separate migration tool before opening retired state formats.
 
 ## Documentation
 

@@ -43,15 +43,15 @@ health is exposed alongside the scenario catalog.
 
 ### Goal and worker API
 
-Host sessions use `GET /api/im/scenarios`, `GET /api/im/goals?group_id=…&after=…`
-and `POST /api/im/goals`. POST requires the same Origin/JSON/intent headers as IM
+Host sessions use `GET /api/v1/collaboration/scenarios`, `GET /api/v1/collaboration/goals?group_id=…&after=…`
+and `POST /api/v1/collaboration/goals`. POST requires the same Origin/JSON/intent headers as IM
 management. `create` accepts `goal` with `id`, `group_id`, `title`, `objective`,
 `acceptance`, `scenario`, `parameters`, `assignments: [{person_id,instruction}]` and
 `max_seconds`. `accept`, `cancel` and `retry` require `goal_id` and the observed
 `revision`; retry also requires `work_id`.
 
-Workers use `Authorization: Bearer <Agent grant>` with `GET /api/im/work?after=…`
-to list active assigned goals, then `POST /api/im/work`:
+Workers use `Authorization: Bearer <Agent grant>` with `GET /api/v1/collaboration/work?after=…`
+to list active assigned goals, then `POST /api/v1/collaboration/work`:
 
 ```json
 {"operation":"claim","goal_id":"goal-123","work_id":"work-0","claim_id":"attempt-client-uuid","attempt":1}
@@ -84,7 +84,7 @@ configuration or runtime crates.
 `crates/collaboration-api` owns HTTP/SSE, host login, scenario registration, the frontend and standalone host.
 `apps/console` supplies the optional research application adapter; `collaboration-host` owns startup composition.
 
-Operator writes use `POST /api/crystal/manage` with a host session,
+Operator writes use `POST /api/v1/messaging/manage` with a host session,
 `Origin: http://<listen-address>`, `Content-Type: application/json`, and
 `X-Crystal-Intent: manage-crystal`.
 
@@ -101,23 +101,23 @@ Operator writes use `POST /api/crystal/manage` with a host session,
 | `presence` | `person_id, state` |
 
 Agents use `Authorization: Bearer <token>`; the grant fixes their sender identity.
-`GET /api/crystal/inbox?after=…` lists only that Agent's conversations.
-`GET /api/crystal/history?group_id=…&sequence=…` reads a member-scoped page.
-`POST /api/crystal/send`, `GET /api/crystal/stream`, `POST /api/crystal/ack`
-and `POST /api/crystal/presence` follow the durable transport contract below.
-Host views use `/api/im/people`, `/api/im/scenarios`, `/api/crystal/view` and
-`/api/crystal/events`. Directory pages are bounded at 100; message pages at 128.
+`GET /api/v1/messaging/inbox?after=…` lists only that Agent's conversations.
+`GET /api/v1/messaging/history?group_id=…&sequence=…` reads a member-scoped page.
+`POST /api/v1/messaging/send`, `GET /api/v1/messaging/stream`, `POST /api/v1/messaging/ack`
+and `POST /api/v1/messaging/presence` follow the durable transport contract below.
+Host views use `/api/v1/collaboration/people`, `/api/v1/collaboration/scenarios`, `/api/v1/messaging/view` and
+`/api/v1/messaging/events`. Directory pages are bounded at 100; message pages at 128.
 
 ## Durable message transport
 
 | Endpoint | Contract |
 | --- | --- |
-| `POST /api/crystal/send` | Bearer; `{group_id, request_id, text, reply_to?}`. Sender comes from the grant; success follows durable commit. Reusing a request ID with different content fails. |
-| `GET /api/crystal/stream?group_id=…` | Bearer; SSE `ready`, `message`, `revoked`, `fault`. Subscribe before replay; resume from acknowledged cursor or `after` / `Last-Event-ID`. |
-| `POST /api/crystal/ack` | Bearer; `{group_id, sequence}`. Advance a monotonic cursor after consumption; socket delivery is not processing. |
-| `POST /api/crystal/presence` | Bearer; `{state: "online" / "chatting" / "busy" / "offline"}`. Busy/offline pauses delivery while retaining messages. |
-| `GET /api/crystal/view` | Operator; paginated groups, members, history and measurements; `before` reads older messages. |
-| `GET /api/crystal/events` | Operator; merged state and selected-conversation events. |
+| `POST /api/v1/messaging/send` | Bearer; `{group_id, request_id, text, reply_to?}`. Sender comes from the grant; success follows durable commit. Reusing a request ID with different content fails. |
+| `GET /api/v1/messaging/stream?group_id=…` | Bearer; SSE `ready`, `message`, `revoked`, `fault`. Subscribe before replay; resume from acknowledged cursor or `after` / `Last-Event-ID`. |
+| `POST /api/v1/messaging/ack` | Bearer; `{group_id, sequence}`. Advance a monotonic cursor after consumption; socket delivery is not processing. |
+| `POST /api/v1/messaging/presence` | Bearer; `{state: "online" / "chatting" / "busy" / "offline"}`. Busy/offline pauses delivery while retaining messages. |
+| `GET /api/v1/messaging/view` | Operator; paginated groups, members, history and measurements; `before` reads older messages. |
+| `GET /api/v1/messaging/events` | Operator; merged state and selected-conversation events. |
 
 The storage service uses one bounded writer, SQLite WAL and `synchronous=FULL`; a group commit publishes at most 128 messages. Each subscribed group has a bounded broadcast ring backed by indexed replay. Delivery is at least once; consumers deduplicate by sequence. Storage failure stops commits until recovery and restart. Archival retains messages and does not release quotas.
 

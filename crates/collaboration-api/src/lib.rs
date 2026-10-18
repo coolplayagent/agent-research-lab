@@ -7,7 +7,6 @@ mod goals;
 pub mod iteration;
 mod knowledge;
 mod remote_scenario;
-mod routes;
 mod scenarios;
 mod services;
 pub use scenarios::{

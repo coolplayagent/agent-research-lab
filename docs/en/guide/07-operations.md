@@ -4,7 +4,7 @@
 
 ## Service deployment
 
-Before using the optional user template `deploy/systemd/agent-research-lab.service`, adjust executable, working-directory and private-configuration paths for the host. Builds do not install or enable services. Run one unified core per state directory; deploy storage/executor/sandbox according to the [service guide](03-services.md). Stop old services before upgrades, retain the old binary and a consistent database backup, install a verified artifact and restart. Reverting across schema versions also requires the matching database backup; never open a newer database with an old binary.
+Before using the optional user template `deploy/systemd/outcome-hub-cli.service`, adjust executable, working-directory and private-configuration paths for the host. Builds do not install or enable services. Run one unified core per state directory; deploy storage/executor/sandbox according to the [service guide](03-services.md). Stop old services before upgrades, retain the old binary and a consistent database backup, install a verified artifact and restart. Reverting across schema versions also requires the matching database backup; never open a newer database with an old binary.
 
 ## Local experiment targets
 
@@ -13,12 +13,12 @@ The controller prepares disposable local targets without a personal desktop or r
 repo-sandbox’s local provider uses host tools and a real Bubblewrap namespace per execution. A persistent session’s `ready` status records a workspace, not a resident container. The controller runs `target install` and `dev up/exec/status/down` against a private registry and verifies actual workspace writes. These run on the host because some AppArmor policies reject nested user namespaces. Models can read retained evidence/private registry; use WSL/VM targets for those semantics.
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml targets prepare
-bazel-bin/agent-research-lab --config local.toml targets verify --kind all
-bazel-bin/agent-research-lab --config local.toml targets status
-bazel-bin/agent-research-lab --config local.toml targets agent-check
-bazel-bin/agent-research-lab --config local.toml doctor
-bazel-bin/agent-research-lab --config local.toml doctor --probe-models
+bazel-bin/outcome-hub-cli --config local.toml targets prepare
+bazel-bin/outcome-hub-cli --config local.toml targets verify --kind all
+bazel-bin/outcome-hub-cli --config local.toml targets status
+bazel-bin/outcome-hub-cli --config local.toml targets agent-check
+bazel-bin/outcome-hub-cli --config local.toml doctor
+bazel-bin/outcome-hub-cli --config local.toml doctor --probe-models
 ```
 
 `targets verify` needs a repo-sandbox build supporting the local provider; older runtimes fail explicitly. Preparation is bounded/resumable, and missing dependencies do not block unrelated research. Logs/screenshots stay in `.lab/runs`. `targets agent-check` calls the configured review model through the production launcher, checks tool events/PNG and consumes model quota; it proves the transport path.
@@ -52,9 +52,9 @@ The private link lives in `state_dir/dashboard/access.json`, outside worker moun
 Use fresh private directories for both loads:
 
 ```sh
-bazel-bin/agent-research-lab crystal-bench --state /private/new-mixed-run \
+bazel-bin/outcome-hub-cli crystal-bench --state /private/new-mixed-run \
   --mode mixed --people 10000 --messages 10000 --rate 1000
-bazel-bin/agent-research-lab crystal-bench --state /private/new-hot-run \
+bazel-bin/outcome-hub-cli crystal-bench --state /private/new-hot-run \
   --mode hot --people 10000 --messages 100 --rate 10
 ```
 

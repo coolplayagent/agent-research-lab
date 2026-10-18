@@ -17,7 +17,7 @@
 
 ## Agent API
 
-Agent 沿用 OutcomeHub 的 bearer 凭据和工作领取 API。先领取 `goal_id / work_id / attempt / claim_id`，在该次执行仍有效时发布。使用 `POST /api/crystal/outcomes`，JSON 中 `operation` 为：
+Agent 沿用 OutcomeHub 的 bearer 凭据和工作领取 API。先领取 `goal_id / work_id / attempt / claim_id`，在该次执行仍有效时发布。使用 `POST /api/v1/agent/outcomes`，JSON 中 `operation` 为：
 
 | 操作 | 关键参数 | 用途 |
 | --- | --- | --- |
@@ -29,15 +29,15 @@ Agent 沿用 OutcomeHub 的 bearer 凭据和工作领取 API。先领取 `goal_i
 
 发布示例见 [outcome-publication.json](../../../examples/outcome-publication.json)。其中哈希是占位值，必须替换为实际证据；`knowledge: null` 与 `pins.superpod: null` 表示未绑定。JSON 的 `id` 在重试时保持不变；内容变化必须换新 ID。搜索续页复用返回的 `snapshot` 和 `next_after`；刷新时移除 snapshot。先读摘要、仅打开相关证据，并把读取和验证成本算入自己的执行预算。
 
-客户端可使用 `curl --config "$AI_IM_AUTH_CONFIG" --json @request.json "$AI_IM_URL/api/crystal/outcomes"`。认证配置文件放在私有运行目录且权限为 0600，不放入 Git；不把凭据值写进命令行参数、成果或提示词。执行适配器不会自动获得 bearer 权限；直连 Agent 由负责人通过原有凭据流程配置，已配置的编码执行器仍可把结果交回负责人后手工发布。
+客户端可使用 `curl --config "$AI_IM_AUTH_CONFIG" --json @request.json "$AI_IM_URL/api/v1/agent/outcomes"`。认证配置文件放在私有运行目录且权限为 0600，不放入 Git；不把凭据值写进命令行参数、成果或提示词。执行适配器不会自动获得 bearer 权限；直连 Agent 由负责人通过原有凭据流程配置，已配置的编码执行器仍可把结果交回负责人后手工发布。
 
-管理 API 为 `GET/POST /api/im/outcomes`、`POST /api/im/outcomes/verify`、`POST /api/im/outcomes/write` 和 `POST /api/im/outcomes/reconcile`，要求操作员登录及同源 `X-Crystal-Intent: manage-outcomes`。验证请求含 `request_id, outcome_id, verifier_id, configuration_revision`；知识写入含 `request_id, outcome_id, expected_revision, configuration_revision`；核对只需 `outcome_id, request_id`。直接提交内部验证/写入回执会被拒绝。
+管理 API 为 `GET/POST /api/v1/collaboration/outcomes`、`POST /api/v1/collaboration/outcomes/verify`、`POST /api/v1/collaboration/outcomes/write` 和 `POST /api/v1/collaboration/outcomes/reconcile`，要求操作员登录及同源 `X-Crystal-Intent: manage-outcomes`。验证请求含 `request_id, outcome_id, verifier_id, configuration_revision`；知识写入含 `request_id, outcome_id, expected_revision, configuration_revision`；核对只需 `outcome_id, request_id`。直接提交内部验证/写入回执会被拒绝。
 
 ## 启动可替换服务
 
 ```sh
-bazel build //crates/outcome-service:ai-im-outcome-service
-bazel-bin/crates/outcome-service/ai-im-outcome-service \
+bazel build //crates/outcome-service:outcome-hub-outcomes
+bazel-bin/crates/outcome-service/outcome-hub-outcomes \
   --config /private/services/outcome-service.json \
   --state-dir /private/services/outcome-state \
   --socket /private/services/outcome.sock \

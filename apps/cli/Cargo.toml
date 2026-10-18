@@ -49,9 +49,6 @@ workflow.workspace = true
 name = "outcome-hub-cli"
 path = "src/main.rs"
 
-[[bin]]
-name = "agent-research-lab"
-path = "src/legacy_main.rs"
 
 [dev-dependencies]
 serde.workspace = true

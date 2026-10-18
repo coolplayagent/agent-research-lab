@@ -19,14 +19,14 @@ fn create(c: &Config, kind: Kind, name: &str) -> Person {
     .unwrap()
 }
 #[test]
-fn all_creation_modes_unique_names_promotion_and_legacy_history_survive() {
+fn all_creation_modes_unique_names_and_promotion_survive() {
     let root = tempfile::tempdir().unwrap();
     let c = config(root.path(), Path::new("/unused"));
-    let legacy = c.state_dir.join("dashboard/personas.json");
-    storage::write(&legacy, &json!({"old-a":"CloudBoat","old-b":"StarRiver"})).unwrap();
-    let directory = directory(&c).unwrap();
-    let legacy_id = directory.tasks["old-a"].clone();
-    assert_eq!(directory.people[&legacy_id].name, "CloudBoat");
+    let person = create(&c, Kind::Temporary, "CloudBoat");
+    let mut directory = directory(&c).unwrap();
+    let legacy_id = person.id.clone();
+    directory.tasks.insert("old-a".into(), legacy_id.clone());
+    save(&c, &directory).unwrap();
     for kind in [Kind::Fixed, Kind::Temporary, Kind::Research] {
         create(&c, kind, "");
     }
@@ -79,10 +79,6 @@ fn all_creation_modes_unique_names_promotion_and_legacy_history_survive() {
     let after = super::directory(&c).unwrap();
     assert_eq!(after.tasks["old-a"], legacy_id);
     assert_eq!(default_id(&c, "research").unwrap(), legacy_id);
-    assert_eq!(
-        storage::read::<Value>(&legacy).unwrap(),
-        json!({"old-a":"CloudBoat","old-b":"StarRiver"})
-    );
     let names: BTreeSet<_> = after.people.values().map(|p| &p.name).collect();
     assert_eq!(names.len(), after.people.len());
 }

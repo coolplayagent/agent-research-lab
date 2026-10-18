@@ -1256,6 +1256,7 @@ fn run_scoped_impl(
     mut admission_hook: Option<&mut dyn admission::ScopedAdmissionHook>,
 ) -> Result<Value> {
     c.validate()?;
+    validate_state(c)?;
     ensure!(
         task_ids_file.is_none() || (!continuous && !seed_requested && max_seconds > 0),
         "scoped runs require a positive max-seconds, no continuous mode and no seed"
@@ -2480,12 +2481,6 @@ struct NextTask {
     required_tools: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-struct ProposalRejection {
-    index: usize,
-    reason: String,
-}
-
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct FollowupReport {
     queued: Vec<String>,
@@ -2494,29 +2489,34 @@ struct FollowupReport {
 
 pub use contracts::FollowupAdmission;
 pub use contracts::MemoryWriteback;
-fn memory_done() -> MemoryWriteback {
-    MemoryWriteback::Done
-}
+use task::{PostSuccess, ProposalRejection};
 
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PostSuccess {
-    schema_version: u32,
-    task_id: String,
-    run_id: String,
-    receipt_sha256: String,
-    memory: MemoryWriteback,
-    #[serde(default = "memory_done")]
-    persona_memory: MemoryWriteback,
-    #[serde(default)]
-    persona_memory_error: Option<String>,
-    followups: FollowupAdmission,
-    memory_error: Option<String>,
-    followup_error: Option<String>,
-    #[serde(default)]
-    followup_queued: Vec<String>,
-    #[serde(default)]
-    followup_rejections: Vec<ProposalRejection>,
+/// Reject retired mutable formats before starting any worker or serving projections.
+pub fn validate_state(c: &Config) -> Result<()> {
+    ensure!(
+        !c.state_dir.join("dashboard/personas.json").try_exists()?,
+        "migration_required: use outcome-hub-migrate before starting the service"
+    );
+    let journals = c.state_dir.join("workflow/host-followups");
+    if journals.try_exists()? {
+        let mut count = 0;
+        for entry in fs::read_dir(journals)? {
+            let path = entry?.path();
+            if path.extension().is_some_and(|e| e == "json") {
+                count += 1;
+                ensure!(count <= 100_000, "completion journal capacity exceeded");
+                let record: PostSuccess = storage::read(&path).context(
+                    "migration_required: completion journal requires offline conversion",
+                )?;
+                ensure!(
+                    record.schema_version == 1
+                        && path.file_stem().and_then(|s| s.to_str()) == Some(&record.run_id),
+                    "invalid completion journal"
+                );
+            }
+        }
+    }
+    Ok(())
 }
 
 fn post_success_path(c: &Config, job: &Job) -> PathBuf {
@@ -2542,13 +2542,10 @@ fn authoritative_success_receipt(w: &Workflow, job: &Job) -> Result<Value> {
     );
     let receipt: Value = serde_json::from_str(encoded)?;
     validate_report(&receipt["agent_report"])?;
-    // Historical receipts remain readable, but only v2 commits the policy pin.
-    if receipt.get("receipt_protocol").is_some() || receipt.get("config_digest").is_some() {
-        ensure!(
-            receipt["receipt_protocol"] == 2 && receipt["config_digest"] == job.config_digest,
-            "committed completion receipt does not bind the frozen policy"
-        );
-    }
+    ensure!(
+        receipt["receipt_protocol"] == 2 && receipt["config_digest"] == job.config_digest,
+        "committed completion receipt does not bind the frozen policy"
+    );
     ensure!(
         receipt["source_commit"] == job.source_commit
             && receipt["superpod_commit"] == job.superpod_commit
@@ -2633,11 +2630,9 @@ fn queue_post_success(c: &Config, w: &Workflow, job: &Job) -> Result<()> {
     } else {
         None
     };
-    let legacy_marker = prior
-        .as_ref()
-        .is_some_and(|value| value == &json!({"task_id":job.task.id,"run_id":job.run_id}));
-    let mut record = if let Some(value) = prior.filter(|_| !legacy_marker) {
-        let record: PostSuccess = serde_json::from_value(value)?;
+    let mut record = if let Some(value) = prior {
+        let record: PostSuccess = serde_json::from_value(value)
+            .context("migration_required: completion journal requires offline conversion")?;
         ensure!(
             record.schema_version == 1
                 && record.task_id == job.task.id
@@ -2647,20 +2642,28 @@ fn queue_post_success(c: &Config, w: &Workflow, job: &Job) -> Result<()> {
         );
         record
     } else {
-        let legacy_memory =
-            job.task.use_memory && (legacy_marker || receipt["post_success_protocol"] != 1);
+        ensure!(
+            receipt["post_success_protocol"] == 1,
+            "migration_required: completion has no current side-effect journal"
+        );
         PostSuccess {
             schema_version: 1,
             task_id: job.task.id.clone(),
             run_id: job.run_id.clone(),
             receipt_sha256: digest,
-            persona_memory: if job.persona.is_some() { MemoryWriteback::Pending } else { MemoryWriteback::Done },
+            persona_memory: if job.persona.is_some() {
+                MemoryWriteback::Pending
+            } else {
+                MemoryWriteback::Done
+            },
             persona_memory_error: None,
-            memory: if !job.task.use_memory { MemoryWriteback::Done }
-                else if legacy_memory { MemoryWriteback::Unknown }
-                else { MemoryWriteback::Pending },
+            memory: if job.task.use_memory {
+                MemoryWriteback::Pending
+            } else {
+                MemoryWriteback::Done
+            },
             followups: FollowupAdmission::Pending,
-            memory_error: legacy_memory.then(|| "legacy completion has no durable memory writeback journal; reconcile before retry".into()),
+            memory_error: None,
             followup_error: None,
             followup_queued: vec![],
             followup_rejections: vec![],
@@ -3431,7 +3434,7 @@ mod tests {
             "prompt_digest":"prompt","config_digest":"config","worktree":repo,
             "run_id":"synthesis-recovery-attempt-1","attempt":1,"last_error":null,"launch":null
         })).unwrap();
-        let receipt = json!({"agent_report":{"summary":"observed fixture result","findings":[],"sources":[],"limitations":["fake transport only"],"next_tasks":proposals},
+        let receipt = json!({"receipt_protocol":2,"config_digest":job.config_digest,"agent_report":{"summary":"observed fixture result","findings":[],"sources":[],"limitations":["fake transport only"],"next_tasks":proposals},
             "source_commit":job.source_commit,"superpod_commit":job.superpod_commit,"prompt_digest":job.prompt_digest,
             "model":job.model,"research_inputs":null,"post_success_protocol":1});
         storage::write(&root.join("authority.json"), &json!({"ok":true,"result":{"status":"succeeded","frames":{"1":{"nodes":{"task":{"outputs":{"result":serde_json::to_string(&receipt).unwrap()}}}}}}})).unwrap();
@@ -3720,7 +3723,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_followup_journal_remains_readable_and_blocked_without_automatic_replay() {
+    fn unmigrated_followup_journal_is_rejected_without_automatic_replay() {
         let (_temp, c, job, w) = completion_fixture(false, json!([]));
         queue_post_success(&c, &w, &job).unwrap();
         let path = post_success_path(&c, &job);
@@ -3730,9 +3733,19 @@ mod tests {
         old["followups"] = json!("blocked");
         old["followup_error"] = json!("historical proposal requires host review");
         storage::write(&path, &old).unwrap();
-        let record: PostSuccess = storage::read(&path).unwrap();
-        assert!(record.followup_queued.is_empty() && record.followup_rejections.is_empty());
-        assert!(!drain_followups(&c, &w).unwrap());
+        assert!(storage::read::<PostSuccess>(&path).is_err());
+        assert!(queue_post_success(&c, &w, &job).is_err());
+        assert_eq!(storage::read::<Value>(&path).unwrap(), old);
+    }
+
+    #[test]
+    fn startup_rejects_retired_completion_before_execution() {
+        let (_temp, c, job, _w) = completion_fixture(false, json!([]));
+        let path = post_success_path(&c, &job);
+        storage::write(&path, &json!({"task_id":job.task.id,"run_id":job.run_id})).unwrap();
+        let before = fs::read(&path).unwrap();
+        assert!(validate_state(&c).is_err());
+        assert_eq!(fs::read(&path).unwrap(), before);
     }
 
     #[test]
@@ -4083,7 +4096,7 @@ mod tests {
     }
 
     #[test]
-    fn completion_recovery_keeps_legacy_memory_outcome_unknown() {
+    fn completion_recovery_rejects_unmigrated_journal() {
         let (temp, c, job, w) = completion_fixture(true, json!([]));
         let authority = temp.path().join("authority.json");
         let mut state: Value = storage::read(&authority).unwrap();
@@ -4095,10 +4108,9 @@ mod tests {
             .remove("post_success_protocol");
         *output = json!(serde_json::to_string(&receipt).unwrap());
         storage::write(&authority, &state).unwrap();
-        reconcile_orphans(&c, &w).unwrap();
-        assert!(drain_followups(&c, &w).unwrap());
-        let record: PostSuccess = storage::read(&post_success_path(&c, &job)).unwrap();
-        assert_eq!(record.memory, MemoryWriteback::Unknown);
+        assert!(reconcile_orphans(&c, &w).is_err());
+        assert!(queue_post_success(&c, &w, &job).is_err());
+        assert!(!post_success_path(&c, &job).exists());
         assert!(!temp.path().join("memory-calls").exists());
     }
 

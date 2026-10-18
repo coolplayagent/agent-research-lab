@@ -42,7 +42,7 @@ bazel run //:outcome-hub -- serve --state-dir /absolute/path/to/state --listen 1
 | CLI | `apps/cli` | 作业管理、知识库管理与可选场景操作 |
 | Console | `apps/console` | 操作面板与可选场景集成 |
 
-独立核心、可选服务和完整发行包分别通过 `//:outcome-hub-package`、`//:adapter-package`、`//:package` 构建。旧命令和根级 Bazel 入口保留兼容。
+独立核心、可选服务和完整发行包分别通过 `//:outcome-hub-package`、`//:adapter-package`、`//:package` 构建。仅保留 OutcomeHub 正式入口；旧状态通过 `//:migration-package` 提供的离线工具转换。
 
 ## 文档
 

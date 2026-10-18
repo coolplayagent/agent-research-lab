@@ -98,6 +98,12 @@ async fn actual_async_http_enforces_origin_intent_and_resource_boundaries() {
             "Research process unavailable",
         ),
         ("/../local.toml", "404 Not Found", "Resource unavailable"),
+        ("/apps/research/", "404 Not Found", "Resource unavailable"),
+        (
+            "/apps/research/style.css",
+            "404 Not Found",
+            "Resource unavailable",
+        ),
         (
             "/api/session/../../local.toml",
             "404 Not Found",
@@ -140,7 +146,7 @@ async fn actual_async_http_enforces_origin_intent_and_resource_boundaries() {
         format!("Origin: http://{}\r\n", h.addr),
         "Origin: https://evil.invalid\r\nX-Crystal-Intent: manage-crystal\r\n".to_owned(),
     ] {
-        let response=h.raw(format!("POST /api/crystal/manage HTTP/1.1\r\nHost: {}\r\n{extra}Content-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}",h.addr)).await;
+        let response=h.raw(format!("POST /api/v1/messaging/manage HTTP/1.1\r\nHost: {}\r\n{extra}Content-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}",h.addr)).await;
         assert!(!response.starts_with("HTTP/1.1 200"));
         assert!(response.contains("same-origin") || response.contains("Service origin"));
     }
@@ -198,7 +204,7 @@ async fn network_busy_queue_reconnect_ack_and_revocation_preserve_private_delive
         .unwrap();
     let a = h.hub.grant("a", 3600).await.unwrap();
     assert!(
-        request(h.addr, "/api/crystal/view", Some(&a), None)
+        request(h.addr, "/api/v1/messaging/view", Some(&a), None)
             .await
             .is_err()
     );
@@ -210,24 +216,32 @@ async fn network_busy_queue_reconnect_ack_and_revocation_preserve_private_delive
     let b = h.hub.grant("b", 3600).await.unwrap();
     let c = h.hub.grant("c", 3600).await.unwrap();
     assert!(
-        Events::connect(h.addr, "/api/crystal/stream?group_id=private", Some(&c))
-            .await
-            .is_err()
-    );
-    let mut stream = Events::connect(h.addr, "/api/crystal/stream?group_id=private", Some(&b))
+        Events::connect(
+            h.addr,
+            "/api/v1/messaging/stream?group_id=private",
+            Some(&c)
+        )
         .await
-        .unwrap();
+        .is_err()
+    );
+    let mut stream = Events::connect(
+        h.addr,
+        "/api/v1/messaging/stream?group_id=private",
+        Some(&b),
+    )
+    .await
+    .unwrap();
     assert_eq!(stream.next().await.unwrap().0, "ready");
     request(
         h.addr,
-        "/api/crystal/presence",
+        "/api/v1/messaging/presence",
         Some(&b),
         Some(&json!({"state":"busy"})),
     )
     .await
     .unwrap();
     let message = json!({"group_id":"private","request_id":"one","text":"I have an alternative hypothesis. Let us test it together."});
-    let receipt = request(h.addr, "/api/crystal/send", Some(&a), Some(&message))
+    let receipt = request(h.addr, "/api/v1/messaging/send", Some(&a), Some(&message))
         .await
         .unwrap();
     let sequence = receipt["message"]["sequence"].as_u64().unwrap();
@@ -238,7 +252,7 @@ async fn network_busy_queue_reconnect_ack_and_revocation_preserve_private_delive
     );
     request(
         h.addr,
-        "/api/crystal/presence",
+        "/api/v1/messaging/presence",
         Some(&b),
         Some(&json!({"state":"online"})),
     )
@@ -251,14 +265,18 @@ async fn network_busy_queue_reconnect_ack_and_revocation_preserve_private_delive
     assert_eq!(received.1["sequence"], sequence);
     drop(stream);
     // No ACK: reconnect must replay the same durable message.
-    let mut stream = Events::connect(h.addr, "/api/crystal/stream?group_id=private", Some(&b))
-        .await
-        .unwrap();
+    let mut stream = Events::connect(
+        h.addr,
+        "/api/v1/messaging/stream?group_id=private",
+        Some(&b),
+    )
+    .await
+    .unwrap();
     stream.next().await.unwrap();
     assert_eq!(stream.next().await.unwrap().1["sequence"], sequence);
     request(
         h.addr,
-        "/api/crystal/ack",
+        "/api/v1/messaging/ack",
         Some(&b),
         Some(&json!({"group_id":"private","sequence":sequence})),
     )
@@ -274,12 +292,12 @@ async fn network_busy_queue_reconnect_ack_and_revocation_preserve_private_delive
         "revoked"
     );
     assert!(
-        request(h.addr, "/api/crystal/send", Some(&c), Some(&message))
+        request(h.addr, "/api/v1/messaging/send", Some(&c), Some(&message))
             .await
             .is_err()
     );
     assert!(
-        request(h.addr, "/api/crystal/send", Some(&b), Some(&message))
+        request(h.addr, "/api/v1/messaging/send", Some(&b), Some(&message))
             .await
             .is_err()
     );

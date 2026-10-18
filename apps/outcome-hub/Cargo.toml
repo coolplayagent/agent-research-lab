@@ -3,9 +3,6 @@ name = "outcome-hub"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-[[bin]]
-name = "ai-im"
-path = "src/legacy_main.rs"
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true

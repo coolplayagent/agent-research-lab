@@ -22,25 +22,6 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-alias(
-    name = "agent_research_lab",
-    actual = "//apps/cli:outcome_hub_cli",
-    visibility = ["//visibility:public"],
-)
-
-# Keep the executable at bazel-bin/agent-research-lab for service and package users.
-rust_binary(
-    name = "agent-research-lab",
-    version = "0.1.0",
-    srcs = ["//apps/cli:src/main.rs"],
-    crate_root = "//apps/cli:src/main.rs",
-    edition = "2024",
-    aliases = aliases(package_name = "apps/cli"),
-    deps = ["//apps/cli:outcome_hub_cli"] + all_crate_deps(normal = True, package_name = "apps/cli"),
-    proc_macro_deps = all_crate_deps(proc_macro = True, package_name = "apps/cli"),
-    visibility = ["//visibility:public"],
-)
-
 test_suite(
     name = "tests",
     tests = [
@@ -56,9 +37,9 @@ test_suite(
         "//crates/collaboration-model:tests",
         "//apps/console:tests",
         "//apps/cli:tests",
-        "//architecture:tests",
+        "//verification:tests",
         "//apps/outcome-hub:standalone_tests",
-        "//apps/cli:serde_compatibility_tests",
+        "//apps/migrate:evidence_bytes_tests",
         "//crates/collaboration-api:tests",
         "//crates/agent-backend:tests",
         "//crates/agent-policy:tests",
@@ -92,18 +73,18 @@ test_suite(
 pkg_tar(
     name = "package",
     srcs = [
-        ":agent-research-lab",
+        ":outcome-hub",
+        "//deploy/systemd:outcome-hub.service",
         ":outcome-hub-cli",
         "//crates/knowledge-service:outcome-hub-knowledge",
-        "//crates/collaboration-storage-service:ai-im-storage",
+        "//crates/collaboration-storage-service:outcome-hub-storage",
         "//crates/collaboration-storage-service:units",
-        "//crates/service-workers:ai-im-services",
-        "//crates/service-workers:ai-im-codex-adapter",
-        "//crates/service-workers:ai-im-outcome-service",
+        "//crates/service-workers:outcome-hub-services",
+        "//crates/codex-adapter:outcome-hub-codex-adapter",
+        "//crates/outcome-service:outcome-hub-outcomes",
         "//crates/service-workers:units",
-        "//deploy/systemd:agent-research-lab.service",
-        "//deploy/systemd:agent-research-lab-dashboard.service",
-    ] + glob(["docs/**", "examples/**", "prompts/**", "research/**", "skills/**", "assets/**", "*.md"]),
+        "//deploy/systemd:outcome-hub-cli.service",
+    ] + glob(["docs/**", "examples/**", "prompts/**", "assets/**", "*.md"]),
     package_dir = "outcome-hub",
     strip_prefix = ".",
     extension = "tar.gz",
@@ -111,9 +92,6 @@ pkg_tar(
     visibility = ["//visibility:public"],
 )
 
-# Minimal AI-IM core package; the main system also supports optional research scenarios.
-alias(name = "ai-im", actual = "//crates/collaboration-api:ai-im", visibility = ["//visibility:public"])
-alias(name = "im-package", actual = "//crates/collaboration-api:package", visibility = ["//visibility:public"])
 
 filegroup(name = "policy_sources", srcs = [
     "//crates/knowledge-model:policy_sources",
@@ -122,7 +100,8 @@ filegroup(name = "policy_sources", srcs = [
     "//crates/knowledge-directory:policy_sources",
     "//crates/knowledge-service:policy_sources",
 
-    "//architecture:policy_sources",
+    "//apps/migrate:policy_sources",
+    "//verification:policy_sources",
     "//crates/collaboration-model:policy_sources",
     "//crates/service-registry:policy_sources",
     "//crates/collaboration-client:policy_sources",
@@ -176,7 +155,7 @@ genrule(name = "source_inventory", srcs = [":policy_sources"], outs = ["source_i
 # Optional execution and knowledge services are installed separately from core collaboration.
 pkg_tar(
     name = "adapter-package",
-    srcs = ["//crates/knowledge-service:outcome-hub-knowledge", "//crates/service-workers:outcome-hub-services", "//crates/codex-adapter:outcome-hub-codex-adapter", "//crates/outcome-service:outcome-hub-outcomes", "//crates/service-workers:ai-im-services", "//crates/service-workers:units", "//crates/codex-adapter:ai-im-codex-adapter", "//crates/outcome-service:ai-im-outcome-service"],
+    srcs = ["//crates/knowledge-service:outcome-hub-knowledge", "//crates/service-workers:outcome-hub-services", "//crates/codex-adapter:outcome-hub-codex-adapter", "//crates/outcome-service:outcome-hub-outcomes", "//crates/service-workers:units", ],
     package_dir = "outcome-hub-adapters", extension = "tar.gz", mode = "0755",
     visibility = ["//visibility:public"],
 )
@@ -194,3 +173,6 @@ rust_binary(
 )
 alias(name = "outcome-hub", actual = "//apps/outcome-hub:outcome-hub", visibility = ["//visibility:public"])
 alias(name = "outcome-hub-package", actual = "//crates/collaboration-api:package", visibility = ["//visibility:public"])
+
+alias(name = "outcome-hub-migrate", actual = "//apps/migrate:outcome-hub-migrate", visibility = ["//visibility:public"])
+alias(name = "migration-package", actual = "//apps/migrate:package", visibility = ["//visibility:public"])

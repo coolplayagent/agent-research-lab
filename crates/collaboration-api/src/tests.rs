@@ -168,7 +168,7 @@ impl Harness {
     }
     pub(super) async fn manage(&self, body: Value) -> Value {
         let (status, response) = self
-            .request("/api/crystal/manage", Some(body), true, None)
+            .request("/api/v1/messaging/manage", Some(body), true, None)
             .await;
         assert_eq!(status, 200, "{response}");
         serde_json::from_str(&response).unwrap()
@@ -226,9 +226,16 @@ async fn independent_host_manages_agents_groups_dms_boards_without_research_conf
         assert_eq!(status, 200, "{path}: {body}");
         assert!(body.contains(content), "{path}: {body}");
     }
-    assert_eq!(h.request("/api/im/people", None, false, None).await.0, 401);
+    assert_eq!(
+        h.request("/api/v1/collaboration/people", None, false, None)
+            .await
+            .0,
+        401
+    );
     assert_eq!(h.request("/api/snapshot", None, true, None).await.0, 404);
-    let response = h.request("/api/im/scenarios", None, true, None).await;
+    let response = h
+        .request("/api/v1/collaboration/scenarios", None, true, None)
+        .await;
     assert_eq!(response.0, 200);
     let scenarios: Value = serde_json::from_str(&response.1).unwrap();
     assert_eq!(scenarios["scenarios"][0]["id"], "collaboration");
@@ -258,7 +265,7 @@ async fn independent_host_manages_agents_groups_dms_boards_without_research_conf
     let token = grant["token"].as_str().unwrap();
     assert_eq!(
         h.request(
-            "/api/crystal/manage",
+            "/api/v1/messaging/manage",
             Some(json!({"operation":"membership","group_id":"board","person_id":"c","add":true})),
             false,
             Some(token)
@@ -269,7 +276,7 @@ async fn independent_host_manages_agents_groups_dms_boards_without_research_conf
     );
     assert_eq!(
         h.request(
-            "/api/crystal/send",
+            "/api/v1/messaging/send",
             Some(json!({"group_id":"board","request_id":"forbidden","text":"Not an operator"})),
             false,
             Some(token)
@@ -280,7 +287,7 @@ async fn independent_host_manages_agents_groups_dms_boards_without_research_conf
     );
     assert!(
         h.request(
-            "/api/crystal/history?group_id=board",
+            "/api/v1/messaging/history?group_id=board",
             None,
             false,
             Some(token)
@@ -292,7 +299,7 @@ async fn independent_host_manages_agents_groups_dms_boards_without_research_conf
     let outsider = h.hub.grant("c", 60).await.unwrap();
     assert_eq!(
         h.request(
-            "/api/crystal/history?group_id=board",
+            "/api/v1/messaging/history?group_id=board",
             None,
             false,
             Some(&outsider)
@@ -302,7 +309,7 @@ async fn independent_host_manages_agents_groups_dms_boards_without_research_conf
         400
     );
     assert!(
-        !h.request("/api/crystal/inbox", None, false, Some(&outsider))
+        !h.request("/api/v1/messaging/inbox", None, false, Some(&outsider))
             .await
             .1
             .contains("Announcements")
@@ -318,32 +325,39 @@ async fn local_operator_enters_management_without_changing_actor_grants() {
     let session: Value = serde_json::from_str(&session).unwrap();
     assert_eq!(session["authenticated"], true);
     assert_eq!(session["local_operator"], true);
-    assert_eq!(h.request("/api/im/people", None, false, None).await.0, 200);
-    let (status, response) = h.request("/api/crystal/manage",Some(json!({"operation":"person","person":{"id":"worker","name":"Worker","application_id":null}})),false,None).await;
+    assert_eq!(
+        h.request("/api/v1/collaboration/people", None, false, None)
+            .await
+            .0,
+        200
+    );
+    let (status, response) = h.request("/api/v1/messaging/manage",Some(json!({"operation":"person","person":{"id":"worker","name":"Worker","application_id":null}})),false,None).await;
     assert_eq!(status, 200, "{response}");
     let grant = h
         .manage(json!({"operation":"grant","person_id":"worker","lifetime_seconds":60}))
         .await;
     let token = grant["token"].as_str().unwrap();
     assert_eq!(
-        h.request("/api/im/people", None, false, Some(token))
+        h.request("/api/v1/collaboration/people", None, false, Some(token))
             .await
             .0,
         401
     );
-    assert_eq!(h.request("/api/crystal/manage",Some(json!({"operation":"person","person":{"id":"imposter","name":"Imposter","application_id":null}})),false,Some(token)).await.0,401);
+    assert_eq!(h.request("/api/v1/messaging/manage",Some(json!({"operation":"person","person":{"id":"imposter","name":"Imposter","application_id":null}})),false,Some(token)).await.0,401);
     assert_ne!(
-        h.request("/api/crystal/inbox", None, false, None).await.0,
+        h.request("/api/v1/messaging/inbox", None, false, None)
+            .await
+            .0,
         200
     );
     assert_ne!(
-        h.request("/api/crystal/inbox", None, false, Some("wrong-token"))
+        h.request("/api/v1/messaging/inbox", None, false, Some("wrong-token"))
             .await
             .0,
         200
     );
     assert_eq!(
-        h.request("/api/crystal/inbox", None, false, Some(token))
+        h.request("/api/v1/messaging/inbox", None, false, Some(token))
             .await
             .0,
         200
@@ -400,28 +414,25 @@ fn local_operator_rejects_remote_bind_and_preserves_existing_credential() {
 #[tokio::test]
 async fn canonical_routes_preserve_operator_and_actor_authority() {
     let h = Harness::new().await;
-    for (old, new) in [
-        ("/api/im/people", "/api/v1/collaboration/people"),
-        ("/api/crystal/view", "/api/v1/messaging/view"),
-        ("/api/im/outcomes", "/api/v1/collaboration/outcomes"),
-        ("/api/im/topics", "/api/v1/collaboration/topics"),
+    for (old, new, expected) in [
+        ("/api/im/people", "/api/v1/collaboration/people", 200),
+        ("/api/crystal/view", "/api/v1/messaging/view", 200),
+        ("/api/im/outcomes", "/api/v1/collaboration/outcomes", 404),
+        ("/api/im/topics", "/api/v1/collaboration/topics", 200),
     ] {
-        assert_eq!(h.request(old, None, false, None).await.0, 401);
+        for operator in [false, true] {
+            assert_eq!(h.request(old, None, operator, None).await.0, 404);
+        }
         assert_eq!(h.request(new, None, false, None).await.0, 401);
-        let legacy = h.request(old, None, true, None).await;
-        let canonical = h.request(new, None, true, None).await;
-        assert_eq!(canonical, legacy, "{new}");
+        assert_eq!(h.request(new, None, true, None).await.0, expected, "{new}");
     }
     for (old, new) in [
         ("/api/crystal/send", "/api/v1/messaging/send"),
         ("/api/im/work", "/api/v1/collaboration/work"),
         ("/api/crystal/outcomes", "/api/v1/agent/outcomes"),
     ] {
-        let payload = Some(json!({}));
-        let legacy = h.request(old, payload.clone(), false, None).await;
-        let canonical = h.request(new, payload, false, None).await;
-        assert_eq!(canonical, legacy, "{new}");
-        assert_ne!(canonical.0, 200);
+        assert_eq!(h.request(old, Some(json!({})), false, None).await.0, 404);
+        assert_ne!(h.request(new, Some(json!({})), false, None).await.0, 200);
     }
     assert_eq!(
         h.request_intent(

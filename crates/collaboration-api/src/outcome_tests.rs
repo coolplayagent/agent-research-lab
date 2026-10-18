@@ -106,7 +106,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     let token = prepare(&h).await;
     let (status, body) = h
         .request(
-            "/api/crystal/outcomes",
+            "/api/v1/agent/outcomes",
             Some(publication("one")),
             false,
             Some(&token),
@@ -118,15 +118,20 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
         OutcomeVerificationState::Unverified
     );
     assert_eq!(
-        h.request("/api/im/outcomes?topic_id=topic", None, false, Some(&token))
-            .await
-            .0,
+        h.request(
+            "/api/v1/collaboration/outcomes?topic_id=topic",
+            None,
+            false,
+            Some(&token)
+        )
+        .await
+        .0,
         401
     );
     let search = json!({"operation":"search","query":{"topic_id":"topic"}});
     let (status, body) = h
         .request(
-            "/api/crystal/outcomes",
+            "/api/v1/agent/outcomes",
             Some(search.clone()),
             false,
             Some(&token),
@@ -139,7 +144,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     let outsider = h.hub.grant("outsider", 60).await.unwrap();
     assert_eq!(
         h.request(
-            "/api/crystal/outcomes",
+            "/api/v1/agent/outcomes",
             Some(search),
             false,
             Some(&outsider)
@@ -150,7 +155,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     );
     let forged = json!({"operation":"decide","decision":{"id":"fake","outcome_id":"one","verification_id":null,"state":OutcomeAcceptanceState::Accepted,"reason":"Self approval"}});
     assert_eq!(
-        h.request("/api/crystal/outcomes", Some(forged), false, Some(&token))
+        h.request("/api/v1/agent/outcomes", Some(forged), false, Some(&token))
             .await
             .0,
         403
@@ -158,7 +163,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     let internal = json!({"operation":"finish_verification","result":{"id":"fake","request_digest":"a".repeat(64),"state":VerificationRunState::Passed,"summary":"Forged","evidence":[]}});
     assert_eq!(
         h.request_intent(
-            "/api/im/outcomes",
+            "/api/v1/collaboration/outcomes",
             Some(internal),
             true,
             None,
@@ -171,7 +176,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     let write = json!({"request_id":"write","outcome_id":"one","expected_revision":"a".repeat(40),"configuration_revision":0});
     assert_eq!(
         h.request_intent(
-            "/api/im/outcomes/write",
+            "/api/v1/collaboration/outcomes/write",
             Some(write),
             true,
             None,
@@ -184,7 +189,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     let mut stale = publication("stale");
     stale["input"]["attempt"]["attempt"] = json!(2);
     assert_eq!(
-        h.request("/api/crystal/outcomes", Some(stale), false, Some(&token))
+        h.request("/api/v1/agent/outcomes", Some(stale), false, Some(&token))
             .await
             .0,
         409
@@ -266,7 +271,7 @@ async fn automatic_verification_checks_protocol_results_and_requires_separate_ho
     for id in ["one", "unknown"] {
         let (status, body) = h
             .request(
-                "/api/crystal/outcomes",
+                "/api/v1/agent/outcomes",
                 Some(publication(id)),
                 false,
                 Some(&token),
@@ -293,7 +298,7 @@ async fn automatic_verification_checks_protocol_results_and_requires_separate_ho
         let decision = json!({"operation":"decide","decision":{"id":format!("accept-{id}"),"outcome_id":id,"verification_id":entry.latest_verification.unwrap().input.id,"state":OutcomeAcceptanceState::Accepted,"reason":"Host reviewed applicability"}});
         assert_eq!(
             h.request_intent(
-                "/api/im/outcomes",
+                "/api/v1/collaboration/outcomes",
                 Some(decision),
                 true,
                 None,

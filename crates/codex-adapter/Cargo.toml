@@ -19,9 +19,6 @@ process.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 
-[[bin]]
-name = "ai-im-codex-adapter"
-path = "src/legacy_main.rs"
 
 [[bin]]
 name = "outcome-hub-codex-adapter"

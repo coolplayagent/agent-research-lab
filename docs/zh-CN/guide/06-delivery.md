@@ -5,8 +5,8 @@
 宿主可将明确审查过的操作加入 `state_dir/outbox`：
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml automation enqueue --input local-operation.json
-bazel-bin/agent-research-lab --config local.toml automation tick
+bazel-bin/outcome-hub-cli --config local.toml automation enqueue --input local-operation.json
+bazel-bin/outcome-hub-cli --config local.toml automation tick
 ```
 
 操作使用 JSON 封套 `{"kind":"…","request":{…}}`。
@@ -42,9 +42,8 @@ GitHub expected-head 前置条件不能原子冻结 base 分支；服务端竞�
 
 ## 已审查的公开研究输入
 
-经审查、可公开分享的经验与假设保存在 [research/insights.md](../../../research/insights.md)。新任务从项目远程默认分支的当前提交读取该文件，并冻结内容摘要。每条记录保留证据、版本限制、反例和下一步实验；详细知识及来源归档继续留在 SuperPOD。
+经审查的研究输入位于绑定外部知识仓库中的 `knowledge/software/ai-sdlc/insights.md`。新任务要求该文件为已提交的普通文件，并冻结仓库提交和内容摘要；文件缺失时阻止准入，不使用空内容降级。历史证据保留原文，来源绑定过期时重新创建实验。
 
-研究输入的维护规则见 [research/README.md](../../../research/README.md)。
 
 ## 软件迭代的验证快照容量
 

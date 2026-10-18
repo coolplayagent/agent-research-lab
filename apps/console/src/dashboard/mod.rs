@@ -260,6 +260,7 @@ pub fn serve(
     max_seconds: u64,
     local_operator: bool,
 ) -> Result<Value> {
+    runtime::validate_state(c)?;
     collaboration_api::validate_listen(listen, local_operator)?;
     ensure!(
         (1..=43200).contains(&max_seconds),

@@ -90,7 +90,7 @@ fn cross_group_identity_history_pages_older_tasks_and_all_attempts_without_promp
         .unwrap();
         jobs.push(j);
     }
-    runtime::people::register_history(&c, &jobs).unwrap();
+    bind_test_people(&c, &jobs);
     let shared = Arc::new(RwLock::new(json!({"jobs":[]})));
     let mut after = String::new();
     let mut runs = BTreeSet::new();
@@ -119,7 +119,7 @@ fn cross_group_identity_history_pages_older_tasks_and_all_attempts_without_promp
         &long,
     )
     .unwrap();
-    runtime::people::register_history(&c, std::slice::from_ref(&long)).unwrap();
+    bind_test_people(&c, std::slice::from_ref(&long));
     assert!(personas::historical_job(&c.state_dir, &long.run_id).is_ok());
     assert!(personas::history(&c, &id, &long.run_id, &shared).is_ok());
     assert!(personas::historical_job(&c.state_dir, "case-00-attempt-1").is_ok());
@@ -146,4 +146,28 @@ fn execution_catalog_exposes_choices_without_executor_secrets() {
     let view = project(&job(), &json!({"state":"running"}));
     assert_eq!(view["session_id"], "research-one");
     assert_eq!(view["execution_id"], "research-one-attempt-1");
+}
+
+fn bind_test_people(c: &Config, jobs: &[Job]) {
+    let mut directory = runtime::people::directory(c).unwrap();
+    for job in jobs {
+        if let Some(person) = &job.persona {
+            directory
+                .tasks
+                .insert(job.task.id.clone(), person.id.clone());
+        } else if !directory.tasks.contains_key(&job.task.id) {
+            let id = runtime::people::new_person(
+                &mut directory,
+                &format!("task:{}", job.task.id),
+                "",
+                &job.task.role,
+                runtime::people::Kind::Temporary,
+                "",
+                "Fixture participant",
+            )
+            .unwrap();
+            directory.tasks.insert(job.task.id.clone(), id);
+        }
+    }
+    storage::write(&c.state_dir.join("people/directory.json"), &directory).unwrap();
 }

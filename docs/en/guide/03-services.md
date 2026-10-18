@@ -23,8 +23,8 @@ Workers claim their own assignments, obey the returned deadline and submit under
 Research uses the separate local `json_process` result-file protocol. [examples/backend.toml](../../../examples/backend.toml) shows `agent_backends`, role selection with `role_backends`, task defaults in `[models]` and optional per-backend lists in `[backend_models]`. Adding a model does not create a person; omitting a list permits the existing role defaults.
 
 ```sh
-agent-research-lab --config local.toml agents backends
-agent-research-lab --config local.toml doctor --probe-models
+outcome-hub-cli --config local.toml agents backends
+outcome-hub-cli --config local.toml doctor --probe-models
 ```
 
 Model probes may consume provider quota. A generic bridge probe only verifies the local JSON contract. Codex model-response probes and actual task results are separate evidence. Unknown models or insufficient capabilities fail explicitly without silently switching models.
@@ -41,10 +41,10 @@ shared_research = true
 This freezes new task identities; historical tasks retain their inputs, and formal collaboration pilots/holdouts do not join automatically.
 
 ```sh
-agent-research-lab --config local.toml agents boards --shard 0 --limit 32
-agent-research-lab --config local.toml agents view --cohort SHA256
-agent-research-lab --config local.toml agents simulate --agent-count 1000
-agent-research-lab --config local.toml agents simulate --agent-count 10000
+outcome-hub-cli --config local.toml agents boards --shard 0 --limit 32
+outcome-hub-cli --config local.toml agents view --cohort SHA256
+outcome-hub-cli --config local.toml agents simulate --agent-count 1000
+outcome-hub-cli --config local.toml agents simulate --agent-count 10000
 ```
 
 Lists use shards/cursors. `agents close` prevents new membership; `agents prune` requires closure and expiry, with required evidence archived first. Tombstones remain; neither operation restores quotas or publishes knowledge. Simulations test logical routing/resource bounds, not 10,000 model processes or research-quality gains. Actual execution remains limited to eight workers.

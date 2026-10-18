@@ -28,7 +28,7 @@ Start with quick start, use the service guide to connect executors, or read desi
 
 ## Maintenance
 
-Number topics independently within each section. Pair languages by number, filename and coverage. Preserve example data, protocol values and commands. Update both languages and index links together. Research knowledge remains in SuperPOD; `research/insights.md` stays at its runtime path.
+Number topics independently within each section. Pair languages by number, filename and coverage. Preserve example data, protocol values and commands. Update both languages and index links together. Research knowledge belongs to the bound external repository; reviewed inputs are read from its committed `knowledge/software/ai-sdlc/insights.md`.
 
 ## OutcomeHub outcome-based work
 

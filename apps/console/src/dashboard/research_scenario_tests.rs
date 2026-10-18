@@ -224,14 +224,9 @@ fn successful_workflow_status_without_a_matching_committed_receipt_cannot_submit
         storage::write(&root.join("response.json"),&json!({"ok":true,"result":{"status":"succeeded","frames":{"1":{"nodes":{"task":{"outputs":{"result":receipt.to_string()}}}}}}})).unwrap()
     };
     persist(&receipt);
-    let result = observe_result(&c, "im-job").unwrap().unwrap();
-    assert!(result.succeeded);
-    assert_eq!(result.summary, "Pinned research result");
-    assert_eq!(result.evidence["source_commit"], job.source_commit);
-    assert!(result.evidence["receipt_sha256"].is_string());
     assert!(
-        result.evidence["policy_digest"].is_null(),
-        "legacy receipts cannot attest policy"
+        observe_result(&c, "im-job").is_err(),
+        "retired receipts cannot attest policy"
     );
     receipt["receipt_protocol"] = json!(2);
     receipt["config_digest"] = json!(job.config_digest);

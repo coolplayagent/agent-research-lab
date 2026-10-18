@@ -1,0 +1,31 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+exports_files(["Cargo.toml"], visibility = ["//visibility:public"])
+_DEPS = ["//crates/filesystem-store:storage", "//crates/execution-config:config", "//crates/execution-model:task", "//crates/execution-runtime:runtime", "//crates/contracts:contracts"]
+rust_library(
+    name = "outcome_hub_migrate", crate_name = "outcome_hub_migrate",
+    srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]), crate_root = "src/lib.rs",
+    edition = "2024", version = "0.1.0", aliases = aliases(),
+    compile_data = glob(["tests/fixtures/**"]),
+    deps = _DEPS + all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"],
+)
+rust_binary(
+    name = "outcome-hub-migrate", srcs = ["src/main.rs"], edition = "2024", aliases = aliases(),
+    deps = [":outcome_hub_migrate"] + all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"],
+)
+rust_test(
+    name = "tests", crate = ":outcome_hub_migrate", aliases = aliases(normal_dev = True, proc_macro_dev = True),
+    deps = ["//crates/collaboration-store:collaboration_store"] + all_crate_deps(normal_dev = True),
+    proc_macro_deps = all_crate_deps(proc_macro_dev = True), visibility = ["//visibility:public"],
+)
+rust_test(
+    name = "evidence_bytes_tests", srcs = ["tests/evidence_bytes.rs"], edition = "2024",
+    compile_data = glob(["tests/fixtures/**"]), aliases = aliases(normal = True, normal_dev = True),
+    deps = _DEPS + ["//crates/collaboration-proposals:communication", "//crates/agent-teams:multi_agent"] + all_crate_deps(normal = True, normal_dev = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True, proc_macro_dev = True), visibility = ["//visibility:public"],
+)
+pkg_tar(name = "package", srcs = [":outcome-hub-migrate"], package_dir = "outcome-hub-migration", extension = "tar.gz", mode = "0755", visibility = ["//visibility:public"])
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/*.rs"]), visibility = ["//visibility:public"])

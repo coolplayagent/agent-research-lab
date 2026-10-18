@@ -4,7 +4,7 @@
 
 ## 服务部署
 
-使用 `deploy/systemd/agent-research-lab.service` 用户服务模板前，按机器调整程序、工作目录和私有配置路径。构建不会自动安装或启用服务。同一状态只运行一个统一核心服务；独立存储、执行器和沙箱按[服务接入指南](03-services.md)部署。升级先停止旧服务，保留旧二进制与一致数据库备份，再安装已验证产物并重启。回退跨数据库版本的二进制时必须恢复匹配备份，不允许旧程序打开新数据库。
+使用 `deploy/systemd/outcome-hub-cli.service` 用户服务模板前，按机器调整程序、工作目录和私有配置路径。构建不会自动安装或启用服务。同一状态只运行一个统一核心服务；独立存储、执行器和沙箱按[服务接入指南](03-services.md)部署。升级先停止旧服务，保留旧二进制与一致数据库备份，再安装已验证产物并重启。回退跨数据库版本的二进制时必须恢复匹配备份，不允许旧程序打开新数据库。
 
 ## 本地实验目标
 
@@ -13,12 +13,12 @@
 repo-sandbox 的 local provider 使用宿主工具，为每次执行创建真实 Bubblewrap 命名空间。持久会话记录工作区并报告 `ready`，不表示存在常驻容器。控制器使用私有注册表运行 `target install`、`dev up/exec/status/down`，并验证实际工作区写入。这些操作在宿主执行，因为部分 AppArmor 策略禁止 Agent 内嵌套用户命名空间。模型可读取保留的证据及私有注册表；需要 WSL/VM 语义时可使用对应目标。
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml targets prepare
-bazel-bin/agent-research-lab --config local.toml targets verify --kind all
-bazel-bin/agent-research-lab --config local.toml targets status
-bazel-bin/agent-research-lab --config local.toml targets agent-check
-bazel-bin/agent-research-lab --config local.toml doctor
-bazel-bin/agent-research-lab --config local.toml doctor --probe-models
+bazel-bin/outcome-hub-cli --config local.toml targets prepare
+bazel-bin/outcome-hub-cli --config local.toml targets verify --kind all
+bazel-bin/outcome-hub-cli --config local.toml targets status
+bazel-bin/outcome-hub-cli --config local.toml targets agent-check
+bazel-bin/outcome-hub-cli --config local.toml doctor
+bazel-bin/outcome-hub-cli --config local.toml doctor --probe-models
 ```
 
 `targets verify` 要求支持 local provider 的 repo-sandbox 构建，旧运行时会明确失败。准备过程有时限且可恢复；缺失依赖产生可操作错误，不阻断无关研究。真实验证日志和截图保存在 `.lab/runs`。`targets agent-check` 经生产目标启动器调用已配置的评审模型，核对实际工具事件和 PNG；它消耗模型额度，证明的是传输链路。
@@ -47,16 +47,16 @@ bazel-bin/agent-research-lab --config local.toml doctor --probe-models
 
 管理链接保存在 worker 挂载不可见的 `state_dir/dashboard/access.json`。首次打开建立 HttpOnly、SameSite 浏览器会话；此链接属于凭证，不得提交、放进 worker 提示词或公开。普通数字人 bearer 授权不能读取操作员面板、私有记忆、设置或其他会话。服务面向单一可信宿主，默认绑定回环地址；常见浏览器凭证目录也对执行器隐藏，同用户运行的任意宿主进程仍在信任范围内。
 
-创建数字人或使用宿主管理的研究执行无需在界面申请个人接入凭证。需要从独立受信适配器访问底层消息 API 时，操作员可在 `POST /api/crystal/manage` 使用 `operation: "grant"` 签发短期授权：只返回一次、仅保存摘要、最长 24 小时有效。操作员变更还须携带精确同源 `Origin`、JSON Content-Type 和 `X-Crystal-Intent: manage-crystal`。
+创建数字人或使用宿主管理的研究执行无需在界面申请个人接入凭证。需要从独立受信适配器访问底层消息 API 时，操作员可在 `POST /api/v1/messaging/manage` 使用 `operation: "grant"` 签发短期授权：只返回一次、仅保存摘要、最长 24 小时有效。操作员变更还须携带精确同源 `Origin`、JSON Content-Type 和 `X-Crystal-Intent: manage-crystal`。
 
 ## 通信基准
 
 在**新的私有目录**中运行两种通信负载：
 
 ```sh
-bazel-bin/agent-research-lab crystal-bench --state /private/new-mixed-run \
+bazel-bin/outcome-hub-cli crystal-bench --state /private/new-mixed-run \
   --mode mixed --people 10000 --messages 10000 --rate 1000
-bazel-bin/agent-research-lab crystal-bench --state /private/new-hot-run \
+bazel-bin/outcome-hub-cli crystal-bench --state /private/new-hot-run \
   --mode hot --people 10000 --messages 100 --rate 10
 ```
 

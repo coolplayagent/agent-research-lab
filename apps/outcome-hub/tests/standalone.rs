@@ -31,7 +31,7 @@ fn core_binary_starts_and_restarts_without_optional_services() {
         let reservation = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = reservation.local_addr().unwrap();
         drop(reservation);
-        let child = Command::new(env!("CARGO_BIN_EXE_ai-im"))
+        let child = Command::new(env!("CARGO_BIN_EXE_outcome-hub"))
             .args(["serve", "--state-dir"])
             .arg(root.path())
             .args([
@@ -59,14 +59,14 @@ fn core_binary_starts_and_restarts_without_optional_services() {
             assert!(Instant::now() < deadline, "core did not become ready");
             std::thread::sleep(Duration::from_millis(20));
         }
-        let response = get(addr, "/api/im/scenarios").unwrap();
+        let response = get(addr, "/api/v1/collaboration/scenarios").unwrap();
         assert!(response.starts_with("HTTP/1.1 200"));
         let body: serde_json::Value =
             serde_json::from_str(response.split_once("\r\n\r\n").unwrap().1).unwrap();
         let scenarios = body["scenarios"].as_array().unwrap();
         assert!(scenarios.iter().any(|s| s["id"] == "collaboration"));
         assert!(scenarios.iter().all(|s| s["id"] != "cli-research"));
-        let topics = get(addr, "/api/im/topics").unwrap();
+        let topics = get(addr, "/api/v1/collaboration/topics").unwrap();
         assert!(topics.starts_with("HTTP/1.1 200"));
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {

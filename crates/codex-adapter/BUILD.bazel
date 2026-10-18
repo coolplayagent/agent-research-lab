@@ -3,7 +3,7 @@ load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test", "rust_binary")
 exports_files(["Cargo.toml", "src/main.rs"], visibility = ["//visibility:public"])
 rust_library(
     name = "codex_adapter", crate_name = "codex_adapter",
-    srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs", "src/legacy_main.rs"]),
+    srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
     crate_root = "src/lib.rs", edition = "2024", aliases = aliases(),
     deps = ["//crates/service-api:service_api", "//crates/service-protocol:service_protocol", "//crates/process:process"] + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
@@ -11,6 +11,5 @@ rust_library(
 )
 rust_test(name = "tests", crate = ":codex_adapter", aliases = aliases(normal_dev = True, proc_macro_dev = True), deps = [] + all_crate_deps(normal_dev = True), proc_macro_deps = all_crate_deps(proc_macro_dev = True), visibility = ["//visibility:public"])
 filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "src/dashboard/*.html", "src/dashboard/*.css"], allow_empty = True), visibility = ["//visibility:public"])
-rust_binary(name = "ai-im-codex-adapter", srcs = ["src/main.rs"], edition = "2024", deps = [":codex_adapter"] + ["//crates/service-api:service_api", "//crates/service-protocol:service_protocol", "//crates/process:process"] + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])
 
 rust_binary(name = "outcome-hub-codex-adapter", srcs = ["src/main.rs"], edition = "2024", deps = [":codex_adapter"] + ["//crates/service-api:service_api", "//crates/service-protocol:service_protocol", "//crates/process:process"] + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])

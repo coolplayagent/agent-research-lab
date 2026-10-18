@@ -20,8 +20,8 @@ linked goal remains unassessed. References and declared commit pins are provenan
 metadata, not independent promotion evidence; existing research gates are preserved.
 Knowledge contents stay in SuperPOD rather than a second local knowledge base.
 
-Host APIs: `GET /api/im/topics`, `GET /api/im/subjects`,
-`GET /api/im/evolution`, and `POST /api/im/research` (intent `manage-research`).
+Host APIs: `GET /api/v1/collaboration/topics`, `GET /api/v1/collaboration/subjects`,
+`GET /api/v1/collaboration/evolution`, and `POST /api/v1/collaboration/coordination` (intent `manage-research`).
 Topic/subject lists use stable ID cursors; graph pages use durable sequence cursors.
 Additive SQLite schema v5 owns topics, subjects, nodes and parent edges in the
 storage service. The graph UI supports subject/topic filters, pagination, zoom,
@@ -41,7 +41,7 @@ Registration does not activate a prompt. Promotion requires three task families 
 
 Host-owned expected context and measured observations must match; unknown fields, stale bindings, missing measurements and severe regressions fail. Synthetic examples cannot replace real measurements. Holdouts, gate inputs and receipts remain outside candidate-writable mounts; directory separation alone does not establish OS isolation.
 
-Reviewed reusable public inputs remain at [research/insights.md](../../../research/insights.md), whose remote-default-branch commit and content digest are frozen for new tasks. Complete knowledge and source archives remain in SuperPOD. See [experiments](../guide/05-experiments.md) and [delivery](../guide/06-delivery.md).
+Reviewed reusable inputs belong to the bound external knowledge repository at `knowledge/software/ai-sdlc/insights.md`. New tasks require that committed regular file and pin its repository revision and content digest. Missing inputs block admission; no empty fallback is used. Preserve original historical evidence and enqueue a new experiment when its source binding is obsolete.
 
 ## Scenario-neutral iteration coordination
 
@@ -62,8 +62,8 @@ The optional `research` scenario retains read-only CLI investigation, and
 policy. Four-agent CLI research is one deployment configuration of these adapters.
 Researching the platform itself uses a separate run and subject.
 
-`GET /api/im/iterations` accepts `group_id`, `scenario_id`, `after` and `active`
-filters and returns full run records. `POST /api/im/iterations` requires the
+`GET /api/v1/collaboration/iterations` accepts `group_id`, `scenario_id`, `after` and `active`
+filters and returns full run records. `POST /api/v1/collaboration/iterations` requires the
 `manage-crystal` intent and an envelope containing `request_id`, `run_id`,
 `revision` and an `action` tagged by `operation`. Creation freezes an `input` with
 the goal criteria, scenario parameters, subject, baseline, assignments and budgets.

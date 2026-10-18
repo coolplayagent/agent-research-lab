@@ -17,7 +17,7 @@ Revisions use new IDs and preserve prior versions. Withdrawal preserves referenc
 
 ## Agent API
 
-Agents use existing OutcomeHub bearer grants and work claiming. Publish only while the exact goal, work, attempt and claim are valid. `POST /api/crystal/outcomes` accepts:
+Agents use existing OutcomeHub bearer grants and work claiming. Publish only while the exact goal, work, attempt and claim are valid. `POST /api/v1/agent/outcomes` accepts:
 
 | Operation | Fields | Purpose |
 | --- | --- | --- |
@@ -29,15 +29,15 @@ Agents use existing OutcomeHub bearer grants and work claiming. Publish only whi
 
 See [outcome-publication.json](../../../examples/outcome-publication.json). Replace placeholder hashes with actual evidence. `knowledge: null` and `pins.superpod: null` mean unbound. Reuse an ID only for identical retries; changed content requires a new ID. Continue searches with returned `snapshot` and `next_after`; omit snapshot to refresh. Include discovery and verification costs in the execution budget.
 
-A client may use `curl --config "$AI_IM_AUTH_CONFIG" --json @request.json "$AI_IM_URL/api/crystal/outcomes"`. Keep the authentication config in a private runtime directory with mode 0600, outside Git. Credential values must not enter command arguments, outcomes or prompts. Execution adapters do not automatically receive bearer access. Operators configure direct Agents through the existing grant flow; configured coding executors can continue returning results for host publication.
+A client may use `curl --config "$AI_IM_AUTH_CONFIG" --json @request.json "$AI_IM_URL/api/v1/agent/outcomes"`. Keep the authentication config in a private runtime directory with mode 0600, outside Git. Credential values must not enter command arguments, outcomes or prompts. Execution adapters do not automatically receive bearer access. Operators configure direct Agents through the existing grant flow; configured coding executors can continue returning results for host publication.
 
-Operator APIs are `GET/POST /api/im/outcomes`, `POST /api/im/outcomes/verify`, `POST /api/im/outcomes/write`, and `POST /api/im/outcomes/reconcile`. Mutations require an operator session, same origin and `X-Crystal-Intent: manage-outcomes`. Verification takes `request_id, outcome_id, verifier_id, configuration_revision`; writes take `request_id, outcome_id, expected_revision, configuration_revision`; reconciliation takes `outcome_id, request_id`. Forged internal receipt commands are rejected.
+Operator APIs are `GET/POST /api/v1/collaboration/outcomes`, `POST /api/v1/collaboration/outcomes/verify`, `POST /api/v1/collaboration/outcomes/write`, and `POST /api/v1/collaboration/outcomes/reconcile`. Mutations require an operator session, same origin and `X-Crystal-Intent: manage-outcomes`. Verification takes `request_id, outcome_id, verifier_id, configuration_revision`; writes take `request_id, outcome_id, expected_revision, configuration_revision`; reconciliation takes `outcome_id, request_id`. Forged internal receipt commands are rejected.
 
 ## Optional services
 
 ```sh
-bazel build //crates/outcome-service:ai-im-outcome-service
-bazel-bin/crates/outcome-service/ai-im-outcome-service \
+bazel build //crates/outcome-service:outcome-hub-outcomes
+bazel-bin/crates/outcome-service/outcome-hub-outcomes \
   --config /private/services/outcome-service.json \
   --state-dir /private/services/outcome-state \
   --socket /private/services/outcome.sock \

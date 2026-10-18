@@ -22,6 +22,12 @@ pub(crate) struct Store {
 impl Store {
     pub fn open(path: &Path) -> Result<Self> {
         use std::os::unix::fs::PermissionsExt;
+        let existing = path.try_exists()?;
+        if existing {
+            let check =
+                Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+            super::schema::validate(&check)?;
+        }
         std::fs::create_dir_all(path.parent().context("database needs a parent")?)?;
         std::fs::set_permissions(
             path.parent().unwrap(),
@@ -30,19 +36,10 @@ impl Store {
         let connection = Connection::open(path)?;
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
         connection.busy_timeout(Duration::from_millis(250))?;
-        connection.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; PRAGMA wal_autocheckpoint=1000;
-          CREATE TABLE IF NOT EXISTS crystal_meta(key TEXT PRIMARY KEY,value INTEGER NOT NULL);
-          INSERT OR IGNORE INTO crystal_meta VALUES('schema',1);
-          CREATE TABLE IF NOT EXISTS actors(id TEXT PRIMARY KEY,presence TEXT NOT NULL DEFAULT 'online');
-          CREATE TABLE IF NOT EXISTS groups(id TEXT PRIMARY KEY,title TEXT NOT NULL,topic TEXT NOT NULL,private INTEGER NOT NULL,archived INTEGER NOT NULL DEFAULT 0,pinned INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 1,created_ms INTEGER NOT NULL,last_sequence INTEGER NOT NULL DEFAULT 0);
-          CREATE TABLE IF NOT EXISTS members(group_id TEXT NOT NULL REFERENCES groups(id),actor_id TEXT NOT NULL REFERENCES actors(id),cursor INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(group_id,actor_id));
-          CREATE INDEX IF NOT EXISTS memberships ON members(actor_id,group_id);
-          CREATE TABLE IF NOT EXISTS grants(token_hash TEXT PRIMARY KEY,actor_id TEXT NOT NULL REFERENCES actors(id),expires_ms INTEGER NOT NULL);
-          CREATE INDEX IF NOT EXISTS grants_actor ON grants(actor_id);
-          CREATE INDEX IF NOT EXISTS grants_expiry ON grants(expires_ms);
-          CREATE TABLE IF NOT EXISTS messages(sequence INTEGER PRIMARY KEY AUTOINCREMENT,group_id TEXT NOT NULL REFERENCES groups(id),sender_id TEXT NOT NULL REFERENCES actors(id),request_id TEXT NOT NULL,text TEXT NOT NULL,reply_to INTEGER,accepted_ms INTEGER NOT NULL,UNIQUE(group_id,sender_id,request_id));
-          CREATE INDEX IF NOT EXISTS room_history ON messages(group_id,sequence);")?;
-        super::schema::migrate(&connection)?;
+        connection.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; PRAGMA wal_autocheckpoint=1000;")?;
+        if !existing {
+            connection.execute_batch(include_str!("current.sql"))?;
+        }
         ensure!(
             connection.query_row("PRAGMA synchronous", [], |r| r.get::<_, u64>(0))? == 2,
             "durable mode must remain FULL"

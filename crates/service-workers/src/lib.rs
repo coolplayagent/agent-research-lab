@@ -3,7 +3,6 @@ use anyhow::{Result, ensure};
 use contracts::ServiceKind;
 use executor_service::execute;
 use sandbox_service as sandbox;
-pub use sandbox_service::run;
 use serde_json::{Value, json};
 use service_api::SandboxRequest;
 use service_protocol as rpc;
@@ -61,7 +60,7 @@ async fn handle(
                         "sandbox service lifetime is too short for this execution"
                     );
                     Ok(json!(
-                        run(
+                        sandbox::run(
                             state,
                             command,
                             env_names,

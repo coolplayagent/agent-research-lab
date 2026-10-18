@@ -1028,6 +1028,7 @@ name = "outcome-hub-execution-model"
 version = "0.1.0"
 dependencies = [
  "outcome-hub-collaboration-proposals",
+ "outcome-hub-contracts",
  "outcome-hub-execution-config",
  "outcome-hub-execution-inputs",
  "serde",
@@ -1230,6 +1231,30 @@ dependencies = [
  "outcome-hub-workflow-adapter",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "outcome-hub-migrate"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "fs2",
+ "libc",
+ "outcome-hub-agent-teams",
+ "outcome-hub-collaboration-proposals",
+ "outcome-hub-collaboration-store",
+ "outcome-hub-contracts",
+ "outcome-hub-execution-config",
+ "outcome-hub-execution-model",
+ "outcome-hub-execution-runtime",
+ "outcome-hub-filesystem-store",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]

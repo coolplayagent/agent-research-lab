@@ -21,9 +21,6 @@ tempfile.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 
-[[bin]]
-name = "ai-im-services"
-path = "src/legacy_main.rs"
 
 [[bin]]
 name = "outcome-hub-services"

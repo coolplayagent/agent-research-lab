@@ -4,9 +4,9 @@
 
 ## 独立服务与核心执行协议
 
-开发模式可用显式独立本地库的 embedded store；生产可独立部署 `ai-im-storage`。存储进程独占 SQLite，核心与研究适配器使用同一客户端 API 和事件流。设置中切换存储需准备目标数据并重启，不隐式迁移或回退到其他数据库。
+开发模式可用显式独立本地库的 embedded store；生产可独立部署 `outcome-hub-storage`。存储进程独占 SQLite，核心与研究适配器使用同一客户端 API 和事件流。设置中切换存储需准备目标数据并重启，不隐式迁移或回退到其他数据库。
 
-`ai-im-services --kind executor` 接收编码任务并委托 `--kind sandbox` 服务执行。初始沙箱采用 Bubblewrap、只读系统文件、一次性工作区、有界 tmpfs、进程组、时限和输出限额。健康检查执行真实隔离命令，需要宿主允许用户命名空间；systemd 模板另限制总内存与进程数。
+`outcome-hub-services --kind executor` 接收编码任务并委托 `--kind sandbox` 服务执行。初始沙箱采用 Bubblewrap、只读系统文件、一次性工作区、有界 tmpfs、进程组、时限和输出限额。健康检查执行真实隔离命令，需要宿主允许用户命名空间；systemd 模板另限制总内存与进程数。
 
 服务端点为私有、同用户 Unix socket；帧为大端 32 位字节长度加 UTF-8 JSON，最多 8 MiB。请求为 `{"protocol_version":1,"request":{...}}`，回复含 `protocol_version`、`result`、`error`。`{"operation":"probe"}` 返回类型化服务种类、就绪状态和版本化能力；核心同时检查可达性、种类与能力，不连接任意 HTTP URL。
 

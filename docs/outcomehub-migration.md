@@ -1,66 +1,44 @@
-# OutcomeHub 命名与接口迁移
+# OutcomeHub legacy 退役与离线迁移
 
-## 应用和目录
+## 正式入口
 
-`app/` 已合并进 `apps/cli/`，不保留重复入口目录或软链接。
+仅分发 `outcome-hub`、`outcome-hub-cli`、`outcome-hub-storage`、`outcome-hub-services`、`outcome-hub-codex-adapter`、`outcome-hub-outcomes` 和 `outcome-hub-knowledge`。旧 `ai-im*`、`agent-research-lab` 可执行入口与旧 Bazel 标签已删除。
 
-| 原名称 | 当前名称 |
-| --- | --- |
-| `apps/ai-im` | `apps/outcome-hub` |
-| `apps/research-cli` | `apps/cli` |
-| `apps/research-console` | `apps/console` |
-| `crystal` | `collaboration-store` |
-| `im-storage` | `collaboration-storage-service` |
-| `im-client`、`im-host`、`im-service` | `collaboration-client`、`collaboration-host`、`collaboration-api` |
-| `communication`、`multi-agent` | `collaboration-proposals`、`agent-teams` |
-| `collaboration-experiment` | `collaboration-evaluation` |
-| `config`、`task`、`runtime` | `execution-config`、`execution-model`、`execution-runtime` |
-| `budget`、`inputs`、`targets` | `execution-budget`、`execution-inputs`、`execution-targets` |
-| `workflow`、`freshness` | `workflow-adapter`、`source-freshness` |
-| `automation`、`delivery` | `delivery-outbox`、`delivery-adapters` |
-| `evolution`、`evolution-cli` | `prompt-evolution`、`prompt-evolution-cli` |
-| `storage` | `filesystem-store` |
-| `knowledge` | 通用 `knowledge-*` 模块及显式报告流程 `knowledge-publication` |
+HTTP 使用 `/api/v1/collaboration/*`、`/api/v1/messaging/*`、`/api/v1/agent/outcomes`；协调操作使用 `/api/v1/collaboration/coordination`，控制台使用 `/apps/console/`。旧 `/api/im/*`、`/api/crystal/*`、`/apps/research/` 不再提供服务。管理与 Agent 的权限边界保持独立。
 
-前端移入 `web/outcome-hub`、`web/console`；共享契约与国际化设施位于 `web/shared`。systemd 模板集中到 `deploy/systemd`。Cargo 包使用 `outcome-hub-` 前缀，内部库依赖按新位置更新；部分通用依赖别名及旧类型重导出用于保持已有代码调用兼容。
+现有 `.ai-im` 默认路径、认证 Cookie、协议头、状态序列化值和外部仓库标识保留，不因源码清理自动改名。当前 v1 配置的可选字段及冻结证据格式继续有效；移除的是运行时的旧格式升级和补写流程。
 
-## 命令与构建
+## 离线工具
 
-| 旧命令（保留） | 规范命令 |
-| --- | --- |
-| `ai-im` | `outcome-hub` |
-| `agent-research-lab` | `outcome-hub-cli` |
-| `ai-im-storage` | `outcome-hub-storage` |
-| `ai-im-services` | `outcome-hub-services` |
-| `ai-im-codex-adapter` | `outcome-hub-codex-adapter` |
-| `ai-im-outcome-service` | `outcome-hub-outcomes` |
-| 新增 | `outcome-hub-knowledge` |
+`outcome-hub-migrate` 是单独分发的 Rust 工具，核心服务不依赖它。它支持数据库 schema 1–7、旧 `dashboard/personas.json`、任务身份关联以及已知的旧完成日志。未知版本、损坏数据、未知完成状态、无法绑定冻结任务或缺失必要回执均拒绝转换。
 
-根级 `//:agent-research-lab`、`//:ai-im`、`//:im-package` 保留兼容；新项目使用 `//:outcome-hub`、`//:outcome-hub-cli`、`//:outcome-hub-package`。旧内部目录对应的 Bazel 标签需按表迁移。
+```sh
+bazel build --lockfile_mode=error //:migration-package
+bazel run //:outcome-hub-migrate -- inspect --source /ABS/old-state
+bazel run //:outcome-hub-migrate -- convert --source /ABS/old-state --destination /ABS/prepared-state
+bazel run //:outcome-hub-migrate -- verify --source /ABS/old-state --destination /ABS/prepared-state
+```
 
-## HTTP
+先停止使用源目录的核心服务、存储服务、控制器及任务进程，保存旧二进制和一致备份。源可以是包含 `messages.sqlite` 的存储目录，也可以是包含存储子目录、人员目录和任务记录的应用状态目录。工具检查现有锁和任务进程；操作者必须保证迁移期间服务不重启。
 
-| 旧入口 | 规范入口 |
-| --- | --- |
-| `/api/im/*` | `/api/v1/collaboration/*` |
-| `/api/im/research` | `/api/v1/collaboration/coordination` |
-| `/api/crystal/*` | `/api/v1/messaging/*` |
-| `/api/crystal/outcomes` | `/api/v1/agent/outcomes` |
-| `/apps/research/` | `/apps/console/` |
-| 新增知识库管理 | `/api/v1/knowledge` |
+目标必须不存在且位于源目录之外。工具只转换私有临时副本，保留源文件；校验完成后以禁止覆盖的原子重命名发布。符号链接、特殊文件和超出边界的输入会失败。限制为 100,000 个目录项、64 层目录、单文件 8 GiB、总文件 32 GiB；大型存储应按独立服务状态目录处理。失败时不会发布半成品；中断残留的 `.outcome-hub-migrate-*` 私有目录不得作为服务目录启动。
 
-别名复用原处理器与授权规则，不通过 HTTP 重定向重放 POST 或流式请求。管理端成果操作与 Agent 成果提交仍是不同权限。既有认证 Cookie、请求意图头和序列化状态值保留兼容。
+迁移清单记录工具版本、源与目标的逐文件摘要、整体摘要以及转换项。数据库转换校验原有列的全部行内容，并检查完整性和引用。清单用于本地迁移一致性核对，不是研究验收或发布凭证。验证必须在首次启动目标服务之前执行；服务启动后会正常改变目标数据。
 
-## 知识库迁移
+冻结任务、回执和实验来源／提示词／策略／知识版本证据不重写。被转换的人员目录和日志原文保存在目标的 `migration-originals/`。历史副作用缺少可信完成记录时，内存回写保持 `Unknown`，后续任务准入保持 `Blocked`，不自动重放。需要核对原始权威证据才能恢复后续操作，迁移不会补造成功回执或提高研究评估结果。
 
-1. 保留旧服务、数据库和发布回执的备份及版本记录。
-2. 启动新的 `outcome-hub-knowledge` 服务，使用独立状态目录。
-3. 将旧配置的仓库位置和分支转换为 `knowledge set` 使用的 Git 目标配置，显式指定 `content_root`、权限与可选远端。
-4. 在服务设置中注册新服务，检查目标连接，再为下一次成果发布选择该目标。
-5. 已发出的旧请求继续由原服务查询回执；不要把同一个请求 ID 转交给不同目标执行。
+## 切换与回退
 
-普通目标不需要 SuperPOD 配置。已有报告工作流须增加明确的 `layout`，包括报告目录、允许修改的导航文件和生成目录、主题、仓库及预期 origin；旧准备请求和待发布报告需在明确审核后补充布局配置；不要自动重写尚未完成的发布操作。旧报告证据字段 `superpod_commit`、`superpod_root` 仍可反序列化，新输入也接受 `knowledge_revision`、`knowledge_root`。历史证据摘要不重算。
+1. 完成停机、备份、转换和离线校验。
+2. 显式配置新服务的数据目录和端点；生产存储只允许一个所有者。
+3. 更新 systemd 模板中的执行文件并重启。模板不会自动选择迁移目录。
+4. 检查服务健康、身份、消息、游标及任务关联。旧工作目录和冻结机器路径不自动改写；需要新执行环境时创建新任务，不能绕过原有策略摘要检查。
+5. 回退时停止新服务，使用旧二进制和原目录／一致备份。不得让旧程序读取新运行后改变的数据，也不执行反向迁移。
 
-## 数据与服务
+主存储仅创建和接受 schema 7，旧版本在修改数据库之前拒绝。研究控制器与控制台在启动前拒绝旧人员目录和不完整完成日志。
 
-本次源码更名不搬迁 `.ai-im`、既有数据库或服务状态。新旧 systemd 模板是替代入口，切换时先停止旧实例，沿用明确准备的数据目录；不要同时启动两个存储所有者。生产存储端点变更仍要求显式重启。
+## 内容归属
+
+仓库不再包含 `skills/`、`research/`、`IM.md` 或根级 `architecture/`。技能从外部分发源安装并记录版本证据；研究知识由外部知识仓库管理。新研究输入要求绑定仓库中已提交的 `knowledge/software/ai-sdlc/insights.md`；文件不存在时明确失败，不削弱 SuperPOD pins 或门禁。本次代码变更不写入外部知识库。
+
+可执行架构边界与 wire 回归检查位于 `verification/`，继续参与 `bazel test //...`。历史数据 fixture 保留在离线迁移工具的测试目录，当前协议 fixture 保留在验证目录。

@@ -14,11 +14,11 @@ CLI 研究发现稳定研究身份并保留 IM 名称，生成只读、不可变
 
 ## 目标与 worker API
 
-宿主使用 `GET /api/im/scenarios`、`GET /api/im/goals?group_id=…&after=…` 和 `POST /api/im/goals`。写请求要求同源 Origin、JSON 和管理 intent 头。
+宿主使用 `GET /api/v1/collaboration/scenarios`、`GET /api/v1/collaboration/goals?group_id=…&after=…` 和 `POST /api/v1/collaboration/goals`。写请求要求同源 Origin、JSON 和管理 intent 头。
 
 `create` 的 `goal` 含 `id`、`group_id`、`title`、`objective`、`acceptance`、`scenario`、`parameters`、`assignments: [{person_id,instruction}]`、`max_seconds`。`accept`、`cancel`、`retry` 需要 `goal_id` 和观察到的 `revision`；重试还需要 `work_id`。
 
-worker 以 `Authorization: Bearer <Agent grant>` 调用 `GET /api/im/work?after=…`，并向 `POST /api/im/work` 提交：
+worker 以 `Authorization: Bearer <Agent grant>` 调用 `GET /api/v1/collaboration/work?after=…`，并向 `POST /api/v1/collaboration/work` 提交：
 
 ```json
 {"operation":"claim","goal_id":"goal-123","work_id":"work-0","claim_id":"attempt-client-uuid","attempt":1}
@@ -40,7 +40,7 @@ worker 以 `Authorization: Bearer <Agent grant>` 调用 `GET /api/im/work?after=
 
 `collaboration-store` 实现身份、成员、凭证、消息、目标、尝试、幂等、重放与投递领域逻辑；生产持久库由独立存储服务持有。`collaboration-api` 负责 HTTP/SSE、登录、场景注册与前端，`collaboration-host` 负责启动装配，`apps/console` 提供研究适配器。
 
-操作员写入 `POST /api/crystal/manage`，携带宿主会话、精确同源 `Origin: http://<listen-address>`、`Content-Type: application/json` 和 `X-Crystal-Intent: manage-crystal`。
+操作员写入 `POST /api/v1/messaging/manage`，携带宿主会话、精确同源 `Origin: http://<listen-address>`、`Content-Type: application/json` 和 `X-Crystal-Intent: manage-crystal`。
 
 | operation | 字段 |
 | --- | --- |
@@ -54,18 +54,18 @@ worker 以 `Authorization: Bearer <Agent grant>` 调用 `GET /api/im/work?after=
 | `grant` | `person_id, lifetime_seconds`，轮换 token，最长 24 小时 |
 | `presence` | `person_id, state` |
 
-Agent bearer 固定发言身份。`GET /api/crystal/inbox?after=…` 只列该 Agent 会话；`GET /api/crystal/history?group_id=…&sequence=…` 按成员权限读取。宿主另可使用 `/api/im/people`、`/api/im/scenarios`、`/api/crystal/view`、`/api/crystal/events`。目录每页最多 100 项，历史每页最多 128 条。
+Agent bearer 固定发言身份。`GET /api/v1/messaging/inbox?after=…` 只列该 Agent 会话；`GET /api/v1/messaging/history?group_id=…&sequence=…` 按成员权限读取。宿主另可使用 `/api/v1/collaboration/people`、`/api/v1/collaboration/scenarios`、`/api/v1/messaging/view`、`/api/v1/messaging/events`。目录每页最多 100 项，历史每页最多 128 条。
 
 ## 持久消息传输
 
 | 接口 | 契约 |
 | --- | --- |
-| `POST /api/crystal/send` | Bearer 授权；`{group_id, request_id, text, reply_to?}`。身份由授权确定，持久提交后返回成功回执；相同 request ID 携带不同内容会被拒绝。 |
-| `GET /api/crystal/stream?group_id=…` | Bearer 授权；SSE 事件为 `ready`、`message`、`revoked`、`fault`。先订阅后重放，重连默认从持久确认游标恢复，可用 `after` / `Last-Event-ID` 指定位置。 |
-| `POST /api/crystal/ack` | Bearer 授权；`{group_id, sequence}`。消费处理后推进单调游标，socket 投递不等于处理完成。 |
-| `POST /api/crystal/presence` | Bearer 授权；`{state: "online" / "chatting" / "busy" / "offline"}`。busy/offline 暂停投递，消息仍持久保留。 |
-| `GET /api/crystal/view` | 操作员会话；分页群组、成员、历史和当前测量，`before` 翻阅旧消息。 |
-| `GET /api/crystal/events` | 操作员会话；合并状态事件和所选会话消息。 |
+| `POST /api/v1/messaging/send` | Bearer 授权；`{group_id, request_id, text, reply_to?}`。身份由授权确定，持久提交后返回成功回执；相同 request ID 携带不同内容会被拒绝。 |
+| `GET /api/v1/messaging/stream?group_id=…` | Bearer 授权；SSE 事件为 `ready`、`message`、`revoked`、`fault`。先订阅后重放，重连默认从持久确认游标恢复，可用 `after` / `Last-Event-ID` 指定位置。 |
+| `POST /api/v1/messaging/ack` | Bearer 授权；`{group_id, sequence}`。消费处理后推进单调游标，socket 投递不等于处理完成。 |
+| `POST /api/v1/messaging/presence` | Bearer 授权；`{state: "online" / "chatting" / "busy" / "offline"}`。busy/offline 暂停投递，消息仍持久保留。 |
+| `GET /api/v1/messaging/view` | 操作员会话；分页群组、成员、历史和当前测量，`before` 翻阅旧消息。 |
+| `GET /api/v1/messaging/events` | 操作员会话；合并状态事件和所选会话消息。 |
 
 存储采用单一有界 writer、SQLite WAL 和 `synchronous=FULL`，每次组提交最多 128 次发布，每个订阅群共享有界广播环。广播环是缓存，落后读者从索引日志重放。投递至少一次，消费者按序号去重。存储失败后禁止继续提交，恢复存储并重启服务。归档保留历史，不删除消息或释放存储配额。
 

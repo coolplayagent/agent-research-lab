@@ -119,3 +119,6 @@ pub struct PersonaMemory {
     pub executable_sha256: String,
     pub captured_at: i64,
 }
+
+mod completion;
+pub use completion::{PostSuccess, ProposalRejection};

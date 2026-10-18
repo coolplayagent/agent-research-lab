@@ -7,8 +7,8 @@
 The host may enqueue explicitly reviewed operations in `state_dir/outbox`:
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml automation enqueue --input local-operation.json
-bazel-bin/agent-research-lab --config local.toml automation tick
+bazel-bin/outcome-hub-cli --config local.toml automation enqueue --input local-operation.json
+bazel-bin/outcome-hub-cli --config local.toml automation tick
 ```
 
 Operations use `{"kind":"…","request":{…}}`.
@@ -44,7 +44,7 @@ Runs, `.lab/`, `.qualitygate/`, local configuration, databases, logs and credent
 
 ## Reviewed public research inputs
 
-[research/insights.md](../../../research/insights.md) retains stable IDs, evidence, version limits, counterexamples and next experiments. New tasks freeze its remote-default-branch commit and content digest. Complete knowledge/source archives remain in SuperPOD. Follow [research/README.md](../../../research/README.md) when proposing reviewed updates; do not translate or relocate the runtime input as part of documentation maintenance.
+Reviewed reusable inputs belong to the bound external knowledge repository at `knowledge/software/ai-sdlc/insights.md`. New tasks require that committed regular file and pin its repository revision and content digest. Missing inputs block admission; no empty fallback is used. Preserve original historical evidence and enqueue a new experiment when its source binding is obsolete.
 
 ## Software-iteration verification snapshot capacity
 

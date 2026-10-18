@@ -40,6 +40,35 @@ pub fn identity(inputs: &ExecutionInputs) -> Result<String> {
     Ok(storage::digest(&serde_json::to_vec(&normalized)?))
 }
 
+/// Reviewed knowledge is owned by the bound external repository.
+pub const REVIEWED_INSIGHTS_PATH: &str = "knowledge/software/ai-sdlc/insights.md";
+fn reviewed_insights(repository: &RepositoryInput) -> Result<String> {
+    let commit = &repository.upstream.commit;
+    delivery::validate_commit(commit)?;
+    let entry = git(
+        &repository.checkout,
+        &["ls-tree", commit, "--", REVIEWED_INSIGHTS_PATH],
+    )?;
+    ensure!(
+        entry.starts_with("100644 blob ") || entry.starts_with("100755 blob "),
+        "external knowledge repository requires committed reviewed insights at {REVIEWED_INSIGHTS_PATH}"
+    );
+    let object = format!("{commit}:{REVIEWED_INSIGHTS_PATH}");
+    let size: usize = git(&repository.checkout, &["cat-file", "-s", &object])?.parse()?;
+    ensure!(
+        size > 0 && size <= 64 * 1024,
+        "reviewed insights must be nonempty and at most 64 KiB"
+    );
+    let output = process::capture(
+        "git",
+        &["cat-file".into(), "blob".into(), object],
+        &repository.checkout,
+        std::time::Duration::from_secs(10),
+    )?;
+    ensure!(output.status.success(), "cannot read reviewed insights");
+    Ok(String::from_utf8(output.stdout)?)
+}
+
 const KNOWLEDGE_ENTRYPOINTS: [&str; 3] = [
     "knowledge/index.md",
     "knowledge/software/ai-sdlc/index.md",
@@ -224,11 +253,7 @@ pub fn collect(c: &Config) -> Result<Option<ExecutionInputs>> {
     })?
     .into_iter()
     .collect();
-    let insights_path = repositories["agent-research-lab"]
-        .checkout
-        .join("research/insights.md");
-    let insights = fs::read_to_string(&insights_path)
-        .context("latest project snapshot needs reviewed research/insights.md")?;
+    let insights = reviewed_insights(&repositories["superpod"])?;
     ensure!(
         !insights.trim().is_empty() && insights.len() <= 64 * 1024,
         "reviewed research input must be nonempty and at most 64 KiB"
@@ -309,12 +334,8 @@ pub fn verify(c: &Config, inputs: Option<&ExecutionInputs>) -> Result<()> {
         Ok(())
     })?;
     ensure!(
-        fs::read_to_string(
-            inputs.repositories["agent-research-lab"]
-                .checkout
-                .join("research/insights.md")
-        )? == inputs.insights,
-        "research input does not match the pinned project commit"
+        reviewed_insights(&inputs.repositories["superpod"])? == inputs.insights,
+        "research input does not match the pinned external knowledge commit"
     );
     if let Some(knowledge) = &inputs.shared_knowledge {
         ensure!(
@@ -406,6 +427,47 @@ mod tests {
             },
         };
         (root, input)
+    }
+
+    #[test]
+    fn reviewed_insights_require_a_pinned_external_regular_blob() {
+        let (root, mut input) = knowledge_fixture("External knowledge");
+        assert!(reviewed_insights(&input).is_err());
+        let path = root.path().join(REVIEWED_INSIGHTS_PATH);
+        let content = include_str!("fixtures/knowledge.md");
+        fs::write(&path, content).unwrap();
+        assert!(reviewed_insights(&input).is_err());
+        git(root.path(), &["add", REVIEWED_INSIGHTS_PATH]).unwrap();
+        git(
+            root.path(),
+            &[
+                "-c",
+                "commit.gpgsign=false",
+                "commit",
+                "-qm",
+                "reviewed insights",
+            ],
+        )
+        .unwrap();
+        input.upstream.commit = git(root.path(), &["rev-parse", "HEAD"]).unwrap();
+        fs::write(&path, "uncommitted changes").unwrap();
+        assert_eq!(reviewed_insights(&input).unwrap(), content);
+        fs::remove_file(&path).unwrap();
+        std::os::unix::fs::symlink("../../methodology/evidence-method.md", &path).unwrap();
+        git(root.path(), &["add", REVIEWED_INSIGHTS_PATH]).unwrap();
+        git(
+            root.path(),
+            &[
+                "-c",
+                "commit.gpgsign=false",
+                "commit",
+                "-qm",
+                "symlink fixture",
+            ],
+        )
+        .unwrap();
+        input.upstream.commit = git(root.path(), &["rev-parse", "HEAD"]).unwrap();
+        assert!(reviewed_insights(&input).is_err());
     }
 
     #[test]

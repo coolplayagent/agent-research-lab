@@ -115,52 +115,6 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
         )
         .route("/api/v1/agent/outcomes", post(crate::outcomes::agent))
         .route("/api/v1/knowledge", post(super::knowledge::manage))
-        .route(
-            "/api/im/services",
-            get(super::services::view).post(super::services::save),
-        )
-        .route("/api/crystal/send", post(send))
-        .route("/api/crystal/stream", get(stream))
-        .route("/api/crystal/ack", post(ack))
-        .route("/api/crystal/presence", post(presence))
-        .route("/api/crystal/manage", post(super::rooms::manage))
-        .route("/api/crystal/view", get(super::rooms::view))
-        .route("/api/crystal/events", get(super::rooms::events))
-        .route("/api/crystal/inbox", get(crate::agents::inbox))
-        .route("/api/crystal/history", get(crate::agents::history))
-        .route("/api/im/people", get(crate::agents::people))
-        .route("/api/im/scenarios", get(crate::goals::scenarios))
-        .route(
-            "/api/im/iterations",
-            get(crate::iteration::list).post(crate::iteration::manage),
-        )
-        .route("/api/im/discussion", post(crate::goals::discuss))
-        .route(
-            "/api/im/goals",
-            get(crate::goals::list).post(crate::goals::manage),
-        )
-        .route(
-            "/api/im/work",
-            get(crate::goals::assigned).post(crate::goals::work),
-        )
-        .route("/api/im/topics", get(crate::coordination::topics))
-        .route("/api/im/subjects", get(crate::coordination::subjects))
-        .route("/api/im/evolution", get(crate::coordination::graph))
-        .route("/api/im/research", post(crate::coordination::change))
-        .route(
-            "/api/im/outcomes",
-            get(crate::outcomes::list).post(crate::outcomes::manage),
-        )
-        .route("/api/im/outcomes/verify", post(crate::outcomes::verify))
-        .route(
-            "/api/im/outcomes/write",
-            post(crate::outcome_knowledge::write),
-        )
-        .route(
-            "/api/im/outcomes/reconcile",
-            post(crate::outcome_knowledge::reconcile),
-        )
-        .route("/api/crystal/outcomes", post(crate::outcomes::agent))
         .merge(application)
         .fallback(resource)
         .layer(axum::middleware::from_fn_with_state(
@@ -384,6 +338,13 @@ async fn stream(
         .into_response()
 }
 async fn resource(State(_web): State<Web>, request: Request) -> Response {
+    if !crate::assets::contains(request.uri().path()) {
+        return response(
+            StatusCode::NOT_FOUND,
+            "application/json",
+            br#"{"error":"Resource unavailable"}"#.as_slice(),
+        );
+    }
     if request.method() != "GET" {
         return response(StatusCode::METHOD_NOT_ALLOWED, "text/plain", "GET required");
     }

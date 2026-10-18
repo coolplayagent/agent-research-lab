@@ -19,9 +19,6 @@ service_protocol.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 
-[[bin]]
-name = "ai-im-storage"
-path = "src/legacy_main.rs"
 
 [[bin]]
 name = "outcome-hub-storage"

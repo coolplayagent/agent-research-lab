@@ -10,7 +10,7 @@
 
 评估状态从目标执行与主持人验收派生。worker 成功提交仍待验收，无关联目标的节点未评估。引用与声明的提交只是来源元数据，不构成独立晋级证据。研究回执还需与冻结尝试和四项绑定完全匹配；旧回执/节点仍可读，缺少新证据则未评估；新研究在版本节点下追加不可变 assessment，规则见下文。
 
-宿主 API 为 `GET /api/im/topics`、`GET /api/im/subjects`、`GET /api/im/evolution`、`POST /api/im/research`（intent `manage-research`）。列表用稳定 ID 游标，图用持久 sequence 游标；存储服务的增量 SQLite schema v5 管理主题、对象、节点与父边。图支持过滤、分页、缩放、键盘选点和证据查看。
+宿主 API 为 `GET /api/v1/collaboration/topics`、`GET /api/v1/collaboration/subjects`、`GET /api/v1/collaboration/evolution`、`POST /api/v1/collaboration/coordination`（intent `manage-research`）。列表用稳定 ID 游标，图用持久 sequence 游标；存储服务的增量 SQLite schema v5 管理主题、对象、节点与父边。图支持过滤、分页、缩放、键盘选点和证据查看。
 
 ## 可重算谱系
 
@@ -24,7 +24,7 @@
 
 冻结的宿主预期上下文必须与实测匹配；未知字段、过期绑定、缺失测量及严重回归使门禁失败。合成示例不能替代实测。保留集、门禁输入和回执在宿主私有区域，不能被候选写挂载访问；仅分目录不是操作系统隔离。
 
-公开研究输入仍是 [research/insights.md](../../../research/insights.md)，新任务冻结远程默认分支提交与内容摘要；完整知识及来源归档归属 SuperPOD。操作见[实验指南](../guide/05-experiments.md)与[交付指南](../guide/06-delivery.md)。
+经审查的研究输入位于绑定外部知识仓库中的 `knowledge/software/ai-sdlc/insights.md`。新任务要求该文件为已提交的普通文件，并冻结仓库提交和内容摘要；文件缺失时阻止准入，不使用空内容降级。历史证据保留原文，来源绑定过期时重新创建实验。
 
 ## 场景无关的迭代协调
 
@@ -32,7 +32,7 @@
 
 通用协作接受外部 worker。内置 `design-review` 让绑定 Agent 提出和独立评审结构化方案，无需 Git/MR/构建；真实提交由宿主记录证据并显式验收。可选 `research` 保持只读调查，`software-evolution` 增加仓库实现与交付策略。四 Agent CLI 研究只是一种部署配置；研究本平台另用独立运行与对象。
 
-`GET /api/im/iterations` 支持 `group_id`、`scenario_id`、`after`、`active`，返回完整运行记录。`POST /api/im/iterations` 需 `manage-crystal` intent，封套含 `request_id`、`run_id`、`revision`、以 `operation` 标记的 `action`；创建时冻结带目标标准、场景参数、对象、基线、分工与预算的 `input`。暂停、继续、停止使用相同 revision 绑定的幂等封套。暂停阻止新领取/新轮次，已领取工作仍有界；停止取消当前轮。已领取切换阶段的激活须先经宿主核对结算，期间暂停与停止受隔离约束。
+`GET /api/v1/collaboration/iterations` 支持 `group_id`、`scenario_id`、`after`、`active`，返回完整运行记录。`POST /api/v1/collaboration/iterations` 需 `manage-crystal` intent，封套含 `request_id`、`run_id`、`revision`、以 `operation` 标记的 `action`；创建时冻结带目标标准、场景参数、对象、基线、分工与预算的 `input`。暂停、继续、停止使用相同 revision 绑定的幂等封套。暂停阻止新领取/新轮次，已领取工作仍有界；停止取消当前轮。已领取切换阶段的激活须先经宿主核对结算，期间暂停与停止受隔离约束。
 
 候选、评估、验收、激活、轮次完成分别记录，并核对当前目标和尝试。迭代内目标不能通过普通目标 API 验收、取消或重试，须用迭代控制保持证据与生命周期一致。
 

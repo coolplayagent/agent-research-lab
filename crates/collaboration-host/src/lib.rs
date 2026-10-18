@@ -45,7 +45,7 @@ pub async fn serve_with_local_operator(
         operator::Operator::open(state, addr)?
     }));
     eprintln!(
-        "AI-IM: http://{addr}; access link: ai-im link --state-dir {}",
+        "OutcomeHub: http://{addr}; access link: outcome-hub link --state-dir {}",
         state.display()
     );
     let halt = async move {

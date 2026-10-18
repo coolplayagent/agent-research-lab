@@ -183,7 +183,7 @@ async fn boards_have_operator_only_publication_and_actor_scoped_discovery() {
     assert_eq!(reopened.group("board").unwrap().kind, GroupKind::Board);
 }
 #[tokio::test]
-async fn v1_database_migrates_without_replacing_messages_members_or_acknowledgements() {
+async fn v1_database_is_rejected_without_writing() {
     let state = tempfile::tempdir().unwrap();
     let db = rusqlite::Connection::open(state.path().join("messages.sqlite")).unwrap();
     db.execute_batch("CREATE TABLE actors(id TEXT PRIMARY KEY,presence TEXT NOT NULL DEFAULT 'online');
@@ -195,19 +195,10 @@ async fn v1_database_migrates_without_replacing_messages_members_or_acknowledgem
         CREATE TABLE messages(sequence INTEGER PRIMARY KEY AUTOINCREMENT,group_id TEXT NOT NULL,sender_id TEXT NOT NULL,request_id TEXT NOT NULL,text TEXT NOT NULL,reply_to INTEGER,accepted_ms INTEGER NOT NULL,UNIQUE(group_id,sender_id,request_id));
         INSERT INTO messages VALUES(9,'legacy-room','legacy','old-request','Preserved message',NULL,10);").unwrap();
     drop(db);
-    let hub = Hub::open(state.path()).unwrap();
-    assert_eq!(hub.person("legacy").unwrap().name, "legacy");
-    let group = hub.group("legacy-room").unwrap();
-    assert_eq!(group.revision, 7);
-    assert!(group.pinned);
-    assert_eq!(group.kind, GroupKind::Conversation);
+    let before = std::fs::read(state.path().join("messages.sqlite")).unwrap();
+    assert!(Hub::open(state.path()).is_err());
     assert_eq!(
-        hub.members("legacy-room", "", 10).unwrap()["members"][0]["person_id"],
-        "legacy"
-    );
-    assert_eq!(hub.cursor("legacy", "legacy-room").await.unwrap(), 9);
-    assert_eq!(
-        hub.history("legacy-room", 0, 10).await.unwrap()[0].text,
-        "Preserved message"
+        before,
+        std::fs::read(state.path().join("messages.sqlite")).unwrap()
     );
 }

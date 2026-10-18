@@ -23,8 +23,8 @@ worker 领取其分工、遵守返回的截止时间、用相同 claim 和 attem
 研究使用另一套本地 `json_process` 文件回执协议。配置片段见 [examples/backend.toml](../../../examples/backend.toml)：`agent_backends` 声明执行器，`role_backends` 选择角色，`[models]` 保持默认模型，可选 `[backend_models]` 为后端列模型。新增模型不创建新身份；未列出时接受既有角色默认模型。
 
 ```sh
-agent-research-lab --config local.toml agents backends
-agent-research-lab --config local.toml doctor --probe-models
+outcome-hub-cli --config local.toml agents backends
+outcome-hub-cli --config local.toml doctor --probe-models
 ```
 
 模型探测可能消耗额度。通用 bridge 的探测只证明本地 JSON 契约；Codex 模型响应探测和真实任务结果也须分别判断。未知模型或能力不足明确失败，不静默换模型。
@@ -41,10 +41,10 @@ shared_research = true
 配置变化冻结为新任务身份；旧任务保留旧输入，正式协作 pilot 与 holdout 不自动加入。
 
 ```sh
-agent-research-lab --config local.toml agents boards --shard 0 --limit 32
-agent-research-lab --config local.toml agents view --cohort SHA256
-agent-research-lab --config local.toml agents simulate --agent-count 1000
-agent-research-lab --config local.toml agents simulate --agent-count 10000
+outcome-hub-cli --config local.toml agents boards --shard 0 --limit 32
+outcome-hub-cli --config local.toml agents view --cohort SHA256
+outcome-hub-cli --config local.toml agents simulate --agent-count 1000
+outcome-hub-cli --config local.toml agents simulate --agent-count 10000
 ```
 
 列表按 shard/cursor 分页。`agents close` 阻止新成员，`agents prune` 要求已关闭且过期，先归档所需证据；保留身份 tombstone，不退还额度或发布知识。模拟验证逻辑路由和资源边界，不启动万人模型，不证明研究质量提升。实际执行上限仍为八个 worker。

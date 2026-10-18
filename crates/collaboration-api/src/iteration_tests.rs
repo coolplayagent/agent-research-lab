@@ -584,12 +584,14 @@ async fn remote_scenario_protocol_checks_health_goal_digest_current_attempt_and_
 async fn iteration_http_api_requires_operator_and_rejects_unavailable_scenario_before_storage() {
     let host = crate::tests::Harness::new().await;
     assert_eq!(
-        host.request("/api/im/iterations", None, false, None)
+        host.request("/api/v1/collaboration/iterations", None, false, None)
             .await
             .0,
         401
     );
-    let (status, body) = host.request("/api/im/iterations", None, true, None).await;
+    let (status, body) = host
+        .request("/api/v1/collaboration/iterations", None, true, None)
+        .await;
     assert_eq!(status, 200, "{body}");
     assert!(
         serde_json::from_str::<Value>(&body).unwrap()["runs"]
@@ -603,7 +605,7 @@ async fn iteration_http_api_requires_operator_and_rejects_unavailable_scenario_b
         "baseline_version_id":"baseline","parameters":{},"max_rounds":2,"max_seconds":60,"total_budget_seconds":120
     }}});
     let (status, body) = host
-        .request("/api/im/iterations", Some(change), true, None)
+        .request("/api/v1/collaboration/iterations", Some(change), true, None)
         .await;
     assert_eq!(status, 400);
     assert!(body.contains("scenario unavailable"), "{body}");
@@ -668,7 +670,7 @@ async fn guarded_scenario_rejects_manual_evidence_and_acceptance_at_the_http_han
         };
         let request = axum::http::Request::builder()
             .method("POST")
-            .uri("/api/im/iterations")
+            .uri("/api/v1/collaboration/iterations")
             .header("host", addr.to_string())
             .header("origin", format!("http://{addr}"))
             .header("content-type", "application/json")

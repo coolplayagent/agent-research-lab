@@ -30,7 +30,7 @@ checks:
     timeout_seconds: 600
   - id: bazel-build
     kind: command
-    argv: [bazel, build, "--lockfile_mode=error", "//:agent-research-lab", "//:outcome-hub", "//:outcome-hub-cli", "//:outcome-hub-package", "//:package", "//:im-package", "//:adapter-package"]
+    argv: [bazel, build, "--lockfile_mode=error", "//:outcome-hub", "//:outcome-hub-cli", "//:outcome-hub-package", "//:package", "//:adapter-package", "//:outcome-hub-migrate", "//:migration-package"]
     timeout_seconds: 900
   - id: bazel-test
     kind: command
@@ -54,7 +54,7 @@ verification_assets:
   - BUILD.bazel
   - apps/**
   - deploy/**
-  - architecture/**
+  - verification/**
   - crates/**
   - "**/*.bzl"
   - rust-toolchain.toml
@@ -63,6 +63,4 @@ verification_assets:
   - .bazelversion
   - .github/workflows/**
   - prompts/**
-  - research/**
-  - skills/**
   - assets/**

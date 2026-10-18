@@ -949,9 +949,9 @@ fn activate_platform(
     let units = &prepared.repository.platform_units;
     ensure!(
         units.len() == 4
-            && units[0].unit == "ai-im-storage"
-            && units[1].unit == "ai-im-executor"
-            && units[2].unit == "ai-im-sandbox"
+            && units[0].unit == "outcome-hub-storage"
+            && units[1].unit == "outcome-hub-executor"
+            && units[2].unit == "outcome-hub-sandbox"
             && units[3].unit == prepared.policy.main_unit,
         "platform units must be ordered storage, executor, sandbox, main"
     );

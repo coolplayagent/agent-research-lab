@@ -4,7 +4,7 @@
 
 ## 配置与工具前提
 
-Linux 研究宿主需要 Git、Bazel、Rust、支持用户命名空间的 Bubblewrap、已配置的执行器与 GitHub CLI。先完成[快速开始](01-quick-start.md)，再复制 [examples/lab.toml](../../../examples/lab.toml) 为不进入 Git 的 `local.toml`。长期运行使用 `bazel build -c opt --lockfile_mode=error //:agent-research-lab //:package`。
+Linux 研究宿主需要 Git、Bazel、Rust、支持用户命名空间的 Bubblewrap、已配置的执行器与 GitHub CLI。先完成[快速开始](01-quick-start.md)，再复制 [examples/lab.toml](../../../examples/lab.toml) 为不进入 Git 的 `local.toml`。长期运行使用 `bazel build -c opt --lockfile_mode=error //:outcome-hub-cli //:package`。
 
 运行研究前编辑 `local.toml`：设置工作区、私有运行目录、已有 SuperPOD 检出、Codex 可执行文件、已发布的 workflow CLI 和 7 个工具绑定。示例路径来自开发机器，仓库路径必须指向已有本地 Git 检出。模型/API 认证通过已安装工具配置，凭证不得写入跟踪的示例配置。
 
@@ -14,11 +14,11 @@ Linux 研究宿主需要 Git、Bazel、Rust、支持用户命名空间的 Bubble
 
 上游存在稳定发行版时，安装较新的本地源码构建还需要 `source_qualitygate: {path, sha256}`：绑定该源码提交、完整、非空且通过的 full diff 报告。保留构建来源，并明确标注开发构建；缺少这些证据时，仍须满足原有发行版要求。
 
-精确结构由 `freshness::SkillsManifest` 和 `SkillSnapshot` 定义，目录摘要算法由 `freshness::skill_tree_digest` 定义。只有完成实际安装和验证后才能填写证据。5 个工具使用上游技能；`skills/` 中另外 2 个项目自有适配说明覆盖缺少上游技能的 Computer Use 与 Relay Memory。运行时二进制在本地安装时打包，不在此仓库跟踪。
+精确结构由 `freshness::SkillsManifest` 和 `SkillSnapshot` 定义，目录摘要算法由 `freshness::skill_tree_digest` 定义。只有完成实际安装和验证后才能填写证据。技能从外部分发源安装，验证后的版本记录在私有技能清单中；本仓库不再内置技能。运行时二进制在本地安装时打包，不在此仓库跟踪。
 
 ```sh
-bazel-bin/agent-research-lab skill-digest /absolute/path/to/installed-skill
-bazel-bin/agent-research-lab --config local.toml refresh
+bazel-bin/outcome-hub-cli skill-digest /absolute/path/to/installed-skill
+bazel-bin/outcome-hub-cli --config local.toml refresh
 ```
 
 目录摘要不能替代发行版或下载校验。控制器核对 GitHub 当前稳定发行版和安装字节，拉取各远程默认分支，并建立独立只读源码工作树，不切换或覆盖开发者分支。最新发行版与最新源码分别记录；旧发行二进制出现问题时，必须在固定的当前源码构建上复现，才能将其视为当前源码缺陷。
@@ -44,8 +44,8 @@ bazel-bin/agent-research-lab --config local.toml refresh
 在同一服务和私有状态中启用研究适配器：
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml serve --listen 127.0.0.1:8090 --max-seconds 43200
-bazel-bin/agent-research-lab --config local.toml serve-link
+bazel-bin/outcome-hub-cli --config local.toml serve --listen 127.0.0.1:8090 --max-seconds 43200
+bazel-bin/outcome-hub-cli --config local.toml serve-link
 ```
 
 首页保持 OutcomeHub。适配器通过稳定 ID 发现已配置研究身份，保留在 IM 中设置的名称。创建群聊，在目标中选择 **CLI 研究**、配置的仓库和研究成员。准入失败会将场景标为暂不可用，并在私有 `private/im-admission/` 中保留有界诊断；界面仅显示稳定状态和结果码。每个分工生成不可变、只读的研究 Job，结果连同源码、提示词、策略及 SuperPOD 绑定返回群组。结果需要主持人显式验收；实现与发布仍受原有 CLI 门禁约束。
@@ -85,10 +85,10 @@ bazel-bin/agent-research-lab --config local.toml serve-link
 以下命令用于主动发起原有 CLI 研究流程：
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml enqueue examples/task.json
-bazel-bin/agent-research-lab --config local.toml run --max-seconds 900
-bazel-bin/agent-research-lab --config local.toml status
-bazel-bin/agent-research-lab --config local.toml report
+bazel-bin/outcome-hub-cli --config local.toml enqueue examples/task.json
+bazel-bin/outcome-hub-cli --config local.toml run --max-seconds 900
+bazel-bin/outcome-hub-cli --config local.toml status
+bazel-bin/outcome-hub-cli --config local.toml report
 ```
 
 `enqueue` 将任务 ID 绑定到输入、源码提交、SuperPOD 提交、提示词和配置；相同 ID 不能绑定不同输入。每个任务使用隔离工作树，依赖接收校验过的完成报告。默认 `write: false`。`required_tools` 声明准入依赖，也适用于后续提案；`use_memory` 启用任务局部 relay-memory，保留有界检查点和不可变回执引用。完整源码/技能快照留在私有回执中。`prompt_version` 显式选择已注册提示词。
@@ -96,9 +96,9 @@ bazel-bin/agent-research-lab --config local.toml report
 `seed` 或 `run --seed` 添加每日独立研究、批评和综合任务，覆盖交付、记忆/恢复、协作和桌面/沙箱操作。综合任务可提出允许仓库中的有界后续任务，实现可请求只读评审。控制器限制提案数量与深度；模型提案不授权安装、远程写入、发布或合并。
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml pause
-bazel-bin/agent-research-lab --config local.toml resume
-bazel-bin/agent-research-lab --config local.toml run --max-seconds 900
+bazel-bin/outcome-hub-cli --config local.toml pause
+bazel-bin/outcome-hub-cli --config local.toml resume
+bazel-bin/outcome-hub-cli --config local.toml run --max-seconds 900
 ```
 
 `pause` 请求停止准入并取消子进程，`resume` 清除暂停标记。重新运行会核对持久尝试与实际进程身份。只读失败有界重试，`retry TASK_ID` 可显式重试符合条件的只读任务。中断写入保留不确定结果，先核对再重试；恢复不保证模型进程内部指令级续接。
@@ -108,7 +108,7 @@ bazel-bin/agent-research-lab --config local.toml run --max-seconds 900
 默认最多并发 8 个 Agent，每个 Asia/Singapore 自然日最多使用 43,200 秒活动墙钟时间。并发任务共享该时长，它不是金额或 token 上限，预算状态跨重启保留。先运行有界周期并检查结果，再显式启动连续播种：
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml run --continuous --seed
+bazel-bin/outcome-hub-cli --config local.toml run --continuous --seed
 ```
 
 持续播种须由显式命令启动；不能与使用同一状态的统一服务并行运行。服务模板及观察诊断见[部署与维护](07-operations.md)。
@@ -130,12 +130,12 @@ bazel-bin/agent-research-lab --config local.toml run --continuous --seed
 `status --summary` 适合重复监控，仅返回 `paused`、`budget`、按同一控制器规则分类的 `summary`、`total_jobs` 和 `details_included: false`，不包含逐任务详情、提示词或工作流回执。观察仍按任务顺序读取，并非原子快照；需要诊断详情时使用 `status` 或 `report`。
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml status --summary
+bazel-bin/outcome-hub-cli --config local.toml status --summary
 ```
 
 ## 有界批量注册
 
-`agent-research-lab --config local.toml enqueue-batch request.json --max-seconds 300` 按序注册 1..32 个普通原生 Task。请求为 `{"schema_version":1,"batch_id":"owned-batch","tasks":[...]}`，必须是最多 1 MiB 的普通 JSON 文件。依赖须已存在或出现在批次前方，必须启用最新基线模式。
+`outcome-hub-cli --config local.toml enqueue-batch request.json --max-seconds 300` 按序注册 1..32 个普通原生 Task。请求为 `{"schema_version":1,"batch_id":"owned-batch","tasks":[...]}`，必须是最多 1 MiB 的普通 JSON 文件。依赖须已存在或出现在批次前方，必须启用最新基线模式。
 
 每次调用只采集一次最新输入。私有不可变计划 `state_dir/private/enqueue-batches/<batch_id>/plan.json` 在注册副作用前冻结 Task 选择、人员记忆、配置和全部源码/技能/知识输入。重放使用相同规范请求与冻结选择，但仍重新采集并拒绝真实绑定漂移；只有仓库/技能获取时间不参与身份比较。实际序列化计划最多 16 MiB。
 

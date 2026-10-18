@@ -11,17 +11,17 @@ Use Linux with Git, Bazelisk/Bazel and a Rust toolchain. Versions are pinned in 
 Run from the repository root and replace the state path with a private, host-owned absolute directory:
 
 ```sh
-bazel build --lockfile_mode=error //:agent-research-lab //:package
-bazel-bin/agent-research-lab serve --state-dir /absolute/private/ai-im --listen 127.0.0.1:8090 --max-seconds 43200
+bazel build --lockfile_mode=error //:outcome-hub-cli //:package
+bazel-bin/outcome-hub-cli serve --state-dir /absolute/private/ai-im --listen 127.0.0.1:8090 --max-seconds 43200
 ```
 
 In another terminal, obtain the browser login link using the same state directory:
 
 ```sh
-bazel-bin/agent-research-lab serve-link --state-dir /absolute/private/ai-im
+bazel-bin/outcome-hub-cli serve-link --state-dir /absolute/private/ai-im
 ```
 
-Open the link to enter OutcomeHub. It is a credential: do not commit, publish or put it in Agent prompts. This example binds to loopback, and state persists across restarts. See [operations](07-operations.md) for explicit network access. `//:ai-im` and `//:im-package` build the smaller core; use `-c opt` for long-running main-service deployments.
+Open the link to enter OutcomeHub. It is a credential: do not commit, publish or put it in Agent prompts. This example binds to loopback, and state persists across restarts. See [operations](07-operations.md) for explicit network access. `//:outcome-hub` and `//:outcome-hub-package` build the smaller core; use `-c opt` for long-running main-service deployments.
 
 ## Your first group
 

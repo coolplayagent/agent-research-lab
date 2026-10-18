@@ -9,7 +9,7 @@ The Linux research host needs Git, Bazel, Rust, Bubblewrap with user namespaces,
 Use an optimized build for sustained execution; unoptimized full skill-tree hashing can consume the host time budget:
 
 ```sh
-bazel build -c opt --lockfile_mode=error //:agent-research-lab //:package
+bazel build -c opt --lockfile_mode=error //:outcome-hub-cli //:package
 ```
 
 ## Freshness and tool evidence
@@ -18,11 +18,11 @@ Production defaults to `require_latest = true`. `skills_manifest` points to an a
 
 When upstream has a stable release, a newer local source build additionally requires `source_qualitygate: {path, sha256}` binding that source commit to a complete, nonempty, passing full diff report. Retain provenance and identify development builds; without that evidence, normal release requirements still apply.
 
-`freshness::SkillsManifest`, `SkillSnapshot` and `freshness::skill_tree_digest` define the structure and digest algorithm. Populate evidence only after installation and verification. Five tools use upstream skills; project-owned `skills/` adapters cover Computer Use and Relay Memory. Runtime binaries are locally packaged and not tracked here.
+`freshness::SkillsManifest`, `SkillSnapshot` and `freshness::skill_tree_digest` define the structure and digest algorithm. Populate evidence only after installation and verification. Install skills from their external distributions and record verified revisions in the private skills manifest; this repository does not vendor skills. Runtime binaries are locally packaged and not tracked here.
 
 ```sh
-bazel-bin/agent-research-lab skill-digest /absolute/path/to/installed-skill
-bazel-bin/agent-research-lab --config local.toml refresh
+bazel-bin/outcome-hub-cli skill-digest /absolute/path/to/installed-skill
+bazel-bin/outcome-hub-cli --config local.toml refresh
 ```
 
 Tree digests do not replace release/download verification. The controller checks current GitHub stable releases and installed bytes, fetches default branches and creates separate read-only source worktrees without switching developer branches. It records latest release and latest source independently. Reproduce old-binary failures on the pinned current-source build before calling them current defects.
@@ -46,8 +46,8 @@ Before admitting up to eight agents in one experiment batch, the controller chec
 Enable research in the same service and private state, after stopping the previous core process:
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml serve --listen 127.0.0.1:8090 --max-seconds 43200
-bazel-bin/agent-research-lab --config local.toml serve-link
+bazel-bin/outcome-hub-cli --config local.toml serve --listen 127.0.0.1:8090 --max-seconds 43200
+bazel-bin/outcome-hub-cli --config local.toml serve-link
 ```
 
 OutcomeHub remains the home page. The adapter discovers configured people by stable ID and preserves their IM names. Create a group and choose CLI research, a configured repository and members in the goal form. Admission failure marks the scenario unavailable and retains bounded private diagnostics in `private/im-admission/`; the UI shows stable status/result codes. Each assignment becomes an immutable, read-only Job; source/prompt/policy/SuperPOD evidence returns to the group. Host acceptance and existing implementation/publication gates remain required.
@@ -81,10 +81,10 @@ Soul and role guidance display separately. Role guidance comes from frozen lab s
 ## Explicit bounded research cycles
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml enqueue examples/task.json
-bazel-bin/agent-research-lab --config local.toml run --max-seconds 900
-bazel-bin/agent-research-lab --config local.toml status
-bazel-bin/agent-research-lab --config local.toml report
+bazel-bin/outcome-hub-cli --config local.toml enqueue examples/task.json
+bazel-bin/outcome-hub-cli --config local.toml run --max-seconds 900
+bazel-bin/outcome-hub-cli --config local.toml status
+bazel-bin/outcome-hub-cli --config local.toml report
 ```
 
 `enqueue` binds IDs to inputs, source, SuperPOD, prompt and configuration; an ID cannot bind different inputs. Tasks use isolated worktrees and dependencies receive validated completion reports. Default `write: false`; `required_tools` controls admission, including follow-ups. `use_memory` enables task-local checkpoints and immutable receipt references. Private receipts retain full source/skill snapshots; `prompt_version` selects a registered prompt explicitly.
@@ -92,9 +92,9 @@ bazel-bin/agent-research-lab --config local.toml report
 `seed` or `run --seed` adds daily independent research, criticism and synthesis for delivery, recovery/memory, collaboration and desktop/sandbox tasks. Synthesis may propose bounded follow-ups in allowed repositories; implementations may request read-only review. The controller caps proposal count/depth. Model proposals never authorize installation, remote writes, publication or merge.
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml pause
-bazel-bin/agent-research-lab --config local.toml resume
-bazel-bin/agent-research-lab --config local.toml run --max-seconds 900
+bazel-bin/outcome-hub-cli --config local.toml pause
+bazel-bin/outcome-hub-cli --config local.toml resume
+bazel-bin/outcome-hub-cli --config local.toml run --max-seconds 900
 ```
 
 Pause stops admission/cancels subprocesses; resume clears the marker. Restart reconciles durable attempts with real process identity. Read-only failures have bounded retries; `retry TASK_ID` explicitly retries eligible tasks. Interrupted writes stay uncertain until reconciled. Recovery does not resume model instructions at an exact instruction boundary.
@@ -104,7 +104,7 @@ Retained launch records reuse original timeouts/input envelopes even after contr
 At most eight agents share 43,200 seconds of active wall time per Asia/Singapore calendar day. This is neither money nor a token cap, and accounting survives restart. Inspect a bounded cycle before explicitly starting continuous seeding:
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml run --continuous --seed
+bazel-bin/outcome-hub-cli --config local.toml run --continuous --seed
 ```
 
 Do not run continuous seeding alongside the unified service on the same state. See [operations](07-operations.md) for service templates and diagnostics.
@@ -148,14 +148,14 @@ checks and full Qualitygate, then obey exact-head remote review and CI gates.
 In an idle window without active or retained launch records, the scheduler prepares the next selected cohort before claiming execution leases one by one. Concurrency, dependencies, research versions and exploration tracks bound the cohort; failed tool preparation consumes no execution slot. Serial desktop/cache preparation may delay the first launch and counts toward run/daily budgets. Launch rechecks versions, pause and remaining time.
 
 ```sh
-bazel-bin/agent-research-lab --config local.toml status --summary
+bazel-bin/outcome-hub-cli --config local.toml status --summary
 ```
 
 For repeated monitoring, `status --summary` returns only `paused`, `budget`, controller-classified `summary`, `total_jobs` and `details_included: false`, without per-task details, prompts or workflow receipts. Observation remains sequential rather than atomic; use `status` or `report` for details.
 
 ## Bounded batch registration
 
-`agent-research-lab --config local.toml enqueue-batch request.json --max-seconds 300`
+`outcome-hub-cli --config local.toml enqueue-batch request.json --max-seconds 300`
 registers an ordered batch of 1..32 ordinary native Tasks. The request is
 `{"schema_version":1,"batch_id":"owned-batch","tasks":[...]}` and must be a
 regular JSON file at most 1 MiB. Dependencies must already exist or precede the

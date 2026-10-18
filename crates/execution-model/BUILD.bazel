@@ -13,6 +13,7 @@ rust_library(
     edition = "2024",
     aliases = aliases(),
     deps = [
+        "//crates/contracts:contracts",
         "//crates/collaboration-proposals:communication",
         "//crates/execution-config:config",
         "//crates/execution-inputs:inputs",

@@ -108,7 +108,7 @@ fn validate_text(s: &str, max: usize) -> bool {
             .chars()
             .any(|ch| ch.is_control() && !matches!(ch, '\n' | '\t'))
 }
-fn validate(directory: &Directory) -> Result<()> {
+pub fn validate(directory: &Directory) -> Result<()> {
     ensure!(
         directory.schema_version == 1,
         "unsupported people directory"
@@ -156,7 +156,7 @@ fn validate(directory: &Directory) -> Result<()> {
     }
     Ok(())
 }
-fn new_person(
+pub fn new_person(
     directory: &mut Directory,
     key: &str,
     name: &str,
@@ -216,37 +216,10 @@ fn load(c: &Config) -> Result<Directory> {
         }
     };
     validate(&directory)?;
-    // Preserve every legacy name and task association. No history or memory is moved.
-    let legacy = c.state_dir.join("dashboard/personas.json");
-    if legacy.try_exists()? {
-        let names: BTreeMap<String, String> = storage::read(&legacy)?;
-        ensure!(
-            names.len() <= MAX_PERSONAS,
-            "legacy identity directory exceeds bound"
-        );
-        for (task, name) in names {
-            if directory.tasks.contains_key(&task) {
-                continue;
-            }
-            let role = task.split('-').next().unwrap_or("research");
-            let role = if role == "critic" { "review" } else { role };
-            let role = if c.models.contains_key(role) || role == "synthesis" {
-                role
-            } else {
-                "research"
-            };
-            let id = new_person(
-                &mut directory,
-                &format!("legacy:{task}"),
-                &name,
-                role,
-                Kind::Temporary,
-                "",
-                "Historical persona; promote to a fixed member for reuse.",
-            )?;
-            directory.tasks.insert(task, id);
-        }
-    }
+    ensure!(
+        !c.state_dir.join("dashboard/personas.json").try_exists()?,
+        "migration_required: use outcome-hub-migrate for the retired persona directory"
+    );
     let roles = c
         .models
         .keys()
@@ -410,7 +383,7 @@ pub fn default_id(c: &Config, role: &str) -> Result<String> {
         .cloned()
         .context("no default digital person for role")
 }
-/// Attach previously existing jobs to preserved legacy people, without rewriting a frozen Job.
+/// Read recorded task identities; historical identities must be migrated offline.
 pub fn register_history(c: &Config, jobs: &[Job]) -> Result<Directory> {
     let _lock = directory_lock(c)?;
     let mut directory = load(c)?;
@@ -427,17 +400,11 @@ pub fn register_history(c: &Config, jobs: &[Job]) -> Result<Directory> {
                     .tasks
                     .insert(job.task.id.clone(), snapshot.id.clone());
             }
-        } else if !directory.tasks.contains_key(&job.task.id) {
-            let id = new_person(
-                &mut directory,
-                &format!("legacy:{}", job.task.id),
-                "",
-                &role_for(&job.task.id, &job.task.role),
-                Kind::Temporary,
-                "",
-                "Historical persona; task and conversation records retained.",
-            )?;
-            directory.tasks.insert(job.task.id.clone(), id);
+        } else {
+            ensure!(
+                directory.tasks.contains_key(&job.task.id),
+                "migration_required: task identity missing; use outcome-hub-migrate"
+            );
         }
     }
     save(c, &directory)?;
@@ -520,18 +487,28 @@ fn capture_snapshot(c: &Config, task: &Task, person: Person) -> Result<Option<Pe
     }))
 }
 pub(super) fn bind(c: &Config, job: &Job) -> Result<()> {
+    let _lock = directory_lock(c)?;
+    let mut directory = load(c)?;
     if let Some(person) = &job.persona {
-        let _lock = directory_lock(c)?;
-        let mut directory = load(c)?;
         if let Some(prior) = directory
             .tasks
             .insert(job.task.id.clone(), person.id.clone())
         {
             ensure!(prior == person.id, "task identity already bound");
         }
-        save(c, &directory)?;
+    } else if !directory.tasks.contains_key(&job.task.id) {
+        let id = new_person(
+            &mut directory,
+            &format!("task:{}", job.task.id),
+            "",
+            &role_for(&job.task.id, &job.task.role),
+            Kind::Temporary,
+            "",
+            "Task participant",
+        )?;
+        directory.tasks.insert(job.task.id.clone(), id);
     }
-    Ok(())
+    save(c, &directory)
 }
 pub(super) fn prompt(snapshot: Option<&PersonaSnapshot>) -> Result<String> {
     let Some(person) = snapshot else {

@@ -1,5 +1,5 @@
 exports_files(glob(["*.service"]), visibility = ["//visibility:public"])
 filegroup(name = "units", srcs = glob(["*.service"]), visibility = ["//visibility:public"])
 
-filegroup(name="storage_units", srcs=["ai-im-storage.service", "outcome-hub-storage.service"], visibility=["//visibility:public"])
-filegroup(name="worker_units", srcs=["ai-im-executor.service", "ai-im-sandbox.service", "outcome-hub-executor.service", "outcome-hub-sandbox.service"], visibility=["//visibility:public"])
+filegroup(name="storage_units", srcs=["outcome-hub-storage.service"], visibility=["//visibility:public"])
+filegroup(name="worker_units", srcs=["outcome-hub-executor.service", "outcome-hub-sandbox.service"], visibility=["//visibility:public"])
