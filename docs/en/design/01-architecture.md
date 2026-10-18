@@ -83,6 +83,10 @@ Private modules own orchestration and supporting operations:
 - `scheduler` owns the controller lock, admission order and active workers;
   `launch` owns lease-fenced preparation and spawn, while `recovery` reconciles
   retained attempts. All three use the same completion and admission guards.
+  Inside `scheduler`, `cohort` retains prerequisite backoff, `workers` owns
+  process/heartbeat guards and settlement, and `eligibility` shares the workflow
+  and cohort admission rules. The controller retains the original budget window
+  and latches guarded failures across polling rounds.
 - `job_store` owns durable research job reads and replayable workflow starts;
   `jobs` handles enqueue identity and bounded retries. Ordinary and batch
   registration share `registration` and `job_store`.
@@ -105,6 +109,8 @@ persona and task memory share checkpoint formatting. Production modules declare
 their imports explicitly. Unit tests live in sibling
 `*_tests.rs` files. The [local semantic review](../../../qualitygate/reviews/runtime-boundaries.md)
 records ownership, unchanged authority checks and verification limits.
+The [scheduler phase review](../../../qualitygate/reviews/scheduler-phases.md)
+records the later separation of controller state and its behavioral regressions.
 
 ## Documentation and build assets
 

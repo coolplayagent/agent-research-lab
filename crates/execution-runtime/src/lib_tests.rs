@@ -992,7 +992,7 @@ fn actual_workflow_fake_codex_completion_and_failure() {
 mod team_tests;
 
 #[path = "cohort_tests.rs"]
-mod cohort_tests;
+pub(crate) mod cohort_tests;
 
 #[path = "admission_tests.rs"]
 pub(super) mod admission_tests;

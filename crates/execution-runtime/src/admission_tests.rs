@@ -10,10 +10,10 @@ pub(crate) fn direct_agent_fixture() -> bool {
     DIRECT_AGENT_FIXTURE.get()
 }
 
-struct DirectAgentFixture;
+pub(crate) struct DirectAgentFixture;
 
 impl DirectAgentFixture {
-    fn enter() -> Self {
+    pub(crate) fn enter() -> Self {
         assert!(!DIRECT_AGENT_FIXTURE.replace(true));
         Self
     }
@@ -26,12 +26,12 @@ impl Drop for DirectAgentFixture {
 }
 
 #[derive(Default)]
-struct Hook {
-    stopped: bool,
-    acquisitions: usize,
-    model_entries: usize,
-    allow_model_entry: bool,
-    admission_delay: Duration,
+pub(crate) struct Hook {
+    pub(crate) stopped: bool,
+    pub(crate) acquisitions: usize,
+    pub(crate) model_entries: usize,
+    pub(crate) allow_model_entry: bool,
+    pub(crate) admission_delay: Duration,
 }
 
 impl admission::ScopedAdmissionHook for Hook {
@@ -77,7 +77,7 @@ impl admission::ScopedAdmissionHook for Hook {
     }
 }
 
-fn fixture(mode: &str) -> (tempfile::TempDir, Config, Job, PathBuf) {
+pub(crate) fn fixture(mode: &str) -> (tempfile::TempDir, Config, Job, PathBuf) {
     let (temp, mut config, mut job, _) = tests::completion_fixture(false, json!([]));
     let model = temp.path().join("model-fixture");
     fs::write(
@@ -155,6 +155,8 @@ elif operation == 'claim':
         'attempt_id': 'fixture-attempt'}}
 elif operation == 'release' and mode == 'release-error':
     sys.exit(14)
+elif operation == 'finish' and mode == 'finish-error':
+    sys.exit(15)
 elif operation == 'status':
     result = {'status': 'running'}
 else:
@@ -174,7 +176,7 @@ print(json.dumps({'ok': True, 'result': result}))
     (temp, config, job, scope)
 }
 
-fn events(temp: &tempfile::TempDir) -> Vec<String> {
+pub(crate) fn events(temp: &tempfile::TempDir) -> Vec<String> {
     fs::read_to_string(temp.path().join("events"))
         .unwrap_or_default()
         .lines()

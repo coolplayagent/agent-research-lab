@@ -2,7 +2,7 @@
 use super::*;
 use std::os::unix::fs::PermissionsExt;
 
-fn fixture() -> (tempfile::TempDir, Config) {
+pub(crate) fn fixture() -> (tempfile::TempDir, Config) {
     let (temp, mut c, job, _) = tests::completion_fixture(false, json!([]));
     fs::remove_file(job_path(&c, &job.task.id)).unwrap();
     c.codex = "/bin/true".into();
@@ -53,7 +53,7 @@ print(json.dumps({'ok':True,'result':result}))
     (temp, c)
 }
 
-fn probe(c: &mut Config, name: &str, operation: &str) {
+pub(crate) fn probe(c: &mut Config, name: &str, operation: &str) {
     let path = c.workspace.join(format!("probe-{name}"));
     fs::write(
         &path,
@@ -74,7 +74,7 @@ fn probe(c: &mut Config, name: &str, operation: &str) {
     );
 }
 
-fn add(c: &Config, id: &str, tool: &str, exploratory: bool) -> Job {
+pub(crate) fn add(c: &Config, id: &str, tool: &str, exploratory: bool) -> Job {
     enqueue(
         c,
         serde_json::from_value(json!({
@@ -87,13 +87,13 @@ fn add(c: &Config, id: &str, tool: &str, exploratory: bool) -> Job {
     .unwrap()
 }
 
-fn run_selected(c: &Config, ids: &[&str], seconds: u64) {
+pub(crate) fn run_selected(c: &Config, ids: &[&str], seconds: u64) {
     let scope = c.state_dir.join("private/selected.json");
     storage::write(&scope, &ids).unwrap();
     run_scoped(c, false, seconds, false, Some(&scope)).unwrap();
 }
 
-fn events(c: &Config) -> Vec<String> {
+pub(crate) fn events(c: &Config) -> Vec<String> {
     fs::read_to_string(c.workspace.join("events"))
         .unwrap_or_default()
         .lines()
