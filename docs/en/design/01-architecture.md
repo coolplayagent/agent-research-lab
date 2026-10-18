@@ -128,6 +128,26 @@ These modules preserve v1 serialization and message identities. Proposal TTLs,
 quotas and retirement markers retain their existing research semantics. See the
 [proposal boundary review](../../../qualitygate/reviews/proposal-boundaries.md).
 
+## Research software activation
+
+`software-delivery` preserves the public `request`, `worker` and `reconcile`
+functions. Private entry modules separate request admission, bounded execution
+and inspection of the actual installation. `model` owns frozen policy/request
+records and switch proofs; shared lifecycle enums still come from `contracts`.
+
+`build` verifies the merged source and its full gate. `cli` owns skill-package
+preparation and configuration rollback; `platform` owns ordered service rollout,
+offline storage compatibility and unit rollback. Both use `admission` for durable
+goal claims and native-work draining, `journal` for local intent and receipts,
+`service` for unit identity and health, and `host` for bounded commands and files.
+Local journal intent does not establish durable admission. Reconciliation checks
+installation proofs without repeating the switch. See the
+[activation boundary review](../../../qualitygate/reviews/activation-boundaries.md).
+The crate reads native job records through `execution-model` and accesses durable
+iteration state through `collaboration-client`; it does not depend on the research
+scheduler or collaboration storage implementation. A Bazel analysis test checks
+that boundary across its transitive dependencies.
+
 ## Documentation and build assets
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.

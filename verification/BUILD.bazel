@@ -62,6 +62,13 @@ dependency_boundary_test(
     forbidden = ["//apps/cli:", "//apps/cli:", "//crates/software-delivery:"],
 )
 
+dependency_boundary_test(
+    name = "software_delivery_does_not_own_runtime_or_storage",
+    subject = "//crates/software-delivery:software_delivery",
+    forbidden = _DATABASE + ["//crates/execution-runtime:"],
+    required = ["//crates/collaboration-client:collaboration_client", "//crates/execution-model:task", "//crates/software-verification:software_verification"],
+)
+
 load("@crates//:defs.bzl", "all_crate_deps")
 load("@rules_rust//rust:defs.bzl", "rust_test")
 rust_test(

@@ -21,7 +21,6 @@ contracts.workspace = true
 collaboration_model.workspace = true
 collaboration_client.workspace = true
 software_verification.workspace = true
-runtime.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

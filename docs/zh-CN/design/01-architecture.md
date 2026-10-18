@@ -67,6 +67,14 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 
 `protocol` 负责协议记录和语法校验，`admission` 消费有界 outbox 槽位，`audience` 共用可见性与回复受众规则。`projection` 从已验证记录生成视图与冻结上下文，`presence` 维护宿主拥有的投递生命周期，`files` 负责锚定目录下的有界读取，`limits` 定义既有配额与容量错误。v1 序列化、消息身份、研究提案 TTL、配额和退役标记均保留。详见[提案边界评审](../../../qualitygate/reviews/proposal-boundaries.md)。
 
+## 研究软件激活
+
+`software-delivery` 保留公开的 `request`、`worker` 和 `reconcile` 函数；内部入口模块分别负责请求受理、有界执行和实际安装状态核对。`model` 集中定义冻结策略、请求与切换凭据，生命周期枚举继续来自 `contracts`。
+
+`build` 验证合并源码及完整门禁；`cli` 负责技能包准备、配置切换和回滚；`platform` 负责有序服务发布、离线存储兼容检查和 unit 回滚。两种路径共用 `admission` 的持久目标认领与原生任务排空、`journal` 的本地意图和回执、`service` 的服务身份和健康观测，以及 `host` 的有界命令与文件操作。本地日志不能代替持久认领；事后核对读取安装凭据，不重复执行切换。详见[激活边界评审](../../../qualitygate/reviews/activation-boundaries.md)。
+
+该 crate 经 `execution-model` 读取原生任务记录，经 `collaboration-client` 访问持久迭代状态，不依赖研究调度器或协作存储实现。Bazel 分析测试检查其传递依赖，防止重新引入这些实现依赖。
+
 ## 构建资产
 
 Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件获取外部依赖。提示词、JSON 示例、桌面资产是显式编译输入，主发布包包含双语文档。命令见[开发与验证](../guide/08-development.md)。
