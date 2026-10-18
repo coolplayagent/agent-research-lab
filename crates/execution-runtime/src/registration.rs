@@ -1,5 +1,6 @@
 //! Immutable native registration preparation shared by ordinary and batch enqueue.
 use super::*;
+use crate::receipts::committed_receipt;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

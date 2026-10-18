@@ -1,0 +1,69 @@
+# Research runtime boundary review
+
+Baseline: `acb23588ceebe93e3f21248c7f20fcd0e8d2b370`.
+This is a local implementation and semantic review, not independent signed approval.
+Acceptance requires the full snapshot-bound Qualitygate and repository tests.
+
+## Ownership
+
+The runtime remains an optional research adapter. This change creates private
+modules inside the existing crate; it adds no service, dependency, public module,
+database owner, lifecycle enum or wire format. Existing public function paths are
+preserved through re-exports. The scheduler still owns worker admission and the
+controller lock.
+
+| Module | Responsibility and boundary |
+| --- | --- |
+| `prompts` | Render frozen role/task/input/persona prompts; registration and execution use the same functions. |
+| `followups` | Define proposal authority and schema, validate proposals and register deterministic child IDs through the existing enqueue entrypoint. |
+| `candidate` | Capture host-owned Git snapshots after checking protected paths, baseline, detached state and Git authority. |
+| `receipts` | Validate report structure, workflow success, dependency agreement and frozen experiment bindings. Raw worker files cannot authorize a completed result. |
+| `completion` | Settle observed worker results using the retained attempt and execution lease; it does not enqueue tasks or perform memory writes. |
+| `memory` | Produce bounded checkpoints and invoke an explicitly configured memory executable with separate per-task state. |
+| `post_success` | Persist and recover the completion journal before memory writes or follow-up admission. |
+| `team_channel` | Revoke retained membership intent and record bounded communication diagnostics. |
+
+New production modules use explicit imports. Batch prompt binding imports
+`prompts` directly, persona writeback imports `memory`, registration reads
+`receipts`, and admission failure settlement imports `completion`. The root
+continues to compose these operations; it does not re-export their private
+implementation helpers as new public APIs.
+
+## Semantic review
+
+- Completion retains the existing observation-success, installed-byte, report,
+  private-tool-snapshot and candidate checks before publishing a result. Rejected
+  read results fail; uncertain writes remain unknown. Lease heartbeats and saved
+  lost-reply results retain their original ordering and deadlines.
+- Receipt projection requires a known workflow success and exact source, prompt,
+  policy, model, research-input and backend bindings. Dependency loading additionally
+  checks local/committed agreement and per-report/aggregate size bounds. The three
+  receipt readers retain their distinct existing contracts; no gate was generalized
+  away during extraction.
+- Post-success processing persists `Running` before an external write and never
+  repeats an unknown memory outcome. Retryable follow-up admission retains stable
+  proposal indices, fixed-scope deferral and exact-task enqueue idempotency.
+- Follow-up authority remains bounded by depth, role, write permission, tool
+  allowlists and proposal count. Prompt instructions, output schema and admission
+  validation still share this policy owner. No worker proposal is host acceptance.
+- The memory call still uses a task-specific home and explicit local backend;
+  full provenance stays in the workflow receipt. Prompt text and serialized
+  authority data retain their original bytes and fields.
+
+## Evidence and limits
+
+The extraction audit compares all 73 original non-test root function bodies,
+preserving expression and literal tokens while ignoring comments and whitespace.
+This supports the mechanical-move claim, not runtime correctness by itself.
+
+Seventeen existing tests now live beside the modules they exercise. Existing
+recovery tests cover forged local evidence, interrupted memory, deterministic
+follow-up replay, scope deferral and invalid proposal siblings. New receipt tests
+exercise changed frozen bindings, unknown/non-success states, forged local reports
+and stale dependency pins through the same workflow-client fixture.
+
+Rust compilation checks visibility and call sites. The code graph is navigation
+evidence with inferred edges, not a semantic proof. Full Bazel tests additionally
+cover wire compatibility, package dependencies, standalone collaboration and
+frontend contracts/locales. Existing ignored external CLI/model tests remain
+ignored; deterministic fixtures do not certify live external services.

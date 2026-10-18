@@ -1,4 +1,5 @@
 use super::*;
+use crate::prompts::{rendered_task_prompt, role_prompt};
 use contracts::BatchPromptSelection;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;

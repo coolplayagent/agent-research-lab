@@ -35,7 +35,7 @@ use the `outcome-hub-` prefix, while Rust library names retain the existing modu
 
 `outcome-hub-cli serve` starts the standalone OutcomeHub system without research
 configuration. `--config` enables the optional research scenario in the same service.
-The smaller `ai-im` binary packages the same core for hosts that only need the
+The smaller `outcome-hub` binary packages the same core for hosts that only need the
 Agent work API. See [Identity, conversations and goals](02-collaboration.md).
 
 Goals and assignments belong to `collaboration-store`, share the durable message writer and
@@ -44,7 +44,7 @@ submit only their own assignments. Successful submissions do not complete a goal
 the host explicitly accepts it. Deadline/claim fencing survives restarts. Active
 goals prevent member removal and group archiving that would orphan their work.
 
-`im-service::ScenarioAdapter` contributes parameter choices and admission validation.
+`collaboration_api::ScenarioAdapter` contributes parameter choices and admission validation.
 The research adapter maps group assignments to immutable runtime Jobs and projects
 settled results back to IM. Its bounded scheduler only admits goal-linked IDs;
 research gates, persona snapshots, source/prompt/policy/SuperPOD bindings and isolated
@@ -75,6 +75,26 @@ omission rules, enum tags and identity hashing. The compatibility regression use
 serialized output and identity digests produced by the previous implementation.
 New crate paths are not a migration of existing private task records.
 
+## Research runtime modules
+
+`execution-runtime` keeps scheduling and controller ownership in its crate root.
+Private modules give each supporting operation an explicit owner:
+
+- `prompts` renders frozen context; `followups` owns proposal authority, output
+  schema and deterministic child registration.
+- `receipts` validates committed results and dependency bindings; `completion`
+  settles observed attempts with their existing leases. `candidate` owns host Git
+  snapshots and protected-path checks.
+- `memory` handles bounded task-local checkpoints and CLI calls; `post_success`
+  journals and recovers memory and follow-up effects. `team_channel` handles
+  retained communication membership and diagnostics.
+
+The modules preserve existing runtime function paths, serialized records and
+research gates. Batch registration and worker execution share prompt rendering;
+persona and task memory share checkpoint formatting. Unit tests live in sibling
+`*_tests.rs` files. The [local semantic review](../../../qualitygate/reviews/runtime-boundaries.md)
+records ownership, unchanged authority checks and verification limits.
+
 ## Documentation and build assets
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.
@@ -91,4 +111,4 @@ Outcome collaboration connects goal paths within topics through immutable public
 - `collaboration-host` selects the configured production storage endpoint or explicitly creates an independent embedded development adapter. Both use the same `collaboration-client` request contract.
 - Messages, goals, outcomes and coordination lineage retain their shared transaction boundary for membership, attempt fencing and acceptance consistency. Research execution, prompt evolution and SuperPOD research publication remain optional extensions outside the core package.
 - `//:outcome-hub-package` contains core collaboration and storage; `//:adapter-package` contains optional services; `//:package` remains the complete research distribution.
-- Bazel analysis tests in `architecture` traverse actual transitive dependencies and package contents. Pre-refactor protocol samples, client transport parity, standalone startup/restart and repository regression tests verify behavior. Semantic review is recorded in `qualitygate/reviews/module-boundaries.md`.
+- Bazel analysis tests in `verification` traverse actual transitive dependencies and package contents. Pre-refactor protocol samples, client transport parity, standalone startup/restart and repository regression tests verify behavior. Semantic review is recorded in `qualitygate/reviews/module-boundaries.md`.

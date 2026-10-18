@@ -1,5 +1,6 @@
 //! CLI integration only: relay-memory owns storage, retrieval and indexing.
 use super::*;
+use crate::memory::{memory_checkpoint, remember_prompt};
 
 fn home(c: &Config, id: &str) -> Result<PathBuf> {
     safe_id(id)?;

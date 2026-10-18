@@ -1,4 +1,5 @@
 //! Same-controller, opt-in admission. Live proof permits belong to the host hook.
+use crate::completion::{ExitObservation, settle};
 use anyhow::{Result, ensure};
 use config::Config;
 use contracts::AcquirePreconditionsV1;
@@ -89,7 +90,7 @@ pub(crate) fn launch_failed(
     }
     let mut release_error = None;
     if let Some(launch) = job.launch.clone() {
-        let observation = super::ExitObservation {
+        let observation = ExitObservation {
             success: false,
             code: None,
             reason: Some(format!("launch failed: {error:#}")),
@@ -101,7 +102,7 @@ pub(crate) fn launch_failed(
                 .join(format!("{}.json", job.run_id)),
             &observation,
         );
-        if super::settle(workflow, job, &observation).is_ok() {
+        if settle(workflow, job, &observation).is_ok() {
             job.launch = None;
         }
         release_error = workflow.release(&launch.lease).err();
