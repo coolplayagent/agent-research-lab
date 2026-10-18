@@ -1,17 +1,26 @@
 //! Bounded registration of native Tasks, with one fresh input acquisition.
 //! Registration does not launch workers or provide atomic cohort admission.
-use super::*;
+use crate::{
+    job_store::{frozen_input, workflow},
+    people, registration,
+};
+use anyhow::{Context, Result, ensure};
+use config::Config;
 use contracts::{
     BatchEntryRegistrationState as EntryState, BatchRegistrationErrorCode as Code,
     BatchRegistrationPhase as Phase, BatchRegistrationState as State,
 };
 use plan::{Entry, Plan, PromptBinding, digest};
+use std::{path::Path, time::Duration};
+use validation::{
+    new_request_bindings, observe, owner, read_job, repair_eligible, requested_matches, structural,
+    validate_job,
+};
 mod plan;
 mod receipt;
 mod validation;
 pub use plan::Request;
 pub use receipt::{Failure, Observation, Receipt};
-use validation::*;
 
 // Test observers coordinate real filesystem/owner faults, never replace effects.
 #[cfg(test)]

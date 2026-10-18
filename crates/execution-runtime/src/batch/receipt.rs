@@ -1,4 +1,11 @@
-use super::*;
+use super::fail;
+use anyhow::Result;
+use contracts::{
+    BatchEntryRegistrationState as EntryState, BatchRegistrationErrorCode as Code,
+    BatchRegistrationPhase as Phase, BatchRegistrationState as State,
+};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

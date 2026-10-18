@@ -1,5 +1,5 @@
 //! Workflow-committed evidence is the authority for dependencies and completed results.
-use crate::{job_path, workflow};
+use crate::job_store::{job_path, workflow};
 use anyhow::{Context, Result, ensure};
 use config::Config;
 use contracts::WorkflowState;

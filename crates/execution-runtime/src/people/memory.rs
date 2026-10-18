@@ -1,6 +1,16 @@
 //! CLI integration only: relay-memory owns storage, retrieval and indexing.
-use super::*;
-use crate::memory::{memory_checkpoint, remember_prompt};
+use super::{Person, directory, validate_text};
+use crate::{
+    host_budget::now,
+    memory::{memory_checkpoint, remember_prompt},
+};
+use anyhow::{Context, Result, ensure};
+use config::{Config, safe_id};
+use contracts::MemoryWriteback;
+use native_effects::fs;
+use serde_json::{Value, json};
+use std::{collections::BTreeSet, path::PathBuf, time::Duration};
+use task::{Job, PersonaMemory, Task};
 
 fn home(c: &Config, id: &str) -> Result<PathBuf> {
     safe_id(id)?;

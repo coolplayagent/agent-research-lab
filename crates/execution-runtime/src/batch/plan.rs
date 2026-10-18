@@ -1,8 +1,14 @@
-use super::*;
-use crate::prompts::{rendered_task_prompt, role_prompt};
+use crate::{
+    prompts::{rendered_task_prompt, role_prompt},
+    registration,
+};
+use anyhow::{Context, Result, ensure};
+use config::Config;
 use contracts::BatchPromptSelection;
-use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
+use native_effects::fs;
+use serde::{Deserialize, Serialize};
+use std::{io::Write, os::unix::fs::OpenOptionsExt, path::Path};
+use task::Task;
 
 pub(super) const REQUEST_LIMIT: usize = 1024 * 1024;
 pub(super) const PLAN_LIMIT: usize = 16 * 1024 * 1024;

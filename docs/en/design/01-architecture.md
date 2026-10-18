@@ -77,9 +77,19 @@ New crate paths are not a migration of existing private task records.
 
 ## Research runtime modules
 
-`execution-runtime` keeps scheduling and controller ownership in its crate root.
-Private modules give each supporting operation an explicit owner:
+`execution-runtime` exposes its existing public API through a small crate root.
+Private modules own orchestration and supporting operations:
 
+- `scheduler` owns the controller lock, admission order and active workers;
+  `launch` owns lease-fenced preparation and spawn, while `recovery` reconciles
+  retained attempts. All three use the same completion and admission guards.
+- `job_store` owns durable research job reads and replayable workflow starts;
+  `jobs` handles enqueue identity and bounded retries. Ordinary and batch
+  registration share `registration` and `job_store`.
+- `host_budget` bounds host work and worker allowance; `scope` validates the
+  selected task set, `seeding` creates optional research cohorts, and `status`
+  projects controller states without admitting work. `worker_identity` and
+  `git` provide shared process-identity and source observations.
 - `prompts` renders frozen context; `followups` owns proposal authority, output
   schema and deterministic child registration.
 - `receipts` validates committed results and dependency bindings; `completion`
@@ -91,7 +101,8 @@ Private modules give each supporting operation an explicit owner:
 
 The modules preserve existing runtime function paths, serialized records and
 research gates. Batch registration and worker execution share prompt rendering;
-persona and task memory share checkpoint formatting. Unit tests live in sibling
+persona and task memory share checkpoint formatting. Production modules declare
+their imports explicitly. Unit tests live in sibling
 `*_tests.rs` files. The [local semantic review](../../../qualitygate/reviews/runtime-boundaries.md)
 records ownership, unchanged authority checks and verification limits.
 

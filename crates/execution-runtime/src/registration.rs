@@ -1,6 +1,17 @@
 //! Immutable native registration preparation shared by ordinary and batch enqueue.
-use super::*;
-use crate::receipts::committed_receipt;
+use crate::{
+    git::git,
+    job_store::{ensure_started_in_store, job_path, workflow},
+    people,
+    prompts::rendered_experiment_prompt,
+    receipts::committed_receipt,
+};
+use anyhow::{Context, Result, ensure};
+use config::Config;
+use native_effects::fs;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use task::{Job, Task};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

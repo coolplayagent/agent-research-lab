@@ -1,5 +1,5 @@
 use super::*;
-use crate::{jobs, reconcile_orphans, tests::completion_fixture};
+use crate::{job_store::jobs, recovery::reconcile_orphans, tests::completion_fixture};
 use std::time::Duration;
 use task::Launch;
 

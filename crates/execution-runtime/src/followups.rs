@@ -1,5 +1,5 @@
 //! Follow-up authority, schema and deterministic child registration.
-use crate::{enqueue_with_inputs, job_path, people};
+use crate::{job_store::job_path, jobs::enqueue_with_inputs, people};
 use anyhow::{Context, Result, ensure};
 use config::Config;
 use serde::{Deserialize, Serialize};

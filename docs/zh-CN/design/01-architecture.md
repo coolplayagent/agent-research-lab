@@ -48,13 +48,16 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 
 ## 研究运行时内部模块
 
-`execution-runtime` 的 crate 根保留调度与控制器所有权，各辅助职责由私有模块承担：
+`execution-runtime` 的 crate 根只转发已有公开 API，调度与辅助职责由私有模块承担：
 
+- `scheduler` 拥有控制器锁、准入顺序和活动进程；`launch` 负责租约隔离下的准备与启动，`recovery` 对保留的尝试进行恢复。三者共用原有结算与准入校验。
+- `job_store` 负责研究任务读取和可重放的 workflow 启动；`jobs` 负责入队身份与有界重试。普通入队与批量入队共用 `registration` 和 `job_store`。
+- `host_budget` 约束宿主操作和执行预算；`scope` 验证所选任务集合；`seeding` 创建可选研究批次；`status` 投影控制器状态，不执行任务准入。`worker_identity` 和 `git` 提供共享的进程身份与源码观察。
 - `prompts` 渲染冻结上下文；`followups` 负责提案权限、输出 schema 和确定性子任务注册。
 - `receipts` 验证已提交结果和依赖绑定；`completion` 使用原有租约结算实际观察到的尝试；`candidate` 负责宿主 Git 快照与受保护路径检查。
 - `memory` 处理有界的任务记忆检查点及 CLI 调用；`post_success` 记录并恢复记忆写回与后续任务副作用；`team_channel` 处理保留的通信成员身份及诊断。
 
-这些模块保留已有 runtime 函数路径、序列化记录和研究门禁。批量注册与执行共享提示词渲染，人员与任务记忆共享检查点格式。单元测试位于兄弟 `*_tests.rs` 文件。[本地语义评审](../../../qualitygate/reviews/runtime-boundaries.md)记录了职责、保留的权限校验及验证范围。
+这些模块保留已有 runtime 函数路径、序列化记录和研究门禁。批量注册与执行共享提示词渲染，人员与任务记忆共享检查点格式。生产模块显式声明依赖，单元测试位于兄弟 `*_tests.rs` 文件。[本地语义评审](../../../qualitygate/reviews/runtime-boundaries.md)记录了职责、保留的权限校验及验证范围。
 
 ## 构建资产
 

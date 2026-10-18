@@ -1,5 +1,21 @@
 //! Binding validation and owner reads. Kernel checks may retain private protocol inputs.
-use super::*;
+use super::{
+    checkpoint, fail,
+    plan::{PromptBinding, Request, digest},
+    receipt::Observation,
+};
+use crate::{
+    job_store::{frozen_input, job_path, workflow},
+    people,
+    prompts::rendered_job_prompt,
+    registration,
+};
+use anyhow::{Context, Result, ensure};
+use config::{Config, safe_id};
+use contracts::{BatchEntryRegistrationState as EntryState, BatchRegistrationErrorCode as Code};
+use native_effects::fs;
+use std::collections::BTreeSet;
+use task::{Job, Task};
 
 pub(super) fn structural(c: &Config, request: &Request) -> Result<()> {
     ensure!(c.require_latest, "enqueue-batch requires latest mode");

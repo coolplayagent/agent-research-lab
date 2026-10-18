@@ -1,5 +1,5 @@
 //! Communication recovery uses only the host's retained membership authority.
-use crate::now;
+use crate::host_budget::now;
 use config::Config;
 use serde_json::json;
 use task::{Job, Launch};

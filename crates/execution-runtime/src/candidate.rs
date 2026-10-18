@@ -1,5 +1,5 @@
 //! Host-owned candidate capture preserves protected paths and frozen Git authority.
-use crate::git;
+use crate::git::git;
 use anyhow::{Context, Result, ensure};
 use native_effects::fs;
 use serde_json::{Value, json};

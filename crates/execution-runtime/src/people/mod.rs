@@ -1,6 +1,15 @@
 //! Stable host-owned identities. Memory semantics live in relay-memory, not here.
-use super::*;
-use task::{PersonaMemory, PersonaSnapshot};
+use crate::host_budget::now;
+use anyhow::{Context, Result, ensure};
+use config::{Config, safe_id};
+use native_effects::fs;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
+};
+use task::{Job, PersonaSnapshot, Task};
 mod memory;
 pub use memory::{inspect_memory, remember_note};
 

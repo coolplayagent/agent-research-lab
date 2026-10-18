@@ -3,6 +3,8 @@
 Baseline: `acb23588ceebe93e3f21248c7f20fcd0e8d2b370`.
 This is a local implementation and semantic review, not independent signed approval.
 Acceptance requires the full snapshot-bound Qualitygate and repository tests.
+The initial completion extraction is recorded first; the orchestration follow-up
+below records the current ownership relative to its own baseline.
 
 ## Ownership
 
@@ -67,3 +69,58 @@ evidence with inferred edges, not a semantic proof. Full Bazel tests additionall
 cover wire compatibility, package dependencies, standalone collaboration and
 frontend contracts/locales. Existing ignored external CLI/model tests remain
 ignored; deterministic fixtures do not certify live external services.
+
+## Orchestration follow-up
+
+Baseline: `7bf230f7a294c5c06822662e8408a62446797688`.
+This follow-up is also a local implementation and semantic review. It preserves
+the service, protocol and evidence boundaries above. The crate root now only
+declares modules and re-exports the existing public API.
+
+| Module | Responsibility and boundary |
+| --- | --- |
+| `scheduler` | Own the controller lock, observer lifecycle, worker set and existing admission/cleanup order. |
+| `launch` | Verify frozen inputs, acquire and claim the current attempt, persist launch authority, then spawn within the original deadline. |
+| `recovery` | Cancel matching retained process groups and reconcile abandoned attempts using their original authority. |
+| `job_store` | Read research jobs, construct the workflow adapter and replay the frozen start record. This is not collaboration database ownership. |
+| `jobs` | Validate ordinary enqueue identity and prepare bounded read-only retries; call the shared registration owner. |
+| `host_budget` | Persist and charge host intervals, honor pause/daily/run limits and bound prerequisite work. |
+| `scope` | Validate a private task-ID file, configuration pins and dependency closure; annotate the existing status projection. |
+| `seeding` | Create optional research cohorts from frozen inputs and persona selections. |
+| `status` | Observe workflow state, distinguish blockers from live execution and expose separately labelled capability probes. |
+| `worker_identity`, `git` | Share process start identity and bounded Git observations without owning task state. |
+
+Production modules no longer import a parent wildcard. In particular, batch
+validation imports the frozen input/start owner directly, and persona memory
+imports only its directory operations and task checkpoint formatter. Registration
+and retries both use `job_store` for replay; registration does not depend on the
+enqueue module. The scheduler composes these owners without adding new state
+enums or a second state machine.
+
+The semantic review checked these preserved orderings and conditions:
+
+- Controller cleanup still cancels matching retained workers before budget or
+  pause can prevent CLI recovery. Process identity still includes Linux start
+  time; recovery cannot use a replacement lease to authorize an old attempt.
+- Source freshness is rechecked after all prerequisite probes and before claims.
+  Launch still verifies frozen prompt/config/backend/dependency evidence, records
+  authority before spawn and consumes final hook time from the same deadline.
+  Guarded job writes still fence both task attempt and retained launch identity.
+- Host work persists its active budget interval before effects and charges failed
+  work. Expired prerequisites defer without claiming or permanently rejecting a
+  task. No budget is restarted by moving the implementation.
+- Status parses shared workflow enums at the boundary; unknown state cannot
+  authorize success or admission. Summary projection still drops raw workflow
+  receipts between observations. Scope validation and retry ceilings are unchanged.
+- Seed and follow-up processing remain subject to explicit scope restrictions.
+  Core collaboration has no new dependency on research configuration or SuperPOD.
+
+The extraction audit compares 52 original Rust items, including struct fields
+and impl blocks. Expression and literal tokens are identical after allowing only
+private visibility changes and the qualified test-fixture path. All 94 runtime
+test bodies and attributes are preserved, including the 35 existing ignored
+external integration tests; twelve tests move beside their new owners. Compilation
+and the runtime tests check cross-module visibility and existing behavior. Final
+acceptance additionally requires full Qualitygate and all Bazel repository tests.
+These checks do not establish live external provider compatibility or deployment
+readiness.

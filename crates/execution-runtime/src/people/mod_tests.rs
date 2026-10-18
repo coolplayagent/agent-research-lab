@@ -1,4 +1,6 @@
 use super::*;
+use serde_json::json;
+use std::path::Path;
 fn config(root: &Path, memory: &Path) -> Config {
     serde_json::from_value(json!({"schema_version":1,"workspace":root,"state_dir":root.join("state"),"superpod":root.join("superpod"),"codex":"unused","workflow":root.join("workflow"),"daily_seconds":600,"max_agents":2,"task_timeout_seconds":60,"require_latest":false,"models":{"research":"test-model","review":"critic-model","implement":"writer-model"},"tools":{"relay-memory":{"binary":memory,"repository":root,"probe":[]}}})).unwrap()
 }

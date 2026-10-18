@@ -1,5 +1,5 @@
 use super::*;
-use crate::{job_path, tests::completion_fixture};
+use crate::{job_store::job_path, tests::completion_fixture};
 use multi_agent::TeamMembership;
 use task::Job;
 

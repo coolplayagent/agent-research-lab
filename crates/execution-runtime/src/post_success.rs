@@ -3,7 +3,7 @@ use crate::followups::admit_followups;
 use crate::memory::{memory_call, memory_checkpoint};
 use crate::receipts::authoritative_success_receipt;
 use crate::team_channel::communication_gap;
-use crate::{TaskScope, job_path, now, people};
+use crate::{host_budget::now, job_store::job_path, people, scope::TaskScope};
 use anyhow::{Context, Result, ensure};
 use config::{Config, safe_id};
 use contracts::{FollowupAdmission, FollowupState, MemoryWriteback, WorkflowState};

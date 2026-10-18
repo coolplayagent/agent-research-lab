@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
-    jobs, receipts::authoritative_success_receipt, rendered_experiment_prompt,
-    tests::completion_fixture, workflow,
+    job_store::jobs, job_store::workflow, receipts::authoritative_success_receipt,
+    rendered_experiment_prompt, tests::completion_fixture,
 };
 use native_effects::fs;
 use std::path::PathBuf;

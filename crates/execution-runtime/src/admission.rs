@@ -30,7 +30,7 @@ pub trait ScopedAdmissionHook {
 }
 
 pub(crate) fn current_job(config: &Config, expected: &Job) -> Result<()> {
-    let actual: Job = storage::read(&super::job_path(config, &expected.task.id))?;
+    let actual: Job = storage::read(&crate::job_store::job_path(config, &expected.task.id))?;
     ensure!(
         serde_json::to_value(&actual)? == serde_json::to_value(expected)?,
         "current task attempt or frozen job authority changed"
@@ -61,7 +61,7 @@ impl JobWrites {
 
     pub(crate) fn persist(&mut self, config: &Config, job: &Job) -> Result<()> {
         self.confirm(config)?;
-        storage::write(&super::job_path(config, &job.task.id), job)?;
+        storage::write(&crate::job_store::job_path(config, &job.task.id), job)?;
         if self.expected.is_some() {
             current_job(config, job)?;
             self.expected = Some(job.clone());
@@ -119,7 +119,7 @@ pub(crate) fn launch_failed(
         });
         job.retry_after = None;
     } else if job.launch.is_none() {
-        super::defer_read_retry(job, format!("launch failed: {error:#}"));
+        crate::jobs::defer_read_retry(job, format!("launch failed: {error:#}"));
     } else {
         job.last_error = Some(format!("launch requires reconciliation: {error:#}"));
         job.retry_after = None;
