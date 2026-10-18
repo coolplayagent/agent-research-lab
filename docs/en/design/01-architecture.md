@@ -165,6 +165,21 @@ preserves raw report states and counts unknown observations as incomplete.
 No summary, worker proposal or diagnostic trace authorizes promotion or knowledge
 publication. See the [evaluation boundary review](../../../qualitygate/reviews/evaluation-boundaries.md).
 
+## Delivery adapters
+
+`delivery-adapters` keeps its public functions and records at the crate root.
+`evidence` validates frozen host artifacts; `package` hashes and copies regular
+package files; `installation` owns the lock, journal, activation and rollback.
+`InstallationPhase` lives in `contracts`, separately from service activation,
+and preserves the existing installation receipt values.
+
+`github` owns remote observations and decoding, `pull_requests` handles PR
+creation/reuse, `merge_gate` evaluates evidence, and `merge` refreshes observations
+before a head-fenced merge. Unknown PR states and missing/malformed review decisions
+are rejected; an explicit null review decision retains its existing meaning.
+`protocol`, `validation` and `host` hold wire records, shared input checks and
+bounded commands. See the [delivery adapter review](../../../qualitygate/reviews/delivery-adapter-boundaries.md).
+
 ## Documentation and build assets
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.

@@ -66,6 +66,11 @@ export declare const messages: {
     readonly "ActivationPhase.active": "版本已启用";
     readonly "ActivationPhase.rolled_back": "已恢复上一版本";
     readonly "ActivationPhase.blocked": "启用受阻";
+    readonly "InstallationPhase.staged": "安装包已暂存";
+    readonly "InstallationPhase.previous_backed_up": "上一安装版本已备份";
+    readonly "InstallationPhase.activated": "安装包已切换";
+    readonly "InstallationPhase.verified": "安装验证通过";
+    readonly "InstallationPhase.rolled_back": "安装已回滚";
     readonly "RoundState.cancelled": "本轮已取消";
     readonly "CodingTaskRole.research": "研究与复现";
     readonly "CodingTaskRole.implement": "候选实现";

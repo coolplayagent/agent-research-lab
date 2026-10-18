@@ -81,6 +81,12 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 
 `bindings`、`cards`、`citations`、`adjudication` 分别校验任务与回执绑定、工作者卡片引用、固定版本来源和独立宿主判断。`metrics` 只生成汇总，`usage` 读取有界诊断轨迹；`identity` 仅归一化新鲜度观测时间，`artifacts` 管理不可变私有文件。工作流状态别名经 `workflow-adapter::parse_run_state` 转为共享 `WorkflowState`，收集器保留报告中的原始状态，并将未知观测计为未完成。汇总、工作者提案和诊断轨迹均不能授权晋升或知识发布。详见[评估边界评审](../../../qualitygate/reviews/evaluation-boundaries.md)。
 
+## 交付适配器
+
+`delivery-adapters` 在 crate 根保留公开函数和记录。`evidence` 校验冻结宿主证据，`package` 对常规包文件计算摘要并复制，`installation` 统一持有安装锁、日志、切换与回滚逻辑。安装生命周期 `InstallationPhase` 在 `contracts` 中定义，与服务激活分开，并保留既有回执值。
+
+`github` 负责远端观测和解码，`pull_requests` 负责 PR 创建与复用，`merge_gate` 判断证据是否满足门禁，`merge` 在绑定 PR 头提交的合并前重新获取观测。未知 PR 状态以及缺失或格式错误的审批结论会失败；明确的 `null` 保持原有语义。`protocol`、`validation`、`host` 分别承载协议记录、通用输入校验和有界命令。详见[交付适配器评审](../../../qualitygate/reviews/delivery-adapter-boundaries.md)。
+
 ## 构建资产
 
 Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件获取外部依赖。提示词、JSON 示例、桌面资产是显式编译输入，主发布包包含双语文档。命令见[开发与验证](../guide/08-development.md)。

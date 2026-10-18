@@ -245,6 +245,14 @@ export const ActivationPhase = {
   Blocked: "blocked",
 } as const;
 export type ActivationPhase = (typeof ActivationPhase)[keyof typeof ActivationPhase];
+export const InstallationPhase = {
+  Staged: "staged",
+  PreviousBackedUp: "previous_backed_up",
+  Activated: "activated",
+  Verified: "verified",
+  RolledBack: "rolled_back",
+} as const;
+export type InstallationPhase = (typeof InstallationPhase)[keyof typeof InstallationPhase];
 export const ScenarioCapability = {
   Execute: "execute",
   Evaluate: "evaluate",

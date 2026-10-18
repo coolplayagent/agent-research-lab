@@ -212,6 +212,13 @@ export const ActivationPhase = {
     RolledBack: "rolled_back",
     Blocked: "blocked",
 };
+export const InstallationPhase = {
+    Staged: "staged",
+    PreviousBackedUp: "previous_backed_up",
+    Activated: "activated",
+    Verified: "verified",
+    RolledBack: "rolled_back",
+};
 export const ScenarioCapability = {
     Execute: "execute",
     Evaluate: "evaluate",

@@ -244,6 +244,14 @@ export declare const ActivationPhase: {
     readonly Blocked: "blocked";
 };
 export type ActivationPhase = (typeof ActivationPhase)[keyof typeof ActivationPhase];
+export declare const InstallationPhase: {
+    readonly Staged: "staged";
+    readonly PreviousBackedUp: "previous_backed_up";
+    readonly Activated: "activated";
+    readonly Verified: "verified";
+    readonly RolledBack: "rolled_back";
+};
+export type InstallationPhase = (typeof InstallationPhase)[keyof typeof InstallationPhase];
 export declare const ScenarioCapability: {
     readonly Execute: "execute";
     readonly Evaluate: "evaluate";

@@ -80,6 +80,7 @@ states! {
     ActivationState { Pending => "pending", Active => "active", Failed => "failed", RolledBack => "rolled_back" }
     ApiErrorCode { InvalidRequest => "invalid_request", Backpressure => "backpressure", StorageUnavailable => "storage_unavailable" }
     ActivationPhase { Prepared => "prepared", Building => "building", Draining => "draining", Switching => "switching", Checking => "checking", Active => "active", RolledBack => "rolled_back", Blocked => "blocked" }
+    InstallationPhase { Staged => "staged", PreviousBackedUp => "previous_backed_up", Activated => "activated", Verified => "verified", RolledBack => "rolled_back" }
     ScenarioCapability { Execute => "execute", Evaluate => "evaluate", Deliver => "deliver", Activate => "activate", Rollback => "rollback" }
     CodingTaskRole { Research => "research", Implement => "implement", Review => "review" }
     ServiceKind { Storage => "storage", Executor => "executor", Sandbox => "sandbox" }
