@@ -93,6 +93,12 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 
 `preparation` 在隔离工作树准备贡献；`snapshot` 将允许的路径、删除项和文件摘要绑定到审阅基线；`publication` 在提交、推送精确 head 和创建 PR 前重新核验清单。`host` 执行有界 Git 与知识 CLI 调用；`index_refresh` 至多提交一次更新，只接受精确、新鲜且完整的索引观测。未知来源状态在输入时拒绝，未知完整性状态不能表示就绪。该研究适配器及外部知识绑定仍为可选项，核心协作不依赖它们。参见[发布边界审阅](../../../qualitygate/reviews/knowledge-publication-boundaries.md)。
 
+## 持久化交付队列
+
+`delivery-outbox` 保留公开的 `enqueue`、`tick`、`reconcile_retry` 及持久化格式。`store::Outbox` 统一持有规范化本地存储路径和锁，覆盖入队、执行与结果落盘；每次请求读取和状态写入都校验条目归属。`protocol` 保存协议记录并复用 `contracts::QueueState`；`provenance` 在入队、执行和显式重试前校验主机证据。
+
+`queue` 每次调度至多执行一个操作，并在调用适配器前持久化运行意图。`dispatch` 根据类型化索引、合并回执判断结果，同时保留原始 JSON 观测。无效的不可变请求会保留原始字节并转入待对账状态，不执行外部操作，后续调度可以继续处理其他条目。中断或失败的外部操作仍须主机显式对账；定时重试只用于尚未就绪的索引刷新。参见[交付队列边界审阅](../../../qualitygate/reviews/outbox-boundaries.md)。
+
 ## 构建资产
 
 Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件获取外部依赖。提示词、JSON 示例、桌面资产是显式编译输入，主发布包包含双语文档。命令见[开发与验证](../guide/08-development.md)。

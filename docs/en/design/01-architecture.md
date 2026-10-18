@@ -198,6 +198,23 @@ fail on input; unknown integrity states never imply readiness. Core collaboratio
 does not require this optional research adapter or an external knowledge binding.
 See the [publication boundary review](../../../qualitygate/reviews/knowledge-publication-boundaries.md).
 
+## Durable delivery outbox
+
+`delivery-outbox` retains the public `enqueue`, `tick` and `reconcile_retry`
+functions and persisted records. One `store::Outbox` owns the canonical local
+store and lock across admission, dispatch and settlement. All request reads and
+state writes validate that retained entries belong to that store. `protocol`
+owns wire records and reuses `contracts::QueueState`; `provenance` checks host
+artifacts before admission, dispatch and explicit retry.
+
+`queue` coordinates at most one operation per tick and persists running intent
+before calling an adapter. `dispatch` interprets typed index and merge receipts,
+retaining their original JSON observations. Invalid immutable requests are
+preserved and marked for reconciliation before effects, so later ticks can
+continue other work. Interrupted or failed effects still require explicit host
+reconciliation; a timer only retries pending index refresh observations. See the
+[outbox boundary review](../../../qualitygate/reviews/outbox-boundaries.md).
+
 ## Documentation and build assets
 
 Each crate declares dependencies in Cargo and Bazel. Prompts, examples and desktop assets are explicit compile inputs. The main package includes both documentation languages. See the [development guide](../guide/08-development.md) for commands.
