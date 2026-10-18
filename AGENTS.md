@@ -38,6 +38,12 @@ values explicitly; unknown state must never imply successful completion.
 
 ## Module and verification discipline
 
+Place unit tests for each Rust source file `<name>.rs` in the sibling file
+`<name>_tests.rs` (for example, `foo.rs` → `foo_tests.rs`, `lib.rs` →
+`lib_tests.rs`, and `main.rs` → `main_tests.rs`). Reference that file from the
+source using `#[cfg(test)]`, `#[path = "<name>_tests.rs"]`, and `mod tests;`.
+Do not embed unit-test bodies in production source files.
+
 Keep frontend behavior in focused TypeScript modules. Locale catalogs and shared
 contracts must remain separate from business behavior; generated assets are
 reproducible through Bazel. Include regression checks for API wire compatibility,
