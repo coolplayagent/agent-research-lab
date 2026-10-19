@@ -47,10 +47,16 @@ fn reject_reparse(path: &Path) -> Result<()> {
     let mut current = PathBuf::new();
     for component in path.components() {
         current.push(component.as_os_str());
+        // A verbatim drive prefix such as \\?\C: is not a filesystem object.
+        // Query it only after RootDir completes the volume root; every actual
+        // directory and file component still receives the reparse-point check.
+        if matches!(component, std::path::Component::Prefix(_)) {
+            continue;
+        }
         let metadata = match fs::symlink_metadata(&current) {
             Ok(metadata) => metadata,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(error) => return Err(error.into()),
+            Err(error) => return Err(error).context("inspect state path component"),
         };
         ensure!(
             metadata.file_attributes() & REPARSE_POINT == 0,

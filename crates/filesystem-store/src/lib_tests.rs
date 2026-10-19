@@ -16,6 +16,23 @@ fn reads_reject_symlinks_and_writes_replace_without_following() {
 
 #[cfg(windows)]
 #[test]
+fn windows_canonical_paths_support_create_replace_read_and_lock() {
+    let root = tempfile::tempdir().unwrap();
+    let canonical = fs::canonicalize(root.path()).unwrap();
+    assert!(canonical.to_string_lossy().starts_with(r"\\?\"));
+    let private = canonical.join("private");
+    private_dir(&private).unwrap();
+    let path = private.join("services.json");
+    write(&path, &serde_json::json!({"revision":0})).unwrap();
+    write(&path, &serde_json::json!({"revision":1})).unwrap();
+    assert_eq!(read::<serde_json::Value>(&path).unwrap()["revision"], 1);
+    private_file(&path).unwrap();
+    let _lock = lock(&private.join("owner.lock")).unwrap();
+    assert!(lock(&private.join("owner.lock")).is_err());
+}
+
+#[cfg(windows)]
+#[test]
 fn windows_state_is_bounded_and_locked() {
     let d = tempfile::tempdir().unwrap();
     let private = d.path().join("private");
