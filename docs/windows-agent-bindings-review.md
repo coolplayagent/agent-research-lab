@@ -16,6 +16,8 @@ Windows uses private local named pipes with same-owner peer checks and remote cl
 
 The native health probe checks the child's Windows AppContainer token and workspace read/write access. Isolation regressions use native filesystem operations to prove host-private files remain inaccessible. npm installations retain their `node_modules` directory layout, including hoisted dependencies, inside the bounded read-only runtime copy. The Windows fixture suite separately exercises an installed Node runtime and a sibling dependency; the `.cmd` shim itself is never evaluated by a shell.
 
+Node receives `--preserve-symlinks-main` and `--preserve-symlinks` for these link-free snapshots. This avoids module-loader realpath probes into inaccessible host ancestor directories while retaining the AppContainer ACL boundary. No permissions are granted to host volume roots or original installation directories.
+
 Windows preparation and execution run outside the asynchronous request threads. Dropping a client operation signals cancellation to that worker; runtime copying, ACL traversal, filesystem-budget checks and process polling check cancellation and the same deadline. Copying is chunked and rejects files that change size. A cancellation before launch prevents the Agent process from starting, and cancellation during execution drops its Job Object before removing disposable state.
 
 Failed native commands retain at most 64 KiB of stderr in a private sandbox diagnostic file, with a maximum of 32 retained failures. Public errors contain only its identifier. Treat these local files as sensitive; authenticated acceptance never prints their contents into CI logs. Deterministic fixture failures may print their own diagnostics to make platform regressions reproducible.

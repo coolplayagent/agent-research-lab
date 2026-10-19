@@ -19,7 +19,7 @@ pub struct Options {
     pub digest: String,
     #[arg(long)]
     pub configuration_digest: Option<String>,
-    #[arg(long)]
+    #[arg(long, allow_hyphen_values = true)]
     pub launcher_argument: Vec<String>,
     #[arg(long)]
     pub model: Option<String>,

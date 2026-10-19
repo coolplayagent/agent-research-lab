@@ -1,4 +1,32 @@
 use super::*;
+
+#[test]
+fn launcher_flags_are_forwarded_as_values_without_consuming_bridge_options() {
+    use clap::Parser;
+    let options = Options::try_parse_from([
+        "bridge",
+        "--agent",
+        "codex",
+        "--program",
+        "node.exe",
+        "--digest",
+        "fixture",
+        "--launcher-argument",
+        "--preserve-symlinks-main",
+        "--launcher-argument",
+        "--preserve-symlinks",
+        "--launcher-argument",
+        "cli.js",
+        "--model",
+        "fixture-model",
+    ])
+    .unwrap();
+    assert_eq!(
+        options.launcher_argument,
+        ["--preserve-symlinks-main", "--preserve-symlinks", "cli.js"]
+    );
+    assert_eq!(options.model.as_deref(), Some("fixture-model"));
+}
 #[test]
 fn claude_unknown_and_failed_results_cannot_be_promoted() {
     for value in [

@@ -115,6 +115,10 @@ fn npm_entry(agent: CodingAgent, shim: &Path) -> Result<(PathBuf, Vec<String>)> 
         return Ok((
             fs::canonicalize(node)?,
             vec![
+                // The isolated copy contains no symlinks. Avoid Node's ancestor
+                // realpath probes, which require access outside that copy.
+                "--preserve-symlinks-main".into(),
+                "--preserve-symlinks".into(),
                 script
                     .to_str()
                     .context("agent script path must be Unicode")?
