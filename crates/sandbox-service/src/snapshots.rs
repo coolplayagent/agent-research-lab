@@ -1,12 +1,18 @@
 use anyhow::{Context, Result, ensure};
-use std::{fs, path::Path};
+use std::{
+    fs,
+    io::{Read, Write},
+    path::Path,
+};
 pub(super) fn copy(
     source: &Path,
     target: &Path,
     bytes: &mut u64,
     files: &mut usize,
     depth: usize,
+    check: &impl Fn() -> Result<()>,
 ) -> Result<()> {
+    check()?;
     ensure!(
         depth <= 32 && *files > 0,
         "runtime snapshot file limit exceeded"
@@ -27,6 +33,7 @@ pub(super) fn copy(
                 bytes,
                 files,
                 depth + 1,
+                check,
             )?;
         }
     } else {
@@ -36,11 +43,32 @@ pub(super) fn copy(
         );
         *bytes -= metadata.len();
         fs::create_dir_all(target.parent().context("runtime parent is missing")?)?;
-        fs::copy(source, target)?;
+        let mut reader = fs::File::open(source)?;
+        let mut writer = fs::File::create(target)?;
+        let mut copied = 0;
+        let mut buffer = [0u8; 65536];
+        loop {
+            check()?;
+            let count = reader.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            copied += count as u64;
+            ensure!(copied <= metadata.len(), "runtime changed during snapshot");
+            writer.write_all(&buffer[..count])?;
+        }
+        ensure!(copied == metadata.len(), "runtime changed during snapshot");
     }
     Ok(())
 }
-pub(super) fn budget(path: &Path, bytes: &mut u64, files: &mut usize, depth: usize) -> Result<()> {
+pub(super) fn budget(
+    path: &Path,
+    bytes: &mut u64,
+    files: &mut usize,
+    depth: usize,
+    check: &impl Fn() -> Result<()>,
+) -> Result<()> {
+    check()?;
     ensure!(depth <= 32 && *files > 0, "sandbox file limit exceeded");
     *files -= 1;
     let metadata = fs::symlink_metadata(path)?;
@@ -50,7 +78,7 @@ pub(super) fn budget(path: &Path, bytes: &mut u64, files: &mut usize, depth: usi
     );
     if metadata.is_dir() {
         for entry in fs::read_dir(path)? {
-            budget(&entry?.path(), bytes, files, depth + 1)?;
+            budget(&entry?.path(), bytes, files, depth + 1, check)?;
         }
     } else {
         ensure!(

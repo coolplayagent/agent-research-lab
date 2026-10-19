@@ -3,6 +3,10 @@ use service_api::SandboxOutput;
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 use windows_runtime::Process;
@@ -85,6 +89,42 @@ pub async fn verify(
 #[allow(clippy::too_many_arguments)]
 async fn execute(
     state: &Path,
+    command: Vec<String>,
+    env_names: Vec<String>,
+    paths: Vec<PathBuf>,
+    network: bool,
+    input: String,
+    seconds: u64,
+    verify: bool,
+) -> Result<SandboxOutput> {
+    let state = windows_runtime::user_path(state)?;
+    let stop = Arc::new(AtomicBool::new(false));
+    let _cancel = CancelOnDrop(stop.clone());
+    let started = Instant::now();
+    tokio::task::spawn_blocking(move || {
+        let check = || {
+            ensure!(!stop.load(Ordering::Acquire), "sandbox execution cancelled");
+            ensure!(
+                started.elapsed() < Duration::from_secs(seconds),
+                "sandbox execution timed out"
+            );
+            Ok(())
+        };
+        execute_blocking(
+            &state, command, env_names, paths, network, input, seconds, verify, started, &check,
+        )
+    })
+    .await?
+}
+struct CancelOnDrop(Arc<AtomicBool>);
+impl Drop for CancelOnDrop {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Release);
+    }
+}
+#[allow(clippy::too_many_arguments)]
+fn execute_blocking(
+    state: &Path,
     mut command: Vec<String>,
     env_names: Vec<String>,
     paths: Vec<PathBuf>,
@@ -92,7 +132,10 @@ async fn execute(
     mut input: String,
     seconds: u64,
     verify: bool,
+    started: Instant,
+    check: &impl Fn() -> Result<()>,
 ) -> Result<SandboxOutput> {
+    check()?;
     service_api::Adapter {
         id: "sandbox-input".into(),
         agent: contracts::CodingAgent::Custom,
@@ -107,7 +150,6 @@ async fn execute(
     }
     .validate()?;
     ensure!(input.len() <= 256 * 1024, "sandbox input exceeds bound");
-    let started = Instant::now();
     let temp = tempfile::Builder::new().prefix("run-").tempdir_in(state)?;
     storage::private_dir(temp.path())?;
     let work = temp.path().join("workspace");
@@ -142,6 +184,7 @@ async fn execute(
             &mut remaining_bytes,
             &mut remaining_files,
             0,
+            check,
         )?;
         for argument in &mut command {
             let path = fs::canonicalize(Path::new(argument))
@@ -156,9 +199,9 @@ async fn execute(
             }
         }
     }
-    container.grant(&runtime, false)?;
-    container.grant(&work, true)?;
-    container.grant(&home, true)?;
+    container.grant(&runtime, false, check)?;
+    container.grant(&work, true, check)?;
+    container.grant(&home, true, check)?;
     let scratch = work.join("tmp");
     fs::create_dir(&scratch)?;
     for name in ["TEMP", "TMP"] {
@@ -202,6 +245,7 @@ async fn execute(
     fs::write(&input_path, input)?;
     let output_path = temp.path().join("output.json");
     let error_path = temp.path().join("diagnostic.log");
+    check()?;
     let child = Process::spawn(
         Some(container),
         &command,
@@ -213,10 +257,7 @@ async fn execute(
         &fs::File::create(&error_path)?,
     )?;
     loop {
-        ensure!(
-            started.elapsed() < Duration::from_secs(seconds),
-            "sandbox execution timed out"
-        );
+        check()?;
         ensure!(
             fs::metadata(&output_path)?.len() <= 256 * 1024,
             "sandbox protocol output exceeds bound"
@@ -227,8 +268,8 @@ async fn execute(
         );
         let mut byte_budget = 256 * 1024 * 1024;
         let mut file_budget = 10000;
-        snapshots::budget(&work, &mut byte_budget, &mut file_budget, 0)?;
-        snapshots::budget(&home, &mut byte_budget, &mut file_budget, 0)?;
+        snapshots::budget(&work, &mut byte_budget, &mut file_budget, 0, check)?;
+        snapshots::budget(&home, &mut byte_budget, &mut file_budget, 0, check)?;
         if let Some(code) = child.poll()? {
             ensure!(
                 code == 0,
@@ -236,7 +277,7 @@ async fn execute(
             );
             break;
         }
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        std::thread::sleep(Duration::from_millis(50));
     }
     drop(child);
     if let Some(challenge) = &challenge {

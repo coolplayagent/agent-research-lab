@@ -106,6 +106,8 @@ fn npm_entry(agent: CodingAgent, shim: &Path) -> Result<(PathBuf, Vec<String>)> 
             script.starts_with(fs::canonicalize(&root)?),
             "agent package entry escapes installation"
         );
+        #[cfg(windows)]
+        let script = windows_runtime::user_path(&script)?;
         let node = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
             .map(|p| p.join("node.exe"))
             .find(|p| p.is_file())

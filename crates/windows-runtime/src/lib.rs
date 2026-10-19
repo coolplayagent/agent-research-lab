@@ -10,6 +10,8 @@ mod job;
 #[cfg(windows)]
 mod launch;
 #[cfg(windows)]
+mod paths;
+#[cfg(windows)]
 mod pipes;
 #[cfg(windows)]
 pub use container::Container;
@@ -17,6 +19,8 @@ pub use container::Container;
 pub use job::*;
 #[cfg(windows)]
 pub use launch::Process;
+#[cfg(windows)]
+pub use paths::user_path;
 #[cfg(windows)]
 pub use pipes::spawn_piped;
 

@@ -63,7 +63,13 @@ impl Container {
         self.sid
     }
     /// Apply permissions only to a disposable snapshot owned by the caller.
-    pub fn grant(&self, path: &Path, writable: bool) -> Result<()> {
+    pub fn grant(
+        &self,
+        path: &Path,
+        writable: bool,
+        check: &impl Fn() -> Result<()>,
+    ) -> Result<()> {
+        check()?;
         ensure!(
             path.is_absolute() && !std::fs::symlink_metadata(path)?.file_type().is_symlink(),
             "sandbox ACL target must be an absolute snapshot"
@@ -88,7 +94,7 @@ impl Container {
         if path.is_dir() {
             // Snapshot children may have protected ACLs from private configuration copies.
             for entry in std::fs::read_dir(path)? {
-                self.grant(&entry?.path(), writable)?;
+                self.grant(&entry?.path(), writable, check)?;
             }
         }
         Ok(())

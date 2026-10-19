@@ -43,9 +43,97 @@ fn sandbox_filesystem_probe() {
 fn sandbox_timeout_probe() {
     if std::env::var("OUTCOME_HUB_ISOLATED").as_deref() == Ok("1") {
         windows_runtime::require_app_container().unwrap();
+        use std::io::Write;
+        println!("sandbox loop started");
+        std::io::stdout().flush().unwrap();
         loop {
             std::thread::sleep(Duration::from_millis(50));
         }
+    }
+}
+#[tokio::test]
+async fn cancelling_client_work_terminates_blocking_native_execution() {
+    let state = tempfile::tempdir().unwrap();
+    storage::private_dir(state.path()).unwrap();
+    let root = state.path().to_owned();
+    let task = tokio::spawn(async move {
+        let (command, paths) = child_test("sandbox_timeout_probe");
+        run(&root, command, vec![], paths, false, String::new(), 30).await
+    });
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let started = fs::read_dir(state.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .any(|entry| {
+                fs::read_to_string(entry.path().join("output.json"))
+                    .is_ok_and(|text| text.contains("sandbox loop started"))
+            });
+        if started {
+            break;
+        }
+        assert!(Instant::now() < deadline, "sandbox child did not start");
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    task.abort();
+    assert!(task.await.err().is_some_and(|error| error.is_cancelled()));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while fs::read_dir(state.path()).unwrap().next().is_some() {
+        assert!(
+            Instant::now() < deadline,
+            "cancelled execution retained disposable state"
+        );
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+}
+#[tokio::test]
+async fn cancellation_during_runtime_preparation_prevents_process_start() {
+    let state = tempfile::tempdir().unwrap();
+    storage::private_dir(state.path()).unwrap();
+    let runtime = tempfile::tempdir().unwrap();
+    for index in 0..2048 {
+        fs::write(
+            runtime.path().join(format!("dependency-{index}")),
+            b"fixture",
+        )
+        .unwrap();
+    }
+    let (command, mut paths) = child_test("sandbox_timeout_probe");
+    paths.push(runtime.path().to_owned());
+    let root = state.path().to_owned();
+    let task =
+        tokio::spawn(
+            async move { run(&root, command, vec![], paths, false, String::new(), 30).await },
+        );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let run = fs::read_dir(state.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .find(|path| path.join("runtime").is_dir());
+        if let Some(run) = run {
+            assert!(
+                !run.join("output.json").exists(),
+                "preparation blocked cancellation until after process launch"
+            );
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "runtime preparation did not start"
+        );
+        tokio::time::sleep(Duration::from_millis(1)).await;
+    }
+    task.abort();
+    assert!(task.await.err().is_some_and(|error| error.is_cancelled()));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while fs::read_dir(state.path()).unwrap().next().is_some() {
+        assert!(
+            Instant::now() < deadline,
+            "cancelled preparation retained disposable state"
+        );
+        tokio::time::sleep(Duration::from_millis(25)).await;
     }
 }
 #[tokio::test]

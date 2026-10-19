@@ -16,6 +16,8 @@ Windows uses private local named pipes with same-owner peer checks and remote cl
 
 The native health probe checks the child's Windows AppContainer token and workspace read/write access. Isolation regressions use native filesystem operations to prove host-private files remain inaccessible. npm installations retain their `node_modules` directory layout, including hoisted dependencies, inside the bounded read-only runtime copy. The Windows fixture suite separately exercises an installed Node runtime and a sibling dependency; the `.cmd` shim itself is never evaluated by a shell.
 
+Windows preparation and execution run outside the asynchronous request threads. Dropping a client operation signals cancellation to that worker; runtime copying, ACL traversal, filesystem-budget checks and process polling check cancellation and the same deadline. Copying is chunked and rejects files that change size. A cancellation before launch prevents the Agent process from starting, and cancellation during execution drops its Job Object before removing disposable state.
+
 Verification is deliberately separated: deterministic native protocol peers test framing, binding persistence, process cleanup and failure handling without credentials; authenticated live acceptance tests vendor compatibility. The live script records binary hashes, versions, sandbox identity and validation evidence, and must be kept outside Git. Windows 10/11 x64 on a local NTFS state volume is the deployment target. OAuth arrangements that depend on an unavailable external helper, protected system credential stores, custom provider profiles, or a local proxy still need acceptance in the user's actual environment.
 
 Protocol references checked during implementation:
