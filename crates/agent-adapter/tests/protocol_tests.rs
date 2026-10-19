@@ -4,23 +4,50 @@ use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
-fn binary(name: &str, cargo: Option<&str>) -> PathBuf {
-    std::env::var_os(name)
+fn binary(name: &str, cargo: Option<&str>) -> Result<PathBuf> {
+    let Some(logical) = std::env::var_os(name) else {
+        return Ok(PathBuf::from(
+            cargo.context("fixture binary must be built by Cargo or Bazel")?,
+        ));
+    };
+    if let Some(manifest) = std::env::var_os("RUNFILES_MANIFEST_FILE") {
+        for line in std::fs::read_to_string(manifest)?.lines() {
+            let escaped = line.starts_with(' ');
+            if let Some((key, value)) = line.trim_start_matches(' ').split_once(' ') {
+                let decode = |value: &str| {
+                    if escaped {
+                        value
+                            .replace("\\s", " ")
+                            .replace("\\n", "\n")
+                            .replace("\\b", "\\")
+                    } else {
+                        value.into()
+                    }
+                };
+                if std::ffi::OsStr::new(&decode(key)) == logical {
+                    return Ok(PathBuf::from(decode(value)));
+                }
+            }
+        }
+        anyhow::bail!("fixture {name} is missing from the Bazel runfiles manifest");
+    }
+    Ok(std::env::var_os("TEST_SRCDIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from(cargo.expect("fixture binary must be built by Cargo or Bazel"))
-        })
+        .unwrap_or_default()
+        .join(logical))
 }
 #[test]
 fn all_four_bridges_consume_real_stdio_and_preserve_request_identity() -> Result<()> {
     let bridge = std::fs::canonicalize(binary(
         "OUTCOME_TEST_BRIDGE",
         option_env!("CARGO_BIN_EXE_outcome-hub-agent"),
-    ))?;
+    )?)
+    .context("resolve agent bridge test binary")?;
     let fixture = std::fs::canonicalize(binary(
         "OUTCOME_TEST_FIXTURE",
         option_env!("CARGO_BIN_EXE_outcome-hub-agent-fixture"),
-    ))?;
+    )?)
+    .context("resolve native agent fixture binary")?;
     let digest = agent_adapter::executable_digest(&fixture, &[])?;
     for agent in ["codex", "cc", "pi", "hds"] {
         let root = tempfile::tempdir()?;

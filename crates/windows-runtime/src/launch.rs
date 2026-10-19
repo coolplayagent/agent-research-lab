@@ -265,6 +265,9 @@ impl Drop for Attributes {
     }
 }
 fn quote(argument: &str) -> String {
+    if !argument.is_empty() && !argument.contains([' ', '\t', '"']) {
+        return argument.into();
+    }
     let mut result = String::from("\"");
     let mut slashes = 0;
     for character in argument.chars() {
