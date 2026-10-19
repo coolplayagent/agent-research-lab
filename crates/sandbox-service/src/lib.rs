@@ -1,6 +1,8 @@
 //! Disposable execution with host-verified binding challenges.
 mod challenge;
 #[cfg(windows)]
+mod diagnostics;
+#[cfg(windows)]
 mod profiles;
 pub fn recover(state: &std::path::Path) -> anyhow::Result<()> {
     #[cfg(windows)]

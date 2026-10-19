@@ -46,6 +46,7 @@ impl Session {
         cwd: &Path,
         env: &[(String, String)],
         seconds: u64,
+        private_diagnostics: bool,
     ) -> Result<Self> {
         #[cfg(unix)]
         let (child, input, stdout, stderr) = {
@@ -117,6 +118,9 @@ impl Session {
                 // Diagnostics are bounded and intentionally never returned as public API errors.
                 let mut bytes = Vec::new();
                 let result = stderr.take(64 * 1024 + 1).read_to_end(&mut bytes);
+                if private_diagnostics {
+                    let _ = std::io::stderr().write_all(&bytes[..bytes.len().min(64 * 1024)]);
+                }
                 if result.is_err() || bytes.len() > 64 * 1024 {
                     let _ = err_tx.send(Err(anyhow::anyhow!("agent diagnostics exceeded bound")));
                 }
@@ -201,7 +205,7 @@ pub fn version(program: &Path, arguments: &[String]) -> Result<String> {
     let mut args = arguments.to_vec();
     args.push("--version".into());
     let cwd = std::env::temp_dir();
-    let mut session = Session::spawn(program, &args, &cwd, &[], 5)?;
+    let mut session = Session::spawn(program, &args, &cwd, &[], 5, false)?;
     session.close_input();
     let mut output = String::new();
     while let Some(line) = session.next()? {

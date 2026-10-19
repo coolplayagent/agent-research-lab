@@ -36,6 +36,15 @@ function Wait-Binding([string]$Id) {
     } while ([DateTime]::UtcNow -lt $deadline)
     throw 'Binding did not reach a terminal state within its bounded lifetime.'
 }
+function Fail-Binding($Operation, [string]$Label) {
+    if ($Fixture) {
+        # Only deterministic fixture diagnostics are suitable for CI logs.
+        $diagnostic = Join-Path $state ("private/binding-" + $Operation.request.request_id + '.diagnostic.json')
+        if (Test-Path -LiteralPath $diagnostic) { Get-Content -LiteralPath $diagnostic -Raw | Write-Output }
+        Get-ChildItem -LiteralPath (Join-Path $state 'private/managed-sandbox') -Filter 'sandbox-*.diagnostic.json' -ErrorAction SilentlyContinue | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | Write-Output }
+    }
+    throw "$Label failed: $($Operation.diagnostic.code), stage $($Operation.diagnostic.stage), OS $($Operation.diagnostic.os_code), diagnostic $($Operation.diagnostic.diagnostic_id). State: $state"
+}
 $evidence = @()
 try {
     $ready = $false
@@ -60,7 +69,7 @@ try {
         $duplicate = Write-Api '/api/v1/collaboration/bindings' $request
         if ($duplicate.request.request_id -ne $operation.request.request_id) { throw 'Duplicate request created another operation.' }
         $result = Wait-Binding $request.request_id
-        if ($result.state -ne 'succeeded') { throw "Binding $agent failed: $($result.diagnostic.code), stage $($result.diagnostic.stage), OS $($result.diagnostic.os_code), diagnostic $($result.diagnostic.diagnostic_id). State: $state" }
+        if ($result.state -ne 'succeeded') { Fail-Binding $result "Binding $agent" }
         if (@($result.steps | Where-Object state -ne 'passed').Count) { throw 'Successful binding has incomplete stages.' }
         $saved = Read-Api '/api/v1/collaboration/services'
         if ($saved.configuration.bindings.$person -ne $agent -or $saved.configuration.binding_evidence.$person.request_id -ne $request.request_id) { throw 'Binding and evidence were not saved together.' }
@@ -89,7 +98,7 @@ require("child_process").spawn(executable, process.argv.slice(2), {stdio:"inheri
         $request = @{request_id=[guid]::NewGuid().ToString(); person_id='binding-codex'; adapter_id='codex'; revision=$saved.configuration.revision; program=$shim; model=$null}
         Write-Api '/api/v1/collaboration/bindings' $request | Out-Null
         $npmResult = Wait-Binding $request.request_id
-        if ($npmResult.state -ne 'succeeded') { throw "npm dependency fixture failed: $($npmResult.diagnostic.code), stage $($npmResult.diagnostic.stage), OS $($npmResult.diagnostic.os_code), diagnostic $($npmResult.diagnostic.diagnostic_id). State: $state" }
+        if ($npmResult.state -ne 'succeeded') { Fail-Binding $npmResult 'npm dependency fixture' }
         Write-Output 'Validated npm launcher with an installed Node runtime and hoisted dependency.'
         $saved = Read-Api '/api/v1/collaboration/services'
         $request = @{request_id=[guid]::NewGuid().ToString(); person_id='binding-codex'; adapter_id='codex'; revision=$saved.configuration.revision; program=(Join-Path $state 'missing.exe'); model=$null}

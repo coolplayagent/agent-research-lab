@@ -73,6 +73,7 @@ fn session(options: &Options, args: &[String]) -> Result<Session> {
         &std::env::current_dir()?,
         &[],
         options.seconds,
+        true,
     )
 }
 fn model(options: &Options, args: &mut Vec<String>) {

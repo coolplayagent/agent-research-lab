@@ -6,8 +6,14 @@ use std::collections::BTreeSet;
 pub fn selected_model(agent: &ResolvedAgent) -> Result<String> {
     let mut args = agent.arguments.clone();
     args.push("--dump-config".into());
-    let mut child =
-        crate::process::Session::spawn(&agent.executable, &args, &std::env::temp_dir(), &[], 5)?;
+    let mut child = crate::process::Session::spawn(
+        &agent.executable,
+        &args,
+        &std::env::temp_dir(),
+        &[],
+        5,
+        false,
+    )?;
     child.close_input();
     let mut document = String::new();
     while let Some(line) = child.next()? {

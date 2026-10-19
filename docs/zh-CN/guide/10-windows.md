@@ -33,6 +33,8 @@ Expand-Archive .\outcome-hub-windows-x86_64.zip -DestinationPath .\outcome-hub-r
 
 使用 Windows 10/11 x64 和本地 NTFS 状态目录。遇到系统错误码（例如 OS error 1）时，界面会显示失败阶段和诊断编号。按阶段检查状态磁盘权限、文件系统支持、Agent 登录和模型设置；详细记录位于状态目录的 private 子目录。不要公开凭据或私有诊断文件。
 
+绑定诊断文件为 `private/binding-<request-id>.diagnostic.json`。原生命令失败时，记录可能引用 `sandbox-...` 编号，对应的限量错误输出位于 `private/managed-sandbox/<编号>.diagnostic.json`。这些文件保留在本机，可能含有敏感 Agent 输出。
+
 在四种 CLI 均已安装并登录的 Windows 机器上，从源码目录运行真实验收：
 
 ```powershell

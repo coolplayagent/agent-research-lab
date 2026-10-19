@@ -271,10 +271,19 @@ fn execute_blocking(
         snapshots::budget(&work, &mut byte_budget, &mut file_budget, 0, check)?;
         snapshots::budget(&home, &mut byte_budget, &mut file_budget, 0, check)?;
         if let Some(code) = child.poll()? {
-            ensure!(
-                code == 0,
-                "sandbox command failed (exit code {code}); verify the agent login and model configuration"
-            );
+            if code != 0 {
+                drop(child);
+                let diagnostic = crate::diagnostics::capture(
+                    state,
+                    &error_path,
+                    &temp.path().to_string_lossy(),
+                    code,
+                )
+                .unwrap_or_else(|_| "unavailable".into());
+                anyhow::bail!(
+                    "sandbox command failed (exit code {code}; diagnostic {diagnostic}); verify the agent login and model configuration"
+                );
+            }
             break;
         }
         std::thread::sleep(Duration::from_millis(50));

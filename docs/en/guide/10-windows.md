@@ -33,6 +33,8 @@ Binding runs one small model task and may incur a charge. Progress distinguishes
 
 Use Windows 10/11 x64 with a local NTFS state directory. If Windows reports an error such as OS error 1, the UI includes its stage and a diagnostic ID. Check the state volume's permissions and filesystem support, the Agent's login and model settings, and the matching private diagnostic file. Do not publish credentials or private diagnostics.
 
+Binding diagnostics are stored under `private/binding-<request-id>.diagnostic.json`. A failed native command may reference a `sandbox-...` identifier; its bounded stderr log is in `private/managed-sandbox/<identifier>.diagnostic.json`. These files stay on this computer and may contain sensitive Agent output.
+
 For authenticated acceptance, run from a source checkout with all four CLIs installed and logged in:
 
 ```powershell

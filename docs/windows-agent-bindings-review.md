@@ -18,6 +18,8 @@ The native health probe checks the child's Windows AppContainer token and worksp
 
 Windows preparation and execution run outside the asynchronous request threads. Dropping a client operation signals cancellation to that worker; runtime copying, ACL traversal, filesystem-budget checks and process polling check cancellation and the same deadline. Copying is chunked and rejects files that change size. A cancellation before launch prevents the Agent process from starting, and cancellation during execution drops its Job Object before removing disposable state.
 
+Failed native commands retain at most 64 KiB of stderr in a private sandbox diagnostic file, with a maximum of 32 retained failures. Public errors contain only its identifier. Treat these local files as sensitive; authenticated acceptance never prints their contents into CI logs. Deterministic fixture failures may print their own diagnostics to make platform regressions reproducible.
+
 Verification is deliberately separated: deterministic native protocol peers test framing, binding persistence, process cleanup and failure handling without credentials; authenticated live acceptance tests vendor compatibility. The live script records binary hashes, versions, sandbox identity and validation evidence, and must be kept outside Git. Windows 10/11 x64 on a local NTFS state volume is the deployment target. OAuth arrangements that depend on an unavailable external helper, protected system credential stores, custom provider profiles, or a local proxy still need acceptance in the user's actual environment.
 
 Protocol references checked during implementation:
