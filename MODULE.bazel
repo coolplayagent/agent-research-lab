@@ -1,4 +1,4 @@
-module(name = "agent_research_lab", version = "0.1.2")
+module(name = "agent_research_lab", version = "0.2.0-rc.1")
 
 bazel_dep(name = "rules_rust", version = "0.74.0")
 bazel_dep(name = "rules_pkg", version = "1.0.1")

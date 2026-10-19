@@ -162,14 +162,14 @@ genrule(name = "source_inventory", srcs = [":policy_sources"], outs = ["source_i
 # Optional execution and knowledge services are installed separately from core collaboration.
 pkg_tar(
     name = "adapter-package",
-    srcs = ["//crates/knowledge-service:outcome-hub-knowledge", "//crates/service-workers:outcome-hub-services", "//crates/codex-adapter:outcome-hub-codex-adapter", "//crates/outcome-service:outcome-hub-outcomes", "//crates/service-workers:units", ],
+    srcs = ["//crates/knowledge-service:outcome-hub-knowledge", "//crates/service-workers:outcome-hub-services", "//crates/agent-adapter:outcome-hub-agent", "//crates/codex-adapter:outcome-hub-codex-adapter", "//crates/outcome-service:outcome-hub-outcomes", "//crates/service-workers:units", ],
     package_dir = "outcome-hub-adapters", extension = "tar.gz", mode = "0755",
     visibility = ["//visibility:public"],
 )
 
 rust_binary(
     name = "outcome-hub-cli",
-    version = "0.1.2",
+    version = "0.2.0-rc.1",
     srcs = ["//apps/cli:src/main.rs"],
     crate_root = "//apps/cli:src/main.rs",
     edition = "2024",

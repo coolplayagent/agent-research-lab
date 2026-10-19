@@ -34,7 +34,7 @@ function sameShape(left, right, location = 'locale') {
 sameShape(translations.en, translations['zh-CN']);
 const root = 'https://coolplayagent.github.io/agent-research-lab/';
 const repository = 'https://github.com/coolplayagent/agent-research-lab';
-const release = repository + '/releases/tag/v0.1.2';
+const release = repository + '/releases/tag/v0.2.0-rc.1';
 const sources = inputs.map((input) => path.posix.normalize(input.replaceAll(path.sep, '/')));
 const sourceSet = new Set(sources);
 const markdown = sources.filter((input) => input.endsWith('.md'));
@@ -130,7 +130,7 @@ function pageShell(output, lang, title, content, description) {
     '<a class="language" href="' + escapeHtml(alternateHref) + '" lang="' +
     (lang === 'en' ? 'zh-CN' : 'en') + '">' + escapeHtml(tr.switchLanguage) + '</a></div></header>' +
     '<div class="layout">' + sidebar + '<main id="content">' + content + '</main></div>' +
-    '<footer><span>OutcomeHub · v0.1.2</span><span>' + escapeHtml(tr.footer) + '</span></footer>' +
+    '<footer><span>OutcomeHub · v0.2.0-rc.1</span><span>' + escapeHtml(tr.footer) + '</span></footer>' +
     '</body></html>\n';
 }
 function renderDocument(input) {
