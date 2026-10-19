@@ -1,6 +1,7 @@
 //! Independently deployable AI-IM. Applications attach routes to this host;
 //! the core has no research controller, experiment configuration or CLI dependency.
 mod agents;
+mod bindings;
 mod design_review;
 pub mod execution;
 mod goals;

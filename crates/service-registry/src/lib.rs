@@ -1,4 +1,8 @@
 //! Host-owned service configuration persistence and health probes.
+mod binding_flow;
+pub use binding_flow::binding_failure_code;
+mod bindings;
+mod managed;
 use anyhow::{Context, Result, ensure};
 use contracts::{ServiceHealth, ServiceKind};
 use service_api::*;
@@ -12,6 +16,8 @@ pub struct Registry {
     path: PathBuf,
     config: Mutex<Configuration>,
     active_storage: Option<(String, PathBuf)>,
+    bindings: bindings::Operations,
+    managed: Mutex<managed::Managed>,
 }
 impl Registry {
     pub fn open(state: &Path) -> Result<Self> {
@@ -32,26 +38,72 @@ impl Registry {
                     .map(|s| (id.clone(), s.endpoint.clone()))
             })
             .transpose()?;
+        #[allow(unused_mut)]
+        let mut managed = managed::Managed::default();
+        #[cfg(windows)]
+        if config
+            .services
+            .iter()
+            .any(|s| s.enabled && s.kind == ServiceKind::Executor)
+        {
+            // Optional execution failure must not prevent core collaboration startup.
+            let _ = managed.prepare(&mut config.clone(), &state);
+        }
         Ok(Self {
             path,
-            config: Mutex::new(config),
+            config: Mutex::new(config.clone()),
+            bindings: bindings::Operations::open(&state, &config)?,
+            managed: Mutex::new(managed),
             active_storage,
         })
     }
     pub fn configuration(&self) -> Configuration {
         self.config.lock().unwrap().clone()
     }
+    pub fn save_settings(&self, mut next: Configuration) -> Result<Configuration> {
+        let current = self.configuration();
+        ensure!(
+            next.bindings
+                .iter()
+                .all(|(person, adapter)| current.bindings.get(person) == Some(adapter)),
+            binding_flow::Failure(contracts::BindingErrorCode::ValidationRequired)
+        );
+        // Evidence is server-owned. Clients cannot forge validation by posting it.
+        next.binding_evidence = current
+            .binding_evidence
+            .into_iter()
+            .filter(|(person, evidence)| {
+                next.bindings
+                    .get(person)
+                    .and_then(|id| next.adapters.iter().find(|a| &a.id == id))
+                    .is_some_and(|adapter| {
+                        serde_json::to_vec(adapter)
+                            .is_ok_and(|bytes| storage::digest(&bytes) == evidence.adapter_digest)
+                    })
+            })
+            .collect();
+        self.save(next)
+    }
     pub fn save(&self, mut next: Configuration) -> Result<Configuration> {
         next.validate()?;
         let mut current = self.config.lock().unwrap();
         ensure!(
             next.revision == current.revision,
-            "service configuration revision conflict"
+            binding_flow::Failure(contracts::BindingErrorCode::RevisionConflict)
         );
         next.revision = next
             .revision
             .checked_add(1)
             .context("configuration revision exhausted")?;
+        next.binding_evidence.retain(|person, evidence| {
+            next.bindings
+                .get(person)
+                .and_then(|id| next.adapters.iter().find(|a| &a.id == id))
+                .is_some_and(|adapter| {
+                    serde_json::to_vec(adapter)
+                        .is_ok_and(|bytes| storage::digest(&bytes) == evidence.adapter_digest)
+                })
+        });
         storage::write(&self.path, &next)?;
         *current = next.clone();
         Ok(next)

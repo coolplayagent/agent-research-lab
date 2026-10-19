@@ -13,7 +13,14 @@ anyhow.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 service_api.workspace = true
+agent_adapter.workspace = true
+storage.workspace = true
+
+[target.'cfg(unix)'.dependencies]
 process.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows_runtime.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -52,7 +52,7 @@ pub async fn save(State(web): State<Web>, request: Request) -> Response {
                 web.services
                     .as_ref()
                     .context("service management is unavailable")?
-                    .save(next)?
+                    .save_settings(next)?
             ))
         }
         .await,

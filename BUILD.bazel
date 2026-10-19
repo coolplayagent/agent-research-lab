@@ -85,6 +85,7 @@ pkg_tar(
         "//crates/collaboration-storage-service:units",
         "//crates/service-workers:outcome-hub-services",
         "//crates/codex-adapter:outcome-hub-codex-adapter",
+        "//crates/agent-adapter:outcome-hub-agent",
         "//crates/outcome-service:outcome-hub-outcomes",
         "//crates/service-workers:units",
         "//deploy/systemd:outcome-hub-cli.service",
@@ -130,6 +131,8 @@ filegroup(name = "policy_sources", srcs = [
     "//crates/contracts:policy_sources",
     "//crates/execution-budget:policy_sources",
     "//crates/process:policy_sources",
+    "//crates/windows-runtime:policy_sources",
+    "//crates/agent-adapter:policy_sources",
     "//crates/native-effects:policy_sources",
     "//crates/agent-policy:policy_sources",
     "//crates/collaboration-evaluation:policy_sources",
@@ -179,7 +182,7 @@ alias(name = "outcome-hub", actual = "//apps/outcome-hub:outcome-hub", visibilit
 
 pkg_files(
     name = "windows-core-files",
-    srcs = [":outcome-hub", "deploy/windows/README.txt"],
+    srcs = [":outcome-hub", "//crates/service-workers:outcome-hub-services", "//crates/agent-adapter:outcome-hub-agent", "deploy/windows/README.txt"],
     visibility = ["//visibility:private"],
 )
 

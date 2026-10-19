@@ -28,6 +28,31 @@ pub struct Reply {
     pub protocol_version: u32,
     pub result: serde_json::Value,
     pub error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_os_code: Option<i32>,
+}
+#[derive(Debug)]
+pub struct RemoteError {
+    pub message: String,
+    pub os_code: Option<i32>,
+}
+impl std::fmt::Display for RemoteError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+impl std::error::Error for RemoteError {}
+pub fn os_code(error: &anyhow::Error) -> Option<i32> {
+    error.chain().find_map(|cause| {
+        cause
+            .downcast_ref::<std::io::Error>()
+            .and_then(std::io::Error::raw_os_error)
+            .or_else(|| {
+                cause
+                    .downcast_ref::<RemoteError>()
+                    .and_then(|error| error.os_code)
+            })
+    })
 }
 impl Reply {
     pub fn from_result(result: Result<serde_json::Value>) -> Self {
@@ -36,11 +61,13 @@ impl Reply {
                 protocol_version: VERSION,
                 result,
                 error: None,
+                error_os_code: None,
             },
             Err(error) => Self {
                 protocol_version: VERSION,
                 result: serde_json::Value::Null,
                 error: Some(error.to_string().chars().take(1000).collect()),
+                error_os_code: os_code(&error),
             },
         }
     }
@@ -50,7 +77,11 @@ impl Reply {
             "unsupported service protocol version"
         );
         if let Some(error) = self.error {
-            anyhow::bail!("service request failed: {error}");
+            return Err(RemoteError {
+                message: format!("service request failed: {error}"),
+                os_code: self.error_os_code,
+            }
+            .into());
         }
         Ok(serde_json::from_value(self.result)?)
     }

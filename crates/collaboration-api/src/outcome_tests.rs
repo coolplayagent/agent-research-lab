@@ -245,6 +245,7 @@ async fn automatic_verification_checks_protocol_results_and_requires_separate_ho
         services: vec![],
         adapters: vec![],
         bindings: BTreeMap::new(),
+        binding_evidence: BTreeMap::new(),
         scenarios: vec![],
         outcome_services: vec![service_api::OutcomeService {
             id: "verifier".into(),

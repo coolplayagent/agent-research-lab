@@ -4,6 +4,19 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
         return Some(asset);
     }
     match path {
+        "/assets/binding-types.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../dist/binding-types.js").as_slice(),
+        )),
+        "/assets/binding-settings.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../dist/binding-settings.js").as_slice(),
+        )),
+        "/assets/binding-progress.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../dist/binding-progress.js").as_slice(),
+        )),
+
         "/assets/outcome-types.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/outcome-types.js").as_slice(),

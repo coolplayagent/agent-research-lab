@@ -9,12 +9,17 @@ name = "service_registry"
 
 [dependencies]
 anyhow.workspace = true
+serde.workspace = true
+agent_adapter.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 contracts.workspace = true
 service_api.workspace = true
 service_protocol.workspace = true
 storage.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows_runtime.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

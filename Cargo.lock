@@ -663,6 +663,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "outcome-hub-agent-adapter"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "clap",
+ "libc",
+ "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
+ "outcome-hub-service-api",
+ "outcome-hub-windows-runtime",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
 name = "outcome-hub-agent-backend"
 version = "0.1.2"
 dependencies = [
@@ -1097,6 +1115,7 @@ name = "outcome-hub-executor-service"
 version = "0.1.2"
 dependencies = [
  "anyhow",
+ "outcome-hub-agent-adapter",
  "outcome-hub-contracts",
  "outcome-hub-filesystem-store",
  "outcome-hub-service-api",
@@ -1336,9 +1355,12 @@ name = "outcome-hub-sandbox-service"
 version = "0.1.2"
 dependencies = [
  "anyhow",
+ "outcome-hub-agent-adapter",
  "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
  "outcome-hub-process",
  "outcome-hub-service-api",
+ "outcome-hub-windows-runtime",
  "serde_json",
  "tempfile",
  "tokio",
@@ -1366,10 +1388,12 @@ dependencies = [
  "anyhow",
  "libc",
  "outcome-hub-contracts",
+ "outcome-hub-windows-runtime",
  "serde",
  "serde_json",
  "tempfile",
  "tokio",
+ "windows-sys",
 ]
 
 [[package]]
@@ -1377,10 +1401,13 @@ name = "outcome-hub-service-registry"
 version = "0.1.2"
 dependencies = [
  "anyhow",
+ "outcome-hub-agent-adapter",
  "outcome-hub-contracts",
  "outcome-hub-filesystem-store",
  "outcome-hub-service-api",
  "outcome-hub-service-protocol",
+ "outcome-hub-windows-runtime",
+ "serde",
  "serde_json",
  "tempfile",
  "tokio",
@@ -1394,6 +1421,7 @@ dependencies = [
  "clap",
  "outcome-hub-contracts",
  "outcome-hub-executor-service",
+ "outcome-hub-filesystem-store",
  "outcome-hub-sandbox-service",
  "outcome-hub-service-api",
  "outcome-hub-service-protocol",
@@ -1459,6 +1487,16 @@ dependencies = [
 [[package]]
 name = "outcome-hub-web-assets"
 version = "0.1.2"
+
+[[package]]
+name = "outcome-hub-windows-runtime"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "sha2",
+ "tempfile",
+ "windows-sys",
+]
 
 [[package]]
 name = "outcome-hub-workflow-adapter"
@@ -1640,6 +1678,19 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_yaml_ng"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b4db627b98b36d4203a7b458cf3573730f2bb591b28871d916dfa9efabfd41f"
+dependencies = [
+ "indexmap",
+ "itoa",
+ "ryu",
+ "serde",
+ "unsafe-libyaml",
 ]
 
 [[package]]
@@ -1886,6 +1937,12 @@ name = "unicode-ident"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954"
+
+[[package]]
+name = "unsafe-libyaml"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
 
 [[package]]
 name = "utf8parse"

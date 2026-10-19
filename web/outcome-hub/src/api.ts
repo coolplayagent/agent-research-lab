@@ -1,4 +1,7 @@
 import { t, describe } from "./i18n.js";
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) { super(message); }
+}
 export async function api<T>(
   path: string,
   body?: unknown,
@@ -15,7 +18,7 @@ export async function api<T>(
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const value = await response.json();
-  if (!response.ok) throw new Error(describe(value.error) || t("api.a472d51792"));
+  if (!response.ok) throw new ApiError(describe(value.error) || t("api.a472d51792"), response.status);
   return value as T;
 }
 export const change = <T = unknown>(body: unknown): Promise<T> =>

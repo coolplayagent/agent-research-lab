@@ -31,6 +31,7 @@ export interface Configuration {
   services: Service[];
   adapters: Adapter[];
   bindings: Record<string, string>;
+  binding_evidence?: Record<string, { request_id: string; verified_unix_ms: number; adapter_digest: string }>;
   scenarios?: ScenarioRegistration[];
   outcome_services?: OutcomeService[];
   outcome_bindings?: Record<string, OutcomeBinding>;
