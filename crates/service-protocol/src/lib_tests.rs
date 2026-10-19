@@ -21,6 +21,7 @@ async fn framed_calls_validate_version_and_private_peer() {
     task.await.unwrap();
     assert!(
         Reply {
+            error_os_code: None,
             protocol_version: 99,
             result: serde_json::json!(true),
             error: None

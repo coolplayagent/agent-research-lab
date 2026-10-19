@@ -5,7 +5,7 @@ rust_library(
     name = "service_workers", crate_name = "service_workers",
     srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
     crate_root = "src/lib.rs", edition = "2024", aliases = aliases(),
-    deps = ["//crates/sandbox-service:sandbox_service", "//crates/executor-service:executor_service", "//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/service-api:service_api"] + all_crate_deps(normal = True),
+    deps = ["//crates/filesystem-store:storage", "//crates/sandbox-service:sandbox_service", "//crates/executor-service:executor_service", "//crates/contracts:contracts", "//crates/service-protocol:service_protocol", "//crates/service-api:service_api"] + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
 )

@@ -6,9 +6,20 @@ use service_api::{ExecutionReceipt, ExecutorRequest, SandboxRequest};
 use service_protocol as rpc;
 use std::time::Duration;
 pub async fn execute(request: ExecutorRequest) -> Result<Value> {
+    let verify = matches!(&request, ExecutorRequest::Validate { .. });
     match request {
         ExecutorRequest::Probe => Ok(json!(info())),
-        ExecutorRequest::Execute {
+        ExecutorRequest::Discover { agent, program } => Ok(json!(
+            tokio::task::spawn_blocking(move || agent_adapter::discover(agent, program.as_deref()))
+                .await??
+        )),
+        ExecutorRequest::Validate {
+            adapter,
+            sandbox,
+            input,
+            seconds,
+        }
+        | ExecutorRequest::Execute {
             adapter,
             sandbox,
             input,
@@ -30,31 +41,52 @@ pub async fn execute(request: ExecutorRequest) -> Result<Value> {
             ensure!(encoded.len() <= 256 * 1024, "agent input exceeds bound");
             let input_sha256 = storage::digest(encoded.as_bytes());
             let adapter_sha256 = storage::digest(&serde_json::to_vec(&adapter)?);
-            let output: service_api::SandboxOutput = rpc::call(
-                &sandbox,
-                &SandboxRequest::Run {
+            let sandbox_request = if verify {
+                SandboxRequest::Verify {
                     command: adapter.command.clone(),
                     env_names: adapter.env_names.clone(),
                     read_only_paths: adapter.read_only_paths.clone(),
                     network: adapter.network,
                     input: encoded,
                     seconds,
-                },
+                }
+            } else {
+                SandboxRequest::Run {
+                    command: adapter.command.clone(),
+                    env_names: adapter.env_names.clone(),
+                    read_only_paths: adapter.read_only_paths.clone(),
+                    network: adapter.network,
+                    input: encoded,
+                    seconds,
+                }
+            };
+            let output: service_api::SandboxOutput = rpc::call(
+                &sandbox,
+                &sandbox_request,
                 Duration::from_secs(seconds + 10),
             )
             .await?;
             let result: service_api::AgentOutput = serde_json::from_str(&output.stdout)?;
             result.validate(&input)?;
-            Ok(json!(ExecutionReceipt {
+            let challenge_verified = output.challenge_verified == Some(true);
+            let receipt = ExecutionReceipt {
                 output_sha256: storage::digest(&serde_json::to_vec(&result)?),
                 output: result,
                 agent: adapter.agent,
                 adapter_id: adapter.id,
-                input_sha256,
+                input_sha256: output.input_sha256.unwrap_or(input_sha256),
                 adapter_sha256,
                 sandbox_id: output.sandbox_id,
-                elapsed_ms: output.elapsed_ms
-            }))
+                elapsed_ms: output.elapsed_ms,
+            };
+            Ok(if verify {
+                json!(service_api::BindingProbeReceipt {
+                    execution: receipt,
+                    challenge_verified
+                })
+            } else {
+                json!(receipt)
+            })
         }
     }
 }

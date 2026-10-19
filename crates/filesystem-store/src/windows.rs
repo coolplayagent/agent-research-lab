@@ -77,19 +77,22 @@ fn restrict_to_owner(path: &Path, directory: bool) -> Result<()> {
         )
     };
     if converted == 0 {
-        return Err(std::io::Error::last_os_error().into());
+        return Err(std::io::Error::last_os_error())
+            .context("build private state access descriptor");
     }
     let result = unsafe { SetFileSecurityW(wide(path.as_os_str()).as_ptr(), 0x4, descriptor) };
+    // Capture GetLastError before cleanup can overwrite the thread-local value.
+    let error = (result == 0).then(std::io::Error::last_os_error);
     unsafe { LocalFree(descriptor) };
-    if result == 0 {
-        return Err(std::io::Error::last_os_error().into());
+    if let Some(error) = error {
+        return Err(error).context("set private state file permissions");
     }
     Ok(())
 }
 
 pub fn private_dir(path: &Path) -> Result<()> {
     reject_reparse(path)?;
-    fs::create_dir_all(path)?;
+    fs::create_dir_all(path).context("create private state directory")?;
     restrict_to_owner(path, true)
 }
 
@@ -109,7 +112,7 @@ fn replace(source: &Path, destination: &Path) -> Result<()> {
         )
     };
     if result == 0 {
-        return Err(std::io::Error::last_os_error().into());
+        return Err(std::io::Error::last_os_error()).context("atomically replace state file");
     }
     Ok(())
 }
@@ -150,8 +153,9 @@ pub fn write<T: Serialize>(path: &Path, value: &T) -> Result<()> {
         .write(true)
         .custom_flags(OPEN_REPARSE_POINT)
         .open(&temporary)?;
-    file.write_all(&bytes)?;
-    file.sync_all()?;
+    file.write_all(&bytes)
+        .context("write temporary state file")?;
+    file.sync_all().context("flush temporary state file")?;
     drop(file);
     private_file(&temporary)?;
     replace(&temporary, path)?;

@@ -1,3 +1,100 @@
+export declare const CodexEventKind: {
+    readonly ThreadStarted: "thread.started";
+    readonly TurnStarted: "turn.started";
+    readonly TurnCompleted: "turn.completed";
+    readonly TurnFailed: "turn.failed";
+    readonly ItemStarted: "item.started";
+    readonly ItemUpdated: "item.updated";
+    readonly ItemCompleted: "item.completed";
+    readonly Error: "error";
+};
+export type CodexEventKind = (typeof CodexEventKind)[keyof typeof CodexEventKind];
+export declare const ClaudeResultState: {
+    readonly Success: "success";
+    readonly ErrorDuringExecution: "error_during_execution";
+    readonly ErrorMaxTurns: "error_max_turns";
+    readonly ErrorMaxBudget: "error_max_budget_usd";
+    readonly ErrorStructuredOutput: "error_max_structured_output_retries";
+};
+export type ClaudeResultState = (typeof ClaudeResultState)[keyof typeof ClaudeResultState];
+export declare const PiEventKind: {
+    readonly Response: "response";
+    readonly AgentStart: "agent_start";
+    readonly AgentEnd: "agent_end";
+    readonly AgentSettled: "agent_settled";
+    readonly TurnStart: "turn_start";
+    readonly TurnEnd: "turn_end";
+    readonly MessageStart: "message_start";
+    readonly MessageUpdate: "message_update";
+    readonly MessageEnd: "message_end";
+    readonly ToolStart: "tool_execution_start";
+    readonly ToolUpdate: "tool_execution_update";
+    readonly ToolEnd: "tool_execution_end";
+    readonly CompactionStart: "auto_compaction_start";
+    readonly CompactionEnd: "auto_compaction_end";
+    readonly RetryStart: "auto_retry_start";
+    readonly RetryEnd: "auto_retry_end";
+};
+export type PiEventKind = (typeof PiEventKind)[keyof typeof PiEventKind];
+export declare const PiStopReason: {
+    readonly Stop: "stop";
+    readonly Length: "length";
+    readonly ToolUse: "toolUse";
+    readonly Error: "error";
+    readonly Aborted: "aborted";
+};
+export type PiStopReason = (typeof PiStopReason)[keyof typeof PiStopReason];
+export declare const DshTurnReason: {
+    readonly Completed: "completed";
+    readonly MaxTokens: "max-tokens";
+    readonly Aborted: "aborted";
+    readonly Blocked: "blocked";
+    readonly Error: "error";
+    readonly Interrupted: "interrupted";
+};
+export type DshTurnReason = (typeof DshTurnReason)[keyof typeof DshTurnReason];
+export declare const BindingStage: {
+    readonly Discover: "discover";
+    readonly Runtime: "runtime";
+    readonly Configuration: "configuration";
+    readonly Execute: "execute";
+    readonly Persist: "persist";
+};
+export type BindingStage = (typeof BindingStage)[keyof typeof BindingStage];
+export declare const BindingOperationState: {
+    readonly Running: "running";
+    readonly Succeeded: "succeeded";
+    readonly Failed: "failed";
+    readonly Cancelled: "cancelled";
+    readonly Interrupted: "interrupted";
+};
+export type BindingOperationState = (typeof BindingOperationState)[keyof typeof BindingOperationState];
+export declare const BindingStepState: {
+    readonly Pending: "pending";
+    readonly Running: "running";
+    readonly Passed: "passed";
+    readonly Failed: "failed";
+    readonly Skipped: "skipped";
+};
+export type BindingStepState = (typeof BindingStepState)[keyof typeof BindingStepState];
+export declare const BindingErrorCode: {
+    readonly ProgramMissing: "program_missing";
+    readonly ProgramInvalid: "program_invalid";
+    readonly LaunchFailed: "launch_failed";
+    readonly ConfigurationInvalid: "configuration_invalid";
+    readonly ServiceUnavailable: "service_unavailable";
+    readonly IsolationUnavailable: "isolation_unavailable";
+    readonly VerificationFailed: "verification_failed";
+    readonly InvalidResponse: "invalid_response";
+    readonly Timeout: "timeout";
+    readonly Cancelled: "cancelled";
+    readonly RevisionConflict: "revision_conflict";
+    readonly PersistenceFailed: "persistence_failed";
+    readonly Interrupted: "interrupted";
+    readonly Busy: "busy";
+    readonly ValidationRequired: "validation_required";
+};
+export type BindingErrorCode = (typeof BindingErrorCode)[keyof typeof BindingErrorCode];
 export declare const KnowledgeBackend: {
     readonly Git: "git";
     readonly Directory: "directory";

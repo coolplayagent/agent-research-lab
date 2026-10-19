@@ -1,3 +1,4 @@
+import { renderBindings } from "./binding-settings.js";
 import { renderKnowledgeSettings } from "./knowledge-settings.js";
 import { trackSettings, savedSettings, allowSettingsLeave, hasUnsavedSettings, } from "./settings-guard.js";
 import { ServiceKind } from "/assets/shared/contracts.js";
@@ -123,57 +124,7 @@ function render(view) {
             storeButton.disabled = false;
         }
     };
-    const bindings = get("binding-list");
-    bindings.replaceChildren();
-    if (!Object.keys(config.bindings).length)
-        bindings.append(element("p", t("layout.noBindings")));
-    for (const [person, id] of Object.entries(config.bindings)) {
-        const row = element("div");
-        row.className = "binding-row";
-        row.append(element("span", `${directory.find((p) => p.id === person)?.name || person} → ${id}`), button(t("services.unbind"), async () => {
-            const next = structuredClone(config);
-            delete next.bindings[person];
-            await save(next);
-        }));
-        bindings.append(row);
-    }
-    const form = element("form"), person = select(directory.filter((p) => p.id !== "operator").map((p) => [p.id, p.name]), directory.find((p) => p.id !== "operator")?.id || ""), adapter = select(config.adapters.map((a) => [a.id, a.id]), config.adapters[0]?.id || "");
-    person.required = true;
-    adapter.required = true;
-    form.className = "settings-form binding-form";
-    trackSettings(form);
-    const submit = element("button", t("services.bind"));
-    submit.type = "submit";
-    submit.className = "primary";
-    submit.disabled = !person.value || !adapter.value;
-    form.append(field(t("services.person"), person), field(t("services.adapter"), adapter), actions(submit));
-    if (!person.value || !adapter.value) {
-        const note = element("p", t("layout.bindingPrerequisite"));
-        const link = element("a", !person.value ? t("workspace.people") : t("workspace.adapters"));
-        link.href = !person.value ? "#people" : "#settings/adapters";
-        note.append(link);
-        form.append(note);
-    }
-    form.onsubmit = async (event) => {
-        event.preventDefault();
-        const done = busy(submit);
-        if (!done)
-            return;
-        try {
-            const next = structuredClone(config);
-            next.bindings[person.value.trim()] = adapter.value;
-            await save(next);
-            savedSettings(form);
-        }
-        catch (error) {
-            get("services-status").textContent = String(error);
-        }
-        finally {
-            done();
-            submit.disabled = !person.value || !adapter.value;
-        }
-    };
-    bindings.append(form);
+    renderBindings(config, directory, save, () => loadServices(true));
 }
 export async function loadServices(force = false) {
     if (!force && hasUnsavedSettings())

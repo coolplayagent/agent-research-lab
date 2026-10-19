@@ -9,6 +9,10 @@ edition = "2024"
 license = "MIT"
 
 [workspace.dependencies]
+windows_runtime = { package = "outcome-hub-windows-runtime", path = "crates/windows-runtime" }
+agent_adapter = { package = "outcome-hub-agent-adapter", path = "crates/agent-adapter" }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Isolation", "Win32_System_Threading", "Win32_System_SystemServices", "Win32_System_JobObjects", "Win32_System_Memory", "Win32_Storage_FileSystem", "Win32_System_Pipes", "Win32_System_IO"] }
+
 outcome_hub_cli = { package = "outcome-hub-cli", path = "apps/cli" }
 outcome_hub_console = { package = "outcome-hub-console", path = "apps/console" }
 software_delivery = { package = "outcome-hub-software-delivery", path = "crates/software-delivery" }
@@ -41,6 +45,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 toml = "0.8"
+serde_yaml = { package = "serde_yaml_ng", version = "0.10" }
 tempfile = "3"
 agent_backend = { package = "outcome-hub-agent-backend", path = "crates/agent-backend" }
 agent_policy = { package = "outcome-hub-agent-policy", path = "crates/agent-policy" }

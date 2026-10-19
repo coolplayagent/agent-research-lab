@@ -52,6 +52,18 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
             get(super::services::view).post(super::services::save),
         )
         .route("/api/v1/messaging/send", post(send))
+        .route(
+            "/api/v1/collaboration/bindings",
+            get(super::bindings::list).post(super::bindings::start),
+        )
+        .route(
+            "/api/v1/collaboration/bindings/{id}",
+            get(super::bindings::get),
+        )
+        .route(
+            "/api/v1/collaboration/bindings/{id}/cancel",
+            post(super::bindings::cancel),
+        )
         .route("/api/v1/messaging/stream", get(stream))
         .route("/api/v1/messaging/ack", post(ack))
         .route("/api/v1/messaging/presence", post(presence))

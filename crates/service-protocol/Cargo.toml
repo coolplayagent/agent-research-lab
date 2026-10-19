@@ -13,5 +13,9 @@ tokio.workspace = true
 libc.workspace = true
 contracts.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+windows_runtime.workspace = true
+windows-sys.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true

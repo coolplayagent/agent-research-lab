@@ -1,7 +1,7 @@
 name: Windows native
 on:
   push:
-    branches: [main, feature/windows-deployment-20261019]
+    branches: [main, feature/windows-deployment-20261019, feature/windows-agent-binding]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -15,7 +15,7 @@ jobs:
         with:
           toolchain: 1.97.1
       - name: Check native core
-        run: cargo check --locked -p outcome-hub
+        run: cargo check --locked -p outcome-hub -p outcome-hub-service-workers -p outcome-hub-agent-adapter
       - name: Test native storage and protocol boundaries
         run: cargo test --locked -p outcome-hub-filesystem-store -p outcome-hub-service-protocol -p outcome-hub-service-api
       - name: Build and smoke-test native core
@@ -40,6 +40,11 @@ jobs:
           $binary = Join-Path $unpacked 'outcome-hub/outcome-hub.exe'
           if (-not (Test-Path -LiteralPath $binary)) { throw 'Native package lacks outcome-hub.exe' }
           ./verification/windows-core-smoke.ps1 -Binary $binary
+          bazel test --lockfile_mode=error //crates/windows-runtime:tests //crates/service-protocol:tests //crates/service-api:tests //crates/service-registry:tests //crates/agent-adapter:tests //crates/agent-adapter:protocol_tests //crates/sandbox-service:tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          bazel build --lockfile_mode=error //crates/agent-adapter:outcome-hub-agent-fixture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./verification/windows-binding-smoke.ps1 -Binary $binary -Fixture (Resolve-Path 'bazel-bin/crates/agent-adapter/outcome-hub-agent-fixture.exe').Path
       - uses: actions/upload-artifact@v4
         with:
           name: outcome-hub-windows-x86_64

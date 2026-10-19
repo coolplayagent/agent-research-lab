@@ -18,6 +18,8 @@ pub struct Configuration {
     pub services: Vec<Service>,
     pub adapters: Vec<Adapter>,
     pub bindings: Bindings,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub binding_evidence: BTreeMap<String, crate::BindingEvidence>,
     #[serde(default)]
     pub scenarios: Vec<ScenarioRegistration>,
     #[serde(default)]
@@ -72,6 +74,7 @@ impl Configuration {
             services,
             adapters,
             bindings: Bindings::new(),
+            binding_evidence: BTreeMap::new(),
             scenarios: vec![],
             outcome_services: vec![],
             outcome_bindings: BTreeMap::new(),

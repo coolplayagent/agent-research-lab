@@ -1,0 +1,10 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test", "rust_binary")
+exports_files(["Cargo.toml"], visibility = ["//visibility:public"])
+rust_library(name = "agent_adapter", crate_name = "agent_adapter", srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs", "src/fixture.rs"]), crate_root = "src/lib.rs", edition = "2024", aliases = aliases(), deps = ["//crates/contracts:contracts", "//crates/service-api:service_api", "//crates/filesystem-store:storage"] + select({"@platforms//os:windows": ["//crates/windows-runtime:windows_runtime"], "//conditions:default": []}) + all_crate_deps(normal = True), proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"])
+rust_test(name = "tests", crate = ":agent_adapter", aliases = aliases(normal_dev = True, proc_macro_dev = True), deps = all_crate_deps(normal_dev = True), proc_macro_deps = all_crate_deps(proc_macro_dev = True), visibility = ["//visibility:public"])
+filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "tests/**/*.rs"]), visibility = ["//visibility:public"])
+rust_binary(name = "outcome-hub-agent", srcs = ["src/main.rs"], edition = "2024", aliases = aliases(), deps = [":agent_adapter", "//crates/service-api:service_api"] + all_crate_deps(normal = True), visibility = ["//visibility:public"])
+
+rust_binary(name = "outcome-hub-agent-fixture", testonly = True, srcs = ["src/fixture.rs"], edition = "2024", aliases = aliases(), deps = all_crate_deps(normal = True), visibility = ["//visibility:public"])
+rust_test(name = "protocol_tests", srcs = ["tests/protocol_tests.rs"], edition = "2024", aliases = aliases(normal_dev = True), deps = [":agent_adapter", "//crates/service-api:service_api"] + all_crate_deps(normal = True, normal_dev = True), data = [":outcome-hub-agent", ":outcome-hub-agent-fixture"], env = {"OUTCOME_TEST_BRIDGE": "$(rootpath :outcome-hub-agent)", "OUTCOME_TEST_FIXTURE": "$(rootpath :outcome-hub-agent-fixture)"})

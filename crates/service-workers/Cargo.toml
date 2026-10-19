@@ -6,6 +6,7 @@ license.workspace = true
 [lib]
 name = "service_workers"
 [dependencies]
+storage.workspace = true
 sandbox_service.workspace = true
 executor_service.workspace = true
 anyhow.workspace = true

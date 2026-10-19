@@ -32,6 +32,9 @@ fn scenario_configuration_is_optional_versioned_and_dependency_checked() {
             .scenarios
             .is_empty()
     );
+    for service in &mut config.services {
+        service.enabled = true;
+    }
     config.scenarios.push(ScenarioRegistration {
         id: "planning".into(),
         endpoint: root.path().join("private/planning.sock"),

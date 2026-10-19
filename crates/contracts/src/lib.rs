@@ -47,6 +47,16 @@ macro_rules! states {
 }
 
 states! {
+    CodexEventKind { ThreadStarted => "thread.started", TurnStarted => "turn.started", TurnCompleted => "turn.completed", TurnFailed => "turn.failed", ItemStarted => "item.started", ItemUpdated => "item.updated", ItemCompleted => "item.completed", Error => "error" }
+    ClaudeResultState { Success => "success", ErrorDuringExecution => "error_during_execution", ErrorMaxTurns => "error_max_turns", ErrorMaxBudget => "error_max_budget_usd", ErrorStructuredOutput => "error_max_structured_output_retries" }
+    PiEventKind { Response => "response", AgentStart => "agent_start", AgentEnd => "agent_end", AgentSettled => "agent_settled", TurnStart => "turn_start", TurnEnd => "turn_end", MessageStart => "message_start", MessageUpdate => "message_update", MessageEnd => "message_end", ToolStart => "tool_execution_start", ToolUpdate => "tool_execution_update", ToolEnd => "tool_execution_end", CompactionStart => "auto_compaction_start", CompactionEnd => "auto_compaction_end", RetryStart => "auto_retry_start", RetryEnd => "auto_retry_end" }
+    PiStopReason { Stop => "stop", Length => "length", ToolUse => "toolUse", Error => "error", Aborted => "aborted" }
+    DshTurnReason { Completed => "completed", MaxTokens => "max-tokens", Aborted => "aborted", Blocked => "blocked", Error => "error", Interrupted => "interrupted" }
+    BindingStage { Discover => "discover", Runtime => "runtime", Configuration => "configuration", Execute => "execute", Persist => "persist" }
+    BindingOperationState { Running => "running", Succeeded => "succeeded", Failed => "failed", Cancelled => "cancelled", Interrupted => "interrupted" }
+    BindingStepState { Pending => "pending", Running => "running", Passed => "passed", Failed => "failed", Skipped => "skipped" }
+    BindingErrorCode { ProgramMissing => "program_missing", ProgramInvalid => "program_invalid", LaunchFailed => "launch_failed", ConfigurationInvalid => "configuration_invalid", ServiceUnavailable => "service_unavailable", IsolationUnavailable => "isolation_unavailable", VerificationFailed => "verification_failed", InvalidResponse => "invalid_response", Timeout => "timeout", Cancelled => "cancelled", RevisionConflict => "revision_conflict", PersistenceFailed => "persistence_failed", Interrupted => "interrupted", Busy => "busy", ValidationRequired => "validation_required" }
+
     KnowledgeBackend { Git => "git", Directory => "directory" }
     KnowledgeAccess { ReadOnly => "read_only", ReadWrite => "read_write" }
     PullRequestState { Open => "OPEN", Closed => "CLOSED", Merged => "MERGED" }

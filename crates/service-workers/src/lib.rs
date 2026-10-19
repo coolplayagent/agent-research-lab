@@ -29,7 +29,7 @@ fn info(kind: ServiceKind, ready: bool) -> rpc::ServiceInfo {
 }
 async fn handle(
     kind: ServiceKind,
-    mut stream: tokio::net::UnixStream,
+    mut stream: rpc::Stream,
     state: &Path,
     remaining: u64,
 ) -> Result<()> {
@@ -42,37 +42,61 @@ async fn handle(
     let action = async {
         match kind {
             ServiceKind::Executor => execute(serde_json::from_value(envelope.request)?).await,
-            ServiceKind::Sandbox => match serde_json::from_value(envelope.request)? {
-                SandboxRequest::Probe => {
-                    sandbox::probe(state).await?;
-                    Ok(json!(info(kind, true)))
+            ServiceKind::Sandbox => {
+                let request: SandboxRequest = serde_json::from_value(envelope.request)?;
+                let verify = matches!(&request, SandboxRequest::Verify { .. });
+                match request {
+                    SandboxRequest::Probe => {
+                        sandbox::probe(state).await?;
+                        Ok(json!(info(kind, true)))
+                    }
+                    SandboxRequest::Verify {
+                        command,
+                        env_names,
+                        read_only_paths,
+                        network,
+                        input,
+                        seconds,
+                    }
+                    | SandboxRequest::Run {
+                        command,
+                        env_names,
+                        read_only_paths,
+                        network,
+                        input,
+                        seconds,
+                    } => {
+                        ensure!(
+                            seconds + 5 < remaining,
+                            "sandbox service lifetime is too short for this execution"
+                        );
+                        let result = if verify {
+                            sandbox::verify(
+                                state,
+                                command,
+                                env_names,
+                                read_only_paths,
+                                network,
+                                input,
+                                seconds,
+                            )
+                            .await?
+                        } else {
+                            sandbox::run(
+                                state,
+                                command,
+                                env_names,
+                                read_only_paths,
+                                network,
+                                input,
+                                seconds,
+                            )
+                            .await?
+                        };
+                        Ok(json!(result))
+                    }
                 }
-                SandboxRequest::Run {
-                    command,
-                    env_names,
-                    read_only_paths,
-                    network,
-                    input,
-                    seconds,
-                } => {
-                    ensure!(
-                        seconds + 5 < remaining,
-                        "sandbox service lifetime is too short for this execution"
-                    );
-                    Ok(json!(
-                        sandbox::run(
-                            state,
-                            command,
-                            env_names,
-                            read_only_paths,
-                            network,
-                            input,
-                            seconds
-                        )
-                        .await?
-                    ))
-                }
-            },
+            }
             ServiceKind::Storage => anyhow::bail!("use the storage service binary"),
         }
     };
@@ -83,7 +107,7 @@ async fn handle(
     )
     .await?
 }
-async fn disconnected(stream: &tokio::net::UnixStream) {
+async fn disconnected(stream: &rpc::Stream) {
     loop {
         if stream.readable().await.is_err() {
             return;
@@ -107,9 +131,7 @@ pub async fn serve(
             && (1..=32).contains(&capacity),
         "invalid service kind, lifetime or capacity"
     );
-    std::fs::create_dir_all(state)?;
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(state, std::fs::Permissions::from_mode(0o700))?;
+    storage::private_dir(state)?;
     let listener = rpc::Listener::bind(socket)?;
     let permits = Arc::new(tokio::sync::Semaphore::new(capacity));
     let mut tasks = tokio::task::JoinSet::new();

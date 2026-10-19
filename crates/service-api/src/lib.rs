@@ -1,4 +1,6 @@
 //! Versioned service and coding-agent contracts. Implementations live in independent processes.
+mod bindings;
+pub use bindings::*;
 mod outcomes;
 mod registry;
 pub use outcomes::*;
@@ -142,6 +144,16 @@ pub struct ExecutionReceipt {
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ExecutorRequest {
     Probe,
+    Discover {
+        agent: CodingAgent,
+        program: Option<PathBuf>,
+    },
+    Validate {
+        adapter: Adapter,
+        sandbox: PathBuf,
+        input: Box<AgentInput>,
+        seconds: u64,
+    },
     Execute {
         adapter: Adapter,
         sandbox: PathBuf,
@@ -153,6 +165,14 @@ pub enum ExecutorRequest {
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SandboxRequest {
     Probe,
+    Verify {
+        command: Vec<String>,
+        env_names: Vec<String>,
+        read_only_paths: Vec<PathBuf>,
+        network: bool,
+        input: String,
+        seconds: u64,
+    },
     Run {
         command: Vec<String>,
         env_names: Vec<String>,
@@ -168,6 +188,10 @@ pub struct SandboxOutput {
     pub stdout: String,
     pub elapsed_ms: u64,
     pub sandbox_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenge_verified: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_sha256: Option<String>,
 }
 pub async fn probe(path: &std::path::Path, kind: ServiceKind) -> Result<rpc::ServiceInfo> {
     let info: rpc::ServiceInfo = rpc::call(
