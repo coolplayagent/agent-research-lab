@@ -38,7 +38,7 @@ impl Harness {
             updates.clone(),
             shutdown.clone(),
         );
-        web.operator = Some(Arc::new(operator::Operator::fixture(&"f".repeat(64))));
+        web.operator = Some(Arc::new(operator::Operator::local(&path, addr).unwrap()));
         let mut stop = shutdown.subscribe();
         let server = tokio::spawn(async move {
             axum::serve(listener, transport::router(web))
@@ -59,11 +59,6 @@ impl Harness {
     }
     async fn raw(&self, header: String) -> String {
         let mut stream = tokio::net::TcpStream::connect(self.addr).await.unwrap();
-        let header = header.replacen(
-            "\r\n",
-            &format!("\r\nCookie: crystal_operator={}\r\n", "f".repeat(64)),
-            1,
-        );
         stream.write_all(header.as_bytes()).await.unwrap();
         let mut body = String::new();
         tokio::time::timeout(Duration::from_secs(3), stream.read_to_string(&mut body))
@@ -155,9 +150,7 @@ async fn actual_async_http_enforces_origin_intent_and_resource_boundaries() {
 #[tokio::test]
 async fn snapshots_push_only_after_notification_while_other_requests_remain_available() {
     let h = Harness::new().await;
-    let mut events = Events::open(h.addr, "/api/events", None, Some(&"f".repeat(64)))
-        .await
-        .unwrap();
+    let mut events = Events::connect(h.addr, "/api/events", None).await.unwrap();
     assert_eq!(events.next().await.unwrap().1["sample"], "first");
     let snapshot = h
         .raw(format!(
@@ -307,13 +300,13 @@ async fn network_busy_queue_reconnect_ack_and_revocation_preserve_private_delive
 }
 
 #[tokio::test]
-async fn research_process_requires_operator_cookie() {
+async fn research_process_is_available_without_operator_cookie() {
     let h = Harness::new().await;
     let mut stream = tokio::net::TcpStream::connect(h.addr).await.unwrap();
     stream.write_all(format!("GET /api/research-process?group_id=g&goal_id=goal&work_id=work-0&attempt=1 HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n", h.addr).as_bytes()).await.unwrap();
     let mut response = String::new();
     stream.read_to_string(&mut response).await.unwrap();
-    assert!(response.starts_with("HTTP/1.1 401"));
-    assert!(response.contains("Host operator login required"));
+    assert!(response.starts_with("HTTP/1.1 404"));
+    assert!(response.contains("Research process unavailable"));
     h.close().await;
 }

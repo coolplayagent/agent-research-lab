@@ -26,7 +26,7 @@ bazel build //:outcome-hub //:outcome-hub-cli //:outcome-hub-package
 bazel run //:outcome-hub -- serve --state-dir /absolute/path/to/state --listen 127.0.0.1:4877
 ```
 
-Use `outcome-hub link` with the same state directory to retrieve the operator access link. Existing state locations are preserved; renaming never switches a live database.
+Open `http://127.0.0.1:4877/` directly; no management credential is required. The service binds only to loopback. Existing state locations are preserved; renaming never switches a live database.
 
 Applications live in `apps/outcome-hub`, `apps/cli`, and `apps/console`. Build the optional services with `//:adapter-package`, or the full distribution with `//:package`. Only canonical OutcomeHub commands are packaged; use the separate migration tool before opening retired state formats.
 

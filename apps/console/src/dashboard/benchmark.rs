@@ -50,26 +50,13 @@ pub(super) struct Events {
 }
 impl Events {
     pub(super) async fn connect(addr: SocketAddr, path: &str, token: Option<&str>) -> Result<Self> {
-        Self::open(addr, path, token, None).await
-    }
-    pub(super) async fn open(
-        addr: SocketAddr,
-        path: &str,
-        token: Option<&str>,
-        cookie: Option<&str>,
-    ) -> Result<Self> {
         let mut stream = TcpStream::connect(addr).await?;
         stream.set_nodelay(true)?;
         let auth = token
             .map(|t| format!("Authorization: Bearer {t}\r\n"))
             .unwrap_or_default();
-        let cookie = cookie
-            .map(|c| format!("Cookie: crystal_operator={c}\r\n"))
-            .unwrap_or_default();
         stream
-            .write_all(
-                format!("GET {path} HTTP/1.1\r\nHost: {addr}\r\n{auth}{cookie}\r\n").as_bytes(),
-            )
+            .write_all(format!("GET {path} HTTP/1.1\r\nHost: {addr}\r\n{auth}\r\n").as_bytes())
             .await?;
         let mut reader = BufReader::new(stream);
         let mut header = String::new();

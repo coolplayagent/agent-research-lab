@@ -4,15 +4,7 @@ use std::future::IntoFuture;
 use std::{net::SocketAddr, path::Path, sync::Arc, time::Duration};
 /// A bounded standalone host. A supervisor can restart it against the same durable state.
 pub async fn serve(state: &Path, listen: SocketAddr, seconds: u64) -> Result<()> {
-    serve_with_local_operator(state, listen, seconds, false).await
-}
-pub async fn serve_with_local_operator(
-    state: &Path,
-    listen: SocketAddr,
-    seconds: u64,
-    local_operator: bool,
-) -> Result<()> {
-    validate_listen(listen, local_operator)?;
+    validate_listen(listen)?;
     ensure!(
         (1..=43200).contains(&seconds),
         "service lifetime must be 1..43200 seconds"
@@ -39,13 +31,9 @@ pub async fn serve_with_local_operator(
         seconds,
         shutdown.subscribe(),
     ));
-    web.operator = Some(Arc::new(if local_operator {
-        operator::Operator::local(state, addr)?
-    } else {
-        operator::Operator::open(state, addr)?
-    }));
+    web.operator = Some(Arc::new(operator::Operator::local(state, addr)?));
     eprintln!(
-        "OutcomeHub: http://{addr}; access link: outcome-hub link --state-dir {}",
+        "OutcomeHub workspace: http://{addr}; state: {}",
         state.display()
     );
     let halt = async move {

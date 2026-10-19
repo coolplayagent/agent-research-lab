@@ -1,8 +1,7 @@
 use crate::tests::Harness;
 use serde_json::{Value, json};
 #[tokio::test]
-async fn group_goal_http_flow_is_independent_of_research_and_enforces_operator_and_assignment_roles()
- {
+async fn group_goal_http_flow_is_independent_of_research_and_enforces_assignment_roles() {
     let h = Harness::new().await;
     for id in ["planner", "reviewer", "outsider"] {
         h.manage(json!({"operation":"person","person":{"id":id,"name":id}}))
@@ -10,28 +9,17 @@ async fn group_goal_http_flow_is_independent_of_research_and_enforces_operator_a
     }
     h.manage(json!({"operation":"create","group":{"id":"team","kind":"conversation","title":"Design","topic":"Compare alternatives","members":["planner","reviewer"]}})).await;
     let create = json!({"operation":"create","goal":{"id":"goal","group_id":"team","title":"Choose a protocol","objective":"Compare two designs","acceptance":"Both members report with evidence","scenario":"collaboration","parameters":{},"max_seconds":60,"assignments":[{"person_id":"planner","instruction":"Propose two designs"},{"person_id":"reviewer","instruction":"Review the tradeoffs"}]}});
-    assert_eq!(
-        h.request(
-            "/api/v1/collaboration/goals",
-            Some(create.clone()),
-            false,
-            None
-        )
-        .await
-        .0,
-        401
-    );
     let (status, body) = h
         .request(
             "/api/v1/collaboration/goals",
             Some(create.clone()),
-            true,
+            false,
             None,
         )
         .await;
     assert_eq!(status, 200, "{body}");
     let current_url = "/api/v1/collaboration/goals?group_id=team&current=true";
-    assert_eq!(h.request(current_url, None, false, None).await.0, 401);
+    assert_eq!(h.request(current_url, None, false, None).await.0, 200);
     let (current_status, current_body) = h.request(current_url, None, true, None).await;
     assert_eq!(current_status, 200, "{current_body}");
     let current: Value = serde_json::from_str(&current_body).unwrap();
@@ -130,7 +118,7 @@ async fn group_goal_http_flow_is_independent_of_research_and_enforces_operator_a
 }
 
 #[tokio::test]
-async fn mention_dispatch_is_operator_only_and_rejects_unavailable_scenarios_without_sending() {
+async fn mention_dispatch_rejects_unavailable_scenarios_without_sending() {
     let h = Harness::new().await;
     h.manage(json!({"operation":"person","person":{"id":"planner","name":"Planner"}}))
         .await;
@@ -145,7 +133,7 @@ async fn mention_dispatch_is_operator_only_and_rejects_unavailable_scenarios_wit
         )
         .await
         .0,
-        401
+        400
     );
     assert_eq!(
         h.request(

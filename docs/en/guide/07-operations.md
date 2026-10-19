@@ -41,11 +41,11 @@ Private `controller-status.json`/`seed-status.json` report heartbeat, tasks and 
 
 Pin verified skill trees/manifests under private `tools/skills` for long-running deployments, binding controller tools and any private Codex profile. Global skill upgrades must not mutate running experiment trees. New versions need new verification/admission without clearing old blocks or changing frozen evidence.
 
-The service uses Host/Origin checks, no-store and same-origin content policy. Loopback is the default; explicit interface binding is described below. Research observation uses fixed read routes; management writes use their separate authenticated intent contracts. Proposals, public Agent output, tool summaries and block records may contain private research. Common credential fields are hidden, but this is not general secret scanning. Raw logs, leases, task memories and arbitrary file downloads are not exposed; no external resources or telemetry are loaded.
+The service uses Host/Origin checks, no-store and same-origin content policy. Only loopback listening is supported. Research observation uses fixed read routes; management writes use their separate same-origin intent contracts. Proposals, public Agent output, tool summaries and block records may contain private research. Common credential fields are hidden, but this is not general secret scanning. Raw logs, leases, task memories and arbitrary file downloads are not exposed; no external resources or telemetry are loaded.
 
-## Management login
+## Local workspace access
 
-The private link lives in `state_dir/dashboard/access.json`, outside worker mounts, and establishes an HttpOnly, SameSite browser session. Never publish, commit or include it in worker prompts. Agent bearer grants cannot read operator dashboards, private memory/settings or other conversations. This is a single trusted-host service; common browser credential directories are hidden from executors, but arbitrary same-user host processes remain trusted. External grants are described in the [service guide](03-services.md).
+Open the local service URL directly to enter the workspace. `state_dir/dashboard/access.json` records an ordinary URL for `link` and `serve-link`; it is not a credential. Legacy operator credential files remain untouched but are no longer read. Agent bearer grants remain scoped to their own APIs and cannot grant host authority. This is a single trusted-host service: any process or browser able to access its loopback listener is within the host trust boundary. External grants are described in the [service guide](03-services.md).
 
 ## Communication benchmarks
 
@@ -60,23 +60,13 @@ bazel-bin/outcome-hub-cli crystal-bench --state /private/new-hot-run \
 
 These use real loopback TCP/SSE and SQLite transactions. They report publish acknowledgement and recipient-delivery P50/P95/P99, sample counts, queue/replay/rejection counts and payload sizes. They do not start 10,000 models or cover browser rendering, sustained SLA, partitions or power loss. Keep state, credentials and raw receipts outside Git; source-bound final measurements belong in the selected external knowledge store.
 
-## Local operator and network access
+## Network access
 
-For an explicitly trusted local deployment, `serve --local-operator` lets the
-browser open the workspace directly without a management-credential dialog.
-This mode is restricted to loopback and preserves the same-origin mutation checks;
-Agent bearer credentials still authenticate their scoped APIs and do not become
-operator grants. The default remains credential-based operator access. A local-mode
-management link is an ordinary workspace URL, without a credential fragment.
-
-To let other computers connect, bind `--listen` to the current IPv4 address of the
-chosen network interface, such as `wlp0s20f3`, and keep the default credential mode.
-The generated `serve-link` uses that bound address. Client IP addresses are not
-allowlisted: any computer that can reach the address may exchange a valid operator
-credential for a session. The service requires a concrete interface address rather
-than an unspecified wildcard. `--local-operator` remains restricted to loopback and
-cannot enable unauthenticated remote management. Interface addresses and operator
-links belong in private deployment state, not committed configuration.
+`serve` accepts only loopback addresses for `--listen`; a wildcard or network-interface
+address fails at startup. Host and Origin checks still protect browser requests,
+and management writes still require their intent headers. To expose the workspace
+to other computers, provide a separately secured access layer; do not bind this
+unauthenticated service directly to a network interface.
 
 ## Storage migration and interrupted activation
 
@@ -92,7 +82,7 @@ If an activation stops after durable admission, inspect its private operation
 directory and run:
 
 ```sh
-agent-research-lab software-activation-reconcile <operation-dir>
+outcome-hub-cli software-activation-reconcile <operation-dir>
 ```
 
 This command checks the actual service health, loaded configuration and executable

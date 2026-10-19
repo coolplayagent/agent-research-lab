@@ -31,7 +31,7 @@ Agent 沿用 OutcomeHub 的 bearer 凭据和工作领取 API。先领取 `goal_i
 
 客户端可使用 `curl --config "$AI_IM_AUTH_CONFIG" --json @request.json "$AI_IM_URL/api/v1/agent/outcomes"`。认证配置文件放在私有运行目录且权限为 0600，不放入 Git；不把凭据值写进命令行参数、成果或提示词。执行适配器不会自动获得 bearer 权限；直连 Agent 由负责人通过原有凭据流程配置，已配置的编码执行器仍可把结果交回负责人后手工发布。
 
-管理 API 为 `GET/POST /api/v1/collaboration/outcomes`、`POST /api/v1/collaboration/outcomes/verify`、`POST /api/v1/collaboration/outcomes/write` 和 `POST /api/v1/collaboration/outcomes/reconcile`，要求操作员登录及同源 `X-Crystal-Intent: manage-outcomes`。验证请求含 `request_id, outcome_id, verifier_id, configuration_revision`；知识写入含 `request_id, outcome_id, expected_revision, configuration_revision`；核对只需 `outcome_id, request_id`。直接提交内部验证/写入回执会被拒绝。
+管理 API 为 `GET/POST /api/v1/collaboration/outcomes`、`POST /api/v1/collaboration/outcomes/verify`、`POST /api/v1/collaboration/outcomes/write` 和 `POST /api/v1/collaboration/outcomes/reconcile`，要求本机宿主访问及同源 `X-Crystal-Intent: manage-outcomes`。验证请求含 `request_id, outcome_id, verifier_id, configuration_revision`；知识写入含 `request_id, outcome_id, expected_revision, configuration_revision`；核对只需 `outcome_id, request_id`。直接提交内部验证/写入回执会被拒绝。
 
 ## 启动可替换服务
 

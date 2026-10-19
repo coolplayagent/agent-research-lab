@@ -34,13 +34,7 @@ fn core_binary_starts_and_restarts_without_optional_services() {
         let child = Command::new(env!("CARGO_BIN_EXE_outcome-hub"))
             .args(["serve", "--state-dir"])
             .arg(root.path())
-            .args([
-                "--listen",
-                &addr.to_string(),
-                "--max-seconds",
-                "3",
-                "--local-operator",
-            ])
+            .args(["--listen", &addr.to_string(), "--max-seconds", "3"])
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()
@@ -61,6 +55,9 @@ fn core_binary_starts_and_restarts_without_optional_services() {
         }
         let response = get(addr, "/api/v1/collaboration/scenarios").unwrap();
         assert!(response.starts_with("HTTP/1.1 200"));
+        let session = get(addr, "/api/operator/session").unwrap();
+        assert!(session.starts_with("HTTP/1.1 200"));
+        assert!(session.contains("\"local_operator\":true"));
         let body: serde_json::Value =
             serde_json::from_str(response.split_once("\r\n\r\n").unwrap().1).unwrap();
         let scenarios = body["scenarios"].as_array().unwrap();

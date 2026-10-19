@@ -45,7 +45,7 @@ bazel-bin/outcome-hub-cli --config local.toml refresh
 
 ```sh
 bazel-bin/outcome-hub-cli --config local.toml serve --listen 127.0.0.1:8090 --max-seconds 43200
-bazel-bin/outcome-hub-cli --config local.toml serve-link
+
 ```
 
 首页保持 OutcomeHub。适配器通过稳定 ID 发现已配置研究身份，保留在 IM 中设置的名称。创建群聊，在目标中选择 **CLI 研究**、配置的仓库和研究成员。准入失败会将场景标为暂不可用，并在私有 `private/im-admission/` 中保留有界诊断；界面仅显示稳定状态和结果码。每个分工生成不可变、只读的研究 Job，结果连同源码、提示词、策略及 SuperPOD 绑定返回群组。结果需要主持人显式验收；实现与发布仍受原有 CLI 门禁约束。

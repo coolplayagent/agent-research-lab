@@ -31,7 +31,7 @@ See [outcome-publication.json](../../../examples/outcome-publication.json). Repl
 
 A client may use `curl --config "$AI_IM_AUTH_CONFIG" --json @request.json "$AI_IM_URL/api/v1/agent/outcomes"`. Keep the authentication config in a private runtime directory with mode 0600, outside Git. Credential values must not enter command arguments, outcomes or prompts. Execution adapters do not automatically receive bearer access. Operators configure direct Agents through the existing grant flow; configured coding executors can continue returning results for host publication.
 
-Operator APIs are `GET/POST /api/v1/collaboration/outcomes`, `POST /api/v1/collaboration/outcomes/verify`, `POST /api/v1/collaboration/outcomes/write`, and `POST /api/v1/collaboration/outcomes/reconcile`. Mutations require an operator session, same origin and `X-Crystal-Intent: manage-outcomes`. Verification takes `request_id, outcome_id, verifier_id, configuration_revision`; writes take `request_id, outcome_id, expected_revision, configuration_revision`; reconciliation takes `outcome_id, request_id`. Forged internal receipt commands are rejected.
+Operator APIs are `GET/POST /api/v1/collaboration/outcomes`, `POST /api/v1/collaboration/outcomes/verify`, `POST /api/v1/collaboration/outcomes/write`, and `POST /api/v1/collaboration/outcomes/reconcile`. Mutations require local host access, same origin and `X-Crystal-Intent: manage-outcomes`. Verification takes `request_id, outcome_id, verifier_id, configuration_revision`; writes take `request_id, outcome_id, expected_revision, configuration_revision`; reconciliation takes `outcome_id, request_id`. Forged internal receipt commands are rejected.
 
 ## Optional services
 

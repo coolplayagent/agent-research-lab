@@ -39,7 +39,6 @@ fn execute(cli: Cli) -> Result<Value> {
             listen,
             max_seconds,
             state_dir,
-            local_operator,
         } => {
             if let Some(path) = &cli.config {
                 let c = Config::load(path)?;
@@ -47,19 +46,14 @@ fn execute(cli: Cli) -> Result<Value> {
                     state_dir.is_none(),
                     "--config uses its configured state_dir; do not also pass --state-dir"
                 );
-                crate::dashboard::serve(&c, listen, max_seconds, local_operator)
+                crate::dashboard::serve(&c, listen, max_seconds)
             } else {
                 let state = state_dir.unwrap_or_else(|| ".ai-im".into());
                 tokio::runtime::Builder::new_multi_thread()
                     .worker_threads(4)
                     .enable_all()
                     .build()?
-                    .block_on(collaboration_host::serve_with_local_operator(
-                        &state,
-                        listen,
-                        max_seconds,
-                        local_operator,
-                    ))?;
+                    .block_on(collaboration_host::serve(&state, listen, max_seconds))?;
                 Ok(json!({"stopped":true,"mode":"ai-im"}))
             }
         }

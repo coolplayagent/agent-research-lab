@@ -22,19 +22,15 @@ mod rooms;
 pub mod transport;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
-/// Bind one advertised interface address; remote management always requires credentials.
-pub fn validate_listen(listen: SocketAddr, local_operator: bool) -> Result<()> {
+/// Direct browser management is limited to a loopback interface.
+pub fn validate_listen(listen: SocketAddr) -> Result<()> {
     ensure!(
-        !listen.ip().is_unspecified() && !listen.ip().is_multicast(),
-        "select an explicit unicast interface address"
-    );
-    ensure!(
-        !local_operator || listen.ip().is_loopback(),
-        "local operator requires a loopback address"
+        listen.ip().is_loopback(),
+        "direct workspace access requires a loopback address"
     );
     Ok(())
 }
-use std::{fs, net::SocketAddr, path::Path, sync::Arc, time::Duration};
+use std::{net::SocketAddr, path::Path, sync::Arc, time::Duration};
 fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
     ensure!(request.ends_with("\r\n\r\n"), "incomplete headers");
     let mut lines = request.split("\r\n");

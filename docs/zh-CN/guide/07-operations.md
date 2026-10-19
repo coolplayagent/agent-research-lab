@@ -41,11 +41,11 @@ bazel-bin/outcome-hub-cli --config local.toml doctor --probe-models
 
 长期部署应将验证过的技能树与清单固定到私有 `tools/skills`，绑定控制器工具及可选私有 Codex profile。全局技能更新不得改变进行中实验的工具树。新版本需要新的源码/清单验证和新准入批次，不清除旧阻塞项或修改冻结证据。
 
-服务默认绑定回环地址，显式网卡绑定见下文；使用 Host/Origin 检查、no-store 和同源内容策略。研究观察通过固定读取路由提供；管理写入使用独立的认证及 intent 契约。提案、公开 Agent 输出、工具摘要和阻塞记录均可能含研究信息，应作为私有数据。常见凭证字段会隐藏，但这不是通用秘密扫描器。原始日志、租约、任务记忆和任意文件下载不开放，不加载外部资源或遥测。
+服务仅绑定回环地址，使用 Host/Origin 检查、no-store 和同源内容策略。研究观察通过固定读取路由提供；管理写入使用独立的同源及 intent 契约。提案、公开 Agent 输出、工具摘要和阻塞记录均可能含研究信息，应作为私有数据。常见凭证字段会隐藏，但这不是通用秘密扫描器。原始日志、租约、任务记忆和任意文件下载不开放，不加载外部资源或遥测。
 
-## 管理登录
+## 本地工作空间访问
 
-管理链接保存在 worker 挂载不可见的 `state_dir/dashboard/access.json`。首次打开建立 HttpOnly、SameSite 浏览器会话；此链接属于凭证，不得提交、放进 worker 提示词或公开。普通数字人 bearer 授权不能读取操作员面板、私有记忆、设置或其他会话。服务面向单一可信宿主，默认绑定回环地址；常见浏览器凭证目录也对执行器隐藏，同用户运行的任意宿主进程仍在信任范围内。
+启动后直接打开本地服务地址即可进入工作空间。`state_dir/dashboard/access.json` 只为 `link` 和 `serve-link` 记录普通 URL，不包含管理凭据。旧管理凭据文件保持原样，但不再读取。数字人的 bearer 授权仍只适用于其范围内的 API，不能获取宿主管理权限。本服务面向单一可信宿主；能访问其本机回环监听的进程或浏览器都处于宿主信任边界内。
 
 创建数字人或使用宿主管理的研究执行无需在界面申请个人接入凭证。需要从独立受信适配器访问底层消息 API 时，操作员可在 `POST /api/v1/messaging/manage` 使用 `operation: "grant"` 签发短期授权：只返回一次、仅保存摘要、最长 24 小时有效。操作员变更还须携带精确同源 `Origin`、JSON Content-Type 和 `X-Crystal-Intent: manage-crystal`。
 
@@ -62,11 +62,9 @@ bazel-bin/outcome-hub-cli crystal-bench --state /private/new-hot-run \
 
 实验使用真实回环 TCP/SSE 和 SQLite 事务，分别报告发布确认与接收方投递的 P50/P95/P99、精确样本数、队列/重放/拒绝计数及载荷大小。不启动 10,000 个模型进程，也不覆盖浏览器渲染、持续 SLA、网络分区或断电。基准状态、凭证和原始回执留在 Git 外；汇总研究及绑定来源的最终测量进入 SuperPOD。
 
-## 本地操作员与网络访问
+## 网络访问
 
-显式信任的本地部署可使用 `serve --local-operator`，浏览器直接进入工作区，不显示管理凭证对话框。此模式仅限回环地址，仍检查同源写请求；Agent bearer 仍只授权其范围 API，不升级为操作员。默认继续要求操作员凭证。本地模式 `serve-link` 返回普通工作区 URL，不带凭证 fragment。
-
-其他计算机访问时，将 `--listen` 绑定到所选网卡（例如 `wlp0s20f3`）当前的具体 IPv4 地址，保持默认凭证模式。`serve-link` 使用该地址。不按客户端 IP 白名单限制：能连接并持有有效操作员凭证的计算机可交换会话。不能使用未指定地址的通配绑定，`--local-operator` 不能开启远程免认证管理。网卡地址与操作员链接只保存在私有部署状态。
+`serve` 的 `--listen` 只接受回环地址；通配地址和网卡地址会在启动时被拒绝。浏览器请求仍检查 Host 和 Origin，管理写入仍需对应 intent 请求头。若需从其他计算机访问，应另行提供带访问控制的入口，不要把免登录服务直接绑定到网卡。
 
 ## 存储迁移与中断激活
 
@@ -75,7 +73,7 @@ bazel-bin/outcome-hub-cli crystal-bench --state /private/new-hot-run \
 激活在持久准入后中断时，检查私有操作目录并运行：
 
 ```sh
-agent-research-lab software-activation-reconcile <operation-dir>
+outcome-hub-cli software-activation-reconcile <operation-dir>
 ```
 
 命令依据保存的安装证明检查实际健康、已加载配置和可执行哈希，仅当候选或旧安装被核实时，生成绑定操作与激活 claim 的回执，再由交付协调器经存储 API 结算。不确定安装保持待核对，时间流逝不能解锁暂停/停止或宣告成功。核对不重放部署、不改服务配置或数据库。

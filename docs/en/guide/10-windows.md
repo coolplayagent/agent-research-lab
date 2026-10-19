@@ -11,14 +11,13 @@ if ($actual -ne $expected) { throw 'Archive checksum mismatch' }
 Expand-Archive .\outcome-hub-windows-x86_64.zip -DestinationPath .\outcome-hub-release
 ```
 
-Open two PowerShell windows in `outcome-hub-release\outcome-hub`. Start the native core in one and obtain its private browser link in the other:
+Open PowerShell in `outcome-hub-release\outcome-hub` and start the native core:
 
 ```powershell
 .\outcome-hub.exe serve --listen 127.0.0.1:4877 --max-seconds 43200
-.\outcome-hub.exe link
 ```
 
-The default state directory is `%LOCALAPPDATA%\OutcomeHub\state`; supply the same absolute `--state-dir` to both commands to use another location. The app creates private access-control lists for its state. Keep the link private and back up the state directory before upgrades. Stop the service before restoring a backup.
+Open `http://127.0.0.1:4877/` directly in a browser on this computer. No management credential is needed. The default state directory is `%LOCALAPPDATA%\OutcomeHub\state`; use an absolute `--state-dir` to choose another location. The app creates private access-control lists for its state. Back up the state directory before upgrades and stop the service before restoring a backup.
 
 This native package runs core collaboration with its separate embedded local store. It does not include the external execution, sandbox, research, or knowledge services. The Windows defaults leave those services disabled; configured external service sockets cannot connect until a native service transport adapter is available. A configured adapter is not evidence of a completed task.
 

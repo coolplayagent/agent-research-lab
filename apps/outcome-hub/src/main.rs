@@ -19,9 +19,6 @@ enum Command {
         listen: SocketAddr,
         #[arg(long, default_value_t = 43200)]
         max_seconds: u64,
-        /// Allow browser management directly on this trusted loopback host.
-        #[arg(long)]
-        local_operator: bool,
     },
     Link {
         #[arg(long)]
@@ -47,16 +44,9 @@ async fn main() -> Result<()> {
             state_dir,
             listen,
             max_seconds,
-            local_operator,
         } => {
             let state_dir = state_dir.map_or_else(default_state_dir, Ok)?;
-            collaboration_host::serve_with_local_operator(
-                &state_dir,
-                listen,
-                max_seconds,
-                local_operator,
-            )
-            .await
+            collaboration_host::serve(&state_dir, listen, max_seconds).await
         }
         Command::Link { state_dir } => {
             let state_dir = state_dir.map_or_else(default_state_dir, Ok)?;

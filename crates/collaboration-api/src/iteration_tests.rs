@@ -581,13 +581,13 @@ async fn remote_scenario_protocol_checks_health_goal_digest_current_attempt_and_
 }
 
 #[tokio::test]
-async fn iteration_http_api_requires_operator_and_rejects_unavailable_scenario_before_storage() {
+async fn iteration_http_api_opens_directly_and_rejects_unavailable_scenario_before_storage() {
     let host = crate::tests::Harness::new().await;
     assert_eq!(
         host.request("/api/v1/collaboration/iterations", None, false, None)
             .await
             .0,
-        401
+        200
     );
     let (status, body) = host
         .request("/api/v1/collaboration/iterations", None, true, None)

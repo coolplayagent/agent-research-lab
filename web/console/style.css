@@ -2636,34 +2636,6 @@ body.focus-graph.profile-open .inspector {
 .crystal-node:hover {
   background: #e8f4f5;
 }
-body.operator-pending > :not(#operator-login) {
-  display: none !important;
-}
-.operator-login {
-  max-width: 560px;
-  margin: 15vh auto;
-  padding: 28px;
-  border: 1px solid #dce7ed;
-  border-radius: 18px;
-  background: white;
-}
-.operator-login p {
-  line-height: 1.7;
-}
-.operator-login form {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-}
-.operator-login input {
-  flex: 1;
-  min-width: 0;
-  padding: 12px;
-}
-.operator-login code {
-  display: block;
-  overflow-wrap: anywhere;
-}
 .crystal-grant {
   flex-basis: 100%;
   padding: 12px;

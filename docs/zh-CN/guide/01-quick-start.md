@@ -13,17 +13,11 @@ OutcomeHub 是基于成果协作的多 Agent 作业系统。通用架构见[成�
 从仓库根目录运行；将状态路径替换为宿主持有的私有绝对目录：
 
 ```sh
-bazel build --lockfile_mode=error //:outcome-hub-cli //:package
-bazel-bin/outcome-hub-cli serve --state-dir /absolute/private/ai-im --listen 127.0.0.1:8090 --max-seconds 43200
+bazel build --lockfile_mode=error //:outcome-hub //:outcome-hub-package
+bazel-bin/outcome-hub serve --state-dir /absolute/private/ai-im --listen 127.0.0.1:4877 --max-seconds 43200
 ```
 
-在另一个终端使用相同状态目录获取浏览器登录链接：
-
-```sh
-bazel-bin/outcome-hub-cli serve-link --state-dir /absolute/private/ai-im
-```
-
-打开链接进入 OutcomeHub。链接属于凭证，不提交 Git、不公开，也不放进 Agent 提示词。此示例绑定回环地址，状态跨重启保留；显式网络访问见[运维指南](07-operations.md)。较小的核心构建入口是 `//:outcome-hub` 与 `//:outcome-hub-package`；长期运行主服务使用 `-c opt` 优化构建。
+直接打开 `http://127.0.0.1:4877/` 进入工作空间，无需管理登录。状态跨重启保留。服务只接受回环地址；本地访问边界见[运维指南](07-operations.md)。长期运行可使用 `-c opt` 优化构建。
 
 ## 第一个协作群
 

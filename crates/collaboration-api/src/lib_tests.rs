@@ -1,4 +1,5 @@
 use crate::*;
+use std::fs;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::watch,
@@ -33,40 +34,32 @@ async fn errors_preserve_messages_and_add_stable_codes_for_existing_statuses() {
     }
 }
 #[test]
-fn interface_access_requires_credentials_and_exact_service_origin() {
-    let addr: SocketAddr = "100.125.79.91:8090".parse().unwrap();
-    assert!(validate_listen(addr, false).is_ok());
-    assert!(validate_listen(addr, true).is_err());
-    for address in ["0.0.0.0:8090", "[::]:8090", "224.0.0.1:8090"] {
-        assert!(validate_listen(address.parse().unwrap(), false).is_err());
+fn direct_workspace_requires_loopback_and_exact_service_origin() {
+    let addr: SocketAddr = "127.0.0.1:8090".parse().unwrap();
+    assert!(validate_listen(addr).is_ok());
+    for address in [
+        "0.0.0.0:8090",
+        "[::]:8090",
+        "224.0.0.1:8090",
+        "100.125.79.91:8090",
+    ] {
+        assert!(validate_listen(address.parse().unwrap()).is_err());
     }
     let request = |host: &str, origin: &str| {
         format!("GET / HTTP/1.1\r\nHost: {host}\r\nOrigin: {origin}\r\n\r\n")
     };
-    assert!(
-        allowed_request(
-            &request("100.125.79.91:8090", "http://100.125.79.91:8090"),
-            addr
-        )
-        .is_ok()
-    );
+    assert!(allowed_request(&request("127.0.0.1:8090", "http://127.0.0.1:8090"), addr).is_ok());
     for (host, origin) in [
-        ("localhost:8090", "http://localhost:8090"),
-        ("127.0.0.1:8090", "http://127.0.0.1:8090"),
-        ("100.125.79.91:8090", "http://foreign.invalid"),
+        ("evil.example:8090", "http://127.0.0.1:8090"),
+        ("127.0.0.1:8090", "http://foreign.invalid"),
     ] {
         assert!(allowed_request(&request(host, origin), addr).is_err());
     }
     let state = tempfile::tempdir().unwrap();
-    let operator = operator::Operator::open(state.path(), addr).unwrap();
-    assert!(!operator.authorized(&axum::http::HeaderMap::new()));
+    let operator = operator::Operator::local(state.path(), addr).unwrap();
+    assert!(operator.authorized(&axum::http::HeaderMap::new()));
     let access: Value = storage::read(&state.path().join("dashboard/access.json")).unwrap();
-    assert!(
-        access["url"]
-            .as_str()
-            .unwrap()
-            .starts_with("http://100.125.79.91:8090/#access=")
-    );
+    assert_eq!(access["url"], "http://127.0.0.1:8090/");
 }
 pub(super) struct Harness {
     _state: tempfile::TempDir,
@@ -77,15 +70,12 @@ pub(super) struct Harness {
 }
 impl Harness {
     pub(super) async fn new() -> Self {
-        Self::with_local_operator(false).await
-    }
-    async fn with_local_operator(local_operator: bool) -> Self {
-        Self::configured(local_operator, None).await
+        Self::configured(None).await
     }
     pub(super) async fn with_services(config: service_api::Configuration) -> Self {
-        Self::configured(false, Some(config)).await
+        Self::configured(Some(config)).await
     }
-    async fn configured(local_operator: bool, config: Option<service_api::Configuration>) -> Self {
+    async fn configured(config: Option<service_api::Configuration>) -> Self {
         let state = tempfile::tempdir().unwrap();
         let hub = collaboration_store::Hub::open(state.path()).unwrap();
         hub.register_operator().await.unwrap();
@@ -102,11 +92,9 @@ impl Harness {
             registry.save(config).unwrap();
             web.services = Some(Arc::new(registry));
         }
-        web.operator = Some(Arc::new(if local_operator {
-            operator::Operator::local(state.path(), addr).unwrap()
-        } else {
-            operator::Operator::fixture(&"f".repeat(64))
-        }));
+        web.operator = Some(Arc::new(
+            operator::Operator::local(state.path(), addr).unwrap(),
+        ));
         let server = tokio::spawn(async move {
             axum::serve(listener, transport::router(web, axum::Router::new()))
                 .with_graceful_shutdown(async move {
@@ -143,16 +131,12 @@ impl Harness {
         let mut stream = tokio::net::TcpStream::connect(self.addr).await.unwrap();
         let method = if body.is_some() { "POST" } else { "GET" };
         let payload = body.map(|v| v.to_string()).unwrap_or_default();
-        let cookie = if operator {
-            format!("Cookie: crystal_operator={}\r\n", "f".repeat(64))
-        } else {
-            String::new()
-        };
+        let _ = operator;
         let auth = token
             .map(|t| format!("Authorization: Bearer {t}\r\n"))
             .unwrap_or_default();
         let request = format!(
-            "{method} {path} HTTP/1.1\r\nHost: {}\r\nOrigin: http://{}\r\nX-Crystal-Intent: {intent}\r\n{cookie}{auth}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nOrigin: http://{}\r\nX-Crystal-Intent: {intent}\r\n{auth}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
             self.addr,
             self.addr,
             payload.len()
@@ -230,7 +214,7 @@ async fn independent_host_manages_agents_groups_dms_boards_without_research_conf
         h.request("/api/v1/collaboration/people", None, false, None)
             .await
             .0,
-        401
+        200
     );
     assert_eq!(h.request("/api/snapshot", None, true, None).await.0, 404);
     let response = h
@@ -319,7 +303,7 @@ async fn independent_host_manages_agents_groups_dms_boards_without_research_conf
 
 #[tokio::test]
 async fn local_operator_enters_management_without_changing_actor_grants() {
-    let h = Harness::with_local_operator(true).await;
+    let h = Harness::new().await;
     let (status, session) = h.request("/api/operator/session", None, false, None).await;
     assert_eq!(status, 200);
     let session: Value = serde_json::from_str(&session).unwrap();
@@ -387,28 +371,41 @@ async fn local_operator_enters_management_without_changing_actor_grants() {
     );
     let access: Value = storage::read(&h._state.path().join("dashboard/access.json")).unwrap();
     assert_eq!(access["url"], format!("http://{}/", h.addr));
+    assert_eq!(
+        h.request("/api/operator/session", Some(json!({})), false, None)
+            .await
+            .0,
+        405
+    );
+    assert_eq!(
+        h.request("/api/operator/logout", Some(json!({})), false, None)
+            .await
+            .0,
+        404
+    );
     h.close().await;
 }
 #[test]
-fn local_operator_rejects_remote_bind_and_preserves_existing_credential() {
+fn direct_workspace_rejects_remote_bind_and_ignores_legacy_credential() {
     let state = tempfile::tempdir().unwrap();
     assert!(operator::Operator::local(state.path(), "0.0.0.0:8090".parse().unwrap()).is_err());
     let addr = "127.0.0.1:8090".parse().unwrap();
-    operator::Operator::open(state.path(), addr).unwrap();
-    let before = fs::read(state.path().join("dashboard/operator-credential.json")).unwrap();
+    fs::create_dir_all(state.path().join("dashboard")).unwrap();
+    let legacy = state.path().join("dashboard/operator-credential.json");
+    fs::write(&legacy, b"legacy credential stays untouched").unwrap();
     operator::Operator::local(state.path(), addr).unwrap();
     assert_eq!(
-        fs::read(state.path().join("dashboard/operator-credential.json")).unwrap(),
-        before
+        fs::read(&legacy).unwrap(),
+        b"legacy credential stays untouched"
     );
     let headers = axum::http::HeaderMap::new();
     assert!(
-        !operator::Operator::open(state.path(), addr)
+        operator::Operator::local(state.path(), addr)
             .unwrap()
             .authorized(&headers)
     );
     let access: Value = storage::read(&state.path().join("dashboard/access.json")).unwrap();
-    assert!(access["url"].as_str().unwrap().contains("#access="));
+    assert_eq!(access["url"], "http://127.0.0.1:8090/");
 }
 
 #[tokio::test]
@@ -423,7 +420,7 @@ async fn canonical_routes_preserve_operator_and_actor_authority() {
         for operator in [false, true] {
             assert_eq!(h.request(old, None, operator, None).await.0, 404);
         }
-        assert_eq!(h.request(new, None, false, None).await.0, 401);
+        assert_eq!(h.request(new, None, false, None).await.0, expected, "{new}");
         assert_eq!(h.request(new, None, true, None).await.0, expected, "{new}");
     }
     for (old, new) in [
@@ -444,7 +441,7 @@ async fn canonical_routes_preserve_operator_and_actor_authority() {
         )
         .await
         .0,
-        401
+        400
     );
     assert_ne!(
         h.request_intent(

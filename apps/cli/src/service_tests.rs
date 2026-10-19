@@ -1,27 +1,12 @@
 use super::*;
 
 #[test]
-fn local_operator_is_an_explicit_serve_option() {
-    for args in [
-        vec!["lab", "serve", "--local-operator"],
-        vec!["lab", "--config", "local.toml", "serve", "--local-operator"],
-    ] {
-        let cli = Cli::try_parse_from(args).unwrap();
-        assert!(matches!(
-            cli.command,
-            Commands::Serve {
-                local_operator: true,
-                ..
-            }
-        ));
-    }
+fn serve_has_no_operator_credential_mode() {
     assert!(matches!(
         Cli::try_parse_from(["lab", "serve"]).unwrap().command,
-        Commands::Serve {
-            local_operator: false,
-            ..
-        }
+        Commands::Serve { .. }
     ));
+    assert!(Cli::try_parse_from(["lab", "serve", "--local-operator"]).is_err());
 }
 #[test]
 fn service_state_selection_rejects_ambiguous_sources() {

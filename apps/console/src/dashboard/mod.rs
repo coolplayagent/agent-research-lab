@@ -254,14 +254,9 @@ fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
     Ok(first[1])
 }
 
-pub fn serve(
-    c: &Config,
-    listen: SocketAddr,
-    max_seconds: u64,
-    local_operator: bool,
-) -> Result<Value> {
+pub fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<Value> {
     runtime::validate_state(c)?;
-    collaboration_api::validate_listen(listen, local_operator)?;
+    collaboration_api::validate_listen(listen)?;
     ensure!(
         (1..=43200).contains(&max_seconds),
         "dashboard lifetime must be 1..43200 seconds"
@@ -287,12 +282,7 @@ pub fn serve(
         shutdown.clone(),
     );
     web.services = Some(services.clone());
-    web.operator = Some(Arc::new(if local_operator {
-        operator::Operator::local(&c.state_dir, addr)?
-    } else {
-        operator::Operator::open(&c.state_dir, addr)?
-    }));
-    eprintln!("Management link is in masked controller state: dashboard/access.json");
+    web.operator = Some(Arc::new(operator::Operator::local(&c.state_dir, addr)?));
     eprintln!("Research dashboard: http://{addr} (event-driven, {max_seconds}s)");
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(4)

@@ -25,16 +25,20 @@ try {
         }
     }
     if (-not $ready) { throw 'OutcomeHub did not answer on loopback.' }
+    $session = Invoke-RestMethod "http://$listen/api/operator/session" -TimeoutSec 2
+    if ($session.authenticated -ne $true -or $session.local_operator -ne $true) {
+        throw 'The native workspace requires unexpected operator credentials.'
+    }
     $link = & $binary link --state-dir $state
-    if ($LASTEXITCODE -ne 0 -or $link -notmatch ('^http://127\.0\.0\.1:' + $port + '/#access=[0-9a-f]{64}$')) {
-        throw 'The native core did not issue a private operator link.'
+    if ($LASTEXITCODE -ne 0 -or $link -ne "http://$listen/") {
+        throw 'The native core did not provide its direct loopback workspace URL.'
     }
     foreach ($path in @($state, (Join-Path $state 'dashboard'), (Join-Path $state 'crystal'))) {
         if ((Get-Acl -LiteralPath $path).Sddl -notmatch 'D:P') {
             throw "State directory has an inherited DACL: $path"
         }
     }
-    Write-Output 'Windows core started, served HTTP, issued a private link and protected its state.'
+    Write-Output 'Windows core started, opened its local workspace directly and protected its state.'
 } finally {
     if (-not $server.HasExited) { $server.Kill(); $server.WaitForExit(5000) | Out-Null }
 }

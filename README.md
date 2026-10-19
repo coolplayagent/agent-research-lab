@@ -34,7 +34,7 @@ bazel build //:outcome-hub //:outcome-hub-cli //:outcome-hub-package
 bazel run //:outcome-hub -- serve --state-dir /absolute/path/to/state --listen 127.0.0.1:4877
 ```
 
-服务默认要求操作者认证；通过同一状态目录执行 `outcome-hub link` 获取本机访问链接。兼容既有数据目录，不因更名自动搬迁数据库。
+启动后直接打开 `http://127.0.0.1:4877/` 进入工作空间，无需管理凭据；服务只绑定本机回环地址。兼容既有数据目录，不因更名自动搬迁数据库。
 
 | 应用 | 源码目录 | 用途 |
 | --- | --- | --- |
