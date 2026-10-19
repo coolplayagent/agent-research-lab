@@ -1,0 +1,51 @@
+name: Pages
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/pages.yml
+      - BUILD.bazel
+      - MODULE.bazel
+      - MODULE.bazel.lock
+      - site/**
+      - docs/**
+      - qualitygate/reviews/**
+      - examples/**
+      - README.md
+      - README.en.md
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+          disk-cache: ${{ github.workflow }}
+      - run: bazel test --lockfile_mode=error //:pages-site-test
+      - run: bazel build --lockfile_mode=error //:pages-site
+      - run: mkdir -p site-output && tar -xzf bazel-bin/pages-site.tar.gz -C site-output
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site-output
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

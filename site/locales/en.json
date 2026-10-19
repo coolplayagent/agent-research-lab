@@ -1,0 +1,21 @@
+{
+  "home": "Home", "documentation": "Documentation", "guides": "Guides",
+  "design": "Architecture", "release": "Download v0.1.0", "browse": "Browse",
+  "source": "Source on GitHub", "quickStart": "Quick start",
+  "skip": "Skip to content", "navigation": "Primary navigation",
+  "switchLanguage": "简体中文", "headingLink": "Link to this section",
+  "footer": "Built from the versioned repository documentation.",
+  "description": "OutcomeHub documentation for outcome-based multi-agent work.",
+  "version": "FIRST PUBLIC RELEASE · V0.1.0",
+  "hero": "Make work visible through outcomes.",
+  "subtitle": "OutcomeHub connects people and agents around goals, evidence, decisions and reusable results. Explore the architecture, run the core workspace and add optional execution services when needed.",
+  "chineseDocs": "中文文档", "explore": "DOCUMENTATION",
+  "findPath": "Find your path",
+  "staticNote": "This is a static documentation site. The OutcomeHub workspace runs on your own host and uses a private access link.",
+  "notFound": "Page not found", "notFoundBody": "This page is not in the published documentation.",
+  "cards": [
+    {"number": "01 / START", "title": "Get running", "description": "Build with Bazel, start the core and connect your first group.", "href": "docs/en/guide/01-quick-start.html"},
+    {"number": "02 / USE", "title": "Explore the guides", "description": "Set up services, coordinate agents and review outcomes.", "href": "docs/en/guide/00-index.html"},
+    {"number": "03 / DESIGN", "title": "Understand the system", "description": "See service boundaries, evidence flows and shared contracts.", "href": "docs/en/design/00-index.html"}
+  ]
+}

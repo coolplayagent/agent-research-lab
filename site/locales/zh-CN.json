@@ -1,0 +1,21 @@
+{
+  "home": "首页", "documentation": "文档", "guides": "使用指南",
+  "design": "架构", "release": "下载 v0.1.0", "browse": "浏览",
+  "source": "GitHub 源码", "quickStart": "快速开始",
+  "skip": "跳至正文", "navigation": "主导航",
+  "switchLanguage": "English", "headingLink": "链接到本节",
+  "footer": "内容来自版本化仓库文档。",
+  "description": "OutcomeHub 基于成果的多 Agent 作业系统文档。",
+  "version": "首个公开版本 · V0.1.0",
+  "hero": "让每次协作留下可验证的成果。",
+  "subtitle": "OutcomeHub 围绕目标、证据、决策和可复用成果连接人与 Agent。阅读架构，运行核心工作区，再按需接入执行服务。",
+  "chineseDocs": "中文文档", "explore": "文档导航",
+  "findPath": "从这里开始",
+  "staticNote": "本站是静态文档。OutcomeHub 工作区运行在你自己的主机上，并使用私有访问链接。",
+  "notFound": "页面不存在", "notFoundBody": "当前发布文档中没有这个页面。",
+  "cards": [
+    {"number": "01 / 入门", "title": "开始使用", "description": "用 Bazel 构建，启动核心服务，建立首个协作群组。", "href": "docs/zh-CN/guide/01-quick-start.html"},
+    {"number": "02 / 使用", "title": "阅读指南", "description": "配置服务，协调 Agent，验收成果。", "href": "docs/zh-CN/guide/00-index.html"},
+    {"number": "03 / 设计", "title": "了解架构", "description": "查看服务边界、证据流程和共享契约。", "href": "docs/zh-CN/design/00-index.html"}
+  ]
+}

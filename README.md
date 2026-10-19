@@ -1,6 +1,6 @@
 # OutcomeHub
 
-[English](README.en.md) · [中文文档](docs/zh-CN/00-index.md)
+[English](README.en.md) · [在线文档](https://coolplayagent.github.io/agent-research-lab/) · [下载版本](https://github.com/coolplayagent/agent-research-lab/releases)
 
 **OutcomeHub 是一个基于成果协作的多 Agent 作业系统。** 人与多个 Agent 围绕共同目标分工执行，将产出沉淀为带版本、来源证据、验收记录和复用关系的成果，持续推进后续作业。
 
@@ -46,6 +46,7 @@ bazel run //:outcome-hub -- serve --state-dir /absolute/path/to/state --listen 1
 
 ## 文档
 
+- [在线文档](https://coolplayagent.github.io/agent-research-lab/)（中文与英文）
 - [快速开始](docs/zh-CN/guide/01-quick-start.md)
 - [成果协作与模块架构](docs/outcomehub-architecture.md)
 - [Git、目录和 SuperPOD 知识库接入](docs/external-knowledge.md)

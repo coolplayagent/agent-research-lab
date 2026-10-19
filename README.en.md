@@ -1,6 +1,6 @@
 # OutcomeHub
 
-[中文](README.md) · [Documentation](docs/zh-CN/00-index.md)
+[中文](README.md) · [Documentation](https://coolplayagent.github.io/agent-research-lab/) · [Releases](https://github.com/coolplayagent/agent-research-lab/releases)
 
 **OutcomeHub is an outcome-based multi-agent work system.** People and agents work toward shared goals, produce versioned outcomes with evidence, obtain host acceptance, and reuse those outcomes in subsequent work.
 
@@ -32,6 +32,7 @@ Applications live in `apps/outcome-hub`, `apps/cli`, and `apps/console`. Build t
 
 ## Documentation
 
+- [Published documentation](https://coolplayagent.github.io/agent-research-lab/) (English and Chinese)
 - [Architecture and ownership](docs/outcomehub-architecture.md)
 - [External knowledge stores](docs/external-knowledge.md)
 - [Migration guide](docs/outcomehub-migration.md)

@@ -1,6 +1,7 @@
 load("@crates//:defs.bzl", "aliases", "all_crate_deps")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("@rules_rust//rust:defs.bzl", "rust_binary")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 exports_files(["Cargo.toml", "Cargo.lock"])
 
@@ -66,6 +67,7 @@ test_suite(
         "//crates/execution-targets:tests",
         "//crates/execution-model:tests",
         "//crates/workflow-adapter:tests",
+        ":pages-site-test",
     ],
     visibility = ["//visibility:public"],
 )
@@ -176,3 +178,33 @@ alias(name = "outcome-hub-package", actual = "//crates/collaboration-api:package
 
 alias(name = "outcome-hub-migrate", actual = "//apps/migrate:outcome-hub-migrate", visibility = ["//visibility:public"])
 alias(name = "migration-package", actual = "//apps/migrate:package", visibility = ["//visibility:public"])
+
+# GitHub Pages is generated from committed documentation and linked examples.
+PAGES_SOURCES = glob([
+    "README*.md",
+    "docs/**/*.md",
+    "qualitygate/reviews/**/*.md",
+    "examples/**",
+])
+
+filegroup(
+    name = "page_sources",
+    srcs = PAGES_SOURCES,
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "pages-site",
+    srcs = [":page_sources", "site/styles.css", "site/locales/en.json", "site/locales/zh-CN.json"],
+    tools = ["site/build.mjs", "@im_node//:bin/node", "@im_marked//:lib/marked.esm.js"],
+    outs = ["pages-site.tar.gz"],
+    cmd = "set -eu; mkdir -p $(@D)/pages-site; $(location @im_node//:bin/node) $(location site/build.mjs) $(location @im_marked//:lib/marked.esm.js) $(@D)/pages-site $(location site/styles.css) $(location site/locales/en.json) $(location site/locales/zh-CN.json) $(locations :page_sources); tar -C $(@D)/pages-site --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -czf $@ .",
+    visibility = ["//visibility:public"],
+)
+
+sh_test(
+    name = "pages-site-test",
+    srcs = ["site/check.sh"],
+    data = [":pages-site", "site/check.py"] + PAGES_SOURCES,
+    args = ["$(location :pages-site)"] + PAGES_SOURCES,
+)
