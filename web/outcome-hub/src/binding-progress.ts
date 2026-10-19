@@ -1,4 +1,4 @@
-import { BindingOperationState } from "/assets/shared/contracts.js";
+import { BindingOperationState, BindingStepState } from "/assets/shared/contracts.js";
 import type { BindingOperation } from "./binding-types.js";
 import { api } from "./api.js";
 import { element } from "./forms.js";
@@ -10,8 +10,11 @@ export function showProgress(container: HTMLElement, records: BindingOperation[]
     const card = element("article"); card.className = "card binding-progress";
     card.append(element("h3", t("binding.operation", { person: record.request.person_id, adapter: record.request.adapter_id })), element("p", label("BindingOperationState", record.state)));
     const steps = element("ol");
+    let previous = 0;
     for (const step of record.steps) {
-      steps.append(element("li", t("binding.step", { stage: label("BindingStage", step.stage), state: label("BindingStepState", step.state), seconds: (step.elapsed_ms / 1000).toFixed(1) })));
+      const elapsed = step.state === BindingStepState.Running ? Math.max(0, Date.now() - record.started_unix_ms - previous) : step.elapsed_ms;
+      previous += step.elapsed_ms;
+      steps.append(element("li", t("binding.step", { stage: label("BindingStage", step.stage), state: label("BindingStepState", step.state), seconds: (elapsed / 1000).toFixed(1) })));
     }
     card.append(steps);
     if (record.program) card.append(element("p", t("binding.found", { agent: label("CodingAgent", record.program.agent), version: record.program.version })), element("code", record.program.executable));

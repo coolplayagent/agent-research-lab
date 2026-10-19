@@ -4,7 +4,7 @@ mod dsh_config;
 mod process;
 mod providers;
 mod snapshots;
-pub use discovery::{discover, executable_digest};
+pub use discovery::{discover, discovery_failure_code, executable_digest};
 pub use dsh_config::selected_model;
 pub use providers::{Options, execute};
 pub use snapshots::{configuration_digest, environment_names, prepare_home, runtime_paths};

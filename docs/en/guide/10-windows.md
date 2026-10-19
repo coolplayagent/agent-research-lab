@@ -22,3 +22,21 @@ Open `http://127.0.0.1:4877/` directly in a browser on this computer. No managem
 This native package runs core collaboration with its separate embedded local store. It does not include the external execution, sandbox, research, or knowledge services. The Windows defaults leave those services disabled; configured external service sockets cannot connect until a native service transport adapter is available. A configured adapter is not evidence of a completed task.
 
 To build from source on Windows, install the pinned Rust toolchain and Bazelisk, then run `bazel build --lockfile_mode=error //:windows-package`. CI builds the archive on `windows-latest`, extracts it and smoke-tests the packaged executable.
+
+## Native Agent bindings in development builds
+
+The development branch adds `outcome-hub-services.exe` and `outcome-hub-agent.exe`; keep them beside `outcome-hub.exe`. Published v0.1.2 contains only the core described above. The next release is gated on authenticated Windows acceptance for all four Agents.
+
+Open Settings → Agent bindings, choose a digital person and Codex, Claude Code, DeepSeek Harness or Pi, then select **Validate and bind**. The app detects installed programs; it never installs third-party CLIs. A standalone `codex.exe` and an explicit absolute program path are supported. Leave the model blank to reuse the local selection. DeepSeek Harness needs an unambiguous configured route or an explicit `provider/model` override.
+
+Binding runs one small model task and may incur a charge. Progress distinguishes program discovery, runtime checks, configuration, task execution and saving. You can cancel or reload the page without losing the operation. Validation times out after 120 seconds. A failure preserves the old binding; settings changes during validation require a fresh request. Existing bindings are shown as unverified until tested.
+
+Use Windows 10/11 x64 with a local NTFS state directory. If Windows reports an error such as OS error 1, the UI includes its stage and a diagnostic ID. Check the state volume's permissions and filesystem support, the Agent's login and model settings, and the matching private diagnostic file. Do not publish credentials or private diagnostics.
+
+For authenticated acceptance, run from a source checkout with all four CLIs installed and logged in:
+
+```powershell
+./verification/windows-binding-smoke.ps1 -Binary C:\OutcomeHub\outcome-hub.exe -Live -Report $env:TEMP\outcome-hub-live.json
+```
+
+Use `-Programs @{codex='C:\Tools\codex.exe'}` or `-Models @{hds='provider/model'}` for explicit overrides. The report is private evidence and belongs outside Git. CI's deterministic fixtures validate transport and isolation; they do not establish authenticated model compatibility.

@@ -51,11 +51,25 @@ impl Operations {
         ensure!(records.len() <= 256, "binding journal exceeds bound");
         let mut entries = BTreeMap::new();
         for mut record in records {
+            record.request.validate()?;
             if record.state == State::Running {
                 if let Some(evidence) = config
                     .binding_evidence
                     .get(&record.request.person_id)
-                    .filter(|e| e.request_id == record.request.request_id)
+                    .filter(|e| {
+                        e.request_id == record.request.request_id
+                            && config.bindings.get(&record.request.person_id)
+                                == Some(&record.request.adapter_id)
+                            && config
+                                .adapters
+                                .iter()
+                                .find(|a| a.id == record.request.adapter_id)
+                                .is_some_and(|adapter| {
+                                    serde_json::to_vec(adapter).is_ok_and(|bytes| {
+                                        storage::digest(&bytes) == e.adapter_digest
+                                    })
+                                })
+                    })
                 {
                     record.state = State::Succeeded;
                     record.configuration_revision = Some(config.revision);
@@ -204,7 +218,8 @@ impl Operations {
         edit(&mut entry.record)?;
         entry.record.sequence += 1;
         let record = entry.record.clone();
-        self.persist(&entries)?;
+        self.persist(&entries)
+            .context(crate::binding_flow::Failure(Code::PersistenceFailed))?;
         Ok(record)
     }
     pub fn cancel(&self, id: &str) -> Result<BindingOperation> {

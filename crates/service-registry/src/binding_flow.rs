@@ -65,7 +65,8 @@ impl Registry {
                             .map_or(Stage::Discover, |s| s.stage);
                         let code = error.downcast_ref::<Failure>().map_or(
                             match stage {
-                                Stage::Discover => Code::ProgramMissing,
+                                Stage::Discover => agent_adapter::discovery_failure_code(&error)
+                                    .unwrap_or(Code::ProgramMissing),
                                 Stage::Runtime => Code::ServiceUnavailable,
                                 Stage::Configuration => Code::ConfigurationInvalid,
                                 Stage::Execute => Code::VerificationFailed,

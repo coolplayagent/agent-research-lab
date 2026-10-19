@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
-use windows_runtime::{Container, Process};
+use windows_runtime::Process;
 #[path = "snapshots.rs"]
 mod snapshots;
 #[cfg(test)]
@@ -106,7 +106,8 @@ async fn execute(
         "OutcomeHub.{}",
         &storage::digest(temp.path().as_os_str().to_string_lossy().as_bytes())[..32]
     );
-    let container = Container::create(&profile)?;
+    let profile = crate::profiles::Profile::create(state, &profile)?;
+    let container = profile.container();
     let runtime = temp.path().join("runtime");
     storage::private_dir(&runtime)?;
     let mut remaining_bytes = 1024 * 1024 * 1024u64;
@@ -180,7 +181,7 @@ async fn execute(
     let output_path = temp.path().join("output.json");
     let error_path = temp.path().join("diagnostic.log");
     let child = Process::spawn(
-        Some(&container),
+        Some(container),
         &command,
         &work,
         &environment,

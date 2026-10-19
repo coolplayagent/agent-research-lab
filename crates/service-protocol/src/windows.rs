@@ -43,6 +43,12 @@ pub enum Stream {
     Server(NamedPipeServer),
 }
 impl Stream {
+    pub async fn ready(&self, interest: tokio::io::Interest) -> io::Result<tokio::io::Ready> {
+        match self {
+            Self::Client(pipe) => pipe.ready(interest).await,
+            Self::Server(pipe) => pipe.ready(interest).await,
+        }
+    }
     pub async fn readable(&self) -> io::Result<()> {
         match self {
             Self::Client(v) => v.readable().await,

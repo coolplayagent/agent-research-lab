@@ -119,7 +119,10 @@ impl Process {
         if container.is_some() {
             attributes.update(PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, &security)?;
         }
-        attributes.update(PROC_THREAD_ATTRIBUTE_HANDLE_LIST, handles)?;
+        let mut inherited = handles.to_vec();
+        inherited.sort();
+        inherited.dedup();
+        attributes.update_slice(PROC_THREAD_ATTRIBUTE_HANDLE_LIST, &inherited)?;
         let mut startup = STARTUPINFOEXW::default();
         startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
         startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
@@ -175,8 +178,12 @@ impl Process {
         self.job.terminate();
     }
     pub fn poll(&self) -> Result<Option<u32>> {
-        if unsafe { WaitForSingleObject(self.handle, 0) } == WAIT_TIMEOUT {
+        let ready = unsafe { WaitForSingleObject(self.handle, 0) };
+        if ready == WAIT_TIMEOUT {
             return Ok(None);
+        }
+        if ready == WAIT_FAILED {
+            return Err(std::io::Error::last_os_error()).context("poll sandbox process");
         }
         let mut code = 0;
         if unsafe { GetExitCodeProcess(self.handle, &mut code) } == 0 {
@@ -229,6 +236,23 @@ impl Attributes {
         } == 0
         {
             return Err(std::io::Error::last_os_error()).context("set sandbox process attribute");
+        }
+        Ok(())
+    }
+    fn update_slice<T>(&self, key: u32, values: &[T]) -> Result<()> {
+        if unsafe {
+            UpdateProcThreadAttribute(
+                self.pointer(),
+                0,
+                key as usize,
+                values.as_ptr().cast(),
+                size_of_val(values),
+                ptr::null_mut(),
+                ptr::null(),
+            )
+        } == 0
+        {
+            return Err(std::io::Error::last_os_error()).context("set sandbox handle inheritance");
         }
         Ok(())
     }

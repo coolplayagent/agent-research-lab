@@ -132,6 +132,10 @@ pub async fn serve(
         "invalid service kind, lifetime or capacity"
     );
     storage::private_dir(state)?;
+    let _state_lock = storage::lock(&state.join("service.lock"))?;
+    if kind == ServiceKind::Sandbox {
+        sandbox::recover(state)?;
+    }
     let listener = rpc::Listener::bind(socket)?;
     let permits = Arc::new(tokio::sync::Semaphore::new(capacity));
     let mut tasks = tokio::task::JoinSet::new();

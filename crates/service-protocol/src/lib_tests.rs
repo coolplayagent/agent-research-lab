@@ -1,4 +1,14 @@
 use super::*;
+#[test]
+fn operating_system_error_survives_protocol_and_context_wrapping() {
+    let error = anyhow::Error::from(std::io::Error::from_raw_os_error(1))
+        .context("flush private state file");
+    let encoded = serde_json::to_vec(&Reply::from_result(Err(error))).unwrap();
+    let decoded: Reply = serde_json::from_slice(&encoded).unwrap();
+    let error = decoded.decode::<serde_json::Value>().unwrap_err();
+    assert_eq!(os_code(&error), Some(1));
+    assert!(error.to_string().contains("flush private state file"));
+}
 #[tokio::test]
 async fn framed_calls_validate_version_and_private_peer() {
     let root = tempfile::tempdir().unwrap();

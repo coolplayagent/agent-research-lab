@@ -28,12 +28,16 @@ fn committed_evidence_recovers_success_after_journal_failure() {
     let mut config = Configuration::defaults(temp.path());
     let operations = Operations::open(temp.path(), &config).unwrap();
     operations.begin(request("first")).unwrap();
+    config.bindings.insert("worker".into(), "codex".into());
+    let adapter_digest = storage::digest(
+        &serde_json::to_vec(config.adapters.iter().find(|a| a.id == "codex").unwrap()).unwrap(),
+    );
     config.binding_evidence.insert(
         "worker".into(),
         BindingEvidence {
             request_id: "first".into(),
             executable_digest: "a".into(),
-            adapter_digest: "b".into(),
+            adapter_digest,
             input_digest: "c".into(),
             output_digest: "d".into(),
             sandbox_id: "test".into(),

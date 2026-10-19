@@ -125,16 +125,21 @@ fn npm_entry(agent: CodingAgent, shim: &Path) -> Result<(PathBuf, Vec<String>)> 
     )
 }
 pub fn discover(agent: CodingAgent, hint: Option<&Path>) -> Result<ResolvedAgent> {
-    let path = resolve(agent, hint)?;
+    let path = resolve(agent, hint).context(DiscoveryFailure(
+        contracts::BindingErrorCode::ProgramMissing,
+    ))?;
     let (executable, arguments) = if path
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("cmd"))
     {
-        npm_entry(agent, &path)?
+        npm_entry(agent, &path).context(DiscoveryFailure(
+            contracts::BindingErrorCode::ProgramInvalid,
+        ))?
     } else {
         (path, vec![])
     };
-    let version = crate::process::version(&executable, &arguments)?;
+    let version = crate::process::version(&executable, &arguments)
+        .context(DiscoveryFailure(contracts::BindingErrorCode::LaunchFailed))?;
     let digest = executable_digest(&executable, &arguments)?;
     Ok(ResolvedAgent {
         agent,
@@ -147,3 +152,17 @@ pub fn discover(agent: CodingAgent, hint: Option<&Path>) -> Result<ResolvedAgent
 #[cfg(test)]
 #[path = "discovery_tests.rs"]
 mod tests;
+
+#[derive(Debug)]
+pub struct DiscoveryFailure(pub contracts::BindingErrorCode);
+impl std::fmt::Display for DiscoveryFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+impl std::error::Error for DiscoveryFailure {}
+pub fn discovery_failure_code(error: &anyhow::Error) -> Option<contracts::BindingErrorCode> {
+    error
+        .downcast_ref::<DiscoveryFailure>()
+        .map(|failure| failure.0)
+}

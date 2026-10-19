@@ -11,6 +11,29 @@ pub struct Container {
 unsafe impl Send for Container {}
 unsafe impl Sync for Container {}
 impl Container {
+    pub fn remove(name: &str) -> Result<()> {
+        ensure!(
+            name.starts_with("OutcomeHub.")
+                && name.len() <= 64
+                && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.'),
+            "invalid sandbox profile name"
+        );
+        let result = unsafe { DeleteAppContainerProfile(wide(OsStr::new(name)).as_ptr()) };
+        ensure!(
+            result >= 0 || [0x80070002u32, 0x80070490].contains(&(result as u32)),
+            "remove AppContainer profile failed (HRESULT {result:#x})"
+        );
+        Ok(())
+    }
+    pub fn close(mut self) -> Result<()> {
+        let result = unsafe { DeleteAppContainerProfile(self.name.as_ptr()) };
+        ensure!(
+            result >= 0,
+            "remove AppContainer profile failed (HRESULT {result:#x})"
+        );
+        self.name.clear();
+        Ok(())
+    }
     pub fn create(name: &str) -> Result<Self> {
         ensure!(
             name.starts_with("OutcomeHub.")
@@ -75,7 +98,9 @@ impl Drop for Container {
     fn drop(&mut self) {
         unsafe {
             FreeSid(self.sid);
-            DeleteAppContainerProfile(self.name.as_ptr());
+            if !self.name.is_empty() {
+                DeleteAppContainerProfile(self.name.as_ptr());
+            }
         }
     }
 }
