@@ -2,7 +2,10 @@ use anyhow::{Context, Result, ensure};
 use std::{ffi::OsStr, os::windows::ffi::OsStrExt, ptr};
 use windows_sys::Win32::{
     Foundation::{CloseHandle, HANDLE, LocalFree},
-    Security::{Authorization::*, GetTokenInformation, TOKEN_QUERY, TOKEN_USER, TokenUser},
+    Security::{
+        Authorization::*, GetTokenInformation, TOKEN_QUERY, TOKEN_USER, TokenIsAppContainer,
+        TokenUser,
+    },
     System::Threading::{
         GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
     },
@@ -14,6 +17,32 @@ pub fn wide(value: &OsStr) -> Vec<u16> {
 
 pub fn owner_sid() -> Result<String> {
     process_sid(unsafe { GetCurrentProcess() })
+}
+pub fn require_app_container() -> Result<()> {
+    let mut token = ptr::null_mut();
+    if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {
+        return Err(std::io::Error::last_os_error()).context("open sandbox identity");
+    }
+    let mut isolated = 0u32;
+    let mut size = 0;
+    let result = unsafe {
+        GetTokenInformation(
+            token,
+            TokenIsAppContainer,
+            (&mut isolated as *mut u32).cast(),
+            size_of::<u32>() as u32,
+            &mut size,
+        )
+    };
+    let error = (result == 0).then(std::io::Error::last_os_error);
+    unsafe {
+        CloseHandle(token);
+    }
+    if let Some(error) = error {
+        return Err(error).context("read sandbox identity");
+    }
+    ensure!(isolated != 0, "process is not running in an AppContainer");
+    Ok(())
 }
 fn process_sid(process: HANDLE) -> Result<String> {
     let mut token = ptr::null_mut();

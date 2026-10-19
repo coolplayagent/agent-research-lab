@@ -20,4 +20,4 @@ mod windows;
 #[cfg(unix)]
 pub use unix::{probe, run, verify};
 #[cfg(windows)]
-pub use windows::{probe, run, verify};
+pub use windows::{probe, probe_child, run, verify};

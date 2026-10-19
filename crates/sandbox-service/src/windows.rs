@@ -13,26 +13,43 @@ mod snapshots;
 mod tests;
 
 pub async fn probe(state: &Path) -> Result<()> {
-    let system =
-        std::env::var_os("SystemRoot").context("Windows system directory is unavailable")?;
-    run(
+    let binary = std::env::current_exe()?;
+    #[cfg(not(test))]
+    let arguments = vec!["--sandbox-probe".into()];
+    #[cfg(test)]
+    let arguments = vec![
+        "--exact".into(),
+        "windows::tests::sandbox_health_probe".into(),
+        "--nocapture".into(),
+    ];
+    let output = run(
         state,
-        vec![
-            PathBuf::from(system)
-                .join("System32/cmd.exe")
-                .to_string_lossy()
-                .into_owned(),
-            "/d".into(),
-            "/c".into(),
-            "exit 0".into(),
-        ],
+        std::iter::once(binary.to_string_lossy().into_owned())
+            .chain(arguments)
+            .collect(),
         vec![],
-        vec![],
+        vec![binary],
         false,
         String::new(),
         5,
     )
     .await?;
+    ensure!(
+        output.stdout.contains("outcome-hub-sandbox-probe-v1"),
+        "sandbox probe response is missing"
+    );
+    Ok(())
+}
+pub fn probe_child() -> Result<()> {
+    windows_runtime::require_app_container()?;
+    let contents = b"outcome-hub-sandbox-probe-v1";
+    fs::write("runtime-probe.txt", contents)?;
+    ensure!(
+        fs::read("runtime-probe.txt")? == contents,
+        "sandbox workspace probe failed"
+    );
+    fs::remove_file("runtime-probe.txt")?;
+    println!("outcome-hub-sandbox-probe-v1");
     Ok(())
 }
 #[allow(clippy::too_many_arguments)]
@@ -130,7 +147,12 @@ async fn execute(
             let path = fs::canonicalize(Path::new(argument))
                 .unwrap_or_else(|_| PathBuf::from(argument.as_str()));
             if let Ok(relative) = path.strip_prefix(&source) {
-                *argument = target.join(relative).to_string_lossy().into_owned();
+                let staged = if relative.as_os_str().is_empty() {
+                    target.clone()
+                } else {
+                    target.join(relative)
+                };
+                *argument = staged.to_string_lossy().into_owned();
             }
         }
     }

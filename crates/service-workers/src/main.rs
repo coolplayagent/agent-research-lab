@@ -17,6 +17,13 @@ struct Cli {
 }
 #[tokio::main(worker_threads = 4)]
 async fn main() -> Result<()> {
+    #[cfg(windows)]
+    if std::env::args_os()
+        .skip(1)
+        .eq([std::ffi::OsString::from("--sandbox-probe")])
+    {
+        return sandbox_service::probe_child();
+    }
     let args = Cli::parse();
     service_workers::serve(
         contracts::ServiceKind::parse(&args.kind)?,

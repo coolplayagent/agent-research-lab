@@ -1,4 +1,10 @@
 use super::*;
+#[test]
+fn sandbox_health_probe() {
+    if std::env::var("OUTCOME_HUB_ISOLATED").as_deref() == Ok("1") {
+        probe_child().unwrap();
+    }
+}
 fn child_test(name: &str) -> (Vec<String>, Vec<PathBuf>) {
     let binary = std::env::current_exe().unwrap();
     (
@@ -16,6 +22,7 @@ fn sandbox_filesystem_probe() {
     if std::env::var("OUTCOME_HUB_ISOLATED").as_deref() != Ok("1") {
         return;
     }
+    windows_runtime::require_app_container().unwrap();
     let secret: PathBuf = serde_json::from_reader(std::io::stdin()).unwrap();
     fs::write("writable.txt", "sandbox fixture").unwrap();
     assert_eq!(
@@ -35,6 +42,7 @@ fn sandbox_filesystem_probe() {
 #[test]
 fn sandbox_timeout_probe() {
     if std::env::var("OUTCOME_HUB_ISOLATED").as_deref() == Ok("1") {
+        windows_runtime::require_app_container().unwrap();
         loop {
             std::thread::sleep(Duration::from_millis(50));
         }
