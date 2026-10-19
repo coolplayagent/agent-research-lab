@@ -5,7 +5,10 @@ use std::path::Path;
 pub type Stream = tokio::net::TcpStream;
 
 pub fn endpoint(path: &Path) -> Result<()> {
-    ensure!(path.is_absolute(), "service endpoint must be an absolute path");
+    ensure!(
+        path.is_absolute(),
+        "service endpoint must be an absolute path"
+    );
     Ok(())
 }
 
