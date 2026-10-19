@@ -37,7 +37,7 @@ impl Configuration {
                 id: kind.to_string(),
                 kind: *kind,
                 endpoint: state.join(format!("private/services/{kind}.sock")),
-                enabled: true,
+                enabled: cfg!(unix),
                 sandbox_id: (*kind == ServiceKind::Executor).then(|| "sandbox".into()),
             })
             .collect();

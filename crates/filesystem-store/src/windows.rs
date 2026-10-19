@@ -116,7 +116,7 @@ fn replace(source: &Path, destination: &Path) -> Result<()> {
 
 pub fn read<T: DeserializeOwned>(path: &Path) -> Result<T> {
     reject_reparse(path)?;
-    let mut file = OpenOptions::new()
+    let file = OpenOptions::new()
         .read(true)
         .custom_flags(OPEN_REPARSE_POINT)
         .open(path)?;

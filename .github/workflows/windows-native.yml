@@ -29,5 +29,19 @@ jobs:
           bazelisk-cache: true
           repository-cache: true
           disk-cache: ${{ github.workflow }}
-      - name: Build native core with Bazel
-        run: bazel build --lockfile_mode=error //:outcome-hub
+      - name: Build native deployment package with Bazel
+        shell: pwsh
+        run: |
+          bazel build --lockfile_mode=error //:windows-package
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $archive = 'bazel-bin/outcome-hub-windows-x86_64.zip'
+          $unpacked = Join-Path $env:RUNNER_TEMP 'outcome-hub-package'
+          Expand-Archive -LiteralPath $archive -DestinationPath $unpacked
+          $binary = Join-Path $unpacked 'outcome-hub/outcome-hub.exe'
+          if (-not (Test-Path -LiteralPath $binary)) { throw 'Native package lacks outcome-hub.exe' }
+          ./verification/windows-core-smoke.ps1 -Binary $binary
+      - uses: actions/upload-artifact@v4
+        with:
+          name: outcome-hub-windows-x86_64
+          path: bazel-bin/outcome-hub-windows-x86_64.zip
+          if-no-files-found: error

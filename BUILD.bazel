@@ -1,5 +1,7 @@
 load("@crates//:defs.bzl", "aliases", "all_crate_deps")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+load("@rules_pkg//pkg:zip.bzl", "pkg_zip")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 load("@rules_rust//rust:defs.bzl", "rust_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
@@ -174,6 +176,21 @@ rust_binary(
     visibility = ["//visibility:public"],
 )
 alias(name = "outcome-hub", actual = "//apps/outcome-hub:outcome-hub", visibility = ["//visibility:public"])
+
+pkg_files(
+    name = "windows-core-files",
+    srcs = [":outcome-hub", "deploy/windows/README.txt"],
+    visibility = ["//visibility:private"],
+)
+
+pkg_zip(
+    name = "windows-package",
+    srcs = [":windows-core-files"],
+    out = "outcome-hub-windows-x86_64.zip",
+    package_dir = "outcome-hub",
+    target_compatible_with = ["@platforms//os:windows"],
+    visibility = ["//visibility:public"],
+)
 alias(name = "outcome-hub-package", actual = "//crates/collaboration-api:package", visibility = ["//visibility:public"])
 
 alias(name = "outcome-hub-migrate", actual = "//apps/migrate:outcome-hub-migrate", visibility = ["//visibility:public"])

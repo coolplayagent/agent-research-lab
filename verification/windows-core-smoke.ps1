@@ -1,5 +1,6 @@
+param([string]$Binary = (Join-Path $PSScriptRoot '..\target\debug\outcome-hub.exe'))
 $ErrorActionPreference = 'Stop'
-$binary = Join-Path $PSScriptRoot '..\target\debug\outcome-hub.exe'
+$binary = (Resolve-Path -LiteralPath $Binary).Path
 $state = Join-Path $env:RUNNER_TEMP ('outcome-hub-' + [guid]::NewGuid().ToString('N'))
 $listen = '127.0.0.1:49877'
 $start = [System.Diagnostics.ProcessStartInfo]::new($binary)
