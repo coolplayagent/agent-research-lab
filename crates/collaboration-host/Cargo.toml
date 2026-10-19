@@ -16,3 +16,4 @@ collaboration_client.workspace = true
 service_api.workspace = true
 service_registry.workspace = true
 collaboration_store.workspace = true
+storage.workspace = true

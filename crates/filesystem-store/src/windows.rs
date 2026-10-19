@@ -3,6 +3,7 @@ use anyhow::{Context, Result, bail, ensure};
 use fs2::FileExt;
 use serde::{Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
+use std::ffi::c_void;
 use std::{
     ffi::OsStr,
     fs::{self, File, OpenOptions},
@@ -24,6 +25,18 @@ static NEXT: AtomicU64 = AtomicU64::new(0);
 #[link(name = "Kernel32")]
 unsafe extern "system" {
     fn MoveFileExW(existing: *const u16, replacement: *const u16, flags: u32) -> i32;
+    fn LocalFree(memory: *mut c_void) -> *mut c_void;
+}
+
+#[link(name = "Advapi32")]
+unsafe extern "system" {
+    fn ConvertStringSecurityDescriptorToSecurityDescriptorW(
+        sddl: *const u16,
+        revision: u32,
+        descriptor: *mut *mut c_void,
+        size: *mut u32,
+    ) -> i32;
+    fn SetFileSecurityW(path: *const u16, information: u32, descriptor: *mut c_void) -> i32;
 }
 
 fn wide(path: &OsStr) -> Vec<u16> {
@@ -45,6 +58,43 @@ fn reject_reparse(path: &Path) -> Result<()> {
         );
     }
     Ok(())
+}
+
+fn restrict_to_owner(path: &Path, directory: bool) -> Result<()> {
+    reject_reparse(path)?;
+    let sddl = if directory {
+        "D:P(A;OICI;FA;;;OW)(A;OICI;FA;;;SY)"
+    } else {
+        "D:P(A;;FA;;;OW)(A;;FA;;;SY)"
+    };
+    let mut descriptor = std::ptr::null_mut();
+    let converted = unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            wide(OsStr::new(sddl)).as_ptr(),
+            1,
+            &mut descriptor,
+            std::ptr::null_mut(),
+        )
+    };
+    if converted == 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    let result = unsafe { SetFileSecurityW(wide(path.as_os_str()).as_ptr(), 0x4, descriptor) };
+    unsafe { LocalFree(descriptor) };
+    if result == 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    Ok(())
+}
+
+pub fn private_dir(path: &Path) -> Result<()> {
+    reject_reparse(path)?;
+    fs::create_dir_all(path)?;
+    restrict_to_owner(path, true)
+}
+
+pub fn private_file(path: &Path) -> Result<()> {
+    restrict_to_owner(path, false)
 }
 
 fn replace(source: &Path, destination: &Path) -> Result<()> {
@@ -103,6 +153,7 @@ pub fn write<T: Serialize>(path: &Path, value: &T) -> Result<()> {
     file.write_all(&bytes)?;
     file.sync_all()?;
     drop(file);
+    private_file(&temporary)?;
     replace(&temporary, path)?;
     Ok(())
 }
@@ -131,6 +182,7 @@ pub fn lock(path: &Path) -> Result<LockGuard> {
         file.metadata()?.file_attributes() & REPARSE_POINT == 0,
         "reparse point lock"
     );
+    private_file(path)?;
     if file.try_lock_exclusive().is_err() {
         bail!("another controller owns {}", path.display());
     }

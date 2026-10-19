@@ -16,6 +16,14 @@ jobs:
           toolchain: 1.97.1
       - name: Check native core
         run: cargo check --locked -p outcome-hub
+      - name: Test native storage and protocol boundaries
+        run: cargo test --locked -p outcome-hub-filesystem-store -p outcome-hub-service-protocol
+      - name: Build and smoke-test native core
+        shell: pwsh
+        run: |
+          cargo build --locked -p outcome-hub
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./verification/windows-core-smoke.ps1
       - uses: bazel-contrib/setup-bazel@0.15.0
         with:
           bazelisk-cache: true

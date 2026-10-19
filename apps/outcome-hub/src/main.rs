@@ -13,8 +13,8 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Serve {
-        #[arg(long, default_value = ".ai-im")]
-        state_dir: PathBuf,
+        #[arg(long)]
+        state_dir: Option<PathBuf>,
         #[arg(long, default_value = "127.0.0.1:4877")]
         listen: SocketAddr,
         #[arg(long, default_value_t = 43200)]
@@ -24,9 +24,21 @@ enum Command {
         local_operator: bool,
     },
     Link {
-        #[arg(long, default_value = ".ai-im")]
-        state_dir: PathBuf,
+        #[arg(long)]
+        state_dir: Option<PathBuf>,
     },
+}
+fn default_state_dir() -> Result<PathBuf> {
+    #[cfg(windows)]
+    {
+        let root = std::env::var_os("LOCALAPPDATA")
+            .ok_or_else(|| anyhow::anyhow!("LOCALAPPDATA is required for the default state"))?;
+        Ok(PathBuf::from(root).join("OutcomeHub").join("state"))
+    }
+    #[cfg(not(windows))]
+    {
+        Ok(PathBuf::from(".ai-im"))
+    }
 }
 #[tokio::main(worker_threads = 4)]
 async fn main() -> Result<()> {
@@ -37,6 +49,7 @@ async fn main() -> Result<()> {
             max_seconds,
             local_operator,
         } => {
+            let state_dir = state_dir.map_or_else(default_state_dir, Ok)?;
             collaboration_host::serve_with_local_operator(
                 &state_dir,
                 listen,
@@ -46,6 +59,7 @@ async fn main() -> Result<()> {
             .await
         }
         Command::Link { state_dir } => {
+            let state_dir = state_dir.map_or_else(default_state_dir, Ok)?;
             let value: serde_json::Value = storage::read(&state_dir.join("dashboard/access.json"))?;
             println!(
                 "{}",

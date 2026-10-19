@@ -12,7 +12,6 @@ use axum::{
     routing::get,
 };
 use serde::Deserialize;
-use std::os::unix::fs::PermissionsExt;
 pub struct Operator {
     digest: String,
     local_operator: bool,
@@ -20,18 +19,24 @@ pub struct Operator {
 impl Operator {
     pub fn open(state: &Path, addr: SocketAddr) -> Result<Self> {
         let directory = state.join("dashboard");
-        fs::create_dir_all(&directory)?;
-        fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))?;
+        storage::private_dir(&directory)?;
         let _lock = storage::lock(&directory.join("operator.lock"))?;
         let path = directory.join("operator-credential.json");
         let token = match fs::symlink_metadata(&path) {
             Ok(metadata) => {
                 ensure!(
-                    metadata.is_file()
-                        && metadata.permissions().mode() & 0o077 == 0
-                        && metadata.len() <= 256,
+                    metadata.is_file() && metadata.len() <= 256,
                     "invalid operator credential file"
                 );
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    ensure!(
+                        metadata.permissions().mode() & 0o077 == 0,
+                        "invalid operator credential file"
+                    );
+                }
+                storage::private_file(&path)?;
                 let value: Value = storage::read(&path)?;
                 value["token"]
                     .as_str()
@@ -66,8 +71,7 @@ impl Operator {
             "local operator requires a loopback address"
         );
         let directory = state.join("dashboard");
-        fs::create_dir_all(&directory)?;
-        fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))?;
+        storage::private_dir(&directory)?;
         let _lock = storage::lock(&directory.join("operator.lock"))?;
         storage::write(
             &directory.join("access.json"),

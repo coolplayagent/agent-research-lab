@@ -5,7 +5,7 @@ rust_library(
     name = "collaboration_host", crate_name = "collaboration_host",
     srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
     crate_root = "src/lib.rs", edition = "2024", aliases = aliases(),
-    deps = ["//crates/contracts:contracts", "//crates/collaboration-api:collaboration_api", "//crates/collaboration-storage-service:collaboration_storage_service", "//crates/collaboration-client:collaboration_client", "//crates/service-api:service_api", "//crates/service-registry:service_registry", "//crates/collaboration-store:collaboration_store"] + all_crate_deps(normal = True),
+    deps = ["//crates/contracts:contracts", "//crates/collaboration-api:collaboration_api", "//crates/collaboration-storage-service:collaboration_storage_service", "//crates/collaboration-client:collaboration_client", "//crates/service-api:service_api", "//crates/service-registry:service_registry", "//crates/collaboration-store:collaboration_store", "//crates/filesystem-store:storage"] + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
 )

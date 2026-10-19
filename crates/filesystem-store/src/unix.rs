@@ -10,6 +10,19 @@ use std::{
 };
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
+pub fn private_dir(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::create_dir_all(path)?;
+    fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+    Ok(())
+}
+
+pub fn private_file(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    Ok(())
+}
+
 pub fn read<T: DeserializeOwned>(p: &Path) -> Result<T> {
     use std::io::Read;
     let mut file = OpenOptions::new()

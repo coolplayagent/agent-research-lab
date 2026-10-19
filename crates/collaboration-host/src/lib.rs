@@ -17,7 +17,7 @@ pub async fn serve_with_local_operator(
         (1..=43200).contains(&seconds),
         "service lifetime must be 1..43200 seconds"
     );
-    std::fs::create_dir_all(state)?;
+    storage::private_dir(state)?;
     let services = Arc::new(service_registry::Registry::open(state)?);
     let hub = storage(&services.configuration(), state)?;
     hub.register_operator().await?;

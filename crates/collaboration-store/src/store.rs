@@ -21,20 +21,16 @@ pub(crate) struct Store {
 }
 impl Store {
     pub fn open(path: &Path) -> Result<Self> {
-        use std::os::unix::fs::PermissionsExt;
         let existing = path.try_exists()?;
         if existing {
+            storage::private_file(path)?;
             let check =
                 Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
             super::schema::validate(&check)?;
         }
-        std::fs::create_dir_all(path.parent().context("database needs a parent")?)?;
-        std::fs::set_permissions(
-            path.parent().unwrap(),
-            std::fs::Permissions::from_mode(0o700),
-        )?;
+        storage::private_dir(path.parent().context("database needs a parent")?)?;
         let connection = Connection::open(path)?;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        storage::private_file(path)?;
         connection.busy_timeout(Duration::from_millis(250))?;
         connection.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; PRAGMA wal_autocheckpoint=1000;")?;
         if !existing {

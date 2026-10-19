@@ -848,6 +848,7 @@ dependencies = [
  "outcome-hub-collaboration-storage-service",
  "outcome-hub-collaboration-store",
  "outcome-hub-contracts",
+ "outcome-hub-filesystem-store",
  "outcome-hub-service-api",
  "outcome-hub-service-registry",
  "tokio",
