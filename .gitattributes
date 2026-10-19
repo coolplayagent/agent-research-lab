@@ -1,3 +1,4 @@
+* text=auto eol=lf
 Cargo.lock text eol=lf
 *.toml text eol=lf
 MODULE.bazel text eol=lf
