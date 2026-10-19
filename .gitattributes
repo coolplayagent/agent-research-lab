@@ -1,1 +1,4 @@
 Cargo.lock text eol=lf
+*.toml text eol=lf
+MODULE.bazel text eol=lf
+MODULE.bazel.lock text eol=lf
