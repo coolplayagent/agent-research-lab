@@ -68,6 +68,29 @@ try {
         Write-Output "Validated $agent (live=$Live), sandbox=$($result.evidence.sandbox_id)"
     }
     if ($Fixture) {
+        # A real Node runtime and a hoisted dependency exercise npm layout in the sandbox.
+        # This remains a deterministic protocol fixture, not authenticated vendor evidence.
+        Get-Command node.exe -ErrorAction Stop | Out-Null
+        $npm = Join-Path $state 'fixture npm'
+        $package = Join-Path $npm 'node_modules/@openai/codex'
+        $dependency = Join-Path $npm 'node_modules/binding-fixture-dependency'
+        New-Item -ItemType Directory -Path (Join-Path $package 'bin'), $dependency -Force | Out-Null
+        Copy-Item -LiteralPath $Fixture -Destination (Join-Path $package 'native-agent.exe')
+        '{"name":"@openai/codex","bin":{"codex":"bin/codex.js"}}' | Set-Content -LiteralPath (Join-Path $package 'package.json') -Encoding utf8
+        'module.exports = require("path").join(__dirname, "..", "@openai", "codex", "native-agent.exe");' | Set-Content -LiteralPath (Join-Path $dependency 'index.js') -Encoding utf8
+        @'
+const executable = require("binding-fixture-dependency");
+require("child_process").spawn(executable, process.argv.slice(2), {stdio:"inherit", windowsHide:true})
+  .on("error", () => process.exit(1)).on("exit", code => process.exit(code ?? 1));
+'@ | Set-Content -LiteralPath (Join-Path $package 'bin/codex.js') -Encoding utf8
+        $shim = Join-Path $npm 'codex.cmd'
+        'exit /b 99' | Set-Content -LiteralPath $shim -Encoding ascii
+        $saved = Read-Api '/api/v1/collaboration/services'
+        $request = @{request_id=[guid]::NewGuid().ToString(); person_id='binding-codex'; adapter_id='codex'; revision=$saved.configuration.revision; program=$shim; model=$null}
+        Write-Api '/api/v1/collaboration/bindings' $request | Out-Null
+        $npmResult = Wait-Binding $request.request_id
+        if ($npmResult.state -ne 'succeeded') { throw "npm dependency fixture failed: $($npmResult.diagnostic.code), stage $($npmResult.diagnostic.stage), OS $($npmResult.diagnostic.os_code), diagnostic $($npmResult.diagnostic.diagnostic_id). State: $state" }
+        Write-Output 'Validated npm launcher with an installed Node runtime and hoisted dependency.'
         $saved = Read-Api '/api/v1/collaboration/services'
         $request = @{request_id=[guid]::NewGuid().ToString(); person_id='binding-codex'; adapter_id='codex'; revision=$saved.configuration.revision; program=(Join-Path $state 'missing.exe'); model=$null}
         Write-Api '/api/v1/collaboration/bindings' $request | Out-Null

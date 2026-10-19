@@ -15,16 +15,25 @@ pub fn runtime_paths(agent: &ResolvedAgent) -> Result<Vec<PathBuf>> {
         if !script.is_file() {
             continue;
         }
-        let root = script
+        let package = script
             .ancestors()
             .skip(1)
             .find(|p| p.join("package.json").is_file())
             .context("agent package root is missing")?;
         ensure!(
-            root.components().count() > 2,
+            package.components().count() > 2,
             "agent package root is too broad"
         );
-        paths.push(root.to_path_buf());
+        // npm hoists dependencies beside the CLI package. Preserve node_modules
+        // as one runtime tree so Node can resolve those sibling packages after staging.
+        let root = package
+            .ancestors()
+            .filter(|p| p.file_name().is_some_and(|name| name == "node_modules"))
+            .last()
+            .unwrap_or(package);
+        if !paths.iter().any(|path| path == root) {
+            paths.push(root.to_path_buf());
+        }
     }
     Ok(paths)
 }
