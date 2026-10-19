@@ -7,7 +7,6 @@ use service_api::{AgentInput, Configuration, ExecutionReceipt, ExecutorRequest};
 use service_registry::Registry;
 use std::{
     collections::BTreeSet,
-    io::Read,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -49,7 +48,7 @@ async fn advance(
     service_api::probe(&executor.endpoint, ServiceKind::Executor).await?;
     service_api::probe(&sandbox.endpoint, ServiceKind::Sandbox).await?;
     let mut random = [0u8; 32];
-    std::fs::File::open("/dev/urandom")?.read_exact(&mut random)?;
+    getrandom::fill(&mut random)?;
     let claim_id = storage::digest(&random);
     let claimed = hub
         .work_as(

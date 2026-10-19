@@ -1,15 +1,16 @@
 //! Small, versioned local service protocol. No service shares mutable database handles.
-use anyhow::{Context, Result, ensure};
+use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::{
-    os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt},
-    path::{Path, PathBuf},
-    time::Duration,
-};
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{UnixListener, UnixStream},
-};
+use std::{path::Path, time::Duration};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+#[cfg(unix)]
+#[path = "unix.rs"]
+mod platform;
+#[cfg(windows)]
+#[path = "windows.rs"]
+mod platform;
+pub use platform::{Listener, Stream, connect, endpoint};
+
 pub const VERSION: u32 = 1;
 pub const MAX_FRAME: usize = 8 * 1024 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -60,47 +61,21 @@ pub struct Envelope<T> {
     pub protocol_version: u32,
     pub request: T,
 }
-pub async fn write<T: Serialize>(stream: &mut UnixStream, value: &T) -> Result<()> {
+pub async fn write<T: Serialize>(stream: &mut Stream, value: &T) -> Result<()> {
     let bytes = serde_json::to_vec(value)?;
     ensure!(bytes.len() <= MAX_FRAME, "service frame exceeds bound");
     stream.write_u32(bytes.len() as u32).await?;
     stream.write_all(&bytes).await?;
     Ok(())
 }
-pub async fn read<T: DeserializeOwned>(stream: &mut UnixStream) -> Result<T> {
+pub async fn read<T: DeserializeOwned>(stream: &mut Stream) -> Result<T> {
     let size = stream.read_u32().await? as usize;
     ensure!(size > 0 && size <= MAX_FRAME, "invalid service frame size");
     let mut bytes = vec![0; size];
     stream.read_exact(&mut bytes).await?;
     Ok(serde_json::from_slice(&bytes)?)
 }
-fn owner() -> u32 {
-    unsafe { libc::geteuid() }
-}
-pub fn endpoint(path: &Path) -> Result<()> {
-    ensure!(
-        path.is_absolute() && path.as_os_str().len() < 104,
-        "service socket must be an absolute path shorter than 104 bytes"
-    );
-    Ok(())
-}
-pub async fn connect(path: &Path) -> Result<UnixStream> {
-    endpoint(path)?;
-    let meta = std::fs::symlink_metadata(path)?;
-    ensure!(
-        meta.file_type().is_socket()
-            && meta.uid() == owner()
-            && meta.permissions().mode() & 0o077 == 0,
-        "service socket must be private and owned by this user"
-    );
-    let stream = tokio::time::timeout(Duration::from_secs(5), UnixStream::connect(path)).await??;
-    ensure!(
-        stream.peer_cred()?.uid() == owner(),
-        "service peer owner mismatch"
-    );
-    Ok(stream)
-}
-pub async fn open<T: Serialize>(path: &Path, request: &T) -> Result<UnixStream> {
+pub async fn open<T: Serialize>(path: &Path, request: &T) -> Result<Stream> {
     let mut stream = connect(path).await?;
     tokio::time::timeout(
         Duration::from_secs(5),
@@ -126,59 +101,6 @@ pub async fn call<Q: Serialize, T: DeserializeOwned>(
     })
     .await?
 }
-pub struct Listener {
-    pub listener: UnixListener,
-    path: PathBuf,
-    inode: u64,
-}
-impl Listener {
-    pub fn bind(path: &Path) -> Result<Self> {
-        endpoint(path)?;
-        let parent = path.parent().context("socket requires parent")?;
-        if !parent.exists() {
-            std::fs::create_dir_all(parent)?;
-            std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700))?;
-        }
-        let meta = std::fs::metadata(parent)?;
-        ensure!(
-            meta.uid() == owner() && meta.permissions().mode() & 0o077 == 0,
-            "socket directory must be private and owned by this user"
-        );
-        if let Ok(meta) = std::fs::symlink_metadata(path) {
-            ensure!(
-                meta.file_type().is_socket() && meta.uid() == owner(),
-                "refusing to replace a non-socket endpoint"
-            );
-            ensure!(
-                std::os::unix::net::UnixStream::connect(path).is_err(),
-                "service endpoint already active"
-            );
-            std::fs::remove_file(path)?;
-        }
-        let listener = UnixListener::bind(path)?;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-        Ok(Self {
-            listener,
-            path: path.into(),
-            inode: std::fs::metadata(path)?.ino(),
-        })
-    }
-    pub async fn accept(&self) -> Result<UnixStream> {
-        let (stream, _) = self.listener.accept().await?;
-        ensure!(
-            stream.peer_cred()?.uid() == owner(),
-            "service peer owner mismatch"
-        );
-        Ok(stream)
-    }
-}
-impl Drop for Listener {
-    fn drop(&mut self) {
-        if std::fs::symlink_metadata(&self.path).is_ok_and(|m| m.ino() == self.inode) {
-            let _ = std::fs::remove_file(&self.path);
-        }
-    }
-}
-#[cfg(test)]
+#[cfg(all(test, unix))]
 #[path = "lib_tests.rs"]
 mod tests;

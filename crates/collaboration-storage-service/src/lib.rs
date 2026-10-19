@@ -2,10 +2,10 @@
 use anyhow::{Result, ensure};
 pub use collaboration_client::{Client, Request};
 use collaboration_store::*;
+use rpc::Stream;
 use serde_json::{Value, json};
 use service_protocol as rpc;
 use std::{path::Path, sync::Arc, time::Duration};
-use tokio::net::UnixStream;
 /// Explicit development adapter; the host chooses an independent local state directory.
 pub fn client(hub: Hub) -> Client {
     Client::Local(Arc::new(LocalStore(hub)))
@@ -163,14 +163,14 @@ async fn execute(hub: &Hub, request: Request) -> Result<Value> {
         }
     }
 }
-async fn reply(stream: &mut UnixStream, value: Result<Value>) -> Result<()> {
+async fn reply(stream: &mut Stream, value: Result<Value>) -> Result<()> {
     tokio::time::timeout(
         Duration::from_secs(5),
         rpc::write(stream, &rpc::Reply::from_result(value)),
     )
     .await?
 }
-async fn disconnected(stream: &UnixStream) {
+async fn disconnected(stream: &Stream) {
     use tokio::io::Interest;
     loop {
         if stream.ready(Interest::READABLE).await.is_err() {
@@ -182,7 +182,7 @@ async fn disconnected(stream: &UnixStream) {
         }
     }
 }
-async fn connection(hub: Hub, mut stream: UnixStream) -> Result<()> {
+async fn connection(hub: Hub, mut stream: Stream) -> Result<()> {
     let envelope: rpc::Envelope<Request> =
         tokio::time::timeout(Duration::from_secs(5), rpc::read(&mut stream)).await??;
     ensure!(

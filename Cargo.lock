@@ -784,6 +784,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "axum",
+ "getrandom",
  "outcome-hub-collaboration-client",
  "outcome-hub-collaboration-model",
  "outcome-hub-collaboration-storage-service",
@@ -899,6 +900,7 @@ name = "outcome-hub-collaboration-store"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "getrandom",
  "outcome-hub-collaboration-model",
  "outcome-hub-contracts",
  "outcome-hub-filesystem-store",

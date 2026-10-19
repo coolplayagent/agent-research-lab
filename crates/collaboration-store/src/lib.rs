@@ -18,7 +18,6 @@ use metrics::Metrics;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, HashMap},
-    io::Read,
     path::Path,
     sync::{
         Arc, Mutex, RwLock,
@@ -287,7 +286,7 @@ impl Hub {
             "grant lifetime must be 1..86400 seconds"
         );
         let mut random = [0u8; 32];
-        std::fs::File::open("/dev/urandom")?.read_exact(&mut random)?;
+        getrandom::fill(&mut random)?;
         let token = storage::digest(&random);
         self.control(Control::Grant {
             actor: actor.into(),

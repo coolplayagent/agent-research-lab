@@ -1,91 +1,13 @@
-use anyhow::{Result, bail};
-use fs2::FileExt;
-use native_effects::fs::{self, File, OpenOptions};
-use serde::{Serialize, de::DeserializeOwned};
-use sha2::{Digest, Sha256};
-use std::{
-    os::unix::fs::OpenOptionsExt,
-    path::Path,
-    sync::atomic::{AtomicU64, Ordering},
-};
-static NEXT: AtomicU64 = AtomicU64::new(0);
+//! Bounded JSON persistence and single-owner state locks.
+#[cfg(unix)]
+mod unix;
+#[cfg(windows)]
+mod windows;
 
-pub fn read<T: DeserializeOwned>(p: &Path) -> Result<T> {
-    use std::io::Read;
-    let mut file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(p)?;
-    let metadata = file.metadata()?;
-    if !metadata.is_file() || metadata.len() > 16 * 1024 * 1024 {
-        bail!("JSON input must be a bounded regular file");
-    }
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-    Ok(serde_json::from_slice(&bytes)?)
-}
-pub fn write<T: Serialize>(p: &Path, v: &T) -> Result<()> {
-    let parent = p
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("missing parent"))?;
-    let prepared = fs::guarded()
-        .then(|| fs::json_bytes(p, v, true))
-        .transpose()?;
-    fs::create_dir_all(parent)?;
-    let temp = p.with_extension(format!(
-        "pending-{}-{}-{}",
-        std::process::id(),
-        chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    ));
-    let mut f = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .mode(0o600)
-        .open(&temp)?;
-    let bytes = match prepared {
-        Some(v) => v,
-        None => serde_json::to_vec_pretty(v)?,
-    };
-    fs::write_all(&mut f, &temp, &bytes)?;
-    fs::sync_all(&f, &temp)?;
-    fs::rename(&temp, p)?;
-    fs::sync_all(&File::open(parent)?, parent)?;
-    Ok(())
-}
-pub struct LockGuard(File, std::path::PathBuf);
-impl Drop for LockGuard {
-    fn drop(&mut self) {
-        let _cleanup = native_effects::cleanup_scope();
-        let _ = if fs::guarded() {
-            fs::unlock(&self.0, &self.1)
-        } else {
-            FileExt::unlock(&self.0)
-        };
-    }
-}
-pub fn lock(p: &Path) -> Result<LockGuard> {
-    fs::create_dir_all(p.parent().unwrap())?;
-    let f = OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .open(p)?;
-    if (if fs::guarded() {
-        fs::try_lock_exclusive(&f, p)
-    } else {
-        f.try_lock_exclusive()
-    })
-    .is_err()
-    {
-        bail!("another controller owns {}", p.display());
-    }
-    Ok(LockGuard(f, p.to_owned()))
-}
-pub fn digest(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
-}
+#[cfg(unix)]
+pub use unix::*;
+#[cfg(windows)]
+pub use windows::*;
 
 #[cfg(test)]
 #[path = "lib_tests.rs"]

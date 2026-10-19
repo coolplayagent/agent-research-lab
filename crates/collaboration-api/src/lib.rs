@@ -34,14 +34,7 @@ pub fn validate_listen(listen: SocketAddr, local_operator: bool) -> Result<()> {
     );
     Ok(())
 }
-use std::{
-    fs::{self, File},
-    io::Read,
-    net::SocketAddr,
-    path::Path,
-    sync::Arc,
-    time::Duration,
-};
+use std::{fs, net::SocketAddr, path::Path, sync::Arc, time::Duration};
 fn allowed_request(request: &str, addr: SocketAddr) -> Result<&str> {
     ensure!(request.ends_with("\r\n\r\n"), "incomplete headers");
     let mut lines = request.split("\r\n");

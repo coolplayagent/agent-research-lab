@@ -1,11 +1,11 @@
 //! Durable collaboration storage client and independently hosted service.
 use anyhow::Result;
 use collaboration_model::*;
+use rpc::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use service_protocol as rpc;
 use std::{path::PathBuf, sync::Arc, time::Duration};
-use tokio::net::UnixStream;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
@@ -657,14 +657,14 @@ impl Client {
         })
     }
 }
-async fn ready(stream: &mut UnixStream) -> Result<()> {
+async fn ready(stream: &mut Stream) -> Result<()> {
     tokio::time::timeout(Duration::from_secs(5), rpc::read::<rpc::Reply>(stream))
         .await??
         .decode::<()>()
 }
 pub enum Changes {
     Local(tokio::sync::watch::Receiver<u64>),
-    Remote(UnixStream),
+    Remote(Stream),
 }
 impl Changes {
     pub async fn changed(&mut self) -> Result<()> {
@@ -680,7 +680,7 @@ impl Changes {
 pub enum Subscription {
     Local(Box<dyn LocalSubscription>),
     Remote {
-        stream: UnixStream,
+        stream: Stream,
         client: Client,
         actor: String,
         group: String,

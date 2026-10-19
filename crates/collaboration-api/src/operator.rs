@@ -40,7 +40,7 @@ impl Operator {
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 let mut random = [0u8; 32];
-                File::open("/dev/urandom")?.read_exact(&mut random)?;
+                getrandom::fill(&mut random)?;
                 let value = storage::digest(&random);
                 storage::write(&path, &json!({"token":value}))?;
                 value

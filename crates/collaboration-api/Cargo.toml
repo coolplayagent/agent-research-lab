@@ -18,6 +18,7 @@ collaboration_client.workspace = true
 web_assets.workspace = true
 contracts.workspace = true
 anyhow.workspace = true
+getrandom.workspace = true
 async-stream.workspace = true
 axum.workspace = true
 collaboration_model.workspace = true
