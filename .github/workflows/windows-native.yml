@@ -1,0 +1,25 @@
+name: Windows native
+on:
+  push:
+    branches: [main, feature/windows-deployment-20261019]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
+      - name: Check native core
+        run: cargo check --locked -p outcome-hub
+      - uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+          disk-cache: ${{ github.workflow }}
+      - name: Build native core with Bazel
+        run: bazel build --lockfile_mode=error //:outcome-hub
