@@ -48,6 +48,7 @@ bazel run //:outcome-hub -- serve --state-dir /absolute/path/to/state --listen 1
 
 - [在线文档](https://coolplayagent.github.io/agent-research-lab/)（中文与英文）
 - [快速开始](docs/zh-CN/guide/01-quick-start.md)
+- [Windows 原生部署](docs/zh-CN/guide/10-windows.md)
 - [成果协作与模块架构](docs/outcomehub-architecture.md)
 - [Git、目录和 SuperPOD 知识库接入](docs/external-knowledge.md)
 - [名称与接口迁移](docs/outcomehub-migration.md)

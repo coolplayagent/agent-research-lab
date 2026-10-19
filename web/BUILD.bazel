@@ -1,4 +1,12 @@
 exports_files(["defs.bzl"])
+alias(
+    name = "node",
+    actual = select({
+        "@platforms//os:windows": "@im_node_windows//:node.exe",
+        "//conditions:default": "@im_node//:bin/node",
+    }),
+    visibility = ["//visibility:public"],
+)
 load("//web:defs.bzl", "node_test")
 node_test(name = "locale_tests", script = "verify-locales.cjs", data = ["//:policy_sources", "//:source_inventory", "//web/shared:assets"])
 node_test(name = "identity_tests", script = "identity-tests.cjs", data = ["//web/shared:policy_sources", "//web/outcome-hub:policy_sources"])

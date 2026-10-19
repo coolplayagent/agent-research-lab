@@ -29,6 +29,11 @@ pub struct Configuration {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub knowledge_goals: BTreeMap<String, KnowledgeTarget>,
 }
+
+#[cfg(test)]
+#[path = "registry_tests.rs"]
+mod tests;
+
 impl Configuration {
     pub fn defaults(state: &Path) -> Self {
         let services = ServiceKind::ALL

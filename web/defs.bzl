@@ -16,7 +16,7 @@ typescript = rule(
     attrs = {
         "srcs": attr.label_list(allow_files = [".ts"]),
         "config": attr.label(allow_single_file = [".json"]),
-        "_node": attr.label(default = "@im_node//:bin/node", executable = True, allow_single_file = True, cfg = "exec"),
+        "_node": attr.label(default = "//web:node", executable = True, allow_single_file = True, cfg = "exec"),
         "_tsc": attr.label(default = "@im_typescript//:bin/tsc", allow_single_file = True),
         "_compiler": attr.label(default = "@im_typescript//:compiler", allow_files = True),
     },
@@ -34,7 +34,7 @@ node_test = rule(
     attrs = {
         "script": attr.label(allow_single_file = [".cjs"], mandatory = True),
         "data": attr.label_list(allow_files = True),
-        "_node": attr.label(default = "@im_node//:bin/node", executable = True, allow_single_file = True, cfg = "exec"),
+        "_node": attr.label(default = "//web:node", executable = True, allow_single_file = True, cfg = "exec"),
         "_typescript": attr.label(default = "@im_typescript//:lib/typescript.js", allow_single_file = True),
         "_compiler": attr.label(default = "@im_typescript//:compiler", allow_files = True),
     },

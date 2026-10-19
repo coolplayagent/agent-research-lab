@@ -37,5 +37,6 @@ Applications live in `apps/outcome-hub`, `apps/cli`, and `apps/console`. Build t
 - [External knowledge stores](docs/external-knowledge.md)
 - [Migration guide](docs/outcomehub-migration.md)
 - [Quick start](docs/zh-CN/guide/01-quick-start.md)
+- [Native Windows deployment](docs/en/guide/10-windows.md)
 
 Run `bazel test //...` and the repository's full Qualitygate against the final delivery snapshot.

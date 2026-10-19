@@ -2,7 +2,11 @@ param([string]$Binary = (Join-Path $PSScriptRoot '..\target\debug\outcome-hub.ex
 $ErrorActionPreference = 'Stop'
 $binary = (Resolve-Path -LiteralPath $Binary).Path
 $state = Join-Path $env:RUNNER_TEMP ('outcome-hub-' + [guid]::NewGuid().ToString('N'))
-$listen = '127.0.0.1:49877'
+$reservation = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+$reservation.Start()
+$port = ([System.Net.IPEndPoint]$reservation.LocalEndpoint).Port
+$reservation.Stop()
+$listen = "127.0.0.1:$port"
 $start = [System.Diagnostics.ProcessStartInfo]::new($binary)
 $start.UseShellExecute = $false
 foreach ($argument in @('serve', '--state-dir', $state, '--listen', $listen, '--max-seconds', '40')) {
@@ -22,7 +26,7 @@ try {
     }
     if (-not $ready) { throw 'OutcomeHub did not answer on loopback.' }
     $link = & $binary link --state-dir $state
-    if ($LASTEXITCODE -ne 0 -or $link -notmatch '^http://127\.0\.0\.1:49877/#access=[0-9a-f]{64}$') {
+    if ($LASTEXITCODE -ne 0 -or $link -notmatch ('^http://127\.0\.0\.1:' + $port + '/#access=[0-9a-f]{64}$')) {
         throw 'The native core did not issue a private operator link.'
     }
     foreach ($path in @($state, (Join-Path $state 'dashboard'), (Join-Path $state 'crystal'))) {
