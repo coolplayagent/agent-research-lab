@@ -86,6 +86,7 @@ export const BindingErrorCode = {
     Interrupted: "interrupted",
     Busy: "busy",
     ValidationRequired: "validation_required",
+    Superseded: "superseded",
 };
 export const KnowledgeBackend = {
     Git: "git",

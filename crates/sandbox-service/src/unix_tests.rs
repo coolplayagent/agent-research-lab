@@ -3,6 +3,7 @@ use super::*;
 fn sandbox_mounts_are_read_only_and_work_is_isolated() {
     let args = arguments(&["/usr/bin/true".into()], &[], false, 4).unwrap();
     assert!(args.contains(&"--unshare-all".into()));
+    assert!(args.contains(&"--as=17179869184:17179869184".into()));
     assert!(!args.contains(&"--share-net".into()));
     assert!(args.windows(2).any(|w| w == ["--tmpfs", "/workspace"]));
     assert!(!args.contains(&"/root".into()));
@@ -103,4 +104,25 @@ async fn private_tmp_does_not_hide_explicit_read_only_runtime_files() {
     .await
     .unwrap();
     assert_eq!(result.stdout.trim(), "read-only");
+}
+
+#[tokio::test]
+async fn failed_sandbox_keeps_only_private_redacted_details_after_disposal() {
+    let state = tempfile::tempdir().unwrap();
+    let error = python(
+        state.path(),
+        "import sys; sys.stderr.write('fixture execution failed'); raise SystemExit(7)",
+    )
+    .await
+    .err()
+    .unwrap();
+    assert!(!format!("{error:#}").contains("fixture execution failed"));
+    let details = service_protocol::private_details(&error).unwrap();
+    assert!(details.contains("Some(7)"));
+    assert!(details.contains("fixture execution failed"));
+    assert_eq!(
+        fs::read_dir(state.path()).unwrap().count(),
+        0,
+        "Disposable homes, process output and workspace must be removed"
+    );
 }

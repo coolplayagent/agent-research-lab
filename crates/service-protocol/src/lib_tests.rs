@@ -32,6 +32,7 @@ async fn framed_calls_validate_version_and_private_peer() {
     assert!(
         Reply {
             error_os_code: None,
+            error_private_details: None,
             protocol_version: 99,
             result: serde_json::json!(true),
             error: None
@@ -39,4 +40,22 @@ async fn framed_calls_validate_version_and_private_peer() {
         .decode::<bool>()
         .is_err()
     );
+}
+
+#[test]
+fn private_diagnostics_survive_service_hops_without_entering_display() {
+    let error =
+        anyhow::Error::new(PrivateDiagnostic("fixture diagnostic".into())).context("execute");
+    let first = Reply::from_result(Err(error)).decode::<bool>().unwrap_err();
+    let second = Reply::from_result(Err(first)).decode::<bool>().unwrap_err();
+    assert_eq!(
+        private_details(&second).as_deref(),
+        Some("fixture diagnostic")
+    );
+    assert!(!format!("{second:#}").contains("fixture diagnostic"));
+    let legacy: Reply = serde_json::from_value(
+        serde_json::json!({"protocol_version":1,"result":null,"error":"legacy"}),
+    )
+    .unwrap();
+    assert!(legacy.error_private_details.is_none());
 }

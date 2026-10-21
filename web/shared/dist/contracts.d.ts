@@ -93,6 +93,7 @@ export declare const BindingErrorCode: {
     readonly Interrupted: "interrupted";
     readonly Busy: "busy";
     readonly ValidationRequired: "validation_required";
+    readonly Superseded: "superseded";
 };
 export type BindingErrorCode = (typeof BindingErrorCode)[keyof typeof BindingErrorCode];
 export declare const KnowledgeBackend: {

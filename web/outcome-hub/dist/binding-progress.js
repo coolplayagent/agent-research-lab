@@ -5,7 +5,12 @@ import { label, t } from "./i18n.js";
 export const bindingEndpoint = "/api/v1/collaboration/bindings";
 export function showProgress(container, records) {
     container.replaceChildren();
-    for (const record of records.slice().sort((a, b) => b.started_unix_ms - a.started_unix_ms).slice(0, 10)) {
+    const latest = new Map();
+    for (const record of records.slice().sort((a, b) => b.started_unix_ms - a.started_unix_ms || b.request.request_id.localeCompare(a.request.request_id))) {
+        if (!latest.has(record.request.person_id))
+            latest.set(record.request.person_id, record);
+    }
+    for (const record of latest.values()) {
         const card = element("article");
         card.className = "card binding-progress";
         card.append(element("h3", t("binding.operation", { person: record.request.person_id, adapter: record.request.adapter_id })), element("p", label("BindingOperationState", record.state)));

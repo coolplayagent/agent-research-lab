@@ -94,6 +94,7 @@ export const BindingErrorCode = {
   Interrupted: "interrupted",
   Busy: "busy",
   ValidationRequired: "validation_required",
+  Superseded: "superseded",
 } as const;
 export type BindingErrorCode = (typeof BindingErrorCode)[keyof typeof BindingErrorCode];
 export const KnowledgeBackend = {

@@ -16,3 +16,19 @@ fn executable_identity_includes_script_content() {
     fs::write(script, b"second").unwrap();
     assert_ne!(first, executable_digest(&executable, &args).unwrap());
 }
+
+#[test]
+fn codex_companion_is_pinned_and_removal_changes_identity() {
+    let root = tempfile::tempdir().unwrap();
+    let program = root.path().join("codex");
+    let host = root.path().join("codex-code-mode-host");
+    fs::write(&program, b"runtime").unwrap();
+    let alone = executable_digest(&program, &[]).unwrap();
+    fs::write(&host, b"host-one").unwrap();
+    let first = executable_digest(&program, &[]).unwrap();
+    assert_ne!(alone, first);
+    fs::write(&host, b"host-two").unwrap();
+    assert_ne!(first, executable_digest(&program, &[]).unwrap());
+    fs::remove_file(host).unwrap();
+    assert_eq!(alone, executable_digest(&program, &[]).unwrap());
+}

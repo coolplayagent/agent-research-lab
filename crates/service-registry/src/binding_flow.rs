@@ -25,11 +25,7 @@ impl Registry {
         request.validate()?;
         // Existing request IDs are checked before revision validation: a lost POST response
         // can be retried after the atomic configuration commit without another model call.
-        if let Ok(existing) = self.bindings.get(&request.request_id) {
-            ensure!(
-                serde_json::to_value(&existing.request)? == serde_json::to_value(&request)?,
-                "binding request identity conflict"
-            );
+        if let Some(existing) = self.bindings.replay(&request)? {
             return Ok(existing);
         }
         let config = self.configuration();

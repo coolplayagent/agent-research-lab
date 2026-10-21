@@ -1,6 +1,5 @@
 //! Disposable execution with host-verified binding challenges.
 mod challenge;
-#[cfg(windows)]
 mod diagnostics;
 #[cfg(windows)]
 mod profiles;

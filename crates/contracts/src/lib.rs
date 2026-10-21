@@ -55,7 +55,7 @@ states! {
     BindingStage { Discover => "discover", Runtime => "runtime", Configuration => "configuration", Execute => "execute", Persist => "persist" }
     BindingOperationState { Running => "running", Succeeded => "succeeded", Failed => "failed", Cancelled => "cancelled", Interrupted => "interrupted" }
     BindingStepState { Pending => "pending", Running => "running", Passed => "passed", Failed => "failed", Skipped => "skipped" }
-    BindingErrorCode { ProgramMissing => "program_missing", ProgramInvalid => "program_invalid", LaunchFailed => "launch_failed", ConfigurationInvalid => "configuration_invalid", ServiceUnavailable => "service_unavailable", IsolationUnavailable => "isolation_unavailable", VerificationFailed => "verification_failed", InvalidResponse => "invalid_response", Timeout => "timeout", Cancelled => "cancelled", RevisionConflict => "revision_conflict", PersistenceFailed => "persistence_failed", Interrupted => "interrupted", Busy => "busy", ValidationRequired => "validation_required" }
+    BindingErrorCode { ProgramMissing => "program_missing", ProgramInvalid => "program_invalid", LaunchFailed => "launch_failed", ConfigurationInvalid => "configuration_invalid", ServiceUnavailable => "service_unavailable", IsolationUnavailable => "isolation_unavailable", VerificationFailed => "verification_failed", InvalidResponse => "invalid_response", Timeout => "timeout", Cancelled => "cancelled", RevisionConflict => "revision_conflict", PersistenceFailed => "persistence_failed", Interrupted => "interrupted", Busy => "busy", ValidationRequired => "validation_required", Superseded => "superseded" }
 
     KnowledgeBackend { Git => "git", Directory => "directory" }
     KnowledgeAccess { ReadOnly => "read_only", ReadWrite => "read_write" }

@@ -113,6 +113,40 @@ def run(archive, fixture):
                 assert saved["bindings"][person] == agent
                 assert saved["binding_evidence"][person]["request_id"] == request["request_id"]
                 assert api("/api/v1/collaboration/bindings", request)["state"] == "succeeded"
+            # A failed change preserves the active binding, but replaces its process log.
+            config = api("/api/v1/collaboration/services")["configuration"]
+            failed_request = {"request_id":"missing-cc", "person_id":"fixture-codex", "adapter_id":"cc", "revision":config["revision"], "program":str(root / "missing-agent")}
+            api("/api/v1/collaboration/bindings", failed_request)
+            deadline = time.monotonic() + 15
+            while True:
+                failed = api("/api/v1/collaboration/bindings/missing-cc")
+                if failed["state"] != "running": break
+                assert time.monotonic() < deadline
+                time.sleep(.1)
+            assert failed["state"] == "failed"
+            assert api("/api/v1/collaboration/services")["configuration"] == config
+            old_log = state / "private/binding-missing-cc.diagnostic.json"
+            assert old_log.exists()
+            request = {"request_id":"replacement-codex", "person_id":"fixture-codex", "adapter_id":"codex", "revision":config["revision"], "program":str(peer)}
+            api("/api/v1/collaboration/bindings", request)
+            deadline = time.monotonic() + 30
+            while True:
+                operation = api("/api/v1/collaboration/bindings/replacement-codex")
+                if operation["state"] != "running": break
+                assert time.monotonic() < deadline
+                time.sleep(.1)
+            assert operation["state"] == "succeeded", operation
+            latest = api("/api/v1/collaboration/bindings")
+            assert len([record for record in latest if record["request"]["person_id"] == "fixture-codex"]) == 1
+            assert not old_log.exists()
+            for path, body in [("/api/v1/collaboration/bindings", failed_request), ("/api/v1/collaboration/bindings/missing-cc", None)]:
+                try:
+                    api(path, body)
+                    raise AssertionError("An obsolete request must not execute again")
+                except urllib.error.HTTPError as error:
+                    assert json.load(error)["error"]["code"] == "superseded"
+            saved = api("/api/v1/collaboration/services")["configuration"]
+            assert saved["binding_evidence"]["fixture-codex"]["request_id"] == "replacement-codex"
             host.terminate()
             host.wait(timeout=12)
             wait_removed(owned)

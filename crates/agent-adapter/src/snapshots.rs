@@ -10,6 +10,11 @@ use std::{
 
 pub fn runtime_paths(agent: &ResolvedAgent) -> Result<Vec<PathBuf>> {
     let mut paths = vec![agent.executable.clone()];
+    if agent.agent == CodingAgent::Codex
+        && let Some(companion) = crate::discovery::companion(&agent.executable)
+    {
+        paths.push(companion);
+    }
     for argument in &agent.arguments {
         let script = Path::new(argument);
         if !script.is_file() {
@@ -55,8 +60,11 @@ pub fn environment_names(agent: CodingAgent) -> Vec<String> {
         ],
         CodingAgent::Custom => &[],
     };
+    // Preserve explicitly configured network routing through the clean service boundary.
+    // Only names are persisted; values remain in the service environment.
     names
         .iter()
+        .chain(service_api::NETWORK_ENVIRONMENT_NAMES.iter())
         .filter(|name| std::env::var_os(name).is_some())
         .map(|s| (*s).into())
         .collect()

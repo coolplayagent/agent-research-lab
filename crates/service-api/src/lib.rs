@@ -14,6 +14,18 @@ pub use scenarios::*;
 use serde::{Deserialize, Serialize};
 use service_protocol as rpc;
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
+/// Explicit network routing names accepted at the execution boundary.
+pub const NETWORK_ENVIRONMENT_NAMES: &[&str] = &[
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+];
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Adapter {
@@ -58,9 +70,10 @@ impl Adapter {
             self.env_names.len() <= 32
                 && self.env_names.iter().all(|name| !name.is_empty()
                     && name.len() <= 80
-                    && name
-                        .bytes()
-                        .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == b'_')
+                    && (NETWORK_ENVIRONMENT_NAMES.contains(&name.as_str())
+                        || name
+                            .bytes()
+                            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == b'_'))
                     && ![
                         "LD_PRELOAD",
                         "LD_LIBRARY_PATH",

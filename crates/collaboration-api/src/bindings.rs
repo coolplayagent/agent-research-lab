@@ -13,7 +13,7 @@ pub async fn list(State(web): State<Web>) -> Response {
     )
 }
 pub async fn get(State(web): State<Web>, RoutePath(id): RoutePath<String>) -> Response {
-    json_response(
+    binding_response(
         web.services
             .as_ref()
             .context("service management is unavailable")
@@ -43,7 +43,7 @@ pub async fn cancel(
     RoutePath(id): RoutePath<String>,
     request: Request,
 ) -> Response {
-    json_response((|| {
+    binding_response((|| {
         intent(request.headers(), web.addr, "manage-services")?;
         Ok(json!(
             web.services
@@ -67,3 +67,7 @@ fn binding_response(result: Result<serde_json::Value>) -> Response {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "bindings_tests.rs"]
+mod tests;

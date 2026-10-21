@@ -30,3 +30,29 @@ fn output_requires_matching_execution_identity_and_protocol() {
     output.summary = "Bounded result".into();
     assert!(output.validate(&input).is_ok());
 }
+
+#[test]
+fn proxy_environment_names_are_explicit_without_allowing_runtime_injection() {
+    let mut adapter = Configuration::defaults(std::path::Path::new("/fixture"))
+        .adapters
+        .remove(0);
+    adapter.env_names = NETWORK_ENVIRONMENT_NAMES
+        .iter()
+        .map(|s| (*s).into())
+        .collect();
+    assert!(adapter.validate().is_ok());
+    for name in [
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "NODE_OPTIONS",
+        "BASH_ENV",
+        "ENV",
+        "PYTHONPATH",
+        "arbitrary_lowercase",
+        "https_proxy=secret",
+        "HTTP_PROXY;command",
+    ] {
+        adapter.env_names = vec![name.into()];
+        assert!(adapter.validate().is_err(), "{name}");
+    }
+}

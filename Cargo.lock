@@ -1360,6 +1360,7 @@ dependencies = [
  "outcome-hub-filesystem-store",
  "outcome-hub-process",
  "outcome-hub-service-api",
+ "outcome-hub-service-protocol",
  "outcome-hub-windows-runtime",
  "serde_json",
  "tempfile",
