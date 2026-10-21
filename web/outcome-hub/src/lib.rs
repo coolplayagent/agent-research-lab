@@ -4,6 +4,14 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
         return Some(asset);
     }
     match path {
+        "/assets/knowledge-bindings.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../dist/knowledge-bindings.js").as_slice(),
+        )),
+        "/assets/knowledge-card.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../dist/knowledge-card.js").as_slice(),
+        )),
         "/assets/knowledge-form.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/knowledge-form.js").as_slice(),

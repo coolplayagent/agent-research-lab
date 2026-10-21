@@ -146,50 +146,84 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
     "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms,
     "./settings-guard.js": { trackSettings() {} },
   });
-  const requests = [];
-  const knowledge = load(base + "knowledge-settings.ts", {
+  const bindingForms = load(base + "knowledge-bindings.ts", {
     "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms,
-    "./knowledge-form.js": targetForms, "./outcome-service-settings.js": serviceSettings, "./api.js": { api: async (_url, body, intent) => {
+    "./settings-guard.js": { trackSettings() {} },
+  });
+  const cards = load(base + "knowledge-card.ts", { "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom });
+  const requests = [], directory = { kind: contracts.KnowledgeBackend.Directory, access: contracts.KnowledgeAccess.ReadOnly, enabled: true, path: "/external", content_root: ".", reference: null, remote: null, credential_env: [] };
+  let targetConfig = { revision: 8, targets: { repo: { ...directory }, "new-repo": { ...directory }, stopped: { ...directory, enabled: false } } };
+  const knowledge = load(base + "knowledge-settings.ts", {
+    "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom,
+    "./knowledge-form.js": targetForms, "./knowledge-card.js": cards, "./knowledge-bindings.js": bindingForms,
+    "./outcome-service-settings.js": serviceSettings, "./api.js": { api: async (_url, body, intent) => {
       requests.push({ body, intent });
-      return body.request.operation === "probe" ? { revision: "abc123" } : { revision: 8, targets: { repo: { kind: contracts.KnowledgeBackend.Directory, access: contracts.KnowledgeAccess.ReadOnly, enabled: true, path: "/external", content_root: "knowledge" } } };
+      if (body.request.operation === "probe") return { revision: "abc123" };
+      if (body.request.operation === "save") targetConfig = structuredClone(body.request.configuration);
+      return structuredClone(targetConfig);
     } },
   }, { confirm: () => true });
-  knowledge.renderKnowledgeSettings(view, save);
+  knowledge.renderKnowledgeSettings(view, save); await tick();
   const knowledgePanel = get("knowledge-services"), targetsPanel = get("knowledge-targets");
   assert.equal(knowledgePanel.children.length, 0, "External knowledge service configuration is removed");
+  assert(buttonIn(targetsPanel, "knowledge.add"));
+  assert(!buttonIn(targetsPanel, "knowledge.addGit") && !buttonIn(targetsPanel, "knowledge.addDirectory"), "Both types share one add entry");
+  assert(textOf(targetsPanel).includes("/external"), "Stored details load automatically");
   assert(!textOf(targetsPanel).includes("unix:///knowledge"));
   assert(!textOf(targetsPanel).includes("disabled-knowledge"));
   const beforeRetiredEditor = box;
   serviceSettings.editOutcomeService(cfg, undefined, save, OutcomeServiceKind.Knowledge);
   assert.equal(box, beforeRetiredEditor, "Generic service editors cannot reopen external knowledge setup");
-  await buttonIn(targetsPanel, "knowledge.binding").onclick();
+  await buttonIn(targetsPanel, "knowledge.binding").onclick(); await tick();
   field(box.form, "knowledge.scope").value = "topic"; field(box.form, "knowledge.scopeId").value = "topic";
-  field(box.form, "knowledge.scope").onchange();
-  assert.equal(field(box.form, "knowledge.id").value, "repo");
-  field(box.form, "knowledge.id").value = "new-repo"; await box.save();
+  await field(box.form, "knowledge.scope").onchange();
+  const targetPicker = field(box.form, "knowledge.selectTarget");
+  assert.equal(targetPicker.tag, "select"); assert.equal(targetPicker.value, "repo");
+  assert.deepEqual(targetPicker.children.map(n => n.value), ["repo", "new-repo"], "Only added, enabled knowledge bases can be bound");
+  targetPicker.value = "new-repo"; await box.save();
   assert.deepEqual(saved.outcome_bindings.topic.verifiers, { [kind]: "verify" });
   assert.equal(saved.outcome_bindings.topic.knowledge.repository, "new-repo");
-  await buttonIn(targetsPanel, "services.unbind").onclick();
+  await buttonIn(targetsPanel.children.at(-1), "services.unbind").onclick();
   assert.deepEqual(saved.outcome_bindings.topic, { verifiers: { [kind]: "verify" }, knowledge: null });
-  const targetServiceCard = targetsPanel.children.at(-1);
-  await buttonIn(targetServiceCard, "knowledge.load").onclick();
+  const targetServiceCard = targetsPanel.children[1].children[0];
   assert.equal(requests[0].intent, "manage-knowledge"); assert.equal(requests[0].body.configuration_revision, 12);
-  await buttonIn(targetServiceCard, "knowledge.probe").onclick();
-  assert(textOf(targetServiceCard).includes("abc123"));
-  await buttonIn(targetServiceCard, "knowledge.disable").onclick();
-  assert.equal(requests.find(r => r.body.request.operation === "save").body.request.configuration.targets.repo.enabled, false);
-
-  await buttonIn(targetsPanel, "knowledge.binding").onclick();
+  const repoCard = find(targetServiceCard, n => n.tag === "article" && textOf(n).includes("repo"))[0];
+  await buttonIn(repoCard, "services.remove").onclick();
+  assert(textOf(repoCard).includes("knowledge.removeBound"));
+  assert(!requests.some(r => r.body.request.operation === "save"), "Deleting a bound target cannot leave dangling defaults");
+  await buttonIn(repoCard, "knowledge.probe").onclick(); assert(textOf(repoCard).includes("abc123"));
+  await buttonIn(repoCard, "knowledge.disable").onclick();
+  assert.equal(targetConfig.targets.repo.enabled, false);
+  await buttonIn(targetsPanel, "knowledge.binding").onclick(); await tick();
   field(box.form, "knowledge.scopeId").value = "group-one";
-  field(box.form, "knowledge.id").value = "group-repo"; await box.save();
-  assert.deepEqual(saved.knowledge_groups["group-one"], { service_id: "knowledge", repository: "group-repo" });
+  field(box.form, "knowledge.selectTarget").value = "new-repo";
+  await field(box.form, "knowledge.scopeId").onchange();
+  assert.equal(field(box.form, "knowledge.selectTarget").value, "new-repo", "Entering a new scope ID preserves the chosen store");
+  await box.save();
+  assert.deepEqual(saved.knowledge_groups["group-one"], { service_id: "knowledge", repository: "new-repo" });
   assert.deepEqual(saved.outcome_bindings, cfg.outcome_bindings);
-  await buttonIn(targetsPanel, "knowledge.binding").onclick();
-  field(box.form, "knowledge.scope").value = "goal";
-  field(box.form, "knowledge.scopeId").value = "goal-one";
-  field(box.form, "knowledge.id").value = "goal-repo"; await box.save();
-  assert.deepEqual(saved.knowledge_goals["goal-one"], { service_id: "knowledge", repository: "goal-repo" });
+  await buttonIn(targetsPanel, "knowledge.binding").onclick(); await tick();
+  field(box.form, "knowledge.scope").value = "goal"; field(box.form, "knowledge.scopeId").value = "goal-one";
+  await field(box.form, "knowledge.scope").onchange();
+  await box.save(); assert.deepEqual(saved.knowledge_goals["goal-one"], { service_id: "knowledge", repository: "new-repo" });
   assert.deepEqual(saved.outcome_bindings, cfg.outcome_bindings);
+
+  // A missing existing default requires explicit replacement and may not silently switch.
+  bindingForms.bindScope(cfg, save, async () => targetConfig, "topic", "topic"); await tick();
+  assert.equal(field(box.form, "knowledge.selectTarget").value, "");
+  await assert.rejects(box.save(), /knowledge.noAvailableTargets/);
+  field(box.form, "knowledge.selectTarget").value = "new-repo"; await box.save();
+  assert.equal(saved.outcome_bindings.topic.knowledge.repository, "new-repo");
+  const secondCfg = structuredClone(cfg); secondCfg.outcome_services.push({ ...cfg.outcome_services[1], id: "second-knowledge" });
+  const late = pending();
+  bindingForms.bindScope(secondCfg, save, service => service === "knowledge" ? late.promise : Promise.resolve({ revision: 1, targets: { second: directory } }));
+  field(box.form, "knowledge.service").value = "second-knowledge";
+  await field(box.form, "knowledge.service").onchange();
+  late.resolve(targetConfig); await tick();
+  assert.equal(field(box.form, "knowledge.selectTarget").value, "second", "Late responses from another service cannot replace the current options");
+  bindingForms.bindScope(cfg, save, async () => { throw new Error("offline"); }); await tick();
+  assert(field(box.form, "knowledge.selectTarget").disabled); await assert.rejects(box.save(), /knowledge.noAvailableTargets/);
+  await buttonIn(box.form, "knowledge.load").onclick(); assert(field(box.form, "knowledge.selectTarget").disabled);
 
   let addedTarget, inspected;
   targetForms.knowledgeForm(contracts.KnowledgeBackend.Directory, async (name, target) => { addedTarget = { name, target }; }, async target => { inspected = target; return { target, revision: "directory-revision" }; });
@@ -204,6 +238,11 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   const writable = field(box.form, "knowledge.writable"); writable.checked = true; writable.onchange();
   assert(field(box.form, "knowledge.branch").required, "Writing requires an explicitly prepared branch");
   assert(find(box.form, node => node.tag === "details")[0].open);
+  const directoryType = find(box.form, node => node.type === "radio" && node.value === contracts.KnowledgeBackend.Directory)[0];
+  directoryType.onchange(); await box.save();
+  assert.equal(addedTarget.target.kind, contracts.KnowledgeBackend.Directory);
+  assert.equal(addedTarget.target.reference, null); assert.equal(field(box.form, "knowledge.branch").required, false);
+  assert(field(box.form, "knowledge.branch").disabled, "Hidden Git fields cannot block directory submission");
 
   let servicesLoaded = 0;
   const settingPanels = ["services", "knowledge", "bindings"].map(name => Object.assign(el("section"), { dataset: { settingsPanel: name } }));

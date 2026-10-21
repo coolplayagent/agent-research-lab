@@ -1186,3 +1186,79 @@ dialog header h2 { overflow-wrap: anywhere; }
 #advanced-settings a { display: block; }
 #execution-status { display: grid; gap: 12px; margin-bottom: 20px; max-width: 680px; }
 #execution-status p { margin: 0; }
+
+/* Knowledge management keeps connection plumbing below the everyday workflow. */
+#knowledge-targets { display: grid; gap: 28px; }
+#knowledge-targets .knowledge-header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px; margin-bottom: 0; align-items: flex-start; }
+.knowledge-header > div:first-child { flex: 1 1 320px; }
+.knowledge-header h2 { font-size: 22px; }
+.knowledge-header p { max-width: 64ch; margin: 10px 0 0; }
+.knowledge-header .card-actions { gap: 10px; }
+.knowledge-service-section { margin-bottom: 26px; }
+.knowledge-service-section:last-child { margin-bottom: 0; }
+#knowledge-targets .knowledge-service-heading { margin-bottom: 14px; }
+.knowledge-service-heading h3 { margin: 0 0 4px; font-size: 14px; }
+.knowledge-service-heading button { background: transparent; }
+.knowledge-grid { grid-template-columns: repeat(auto-fill, minmax(min(350px, 100%), 1fr)); gap: 18px; }
+.knowledge-card { gap: 16px; padding: 22px; box-shadow: 0 2px 6px #153b2d04; }
+.knowledge-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.knowledge-card-heading > div { min-width: 0; }
+.knowledge-card-heading h4 { font-size: 16px; margin: 0 0 5px; }
+.knowledge-card-heading small { font-size: 12px; }
+.knowledge-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.knowledge-badge { display: inline-flex; align-items: center; flex: none; gap: 6px; border-radius: 20px; padding: 4px 9px; color: #687c76; background: #f0f3f2; font-size: 11px; line-height: 1.4; }
+.knowledge-badge.is-enabled { color: #216753; background: #edf7f0; }
+.knowledge-badge.is-enabled::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #388260; }
+.knowledge-access { border-radius: 5px; background: #f1f6f5; color: #516a64; }
+.knowledge-details { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px 12px; margin: 0; font-size: 12px; line-height: 1.6; }
+.knowledge-details dt { color: var(--muted); }
+.knowledge-details dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.knowledge-details dd code { display: inline; padding: 0; background: transparent; border: 0; }
+.knowledge-card .card-actions { border-top: 1px solid #edf1ef; padding-top: 16px; gap: 7px; }
+.knowledge-card .card-actions button { padding: 6px 10px; min-height: 34px; font-size: 12px; }
+.knowledge-edit { border-color: #afc9bf; color: var(--accent); }
+button.knowledge-danger { margin-left: auto; color: #a24742; border-color: transparent; background: transparent; }
+button.knowledge-danger:hover { background: #fff3f1; border-color: #e3bcb8; }
+.knowledge-extra summary { color: var(--muted); cursor: pointer; font-size: 12px; }
+.knowledge-extra .knowledge-details { margin-top: 12px; }
+.knowledge-card-status:empty, .knowledge-load-status:empty { display: none; }
+.knowledge-card-status { overflow-wrap: anywhere; }
+.knowledge-empty { grid-column: 1 / -1; border: 1px dashed #c9dcd4; border-radius: 12px; padding: 40px 24px; text-align: center; background: #f5f9f7; }
+.knowledge-empty h3 { margin: 0 0 10px; font-size: 16px; }
+.knowledge-empty p { margin: 0 auto; max-width: 52ch; }
+.knowledge-defaults { padding: 22px 24px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.knowledge-defaults > h3 { margin: 0 0 8px; font-size: 15px; }
+.knowledge-defaults > p { margin-bottom: 16px; }
+.knowledge-defaults > p:last-child { margin-bottom: 0; }
+.knowledge-binding-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid #edf1ef; }
+.knowledge-binding-row > div:first-child { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-width: 0; overflow-wrap: anywhere; }
+.knowledge-binding-row .card-actions { flex: none; }
+.knowledge-dialog { width: min(680px, calc(100% - 32px)); max-width: 680px; padding: 26px; border-radius: 14px; }
+.knowledge-dialog .knowledge-form-note { line-height: 1.7; margin-bottom: 22px; }
+.knowledge-types { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; border: 0; margin: 0 0 22px; padding: 0; }
+.knowledge-types legend { margin-bottom: 10px; font-size: 12px; color: var(--muted); }
+.knowledge-types .knowledge-type { display: flex; align-items: flex-start; gap: 10px; padding: 16px 14px; margin: 0; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; }
+.knowledge-type:has(input:checked) { border-color: var(--accent); background: #f0f8f4; box-shadow: 0 0 0 1px var(--accent); }
+.knowledge-type:focus-within { outline: 2px solid #75b9a6; outline-offset: 3px; }
+.knowledge-type input[type="radio"] { width: 16px; height: 16px; min-height: 0; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
+.knowledge-type span { display: grid; gap: 6px; }
+.knowledge-type strong { font-weight: 600; }
+.knowledge-type small { font-size: 11px; line-height: 1.5; }
+.knowledge-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.knowledge-form-grid > label { margin: 0; min-width: 0; font-size: 12px; }
+.knowledge-form-grid input, .knowledge-form-grid select { font-size: 13px; }
+.knowledge-advanced { margin: 20px 0; border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.knowledge-advanced > summary { cursor: pointer; font-size: 13px; color: #527164; }
+.knowledge-advanced p { line-height: 1.6; }
+.knowledge-dialog .form-actions { bottom: -26px; padding-bottom: 4px; }
+@media (max-width: 599px) {
+  .knowledge-header .card-actions { width: 100%; }
+  .knowledge-header .card-actions button { flex: 1; }
+  .knowledge-card { padding: 18px; }
+  .knowledge-defaults { padding: 18px; }
+  .knowledge-binding-row { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .knowledge-dialog { padding: 20px; }
+  .knowledge-form-grid, .knowledge-types { grid-template-columns: minmax(0, 1fr); }
+  .knowledge-type small { font-size: 12px; }
+  .knowledge-dialog .form-actions { bottom: -20px; }
+}

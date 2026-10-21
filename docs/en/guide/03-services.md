@@ -16,8 +16,8 @@ Create a digital person directly in Agent bindings; the new person is selected w
 
 ## Add an optional knowledge store
 
-Open **Settings → Knowledge** and choose **Add Git repository** or **Add directory**.
-Enter an identifier and an existing absolute path on the host. The whole selected
+Open **Settings → Knowledge**, choose **Add knowledge store**, and select Git or a local directory in the same form.
+Enter a name and an existing absolute path on the host. The whole selected
 location is used by default; advanced options can restrict it to a relative content
 subdirectory. New stores are read-only. Git reads detect the current branch; detached
 HEAD or an empty repository requires preparing a usable branch first. Write access
@@ -31,7 +31,8 @@ service; external knowledge service connections are no longer configurable or us
 On upgrade, the registry backs up its configuration and removes external knowledge
 connections and their current default bindings. Historical outcomes, receipts,
 local connections and knowledge files are preserved.
-After adding a store, select default bindings explicitly when needed. Legacy
+Cards show the saved path, type, access and enabled state, with edit, disable and delete actions.
+Default bindings select an enabled store by name. Unbind references before deleting its configuration; knowledge files remain in place. Legacy
 research adapters retain their original evidence pins and gates.
 
 Directory targets exclude `.git` and `.outcomehub` at every level and apply only
