@@ -10,11 +10,11 @@ no management credential is needed. The default state is under
 %LOCALAPPDATA%\OutcomeHub\state. Use --state-dir to choose an alternate
 private directory. Back up the state directory before upgrading.
 
-This v0.2.0-rc.1 preview includes outcome-hub-services.exe and
+This v0.2.1 package includes outcome-hub-services.exe and
 outcome-hub-agent.exe. Keep these beside outcome-hub.exe. Windows CI verifies
-core startup, isolation and deterministic binding fixtures. Authenticated model
-acceptance for all four Agents remains pending and is required before the stable
-v0.2.0 release. The latest stable version remains v0.1.2.
+core startup, isolation and deterministic binding fixtures. The maintainer
+confirmed authenticated Windows model acceptance for all four Agents on
+2026-10-21 for v0.2.1. This is a maintainer attestation; private live-run reports are not included in this package.
 
 In Settings, select a digital person and an Agent, then choose Validate and bind.
 OutcomeHub detects existing Codex, Claude Code, DeepSeek Harness and Pi programs;

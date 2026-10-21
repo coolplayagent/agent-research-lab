@@ -6,7 +6,7 @@ _DEPS = ["//crates/filesystem-store:storage", "//crates/execution-config:config"
 rust_library(
     name = "outcome_hub_migrate", crate_name = "outcome_hub_migrate",
     srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]), crate_root = "src/lib.rs",
-    edition = "2024", version = "0.2.0-rc.1", aliases = aliases(),
+    edition = "2024", version = "0.2.1", aliases = aliases(),
     compile_data = glob(["tests/fixtures/**"]),
     deps = _DEPS + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True), visibility = ["//visibility:public"],

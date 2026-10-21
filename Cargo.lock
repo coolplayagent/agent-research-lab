@@ -651,7 +651,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "outcome-hub"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -664,7 +664,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-agent-adapter"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -682,7 +682,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-agent-backend"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -701,7 +701,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-agent-policy"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "serde_json",
@@ -709,7 +709,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-agent-teams"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-collaboration-proposals",
@@ -723,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-build-cache"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "libc",
@@ -740,7 +740,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-cli"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -783,7 +783,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-codex-adapter"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -797,7 +797,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-collaboration-api"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -824,7 +824,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-collaboration-client"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-collaboration-model",
@@ -836,7 +836,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-collaboration-evaluation"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "libc",
@@ -857,7 +857,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-collaboration-host"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -874,7 +874,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-collaboration-model"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-contracts",
@@ -885,7 +885,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-collaboration-proposals"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "libc",
@@ -900,7 +900,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-collaboration-storage-service"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -916,7 +916,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-collaboration-store"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "getrandom",
@@ -932,7 +932,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-console"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -968,11 +968,11 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-console-web"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 
 [[package]]
 name = "outcome-hub-contracts"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "libc",
  "serde",
@@ -981,7 +981,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-delivery-adapters"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-contracts",
@@ -996,7 +996,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-delivery-outbox"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1012,7 +1012,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-execution-budget"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "serde",
@@ -1021,7 +1021,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-execution-config"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-agent-policy",
@@ -1031,7 +1031,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-execution-inputs"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-delivery-adapters",
@@ -1047,7 +1047,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-execution-model"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "outcome-hub-collaboration-proposals",
  "outcome-hub-contracts",
@@ -1059,7 +1059,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-execution-runtime"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1092,7 +1092,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-execution-targets"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1112,7 +1112,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-executor-service"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-agent-adapter",
@@ -1126,7 +1126,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-filesystem-store"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1141,7 +1141,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-isolation"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "libc",
@@ -1153,7 +1153,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-knowledge-client"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-knowledge-model",
@@ -1165,7 +1165,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-knowledge-directory"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "libc",
@@ -1180,7 +1180,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-knowledge-git"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-collaboration-model",
@@ -1197,7 +1197,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-knowledge-model"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-collaboration-model",
@@ -1209,7 +1209,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-knowledge-publication"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1224,7 +1224,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-knowledge-service"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1244,7 +1244,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-lease-heartbeat"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "libc",
@@ -1258,7 +1258,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-migrate"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1282,7 +1282,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-native-effects"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "libc",
@@ -1294,7 +1294,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-outcome-service"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1313,7 +1313,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-process"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "libc",
@@ -1324,7 +1324,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-prompt-evolution"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1337,7 +1337,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-prompt-evolution-cli"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-contracts",
@@ -1352,7 +1352,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-sandbox-service"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-agent-adapter",
@@ -1368,7 +1368,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-service-api"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-collaboration-model",
@@ -1383,7 +1383,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-service-protocol"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "libc",
@@ -1398,7 +1398,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-service-registry"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-agent-adapter",
@@ -1415,7 +1415,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-service-workers"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1433,7 +1433,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-software-delivery"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1455,14 +1455,14 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-software-verification"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "outcome-hub-source-freshness"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1479,18 +1479,18 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-web"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "outcome-hub-web-assets",
 ]
 
 [[package]]
 name = "outcome-hub-web-assets"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 
 [[package]]
 name = "outcome-hub-windows-runtime"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "sha2",
@@ -1500,7 +1500,7 @@ dependencies = [
 
 [[package]]
 name = "outcome-hub-workflow-adapter"
-version = "0.2.0-rc.1"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "outcome-hub-contracts",

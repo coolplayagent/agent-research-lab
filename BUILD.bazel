@@ -169,7 +169,7 @@ pkg_tar(
 
 rust_binary(
     name = "outcome-hub-cli",
-    version = "0.2.0-rc.1",
+    version = "0.2.1",
     srcs = ["//apps/cli:src/main.rs"],
     crate_root = "//apps/cli:src/main.rs",
     edition = "2024",

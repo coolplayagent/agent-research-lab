@@ -19,13 +19,13 @@ Expand-Archive .\outcome-hub-windows-x86_64.zip -DestinationPath .\outcome-hub-r
 
 在这台计算机的浏览器中直接打开 `http://127.0.0.1:4877/`，无需管理凭据。默认状态目录是 `%LOCALAPPDATA%\OutcomeHub\state`；使用绝对路径 `--state-dir` 可更换目录。程序为状态设置私有访问控制列表。升级前备份状态目录，恢复备份前停止服务。
 
-v0.2.0-rc.1 预览包提供核心协作、独立的嵌入式本地存储、本地执行进程和 Agent 桥接程序。绑定验证按需启动托管的执行与沙箱服务。研究与知识库服务仍是可选的外部服务。配置完成不等于任务已执行成功。
+v0.2.1 包提供核心协作、独立的嵌入式本地存储、本地执行进程和 Agent 桥接程序。绑定验证按需启动托管的执行与沙箱服务。研究与知识库服务仍是可选的外部服务。配置完成不等于任务已执行成功。
 
 从源码构建需安装仓库固定版本的 Rust 工具链及 Bazelisk，然后运行 `bazel build --lockfile_mode=error //:windows-package`。CI 在 `windows-latest` 上构建、解压并实际启动包内的可执行文件。
 
-## v0.2.0-rc.1 中的原生 Agent 绑定
+## v0.2.1 中的原生 Agent 绑定
 
-[v0.2.0-rc.1 预览版](https://github.com/coolplayagent/agent-research-lab/releases/tag/v0.2.0-rc.1) 新增 `outcome-hub-services.exe` 和 `outcome-hub-agent.exe`，请将它们与 `outcome-hub.exe` 放在同一目录。本版修复了 Windows 规范化路径处理导致绑定出现 OS error 1 的问题。Windows 自动化测试覆盖核心启动、进程隔离、四种 Agent 的确定性协议测试程序和已安装 Node 的启动处理。四种 Agent 的 Windows 登录与真实模型验收尚未完成，正式发布 v0.2.0 前仍须通过该验收。[v0.1.2](https://github.com/coolplayagent/agent-research-lab/releases/tag/v0.1.2) 仍为最新正式版，仅提供核心协作功能。
+[v0.2.1](https://github.com/coolplayagent/agent-research-lab/releases/tag/v0.2.1) 新增 `outcome-hub-services.exe` 和 `outcome-hub-agent.exe`，请将它们与 `outcome-hub.exe` 放在同一目录。本版修复了 Windows 规范化路径处理导致绑定出现 OS error 1 的问题。Windows 自动化测试覆盖核心启动、进程隔离、四种 Agent 的确定性协议测试程序和已安装 Node 的启动处理。维护者于 2026-10-21 确认，v0.2.1 的四种 Agent 已完成 Windows 登录与真实模型验收。此项为维护者确认，私有真实运行报告不进入仓库；自动化测试程序仅证明其覆盖范围内的协议与隔离行为。
 
 进入“设置 → Agent 与执行器绑定”，选择数字人以及 Codex、Claude Code、DeepSeek Harness 或 Pi，点击“验证并绑定数字人”。程序自动查找已安装的 Agent，不会安装第三方 CLI。支持独立 `codex.exe`；自动查找失败时，可填写完整程序路径。模型留空时沿用本地选择；DeepSeek Harness 需要明确的已有模型路由，或手动填写 `provider/model`。
 

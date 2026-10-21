@@ -19,13 +19,13 @@ Open PowerShell in `outcome-hub-release\outcome-hub` and start the native core:
 
 Open `http://127.0.0.1:4877/` directly in a browser on this computer. No management credential is needed. The default state directory is `%LOCALAPPDATA%\OutcomeHub\state`; use an absolute `--state-dir` to choose another location. The app creates private access-control lists for its state. Back up the state directory before upgrades and stop the service before restoring a backup.
 
-The v0.2.0-rc.1 preview runs core collaboration with its separate embedded local store and includes local execution workers and the Agent bridge. Binding validation starts the managed execution and sandbox services when needed. Research and knowledge services remain optional external services. A configured adapter is not evidence of a completed task.
+The v0.2.1 package runs core collaboration with its separate embedded local store and includes local execution workers and the Agent bridge. Binding validation starts the managed execution and sandbox services when needed. Research and knowledge services remain optional external services. A configured adapter is not evidence of a completed task.
 
 To build from source on Windows, install the pinned Rust toolchain and Bazelisk, then run `bazel build --lockfile_mode=error //:windows-package`. CI builds the archive on `windows-latest`, extracts it and smoke-tests the packaged executable.
 
-## Native Agent bindings in v0.2.0-rc.1
+## Native Agent bindings in v0.2.1
 
-The [v0.2.0-rc.1 preview](https://github.com/coolplayagent/agent-research-lab/releases/tag/v0.2.0-rc.1) adds `outcome-hub-services.exe` and `outcome-hub-agent.exe`; keep them beside `outcome-hub.exe`. It fixes the Windows canonical-path handling that caused OS error 1 during binding. Automated Windows tests cover core startup, process isolation, four deterministic Agent protocol fixtures and installed Node launcher handling. Authenticated model acceptance for all four Agents remains pending; it is still required before the stable v0.2.0 release. [v0.1.2](https://github.com/coolplayagent/agent-research-lab/releases/tag/v0.1.2) remains the latest stable release and provides core collaboration only.
+[v0.2.1](https://github.com/coolplayagent/agent-research-lab/releases/tag/v0.2.1) adds `outcome-hub-services.exe` and `outcome-hub-agent.exe`; keep them beside `outcome-hub.exe`. It fixes the Windows canonical-path handling that caused OS error 1 during binding. Automated Windows tests cover core startup, process isolation, four deterministic Agent protocol fixtures and installed Node launcher handling. For v0.2.1, the maintainer confirmed completion of authenticated Windows model acceptance for all four Agents on 2026-10-21. This is a maintainer attestation; private live-run reports are not included in the repository. Automated fixture tests establish protocol and isolation behavior within their tested scope.
 
 Open Settings → Agent bindings, choose a digital person and Codex, Claude Code, DeepSeek Harness or Pi, then select **Validate and bind**. The app detects installed programs; it never installs third-party CLIs. A standalone `codex.exe` and an explicit absolute program path are supported. Leave the model blank to reuse the local selection. DeepSeek Harness needs an unambiguous configured route or an explicit `provider/model` override.
 
