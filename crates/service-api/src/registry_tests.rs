@@ -1,7 +1,8 @@
 use super::*;
 #[test]
 fn default_services_are_local_execution_without_unused_storage() {
-    let config = Configuration::defaults(Path::new("/tmp/outcome-hub"));
+    let root = tempfile::tempdir().unwrap();
+    let config = Configuration::defaults(root.path());
     assert_eq!(config.services.len(), 2);
     assert!(
         config
@@ -20,7 +21,8 @@ fn default_services_are_local_execution_without_unused_storage() {
 }
 #[test]
 fn legacy_service_management_defaults_to_external_and_unknown_modes_fail() {
-    let config = Configuration::defaults(Path::new("/tmp/outcome-hub"));
+    let root = tempfile::tempdir().unwrap();
+    let config = Configuration::defaults(root.path());
     let mut value = serde_json::to_value(&config.services[0]).unwrap();
     value.as_object_mut().unwrap().remove("management");
     let legacy: Service = serde_json::from_value(value.clone()).unwrap();
