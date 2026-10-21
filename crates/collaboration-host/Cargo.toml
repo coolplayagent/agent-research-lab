@@ -7,7 +7,7 @@ license.workspace = true
 name = "collaboration_host"
 [dependencies]
 anyhow.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["signal"] }
 axum.workspace = true
 contracts.workspace = true
 collaboration_api.workspace = true

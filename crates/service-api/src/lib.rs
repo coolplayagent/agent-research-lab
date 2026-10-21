@@ -1,6 +1,8 @@
 //! Versioned service and coding-agent contracts. Implementations live in independent processes.
 mod bindings;
+mod configuration_error;
 pub use bindings::*;
+pub use configuration_error::*;
 mod outcomes;
 mod registry;
 pub use outcomes::*;
@@ -36,7 +38,7 @@ impl Adapter {
         );
         ensure!(
             !self.enabled || !self.command.is_empty(),
-            "enabled adapter requires a JSON protocol command"
+            ConfigurationFailure(contracts::ServiceConfigurationErrorCode::CommandRequired)
         );
         ensure!(
             self.command.len() <= 64

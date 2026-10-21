@@ -17,7 +17,7 @@ pub struct Registry {
     config: Mutex<Configuration>,
     active_storage: Option<(String, PathBuf)>,
     bindings: bindings::Operations,
-    managed: Mutex<managed::Managed>,
+    managed: tokio::sync::Mutex<managed::Managed>,
 }
 impl Registry {
     pub fn open(state: &Path) -> Result<Self> {
@@ -38,22 +38,12 @@ impl Registry {
                     .map(|s| (id.clone(), s.endpoint.clone()))
             })
             .transpose()?;
-        #[allow(unused_mut)]
-        let mut managed = managed::Managed::default();
-        #[cfg(windows)]
-        if config
-            .services
-            .iter()
-            .any(|s| s.enabled && s.kind == ServiceKind::Executor)
-        {
-            // Optional execution failure must not prevent core collaboration startup.
-            let _ = managed.prepare(&mut config.clone(), &state);
-        }
+        managed::validate_locations(&config, &state)?;
         Ok(Self {
             path,
             config: Mutex::new(config.clone()),
             bindings: bindings::Operations::open(&state, &config)?,
-            managed: Mutex::new(managed),
+            managed: tokio::sync::Mutex::new(managed::Managed::default()),
             active_storage,
         })
     }
@@ -68,6 +58,18 @@ impl Registry {
                 .all(|(person, adapter)| current.bindings.get(person) == Some(adapter)),
             binding_flow::Failure(contracts::BindingErrorCode::ValidationRequired)
         );
+        for adapter in &next.adapters {
+            if adapter.agent != contracts::CodingAgent::Custom && adapter.enabled {
+                ensure!(
+                    current.adapters.iter().any(|old| old.id == adapter.id
+                        && old.enabled
+                        && serde_json::to_value(old).ok() == serde_json::to_value(adapter).ok()),
+                    ConfigurationFailure(
+                        contracts::ServiceConfigurationErrorCode::ValidationRequired
+                    )
+                );
+            }
+        }
         // Evidence is server-owned. Clients cannot forge validation by posting it.
         next.binding_evidence = current
             .binding_evidence
@@ -86,11 +88,26 @@ impl Registry {
     }
     pub fn save(&self, mut next: Configuration) -> Result<Configuration> {
         next.validate()?;
+        managed::validate_locations(
+            &next,
+            self.path
+                .parent()
+                .and_then(|p| p.parent())
+                .context("registry state is missing")?,
+        )?;
         let mut current = self.config.lock().unwrap();
         ensure!(
             next.revision == current.revision,
             binding_flow::Failure(contracts::BindingErrorCode::RevisionConflict)
         );
+        for service in &next.services {
+            if let Some(old) = current.services.iter().find(|s| s.id == service.id) {
+                ensure!(
+                    old.kind == service.kind,
+                    ConfigurationFailure(contracts::ServiceConfigurationErrorCode::KindImmutable)
+                );
+            }
+        }
         next.revision = next
             .revision
             .checked_add(1)
@@ -107,6 +124,44 @@ impl Registry {
         storage::write(&self.path, &next)?;
         *current = next.clone();
         Ok(next)
+    }
+    pub async fn prepare_execution(&self, config: &Configuration, executor_id: &str) -> Result<()> {
+        let state = self
+            .path
+            .parent()
+            .and_then(|p| p.parent())
+            .context("registry state is missing")?;
+        self.managed
+            .lock()
+            .await
+            .prepare(config, state, executor_id)
+            .await
+    }
+    pub async fn prepare_local_execution(&self) -> Result<()> {
+        let config = self.configuration();
+        for service in config.services.iter().filter(|s| {
+            s.enabled
+                && s.kind == ServiceKind::Executor
+                && s.management == contracts::ServiceManagement::LocalManaged
+        }) {
+            self.prepare_execution(&config, &service.id).await?;
+        }
+        Ok(())
+    }
+    pub async fn supervise(&self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
+        let config = self.configuration();
+        for adapter in config.adapters.iter().filter(|a| a.enabled) {
+            let _ = self.prepare_execution(&config, &adapter.executor_id).await;
+        }
+        loop {
+            tokio::select! {
+                _ = shutdown.changed() => break,
+                _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
+                    self.managed.lock().await.maintain(&self.configuration());
+                }
+            }
+        }
+        *self.managed.lock().await = managed::Managed::default();
     }
     pub async fn view(&self) -> Result<serde_json::Value> {
         let config = self.configuration();
@@ -133,8 +188,10 @@ impl Registry {
                 serde_json::json!({"id":service.id,"status":status,"error":error})
             });
         }
+        let started = self.managed.lock().await.started.clone();
         let mut probes = tokio::task::JoinSet::new();
         for service in config.services.clone() {
+            let started = started.contains(&service.id);
             probes.spawn(async move {
                 let (status, info, error) = if !service.enabled {
                     (ServiceHealth::Disabled, None, None)
@@ -153,7 +210,7 @@ impl Registry {
                         }
                     }
                 };
-                serde_json::json!({"id":service.id,"status":status,"info":info,"error":error})
+                serde_json::json!({"id":service.id,"status":status,"info":info,"error":error,"started":started})
             });
         }
         let mut health = Vec::new();

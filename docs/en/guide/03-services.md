@@ -2,13 +2,30 @@
 
 [Documentation](../00-index.md) · [Section index](00-index.md) · [简体中文](../../zh-CN/guide/03-services.md)
 
-## Core service settings
+## Bind an Agent
 
-In settings, configure private Unix sockets and enablement for storage, sandbox and executor services, then executor-to-sandbox dependencies, adapter profiles and person bindings. Updates use revisions; resolve invalid references/dependencies first. Leaving unsaved forms prompts a warning. Storage and worker packages include service templates with bounded processes, memory and output.
+System settings opens **Agent bindings**. Create a digital person, select Claude Code, Codex, DeepSeek Harness or Pi, then choose **Validate and bind**. The installed Agent must already be authenticated. The validation performs a model request and may consume provider quota; its progress and failure stage appear on this page. Only successful validation enables the adapter and saves binding evidence. Creating an identity or saving an adapter template does not invoke a model.
 
-Development can use an explicitly separate embedded store. One storage service owns the production database. Prepare target data before changing its endpoint, then stop/restart the core; an endpoint change must not silently replace a live store. See [operations](07-operations.md) for deployment and backups.
+Use the Linux `//:local-package` or the Windows package for local execution. Keep `outcome-hub`, `outcome-hub-services` and `outcome-hub-agent` together (with `.exe` on Windows). A fresh workspace uses a separate embedded development store and starts its managed executor and sandbox on demand. **Execution status → Prepare local runtime** checks the local services without invoking a model. Enabled adapters restore their local services on the next host start. Host shutdown cleans up the processes it owns. Core chat can still start without these optional executables; Agent validation then reports the missing runtime.
 
-Claude Code, Codex, DeepSeek Harness and Pi profiles start disabled. Supply a wrapper command array implementing `json_stdio_v1`, then enable and bind it. A vendor CLI name alone is not compatibility evidence. Health probes verify protocol and capabilities, and the sandbox runs a real isolated command; model tasks require separate verification.
+## Advanced deployment
+
+The collapsed **Advanced settings** section contains service connections, execution adapters, scenario services and storage. Existing deep links still open their page. Leaving unsaved forms prompts a warning.
+
+| Component | Responsibility |
+| --- | --- |
+| Executor service | Accept the versioned execution protocol and use its configured sandbox. Its service card lists adapters that reference it. |
+| Execution adapter | Select an Agent program through the shared JSON protocol and associate it with an executor. |
+| Sandbox service | Run commands with bounded lifetime/output and disposable state. |
+| Storage service | Own the production collaboration database behind its API. |
+
+Existing service IDs and roles are fixed when editing; create a separate connection to use another role. Only enabled sandboxes are eligible executor dependencies. Configuration updates validate references and revisions atomically.
+
+Built-in Agent profiles start disabled. Saving one stores a template; **Validate and bind** generates its bridge command. Changing its executor or time limit requires revalidation. Custom adapters retain the advanced `json_stdio_v1` command-array editor and require a command before being enabled. A configured profile or healthy service alone is not model/task compatibility evidence.
+
+Service management is explicit: `local_managed` starts packaged workers at their private workspace endpoints; `external` connects to separately managed services. Existing configurations without this field remain external, including disabled entries and custom endpoints. Installing a new package never takes over them. To use an existing external setup, start its configured services before validation.
+
+Development uses an explicitly separate embedded store. One storage service owns the production database. Prepare target data before changing its endpoint, then stop/restart the core; an endpoint change must not silently replace a live store. See [operations](07-operations.md) for deployment and backups.
 
 Keep secret values in the service environment. Profiles list allowed variable names only; do not expose values through the UI, responses or command arguments. Optional mounts are read-only, network access is explicit and every run gets a disposable workspace. See the [service protocols](../design/03-services.md) for frames, requests, output and attempt fencing.
 

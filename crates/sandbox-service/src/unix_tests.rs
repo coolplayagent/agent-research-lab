@@ -65,3 +65,42 @@ async fn native_runtime_files_are_bounded_separately_from_protocol_output() {
     );
     assert!(python(state.path(), "raise SystemExit(7)").await.is_err());
 }
+
+#[tokio::test]
+async fn private_tmp_does_not_hide_explicit_read_only_runtime_files() {
+    let state = tempfile::tempdir().unwrap();
+    let runtime = tempfile::Builder::new()
+        .prefix("oh-runtime-mount-")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let program = runtime.path().join("agent-runtime");
+    fs::copy("/usr/bin/true", &program).unwrap();
+    let result = run(
+        state.path(),
+        vec![program.to_string_lossy().into_owned()],
+        vec![],
+        vec![program.clone()],
+        false,
+        String::new(),
+        5,
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.stdout, "");
+    let script = format!(
+        "import pathlib; p=pathlib.Path({:?}); assert p.read_bytes();\ntry: p.write_bytes(b'overwrite')\nexcept OSError: print('read-only')\nelse: raise AssertionError('runtime became writable')",
+        program.to_string_lossy()
+    );
+    let result = run(
+        state.path(),
+        vec!["/usr/bin/python3".into(), "-c".into(), script],
+        vec![],
+        vec![program],
+        false,
+        String::new(),
+        5,
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.stdout.trim(), "read-only");
+}

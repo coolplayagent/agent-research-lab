@@ -1,90 +1,102 @@
-//! Packaged local executor services are supervised independently of collaboration storage.
-use anyhow::{Result, ensure};
-use service_api::Configuration;
+//! Owned execution processes. External endpoints are only probed, never replaced.
+mod child;
+use anyhow::{Context, Result, ensure};
+use contracts::{ServiceKind, ServiceManagement};
+use service_api::{Configuration, Service};
+use std::{
+    path::Path,
+    time::{Duration, Instant},
+};
 #[derive(Default)]
 pub(super) struct Managed {
-    #[cfg(windows)]
-    children: Vec<(contracts::ServiceKind, windows_runtime::Process)>,
+    children: Vec<(Service, child::Child)>,
+    pub started: std::collections::BTreeSet<String>,
+}
+pub(super) fn validate_locations(config: &Configuration, state: &Path) -> Result<()> {
+    for service in &config.services {
+        if service.management == ServiceManagement::LocalManaged {
+            ensure!(
+                service.endpoint == state.join(format!("private/services/{}.sock", service.id)),
+                "managed service endpoint must be inside its private state directory"
+            );
+        }
+    }
+    Ok(())
 }
 impl Managed {
-    pub fn prepare(&mut self, config: &mut Configuration, state: &std::path::Path) -> Result<()> {
-        #[cfg(windows)]
-        {
-            use anyhow::Context;
-            use contracts::ServiceKind;
-
-            let binary = std::env::current_exe()?.with_file_name("outcome-hub-services.exe");
-            for kind in [ServiceKind::Sandbox, ServiceKind::Executor] {
-                let expected = state.join(format!("private/services/{kind}.sock"));
-                let service = config
-                    .services
-                    .iter_mut()
-                    .find(|s| s.id == kind.as_str() && s.kind == kind)
-                    .context("local execution service is not configured")?;
-                if service.endpoint != expected {
-                    continue;
-                }
-                let service_state = state.join(format!("private/managed-{kind}"));
-                if !self.children.iter_mut().any(|(running_kind, child)| {
-                    *running_kind == kind && child.poll().is_ok_and(|status| status.is_none())
-                }) {
-                    ensure!(binary.is_file(), "packaged execution service is missing");
-                    storage::private_dir(&service_state)?;
-                    let log = std::fs::OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open(service_state.join("service.log"))?;
-                    storage::private_file(&service_state.join("service.log"))?;
-                    let command = vec![
-                        binary.to_string_lossy().into_owned(),
-                        "--kind".into(),
-                        kind.to_string(),
-                        "--state-dir".into(),
-                        service_state.to_string_lossy().into_owned(),
-                        "--socket".into(),
-                        service.endpoint.to_string_lossy().into_owned(),
-                        "--max-seconds".into(),
-                        "43200".into(),
-                    ];
-                    let null = std::fs::OpenOptions::new()
-                        .read(true)
-                        .write(true)
-                        .open("NUL")?;
-                    let child = windows_runtime::Process::spawn(
-                        None,
-                        &command,
-                        &service_state,
-                        &std::env::vars().collect::<Vec<_>>(),
-                        false,
-                        &null,
-                        &null,
-                        &log,
-                    )
-                    .context("start packaged execution service")?;
-                    self.children.push((kind, child));
-                }
-                service.enabled = true;
-            }
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = (self, state);
-            ensure!(
-                config
-                    .services
+    pub fn maintain(&mut self, config: &Configuration) {
+        self.children.retain_mut(|(service, child)| {
+            config.services.iter().any(|current| {
+                current.enabled
+                    && serde_json::to_value(current).ok() == serde_json::to_value(&*service).ok()
+            }) && child.running()
+        });
+    }
+    pub async fn prepare(
+        &mut self,
+        config: &Configuration,
+        state: &Path,
+        executor_id: &str,
+    ) -> Result<()> {
+        let binary = std::env::current_exe()?.with_file_name(if cfg!(windows) {
+            "outcome-hub-services.exe"
+        } else {
+            "outcome-hub-services"
+        });
+        self.prepare_with(config, state, executor_id, &binary).await
+    }
+    async fn prepare_with(
+        &mut self,
+        config: &Configuration,
+        state: &Path,
+        executor_id: &str,
+        binary: &Path,
+    ) -> Result<()> {
+        validate_locations(config, state)?;
+        self.maintain(config);
+        let executor = config.service(executor_id, ServiceKind::Executor)?;
+        let sandbox = config.service(
+            executor
+                .sandbox_id
+                .as_deref()
+                .context("executor sandbox is missing")?,
+            ServiceKind::Sandbox,
+        )?;
+        for service in [sandbox, executor] {
+            if service.management == ServiceManagement::LocalManaged
+                && !self
+                    .children
                     .iter()
-                    .any(|s| s.kind == contracts::ServiceKind::Executor && s.enabled),
-                "execution service is disabled"
-            );
+                    .any(|(owned, _)| owned.id == service.id)
+            {
+                self.started.insert(service.id.clone());
+                ensure!(binary.is_file(), "packaged execution service is missing");
+                let child = child::Child::spawn(binary, service, state)?;
+                self.children.push((service.clone(), child));
+            }
+            let deadline = Instant::now() + Duration::from_secs(15);
+            loop {
+                match service_api::probe(&service.endpoint, service.kind).await {
+                    Ok(_) => break,
+                    Err(error) => {
+                        if service.management == ServiceManagement::External
+                            || Instant::now() >= deadline
+                        {
+                            return Err(error.context("execution runtime is not ready"));
+                        }
+                        if let Some((_, child)) =
+                            self.children.iter_mut().find(|(s, _)| s.id == service.id)
+                        {
+                            ensure!(child.running(), "managed service exited before readiness");
+                        }
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
         }
         Ok(())
     }
 }
-#[cfg(windows)]
-impl Drop for Managed {
-    fn drop(&mut self) {
-        for (_, child) in &mut self.children {
-            child.terminate();
-        }
-    }
-}
+#[cfg(test)]
+#[path = "managed_tests.rs"]
+mod tests;

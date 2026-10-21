@@ -3,10 +3,19 @@ import { uuid } from "/assets/shared/identity.js";
 import { api, ApiError } from "./api.js";
 import { get, actions } from "./dom.js";
 import { element, field, input, select } from "./forms.js";
-import { t } from "./i18n.js";
+import { t, label } from "./i18n.js";
 import { savedSettings, trackSettings } from "./settings-guard.js";
 import { bindingEndpoint, showProgress } from "./binding-progress.js";
 let generation = 0;
+let preferredAdapter = "";
+export function chooseBinding(id) { preferredAdapter = id; location.hash = "#settings/bindings"; }
+function adapterTitle(config, id) {
+    const adapter = config.adapters.find(a => a.id === id);
+    if (!adapter)
+        return id;
+    const name = label("CodingAgent", adapter.agent);
+    return config.adapters.filter(a => a.agent === adapter.agent).length > 1 || adapter.agent === CodingAgent.Custom ? `${name} · ${id}` : name;
+}
 export function renderBindings(config, people, save, refresh) {
     const render = ++generation, container = get("binding-list");
     container.replaceChildren();
@@ -29,14 +38,14 @@ export function renderBindings(config, people, save, refresh) {
                 unbind.disabled = false;
             }
         };
-        row.append(element("span", `${people.find((p) => p.id === person)?.name || person} → ${adapter}`), element("span", config.binding_evidence?.[person] ? t("binding.verified") : t("binding.unverified")), unbind);
+        row.append(element("span", `${people.find((p) => p.id === person)?.name || person} → ${adapterTitle(config, adapter)}`), element("span", config.binding_evidence?.[person] ? t("binding.verified") : t("binding.unverified")), unbind);
         container.append(row);
     }
     const form = element("form");
     form.className = "settings-form binding-form";
     trackSettings(form);
     const person = select(people.filter((p) => p.id !== "operator").map((p) => [p.id, p.name]), people.find((p) => p.id !== "operator")?.id || "");
-    const adapter = select(config.adapters.map((a) => [a.id, a.id]), config.adapters[0]?.id || "");
+    const adapter = select(config.adapters.map((a) => [a.id, adapterTitle(config, a.id)]), config.adapters.some(a => a.id === preferredAdapter) ? preferredAdapter : config.adapters[0]?.id || "");
     const program = input(""), model = input("");
     program.placeholder = t("binding.programPlaceholder");
     model.placeholder = t("binding.modelPlaceholder");
@@ -49,7 +58,7 @@ export function renderBindings(config, people, save, refresh) {
     status.setAttribute("role", "status");
     const progress = element("div");
     progress.setAttribute("aria-live", "polite");
-    form.append(field(t("services.person"), person), field(t("services.adapter"), adapter), field(t("binding.program"), program), field(t("binding.model"), model), element("p", t("binding.cost")), actions(submit), status);
+    form.append(field(t("services.person"), person), field(t("services.agent"), adapter), field(t("binding.program"), program), field(t("binding.model"), model), element("p", t("binding.cost")), actions(submit), status);
     container.append(form, progress);
     let pending;
     let records = [];
@@ -63,8 +72,13 @@ export function renderBindings(config, people, save, refresh) {
     person.onchange = update;
     adapter.onchange = update;
     update();
-    if (!person.value || !adapter.value)
-        form.append(element("p", t("layout.bindingPrerequisite")));
+    if (!person.value || !adapter.value) {
+        const hint = element("p", t(!person.value ? "binding.needsPerson" : "binding.needsAdapter"));
+        const link = element("a", t(!person.value ? "workspace.people" : "workspace.adapters"));
+        link.href = !person.value ? "#people" : "#settings/adapters";
+        hint.append(link);
+        form.append(hint);
+    }
     const poll = async () => {
         if (polling || render !== generation)
             return;

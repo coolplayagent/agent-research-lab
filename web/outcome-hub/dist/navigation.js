@@ -30,7 +30,7 @@ export function navigate() {
     let requested = location.hash.slice(1);
     if (requested === "settings" ||
         (requested.startsWith("settings/") && !settings[requested.split("/")[1]])) {
-        requested = "settings/services";
+        requested = "settings/bindings";
         history.replaceState(null, "", "#" + requested);
     }
     if (previous.startsWith("#settings/") &&
@@ -90,6 +90,8 @@ export function navigate() {
     if (page === "applications")
         void loadApplications();
     if (setting) {
+        if (["services", "adapters", "scenarios", "storage"].includes(setting))
+            get("advanced-settings").open = true;
         for (const panel of document.querySelectorAll("[data-settings-panel]"))
             panel.hidden = panel.dataset.settingsPanel !== setting;
         for (const link of document.querySelectorAll("[data-setting]"))

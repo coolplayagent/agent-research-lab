@@ -7,11 +7,13 @@ import {
   hasUnsavedSettings,
 } from "./settings-guard.js";
 import type { Page, Person } from "./types.js";
-import { ServiceKind } from "/assets/shared/contracts.js";
+import { ServiceKind, ServiceManagement, ServiceHealth } from "/assets/shared/contracts.js";
 import { api } from "./api.js";
 import { get, actions } from "./dom.js";
 import { t, label } from "./i18n.js";
-import { editAdapter, editService } from "./service-forms.js";
+import { editService } from "./service-forms.js";
+import { editAdapter } from "./adapter-forms.js";
+import { renderExecutionStatus } from "./execution-status.js";
 import { element, select, field } from "./forms.js";
 import type { Configuration, ServiceView } from "./service-types.js";
 import { busy } from "./feedback.js";
@@ -47,6 +49,7 @@ async function save(config: Configuration): Promise<void> {
 function render(view: ServiceView): void {
   const config = view.configuration;
   current = view;
+  renderExecutionStatus(view, directory, () => loadServices(true));
   renderScenarios(view, save);
   renderOutcomeSettings(view, save);
   renderKnowledgeSettings(view, save);
@@ -65,17 +68,20 @@ function render(view: ServiceView): void {
         : t("services.unknown");
     card.className = "card";
     card.append(
-      element("h3", service.id),
-      element("p", `${label("ServiceKind", service.kind)} · ${status}`),
+      element("h3", label("ServiceKind", service.kind)),
+      element("small", service.id),
+      element("p", `${label("ServiceManagement", service.management || ServiceManagement.External)} · ${health?.status === ServiceHealth.Unavailable && health.started === false && service.management === ServiceManagement.LocalManaged ? t("settings.standby") : status}`),
       element("code", service.endpoint),
     );
+    const users = config.adapters.filter(a => a.executor_id === service.id);
+    if (users.length) card.append(element("p", t("settings.usedBy", { agents: users.map(a => `${label("CodingAgent", a.agent)} (${a.id})`).join(" · ") })));
     if (service.sandbox_id)
       card.append(
         element("p", t("services.dependency", { p0: service.sandbox_id })),
       );
     if (health?.info)
       card.append(element("p", health.info.capabilities.join(" · ")));
-    if (health?.error) card.append(element("p", health.error));
+    if (health?.error && !(health.started === false && service.management === ServiceManagement.LocalManaged)) card.append(element("p", health.error));
     card.append(actions(
       button(t("services.edit"), () => editService(config, service, save)),
       button(t("services.remove"), async () => {

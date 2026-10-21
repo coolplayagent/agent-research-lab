@@ -426,6 +426,20 @@ export const ServiceKind = {
   Sandbox: "sandbox",
 } as const;
 export type ServiceKind = (typeof ServiceKind)[keyof typeof ServiceKind];
+export const ServiceManagement = {
+  External: "external",
+  LocalManaged: "local_managed",
+} as const;
+export type ServiceManagement = (typeof ServiceManagement)[keyof typeof ServiceManagement];
+export const ServiceConfigurationErrorCode = {
+  KindImmutable: "service_kind_immutable",
+  CommandRequired: "adapter_command_required",
+  ValidationRequired: "adapter_validation_required",
+  Invalid: "service_configuration_invalid",
+  RuntimeUnavailable: "local_runtime_unavailable",
+  RevisionConflict: "service_revision_conflict",
+} as const;
+export type ServiceConfigurationErrorCode = (typeof ServiceConfigurationErrorCode)[keyof typeof ServiceConfigurationErrorCode];
 export const ServiceHealth = {
   Healthy: "healthy",
   Unavailable: "unavailable",

@@ -3,6 +3,7 @@ import type {
   AgentProtocol,
   ServiceKind,
   ServiceHealth,
+  ServiceManagement,
   ScenarioCapability,
 } from "/assets/shared/contracts.js";
 import type { OutcomeService, OutcomeBinding } from "./outcome-types.js";
@@ -12,6 +13,7 @@ export interface Service {
   endpoint: string;
   enabled: boolean;
   sandbox_id: string | null;
+  management?: ServiceManagement;
 }
 export interface Adapter {
   id: string;
@@ -51,6 +53,7 @@ export interface ServiceView {
   health: {
     id: string;
     status: ServiceHealth;
+    started?: boolean;
     info: { service_id: string; capabilities: string[] } | null;
     error: string | null;
   }[];
@@ -60,6 +63,7 @@ export interface ServiceView {
   scenario_health?: {
     id: string;
     status: ServiceHealth;
+    started?: boolean;
     error: string | null;
   }[];
   outcome_health?: { id: string; status: ServiceHealth; error: string | null }[];

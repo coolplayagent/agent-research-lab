@@ -5,7 +5,7 @@ rust_library(
     name = "service_registry", crate_name = "service_registry",
     srcs = glob(["src/**/*.rs"], exclude = ["src/main.rs"]),
     crate_root = "src/lib.rs", edition = "2024", aliases = aliases(),
-    deps = ["//crates/agent-adapter:agent_adapter", "//crates/contracts:contracts", "//crates/service-api:service_api", "//crates/service-protocol:service_protocol", "//crates/filesystem-store:storage"] + select({"@platforms//os:windows": ["//crates/windows-runtime:windows_runtime"], "//conditions:default": []}) + all_crate_deps(normal = True),
+    deps = ["//crates/agent-adapter:agent_adapter", "//crates/contracts:contracts", "//crates/service-api:service_api", "//crates/service-protocol:service_protocol", "//crates/filesystem-store:storage"] + select({"@platforms//os:windows": ["//crates/windows-runtime:windows_runtime"], "//conditions:default": ["//crates/process:process"]}) + all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
 )

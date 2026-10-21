@@ -1,7 +1,7 @@
 load("@crates//:defs.bzl", "aliases", "all_crate_deps")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("@rules_pkg//pkg:zip.bzl", "pkg_zip")
-load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "pkg_attributes")
 load("@rules_rust//rust:defs.bzl", "rust_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
@@ -77,15 +77,13 @@ test_suite(
 pkg_tar(
     name = "package",
     srcs = [
-        ":outcome-hub",
+        ":local-runtime-files",
         "//deploy/systemd:outcome-hub.service",
         ":outcome-hub-cli",
         "//crates/knowledge-service:outcome-hub-knowledge",
         "//crates/collaboration-storage-service:outcome-hub-storage",
         "//crates/collaboration-storage-service:units",
-        "//crates/service-workers:outcome-hub-services",
         "//crates/codex-adapter:outcome-hub-codex-adapter",
-        "//crates/agent-adapter:outcome-hub-agent",
         "//crates/outcome-service:outcome-hub-outcomes",
         "//crates/service-workers:units",
         "//deploy/systemd:outcome-hub-cli.service",
@@ -181,6 +179,20 @@ rust_binary(
 alias(name = "outcome-hub", actual = "//apps/outcome-hub:outcome-hub", visibility = ["//visibility:public"])
 
 pkg_files(
+    name = "local-runtime-files",
+    attributes = pkg_attributes(mode = "0755"),
+    srcs = [":outcome-hub", "//crates/service-workers:outcome-hub-services", "//crates/agent-adapter:outcome-hub-agent"],
+    visibility = ["//visibility:public"],
+)
+
+pkg_tar(
+    name = "local-package",
+    srcs = [":local-runtime-files"],
+    package_dir = "outcome-hub", extension = "tar.gz", mode = "0755",
+    visibility = ["//visibility:public"],
+)
+
+pkg_files(
     name = "windows-core-files",
     srcs = [":outcome-hub", "//crates/service-workers:outcome-hub-services", "//crates/agent-adapter:outcome-hub-agent", "deploy/windows/README.txt"],
     visibility = ["//visibility:private"],
@@ -227,4 +239,14 @@ sh_test(
     srcs = ["site/check.sh"],
     data = [":pages-site", "site/check.py"] + PAGES_SOURCES,
     args = ["$(location :pages-site)"] + PAGES_SOURCES,
+)
+
+sh_test(
+    name = "local-runtime-smoke",
+    srcs = ["//verification:local-runtime-smoke.sh"],
+    args = ["$(location //verification:local-runtime-smoke.py)", "$(location :local-package)", "$(location //crates/agent-adapter:outcome-hub-agent-fixture)"],
+    data = ["//verification:local-runtime-smoke.py", ":local-package", "//crates/agent-adapter:outcome-hub-agent-fixture"],
+    target_compatible_with = ["@platforms//os:linux"],
+    size = "medium",
+    timeout = "moderate",
 )

@@ -105,3 +105,5 @@ dependency_boundary_test(
     forbidden = _DATABASE + _OPTIONAL_SCENARIOS + ["//crates/knowledge-git:", "//crates/knowledge-service:", "//crates/collaboration-api:"],
     required = ["//crates/knowledge-model:knowledge_model"],
 )
+
+exports_files(["local-runtime-smoke.sh", "local-runtime-smoke.py"])

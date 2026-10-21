@@ -371,6 +371,18 @@ export const ServiceKind = {
     Executor: "executor",
     Sandbox: "sandbox",
 };
+export const ServiceManagement = {
+    External: "external",
+    LocalManaged: "local_managed",
+};
+export const ServiceConfigurationErrorCode = {
+    KindImmutable: "service_kind_immutable",
+    CommandRequired: "adapter_command_required",
+    ValidationRequired: "adapter_validation_required",
+    Invalid: "service_configuration_invalid",
+    RuntimeUnavailable: "local_runtime_unavailable",
+    RevisionConflict: "service_revision_conflict",
+};
 export const ServiceHealth = {
     Healthy: "healthy",
     Unavailable: "unavailable",

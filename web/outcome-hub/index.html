@@ -55,7 +55,7 @@
           </nav>
           <div class="sidebar-footer">
             <span id="connection" data-i18n="html.694186911a"></span
-            ><a href="#settings/services" data-i18n="html.638daed1c4"></a>
+            ><a href="#settings/bindings" data-i18n="html.638daed1c4"></a>
           </div>
         </div>
         <div id="settings-navigation" hidden>
@@ -66,32 +66,15 @@
           ></a>
           <h2 data-i18n="html.638daed1c4"></h2>
           <nav data-i18n-aria-label="workspace.settingsNav">
-            <a href="#settings/scenarios" data-setting="scenarios" data-i18n="scenarioSettings.title"></a>
-            <a
-              href="#settings/services"
-              data-setting="services"
-              data-i18n="workspace.services"
-            ></a>
-            <a
-              href="#settings/adapters"
-              data-setting="adapters"
-              data-i18n="workspace.adapters"
-            ></a>
-            <a
-              href="#settings/bindings"
-              data-setting="bindings"
-              data-i18n="workspace.bindings"
-            ></a>
-            <a
-              href="#settings/storage"
-              data-setting="storage"
-              data-i18n="workspace.storage"
-            ></a>
-            <a
-              href="#settings/status"
-              data-setting="status"
-              data-i18n="workspace.status"
-            ></a>
+            <a href="#settings/bindings" data-setting="bindings" data-i18n="workspace.bindings"></a>
+            <a href="#settings/status" data-setting="status" data-i18n="workspace.status"></a>
+            <details id="advanced-settings">
+              <summary data-i18n="settings.advanced"></summary>
+              <a href="#settings/services" data-setting="services" data-i18n="workspace.services"></a>
+              <a href="#settings/adapters" data-setting="adapters" data-i18n="workspace.adapters"></a>
+              <a href="#settings/scenarios" data-setting="scenarios" data-i18n="scenarioSettings.title"></a>
+              <a href="#settings/storage" data-setting="storage" data-i18n="workspace.storage"></a>
+            </details>
           </nav>
         </div>
         <div
@@ -339,6 +322,7 @@
           </section>
           <section data-settings-panel="status" hidden>
             <h2 data-i18n="workspace.status"></h2>
+            <div id="execution-status"></div>
             <dl id="metrics" class="metrics"></dl>
           </section>
         </section>

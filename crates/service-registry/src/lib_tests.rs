@@ -137,3 +137,49 @@ fn scenario_configuration_is_optional_versioned_and_dependency_checked() {
     config.scenarios.push(config.scenarios[0].clone());
     assert!(config.validate().is_err());
 }
+
+#[test]
+fn changing_an_existing_service_role_is_rejected_atomically() {
+    let root = tempfile::tempdir().unwrap();
+    let registry = Registry::open(root.path()).unwrap();
+    let initial = registry.configuration();
+    let mut next = initial.clone();
+    let service = next
+        .services
+        .iter_mut()
+        .find(|s| s.id == "executor")
+        .unwrap();
+    service.kind = ServiceKind::Sandbox;
+    service.sandbox_id = None;
+    let error = registry.save(next).unwrap_err();
+    assert_eq!(
+        error.downcast_ref::<ConfigurationFailure>().unwrap().0,
+        contracts::ServiceConfigurationErrorCode::KindImmutable
+    );
+    assert_eq!(
+        serde_json::to_value(registry.configuration()).unwrap(),
+        serde_json::to_value(initial).unwrap()
+    );
+    assert!(!root.path().join("private/services.json").exists());
+}
+#[test]
+fn builtin_adapter_templates_save_but_cannot_be_enabled_by_settings() {
+    let root = tempfile::tempdir().unwrap();
+    let registry = Registry::open(root.path()).unwrap();
+    let saved = registry.save_settings(registry.configuration()).unwrap();
+    let mut next = saved.clone();
+    let adapter = next.adapters.iter_mut().find(|a| a.id == "codex").unwrap();
+    adapter.enabled = true;
+    adapter.command = vec![
+        root.path()
+            .join("fake-command")
+            .to_string_lossy()
+            .into_owned(),
+    ];
+    let error = registry.save_settings(next).unwrap_err();
+    assert_eq!(
+        error.downcast_ref::<ConfigurationFailure>().unwrap().0,
+        contracts::ServiceConfigurationErrorCode::ValidationRequired
+    );
+    assert_eq!(registry.configuration().revision, saved.revision);
+}

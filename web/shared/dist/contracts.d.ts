@@ -425,6 +425,20 @@ export declare const ServiceKind: {
     readonly Sandbox: "sandbox";
 };
 export type ServiceKind = (typeof ServiceKind)[keyof typeof ServiceKind];
+export declare const ServiceManagement: {
+    readonly External: "external";
+    readonly LocalManaged: "local_managed";
+};
+export type ServiceManagement = (typeof ServiceManagement)[keyof typeof ServiceManagement];
+export declare const ServiceConfigurationErrorCode: {
+    readonly KindImmutable: "service_kind_immutable";
+    readonly CommandRequired: "adapter_command_required";
+    readonly ValidationRequired: "adapter_validation_required";
+    readonly Invalid: "service_configuration_invalid";
+    readonly RuntimeUnavailable: "local_runtime_unavailable";
+    readonly RevisionConflict: "service_revision_conflict";
+};
+export type ServiceConfigurationErrorCode = (typeof ServiceConfigurationErrorCode)[keyof typeof ServiceConfigurationErrorCode];
 export declare const ServiceHealth: {
     readonly Healthy: "healthy";
     readonly Unavailable: "unavailable";

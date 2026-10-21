@@ -159,12 +159,9 @@ impl Registry {
         self.passed(id, Stage::Discover, started)?;
 
         let started = self.stage(id, Stage::Runtime)?;
-        let state = self
-            .path
-            .parent()
-            .and_then(|p| p.parent())
-            .context("registry state directory is missing")?;
-        self.managed.lock().unwrap().prepare(&mut config, state)?;
+        self.prepare_execution(&config, &config.adapters[index].executor_id)
+            .await
+            .map_err(|error| error.context(Failure(Code::ServiceUnavailable)))?;
         let executor = config
             .service(&config.adapters[index].executor_id, ServiceKind::Executor)?
             .clone();

@@ -34,7 +34,7 @@ export function navigate(): void {
     requested === "settings" ||
     (requested.startsWith("settings/") && !settings[requested.split("/")[1]])
   ) {
-    requested = "settings/services";
+    requested = "settings/bindings";
     history.replaceState(null, "", "#" + requested);
   }
   if (
@@ -88,6 +88,8 @@ export function navigate(): void {
   if (page === "people") void loadPeople();
   if (page === "applications") void loadApplications();
   if (setting) {
+    if (["services", "adapters", "scenarios", "storage"].includes(setting))
+      get<HTMLDetailsElement>("advanced-settings").open = true;
     for (const panel of document.querySelectorAll<HTMLElement>(
       "[data-settings-panel]",
     ))

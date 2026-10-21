@@ -8,6 +8,8 @@ pub struct Service {
     pub kind: ServiceKind,
     pub endpoint: PathBuf,
     pub enabled: bool,
+    #[serde(default, skip_serializing_if = "external_management")]
+    pub management: contracts::ServiceManagement,
     pub sandbox_id: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -36,15 +38,20 @@ pub struct Configuration {
 #[path = "registry_tests.rs"]
 mod tests;
 
+fn external_management(value: &contracts::ServiceManagement) -> bool {
+    *value == contracts::ServiceManagement::External
+}
+
 impl Configuration {
     pub fn defaults(state: &Path) -> Self {
-        let services = ServiceKind::ALL
+        let services = [ServiceKind::Executor, ServiceKind::Sandbox]
             .iter()
             .map(|kind| Service {
                 id: kind.to_string(),
                 kind: *kind,
                 endpoint: state.join(format!("private/services/{kind}.sock")),
-                enabled: cfg!(unix),
+                enabled: true,
+                management: contracts::ServiceManagement::LocalManaged,
                 sandbox_id: (*kind == ServiceKind::Executor).then(|| "sandbox".into()),
             })
             .collect();
@@ -104,6 +111,11 @@ impl Configuration {
             collaboration_model::id(&s.id)?;
             ensure!(ids.insert(&s.id), "duplicate service ID");
             rpc::endpoint(&s.endpoint)?;
+            ensure!(
+                s.management != contracts::ServiceManagement::LocalManaged
+                    || s.kind != ServiceKind::Storage,
+                "storage cannot be locally managed by the execution host"
+            );
             ensure!(
                 s.kind == ServiceKind::Executor || s.sandbox_id.is_none(),
                 "only executors depend on sandboxes"

@@ -45,21 +45,6 @@ fn arguments(
             }
         }
     }
-    for path in mounts {
-        let resolved = fs::canonicalize(path)?;
-        ensure!(
-            resolved.components().count() > 2
-                && !["/proc", "/dev", "/sys", "/run"]
-                    .iter()
-                    .any(|p| resolved.starts_with(p)),
-            "invalid read-only mount"
-        );
-        let path = resolved
-            .to_str()
-            .context("mount must be UTF-8")?
-            .to_string();
-        args.extend(["--ro-bind".into(), path.clone(), path]);
-    }
     args.extend([
         "--proc".into(),
         "/proc".into(),
@@ -88,6 +73,23 @@ fn arguments(
         "PATH".into(),
         "/usr/local/bin:/usr/bin:/bin".into(),
     ]);
+    // Runtime files may live under /tmp or the user's home. Mount them after
+    // creating the private filesystems so those filesystems cannot hide them.
+    for path in mounts {
+        let resolved = fs::canonicalize(path)?;
+        ensure!(
+            resolved.components().count() > 2
+                && !["/proc", "/dev", "/sys", "/run"]
+                    .iter()
+                    .any(|p| resolved.starts_with(p)),
+            "invalid read-only mount"
+        );
+        let path = resolved
+            .to_str()
+            .context("mount must be UTF-8")?
+            .to_string();
+        args.extend(["--ro-bind".into(), path.clone(), path]);
+    }
     args.push("--".into());
     args.extend_from_slice(command);
     Ok(args)

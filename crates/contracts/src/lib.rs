@@ -103,6 +103,9 @@ states! {
     ScenarioCapability { Execute => "execute", Evaluate => "evaluate", Deliver => "deliver", Activate => "activate", Rollback => "rollback" }
     CodingTaskRole { Research => "research", Implement => "implement", Review => "review" }
     ServiceKind { Storage => "storage", Executor => "executor", Sandbox => "sandbox" }
+    #[derive(Default)]
+    ServiceManagement { #[default] External => "external", LocalManaged => "local_managed" }
+    ServiceConfigurationErrorCode { KindImmutable => "service_kind_immutable", CommandRequired => "adapter_command_required", ValidationRequired => "adapter_validation_required", Invalid => "service_configuration_invalid", RuntimeUnavailable => "local_runtime_unavailable", RevisionConflict => "service_revision_conflict" }
     ServiceHealth { Healthy => "healthy", Unavailable => "unavailable", Disabled => "disabled", ProtocolMismatch => "protocol_mismatch", RestartRequired => "restart_required" }
     CodingAgent { ClaudeCode => "cc", Codex => "codex", DeepseekHarness => "hds", Pi => "pi", Custom => "custom" }
     AgentProtocol { JsonStdioV1 => "json_stdio_v1" }

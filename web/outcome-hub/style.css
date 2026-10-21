@@ -1181,3 +1181,8 @@ dialog header h2 { overflow-wrap: anywhere; }
 .outcome-dialog { width: min(850px, 94vw); }
 .outcome-dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
 .outcome-dialog section, .outcome-dialog details { margin-block: .75rem; }
+#advanced-settings { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+#advanced-settings summary { cursor: pointer; padding: 10px 12px; font-weight: 600; }
+#advanced-settings a { display: block; }
+#execution-status { display: grid; gap: 12px; margin-bottom: 20px; max-width: 680px; }
+#execution-status p { margin: 0; }

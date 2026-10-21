@@ -1,4 +1,12 @@
 export declare const messages: {
+    readonly "ServiceConfigurationErrorCode.service_kind_immutable": "已有连接的类型不能更改。请新增所需类型的连接后调整引用。";
+    readonly "ServiceConfigurationErrorCode.adapter_command_required": "启用自定义适配器前，请填写实现 JSON 标准输入／输出协议的完整启动命令。";
+    readonly "ServiceConfigurationErrorCode.adapter_validation_required": "内置 Agent 配置需要通过“验证并绑定”启用，请先保存为未验证配置。";
+    readonly "ServiceConfigurationErrorCode.service_configuration_invalid": "配置无效，请检查服务类型、端点、启用状态与依赖引用。";
+    readonly "ServiceConfigurationErrorCode.local_runtime_unavailable": "本机执行环境尚未就绪。请检查完整安装包中的执行服务及 Linux bubblewrap／Windows 隔离环境，再重试。";
+    readonly "ServiceConfigurationErrorCode.service_revision_conflict": "配置已被其他操作更新，请刷新后重试。";
+    readonly "ServiceManagement.external": "外部管理";
+    readonly "ServiceManagement.local_managed": "本机托管";
     readonly "KnowledgeBackend.git": "Git 仓库";
     readonly "KnowledgeBackend.directory": "目录";
     readonly "KnowledgeAccess.read_only": "只读";
@@ -243,9 +251,9 @@ export declare const messages: {
     readonly "EvolutionOperation.baseline": "基线";
     readonly "EvolutionOperation.mutation": "变异";
     readonly "EvolutionOperation.recombination": "组合";
-    readonly "ServiceKind.storage": "存储服务";
-    readonly "ServiceKind.executor": "执行器服务";
-    readonly "ServiceKind.sandbox": "轻量沙箱";
+    readonly "ServiceKind.storage": "数据存储";
+    readonly "ServiceKind.executor": "任务执行服务";
+    readonly "ServiceKind.sandbox": "执行隔离服务";
     readonly "ServiceHealth.healthy": "健康";
     readonly "ServiceHealth.unavailable": "不可用";
     readonly "ServiceHealth.disabled": "已停用";

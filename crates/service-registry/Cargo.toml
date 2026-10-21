@@ -18,6 +18,9 @@ service_api.workspace = true
 service_protocol.workspace = true
 storage.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+process.workspace = true
+
 [target.'cfg(windows)'.dependencies]
 windows_runtime.workspace = true
 

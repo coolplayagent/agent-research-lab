@@ -25,6 +25,10 @@ pub async fn serve(state: &Path, listen: SocketAddr, seconds: u64) -> Result<()>
         seconds,
         shutdown.subscribe(),
     ));
+    let supervisor_registry = services.clone();
+    let supervisor_shutdown = shutdown.subscribe();
+    let supervisor =
+        tokio::spawn(async move { supervisor_registry.supervise(supervisor_shutdown).await });
     let execution = tokio::spawn(collaboration_api::execution::run(
         web.hub.clone(),
         services,
@@ -37,7 +41,10 @@ pub async fn serve(state: &Path, listen: SocketAddr, seconds: u64) -> Result<()>
         state.display()
     );
     let halt = async move {
-        tokio::time::sleep(Duration::from_secs(seconds)).await;
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(seconds)) => {},
+            _ = shutdown_signal() => {},
+        }
         shutdown.send_replace(true);
     };
     let served = tokio::time::timeout(
@@ -51,6 +58,8 @@ pub async fn serve(state: &Path, listen: SocketAddr, seconds: u64) -> Result<()>
     iterations.abort();
     let _ = iterations.await;
     let _ = execution.await;
+    supervisor.abort();
+    let _ = supervisor.await;
     served??;
     Ok(())
 }
@@ -70,5 +79,22 @@ pub fn storage(
         None => Ok(collaboration_storage_service::client(
             collaboration_store::Hub::open(&state.join("crystal"))?,
         )),
+    }
+}
+
+async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        if let Ok(mut terminate) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
+            tokio::select! { _ = terminate.recv() => {}, _ = tokio::signal::ctrl_c() => {} }
+        } else {
+            std::future::pending::<()>().await;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
     }
 }
