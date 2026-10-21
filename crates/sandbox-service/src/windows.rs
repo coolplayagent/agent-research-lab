@@ -273,16 +273,12 @@ fn execute_blocking(
         if let Some(code) = child.poll()? {
             if code != 0 {
                 drop(child);
-                let diagnostic = crate::diagnostics::capture(
-                    state,
+                return Err(crate::diagnostics::failure(
                     &error_path,
-                    &temp.path().to_string_lossy(),
-                    code,
-                )
-                .unwrap_or_else(|_| "unavailable".into());
-                anyhow::bail!(
-                    "sandbox command failed (exit code {code}; diagnostic {diagnostic}); verify the agent login and model configuration"
-                );
+                    &home,
+                    &environment,
+                    Some(code as i32),
+                ));
             }
             break;
         }

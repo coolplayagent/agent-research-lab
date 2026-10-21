@@ -17,10 +17,22 @@ fn basename(agent: CodingAgent) -> Result<&'static str> {
         CodingAgent::Custom => bail!("custom adapter requires an explicit protocol command"),
     })
 }
+pub(super) fn companion(program: &Path) -> Option<PathBuf> {
+    if !program.file_stem().is_some_and(|name| name == "codex") {
+        return None;
+    }
+    let path = program.with_file_name(if program.extension().is_some_and(|ext| ext == "exe") {
+        "codex-code-mode-host.exe"
+    } else {
+        "codex-code-mode-host"
+    });
+    path.is_file().then_some(path)
+}
 pub fn executable_digest(program: &Path, arguments: &[String]) -> Result<String> {
     let mut hash = Sha256::new();
     for path in std::iter::once(program.to_path_buf())
         .chain(arguments.iter().map(PathBuf::from).filter(|p| p.is_file()))
+        .chain(companion(program))
     {
         let mut file = fs::File::open(&path)?;
         ensure!(

@@ -187,7 +187,7 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
         update();
         try {
             const record = await api(bindingEndpoint, pending, "manage-services");
-            records = records.filter((r) => r.request.request_id !== record.request.request_id).concat(record);
+            records = records.filter((r) => r.request.person_id !== record.request.person_id).concat(record);
             savedSettings(form);
             status.textContent = "";
             showProgress(progress, records);

@@ -32,3 +32,47 @@ fn snapshot_rejects_directories_and_oversized_configuration() {
     copy_file(&source, &target).unwrap();
     assert_eq!(fs::read(&target).unwrap(), b"private");
 }
+
+#[test]
+fn codex_runtime_mounts_its_native_tool_host() {
+    let root = tempfile::tempdir().unwrap();
+    let executable = root.path().join("codex");
+    let host = root.path().join("codex-code-mode-host");
+    fs::write(&executable, b"runtime").unwrap();
+    fs::write(&host, b"host").unwrap();
+    let resolved = ResolvedAgent {
+        agent: CodingAgent::Codex,
+        executable: executable.clone(),
+        arguments: vec![],
+        version: "fixture".into(),
+        digest: "fixture".into(),
+    };
+    assert_eq!(runtime_paths(&resolved).unwrap(), vec![executable, host]);
+}
+#[test]
+fn network_routing_is_forwarded_by_name_only() {
+    for agent in [
+        CodingAgent::Codex,
+        CodingAgent::ClaudeCode,
+        CodingAgent::Pi,
+        CodingAgent::DeepseekHarness,
+    ] {
+        let names = environment_names(agent);
+        for name in [
+            "HTTPS_PROXY",
+            "HTTP_PROXY",
+            "ALL_PROXY",
+            "NO_PROXY",
+            "https_proxy",
+            "http_proxy",
+            "all_proxy",
+            "no_proxy",
+        ] {
+            assert_eq!(
+                names.iter().any(|n| n == name),
+                std::env::var_os(name).is_some()
+            );
+        }
+        assert!(names.iter().all(|name| !name.contains("://")));
+    }
+}

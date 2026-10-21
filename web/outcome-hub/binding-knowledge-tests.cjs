@@ -238,6 +238,21 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   });
   await settings.loadServices(); assert(bindingRendered, "Service settings render before independent directory requests");
 
+  const progressView = load(base + "binding-progress.ts", {
+    "/assets/shared/contracts.js": contracts, "./api.js": { api }, "./forms.js": forms, "./i18n.js": i18n,
+  });
+  const logPanel = el("div");
+  const attempt = (person, id, started, adapter = "codex") => ({ request: { person_id: person, request_id: id, adapter_id: adapter }, started_unix_ms: started, state: contracts.BindingOperationState.Failed, steps: [] });
+  const attempts = [attempt("same-person", "old", 1, "cc"), attempt("same-person", "latest", 2)];
+  progressView.showProgress(logPanel, attempts);
+  assert.equal(logPanel.children.length, 1);
+  assert(!textOf(logPanel).includes('"adapter":"cc"'));
+  assert(textOf(logPanel).includes('"adapter":"codex"'));
+  assert.equal(attempts.length, 2, "Rendering never mutates the poll response");
+  progressView.showProgress(logPanel, [...attempts, ...Array.from({ length: 12 }, (_, index) => attempt(`person-${index}`, `id-${index}`, index + 3))]);
+  assert.equal(logPanel.children.length, 13, "Latest records for other people are not hidden by the old ten-attempt limit");
+  progressView.showProgress(logPanel, []); assert.equal(logPanel.children.length, 0);
+
   const html = fs.readFileSync(path.join(root, "web/outcome-hub/index.html"), "utf8");
   assert.match(html, /href="#settings\/knowledge" data-setting="knowledge"/);
   assert.match(html, /data-settings-panel="knowledge" hidden>\s*<div id="knowledge-targets"><\/div>/);

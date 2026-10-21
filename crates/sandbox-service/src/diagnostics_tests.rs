@@ -1,16 +1,30 @@
 use super::*;
 #[test]
-fn failure_output_is_bounded_and_never_returned_in_the_public_identifier() {
-    let state = tempfile::tempdir().unwrap();
-    storage::private_dir(state.path()).unwrap();
+fn failure_is_bounded_redacted_and_private() {
+    let home = tempfile::tempdir().unwrap();
+    fs::create_dir(home.path().join(".codex")).unwrap();
+    fs::write(
+        home.path().join(".codex/auth.json"),
+        r#"{"tokens":{"access_token":"fixture-secret-token"}}"#,
+    )
+    .unwrap();
     let output = tempfile::NamedTempFile::new().unwrap();
-    fs::write(output.path(), vec![b'x'; 80 * 1024]).unwrap();
-    for index in 0..35 {
-        let id = capture(state.path(), output.path(), &format!("fixture-{index}"), 1).unwrap();
-        assert_eq!(id.len(), 40);
-        let value: serde_json::Value =
-            storage::read(&state.path().join(format!("{id}.diagnostic.json"))).unwrap();
-        assert_eq!(value["stderr"].as_str().unwrap().len(), 64 * 1024);
+    fs::write(output.path(), format!("request timed out fixture-secret-token fixture-env-secret https://private.example/token?secret=value {}", "x".repeat(80 * 1024))).unwrap();
+    let error = failure(
+        output.path(),
+        home.path(),
+        &[("HTTPS_PROXY".into(), "fixture-env-secret".into())],
+        Some(1),
+    );
+    let details = service_protocol::private_details(&error).unwrap();
+    assert!(details.len() <= 8192);
+    assert!(details.contains("request timed out"));
+    for secret in [
+        "fixture-secret-token",
+        "fixture-env-secret",
+        "private.example",
+    ] {
+        assert!(!details.contains(secret));
     }
-    assert_eq!(fs::read_dir(state.path()).unwrap().count(), 32);
+    assert!(!format!("{error:#}").contains("request timed out"));
 }

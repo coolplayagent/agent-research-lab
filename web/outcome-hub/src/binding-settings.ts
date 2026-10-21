@@ -123,7 +123,7 @@ export function renderBindings(config: Configuration, people: Person[], save: (n
     posting = true; status.textContent = t("binding.starting"); update();
     try {
       const record = await api<BindingOperation>(bindingEndpoint, pending, "manage-services");
-      records = records.filter((r) => r.request.request_id !== record.request.request_id).concat(record);
+      records = records.filter((r) => r.request.person_id !== record.request.person_id).concat(record);
       savedSettings(form); status.textContent = ""; showProgress(progress, records);
     } catch (error) { if (error instanceof ApiError) pending = undefined; status.textContent = t("binding.startError", { error: String(error) }); }
     finally { posting = false; update(); void poll(); }

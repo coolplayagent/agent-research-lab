@@ -9,6 +9,9 @@ const BWRAP: &str = "/usr/bin/bwrap";
 const PRLIMIT: &str = "/usr/bin/prlimit";
 // Native adapters maintain disposable databases and caches independently of
 // their protocol output. Keep their file quota below the enclosing tmpfs bound.
+// V8's code-mode host reserves a multi-GiB virtual address cage before running
+// tools. A 4 GiB RLIMIT_AS aborts it even when its resident use is small.
+const MAX_ADDRESS_SPACE: u64 = 16 * 1024 * 1024 * 1024;
 const MAX_RUNTIME_FILE: u64 = 16 * 1024 * 1024;
 const MAX_PROTOCOL_OUTPUT: u64 = 256 * 1024;
 const MAX_DIAGNOSTIC_OUTPUT: u64 = 4 * 1024 * 1024;
@@ -20,7 +23,7 @@ fn arguments(
 ) -> Result<Vec<String>> {
     let mut args = vec![
         format!("--cpu={}:{}", seconds + 1, seconds + 2),
-        "--as=4294967296".into(),
+        format!("--as={MAX_ADDRESS_SPACE}:{MAX_ADDRESS_SPACE}"),
         format!("--fsize={MAX_RUNTIME_FILE}:{MAX_RUNTIME_FILE}"),
         "--nofile=256".into(),
         "--".into(),
@@ -245,11 +248,14 @@ async fn execute(
             "sandbox diagnostic output exceeds bound"
         );
         if let Some(status) = status {
-            ensure!(
-                status.success(),
-                "sandbox command failed with exit code {:?}",
-                status.code()
-            );
+            if !status.success() {
+                return Err(crate::diagnostics::failure(
+                    &child.stderr,
+                    &home,
+                    &env,
+                    status.code(),
+                ));
+            }
             break;
         }
         tokio::time::sleep(Duration::from_millis(20)).await;

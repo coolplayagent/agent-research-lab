@@ -30,11 +30,14 @@ pub struct Reply {
     pub error: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_os_code: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_private_details: Option<String>,
 }
 #[derive(Debug)]
 pub struct RemoteError {
     pub message: String,
     pub os_code: Option<i32>,
+    pub private_details: Option<String>,
 }
 impl std::fmt::Display for RemoteError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -54,6 +57,30 @@ pub fn os_code(error: &anyhow::Error) -> Option<i32> {
             })
     })
 }
+/// Private service-to-service diagnostic data. Display intentionally excludes it.
+#[derive(Debug)]
+pub struct PrivateDiagnostic(pub String);
+impl std::fmt::Display for PrivateDiagnostic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("sandbox command failed; see private binding diagnostic")
+    }
+}
+impl std::error::Error for PrivateDiagnostic {}
+pub fn private_details(error: &anyhow::Error) -> Option<String> {
+    error
+        .chain()
+        .find_map(|cause| {
+            cause
+                .downcast_ref::<PrivateDiagnostic>()
+                .map(|d| d.0.clone())
+                .or_else(|| {
+                    cause
+                        .downcast_ref::<RemoteError>()
+                        .and_then(|e| e.private_details.clone())
+                })
+        })
+        .map(|s| s.chars().take(8192).collect())
+}
 impl Reply {
     pub fn from_result(result: Result<serde_json::Value>) -> Self {
         match result {
@@ -62,12 +89,14 @@ impl Reply {
                 result,
                 error: None,
                 error_os_code: None,
+                error_private_details: None,
             },
             Err(error) => Self {
                 protocol_version: VERSION,
                 result: serde_json::Value::Null,
                 error: Some(error.to_string().chars().take(1000).collect()),
                 error_os_code: os_code(&error),
+                error_private_details: private_details(&error),
             },
         }
     }
@@ -80,6 +109,9 @@ impl Reply {
             return Err(RemoteError {
                 message: format!("service request failed: {error}"),
                 os_code: self.error_os_code,
+                private_details: self
+                    .error_private_details
+                    .map(|s| s.chars().take(8192).collect()),
             }
             .into());
         }
