@@ -107,3 +107,5 @@ dependency_boundary_test(
 )
 
 exports_files(["local-runtime-smoke.sh", "local-runtime-smoke.py"])
+
+exports_files(["local-knowledge-smoke.sh", "local-knowledge-smoke.py"])

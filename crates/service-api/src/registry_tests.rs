@@ -30,3 +30,11 @@ fn legacy_service_management_defaults_to_external_and_unknown_modes_fail() {
     value["management"] = serde_json::json!("future");
     assert!(serde_json::from_value::<Service>(value).is_err());
 }
+
+#[test]
+fn legacy_knowledge_connections_preserve_wire_bytes_and_remain_external() {
+    let value = serde_json::json!({"id":"knowledge","kind":"knowledge","endpoint":"/private/knowledge.sock","enabled":true,"protocol_version":1,"outcome_kinds":["finding"],"dependencies":[],"max_seconds":120});
+    let service: crate::OutcomeService = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(service.management, contracts::ServiceManagement::External);
+    assert_eq!(serde_json::to_value(service).unwrap(), value);
+}

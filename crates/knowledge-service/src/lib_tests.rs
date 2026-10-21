@@ -313,3 +313,139 @@ fn preview_is_bound_to_outcome_version_and_never_authorizes_replacement_content(
             .contains("configuration_conflict")
     );
 }
+
+#[test]
+fn local_directory_add_is_atomic_idempotent_and_supports_the_selected_root() {
+    let (root, service, mut target) = fixture(false);
+    target.content_root = ".".into();
+    target.access = KnowledgeAccess::ReadOnly;
+    let request = || Request::Add {
+        name: "whole".into(),
+        target: target.clone(),
+    };
+    let added = service.manage(request()).unwrap();
+    assert_eq!(
+        added["configuration"]["targets"]["whole"]["content_root"],
+        "."
+    );
+    assert_eq!(
+        service.manage(request()).unwrap()["configuration"]["revision"],
+        added["configuration"]["revision"]
+    );
+    let value = service
+        .manage(Request::Read {
+            target: "whole".into(),
+            path: "knowledge/note.md".into(),
+            revision: None,
+        })
+        .unwrap();
+    assert_eq!(value["content"], "  source\n");
+    assert!(!target.path.join(".outcomehub").exists());
+    let mut conflicting = target.clone();
+    conflicting.access = KnowledgeAccess::ReadWrite;
+    assert!(
+        service
+            .manage(Request::Add {
+                name: "whole".into(),
+                target: conflicting
+            })
+            .is_err()
+    );
+    let mut invalid = target.clone();
+    invalid.path = root.path().join("missing");
+    assert!(
+        service
+            .manage(Request::Add {
+                name: "missing".into(),
+                target: invalid
+            })
+            .is_err()
+    );
+    assert_eq!(
+        service.manage(Request::List).unwrap()["revision"],
+        added["configuration"]["revision"]
+    );
+    assert!(knowledge_model::relative(Path::new(".")).is_err());
+    assert!(
+        service
+            .manage(Request::Read {
+                target: "whole".into(),
+                path: "../outside".into(),
+                revision: None
+            })
+            .is_err()
+    );
+}
+
+#[test]
+fn local_git_detects_read_branch_without_writes_and_requires_prepared_write_branch() {
+    let (_root, service, mut target) = fixture(true);
+    target.content_root = ".".into();
+    target.access = KnowledgeAccess::ReadOnly;
+    target.reference = None;
+    let added = service
+        .manage(Request::Add {
+            name: "whole".into(),
+            target: target.clone(),
+        })
+        .unwrap();
+    assert_eq!(added["target"]["reference"], "refs/heads/main");
+    let value = service
+        .manage(Request::Read {
+            target: "whole".into(),
+            path: "knowledge/note.md".into(),
+            revision: None,
+        })
+        .unwrap();
+    assert_eq!(value["content"], "  source\n");
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(&target.path)
+        .args(["status", "--porcelain"])
+        .output()
+        .unwrap();
+    assert!(status.status.success() && status.stdout.is_empty());
+    target.access = KnowledgeAccess::ReadWrite;
+    assert!(
+        service
+            .manage(Request::Inspect {
+                target: target.clone()
+            })
+            .is_err()
+    );
+    target.reference = Some("refs/heads/main".into());
+    assert!(
+        service
+            .manage(Request::Inspect {
+                target: target.clone()
+            })
+            .is_err()
+    );
+    target.reference = Some("refs/heads/outcomes".into());
+    service
+        .manage(Request::Add {
+            name: "publish".into(),
+            target: target.clone(),
+        })
+        .unwrap();
+    let preview: Preview = serde_json::from_value(
+        service
+            .manage(Request::Preview {
+                target: "publish".into(),
+                outcome: Box::new(outcome()),
+            })
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(preview.path, "accepted-outcomes/finding.json");
+    let mut request = write(&preview);
+    request.input.repository = "publish".into();
+    request.request_digest = storage::digest(&serde_json::to_vec(&request.input).unwrap());
+    let result = service
+        .dispatch(OutcomeServiceRequest::Write {
+            write: request,
+            outcome: Box::new(outcome()),
+        })
+        .unwrap();
+    assert_eq!(result["state"], "applied");
+}

@@ -6,11 +6,11 @@ export class ApiError extends Error {
         this.status = status;
     }
 }
-export async function api(path, body, intent = "manage-crystal") {
+export async function api(path, body, intent = "manage-crystal", timeoutMs = 15000) {
     const response = await fetch(path, {
         method: body === undefined ? "GET" : "POST",
         cache: "no-store",
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(timeoutMs),
         headers: body === undefined
             ? {}
             : { "Content-Type": "application/json", "X-Crystal-Intent": intent },

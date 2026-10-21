@@ -46,7 +46,11 @@ fn root(target: &Target) -> Result<File> {
         target.path.strip_prefix("/")?,
         false,
     )?;
-    child(&base, &target.content_root, false)
+    if target.content_root == Path::new(".") {
+        Ok(base)
+    } else {
+        child(&base, &target.content_root, false)
+    }
 }
 fn read(root: &File, path: &Path) -> Result<Option<Vec<u8>>> {
     knowledge_model::relative(path)?;

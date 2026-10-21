@@ -1,5 +1,5 @@
 //! Owned execution processes. External endpoints are only probed, never replaced.
-mod child;
+pub(super) mod child;
 use anyhow::{Context, Result, ensure};
 use contracts::{ServiceKind, ServiceManagement};
 use service_api::{Configuration, Service};

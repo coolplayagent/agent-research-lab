@@ -9,6 +9,7 @@ export const display = (id) => id === "operator" ? t("people.e19796712f") : peop
 let next = null, generation = 0;
 let editing = null;
 let personId = "";
+let onSaved;
 export async function loadPeople(append = false) {
     const request = ++generation;
     try {
@@ -50,7 +51,8 @@ export async function loadPeople(append = false) {
         notice(error);
     }
 }
-function openPerson(person) {
+export function openPerson(person, saved) {
+    onSaved = saved;
     editing = person;
     personId = person?.id || "agent-" + uuid();
     get("person-form").reset();
@@ -70,14 +72,9 @@ export function initPeople() {
             return;
         try {
             const name = value("person-name");
-            await change({
-                operation: "person",
-                person: {
-                    id: personId,
-                    name,
-                    application_id: editing?.application_id || null,
-                },
-            });
+            const identity = { id: personId, name, application_id: editing?.application_id || null };
+            const saved = onSaved;
+            await change({ operation: "person", person: identity });
             const person = people.get(personId);
             if (person)
                 people.set(personId, { ...person, name });
@@ -85,6 +82,7 @@ export function initPeople() {
             if (!name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase()) && !personId.includes(search.value))
                 search.value = "";
             close("person-dialog");
+            saved?.(identity);
             await loadPeople();
             document.dispatchEvent(new Event("workspace-people"));
         }

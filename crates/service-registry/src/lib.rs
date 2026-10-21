@@ -2,6 +2,7 @@
 mod binding_flow;
 pub use binding_flow::binding_failure_code;
 mod bindings;
+mod local_knowledge;
 mod managed;
 use anyhow::{Context, Result, ensure};
 use contracts::{ServiceHealth, ServiceKind};
@@ -18,6 +19,7 @@ pub struct Registry {
     active_storage: Option<(String, PathBuf)>,
     bindings: bindings::Operations,
     managed: tokio::sync::Mutex<managed::Managed>,
+    knowledge: tokio::sync::Mutex<local_knowledge::ManagedKnowledge>,
 }
 impl Registry {
     pub fn open(state: &Path) -> Result<Self> {
@@ -39,11 +41,13 @@ impl Registry {
             })
             .transpose()?;
         managed::validate_locations(&config, &state)?;
+        local_knowledge::validate_locations(&config, &state)?;
         Ok(Self {
             path,
             config: Mutex::new(config.clone()),
             bindings: bindings::Operations::open(&state, &config)?,
             managed: tokio::sync::Mutex::new(managed::Managed::default()),
+            knowledge: tokio::sync::Mutex::new(local_knowledge::ManagedKnowledge::default()),
             active_storage,
         })
     }
@@ -95,6 +99,7 @@ impl Registry {
                 .and_then(|p| p.parent())
                 .context("registry state is missing")?,
         )?;
+        local_knowledge::validate_locations(&next, self.path.parent().unwrap().parent().unwrap())?;
         let mut current = self.config.lock().unwrap();
         ensure!(
             next.revision == current.revision,
@@ -105,6 +110,14 @@ impl Registry {
                 ensure!(
                     old.kind == service.kind,
                     ConfigurationFailure(contracts::ServiceConfigurationErrorCode::KindImmutable)
+                );
+            }
+        }
+        for service in &next.outcome_services {
+            if let Some(old) = current.outcome_services.iter().find(|s| s.id == service.id) {
+                ensure!(
+                    old.kind == service.kind && old.management == service.management,
+                    "knowledge_service_role_immutable"
                 );
             }
         }
@@ -150,6 +163,9 @@ impl Registry {
     }
     pub async fn supervise(&self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
         let config = self.configuration();
+        for service in config.outcome_services.iter().filter(|s| s.enabled) {
+            let _ = self.prepare_knowledge(service).await;
+        }
         for adapter in config.adapters.iter().filter(|a| a.enabled) {
             let _ = self.prepare_execution(&config, &adapter.executor_id).await;
         }
@@ -158,10 +174,12 @@ impl Registry {
                 _ = shutdown.changed() => break,
                 _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
                     self.managed.lock().await.maintain(&self.configuration());
+                    self.knowledge.lock().await.maintain(&self.configuration());
                 }
             }
         }
         *self.managed.lock().await = managed::Managed::default();
+        *self.knowledge.lock().await = local_knowledge::ManagedKnowledge::default();
     }
     pub async fn view(&self) -> Result<serde_json::Value> {
         let config = self.configuration();

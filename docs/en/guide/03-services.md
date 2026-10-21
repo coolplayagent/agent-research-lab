@@ -8,6 +8,25 @@ System settings opens **Agent bindings**. Create a digital person, select Claude
 
 Use the Linux `//:local-package` or the Windows package for local execution. Keep `outcome-hub`, `outcome-hub-services` and `outcome-hub-agent` together (with `.exe` on Windows). A fresh workspace uses a separate embedded development store and starts its managed executor and sandbox on demand. **Execution status → Prepare local runtime** checks the local services without invoking a model. Enabled adapters restore their local services on the next host start. Host shutdown cleans up the processes it owns. Core chat can still start without these optional executables; Agent validation then reports the missing runtime.
 
+Create a digital person directly in Agent bindings; the new person is selected while your Agent, program and model choices are preserved. Knowledge service connections, repositories and group/goal/topic knowledge bindings live under **Settings → Knowledge**. Topic knowledge and verifier edits preserve each other.
+
+## Add an optional knowledge store
+
+Open **Settings → Knowledge** and choose **Add Git repository** or **Add directory**.
+Enter an identifier and an existing absolute path on the host. The whole selected
+location is used by default; advanced options can restrict it to a relative content
+subdirectory. New stores are read-only. Git reads detect the current branch; detached
+HEAD or an empty repository requires preparing a usable branch first. Write access
+requires an explicit existing publication branch that is not checked out. Adding a
+store does not clone, create branches, commit, publish, or create a default binding.
+
+The Linux local package includes the optional `outcome-hub-knowledge` executable.
+The host starts it on demand with private state and cleans it up on shutdown. Core
+collaboration still starts without it. Externally managed knowledge connections
+remain available under advanced connections and are never silently taken over.
+After adding a store, select default bindings explicitly when needed. Legacy
+research adapters retain their original evidence pins and gates.
+
 ## Advanced deployment
 
 The collapsed **Advanced settings** section contains service connections, execution adapters, scenario services and storage. Existing deep links still open their page. Leaving unsaved forms prompts a warning.

@@ -181,7 +181,7 @@ alias(name = "outcome-hub", actual = "//apps/outcome-hub:outcome-hub", visibilit
 pkg_files(
     name = "local-runtime-files",
     attributes = pkg_attributes(mode = "0755"),
-    srcs = [":outcome-hub", "//crates/service-workers:outcome-hub-services", "//crates/agent-adapter:outcome-hub-agent"],
+    srcs = [":outcome-hub", "//crates/service-workers:outcome-hub-services", "//crates/agent-adapter:outcome-hub-agent", "//crates/knowledge-service:outcome-hub-knowledge"],
     visibility = ["//visibility:public"],
 )
 
@@ -246,6 +246,16 @@ sh_test(
     srcs = ["//verification:local-runtime-smoke.sh"],
     args = ["$(location //verification:local-runtime-smoke.py)", "$(location :local-package)", "$(location //crates/agent-adapter:outcome-hub-agent-fixture)"],
     data = ["//verification:local-runtime-smoke.py", ":local-package", "//crates/agent-adapter:outcome-hub-agent-fixture"],
+    target_compatible_with = ["@platforms//os:linux"],
+    size = "medium",
+    timeout = "moderate",
+)
+
+sh_test(
+    name = "local-knowledge-smoke",
+    srcs = ["//verification:local-knowledge-smoke.sh"],
+    args = ["$(location //verification:local-knowledge-smoke.py)", "$(location :local-package)"],
+    data = ["//verification:local-knowledge-smoke.py", ":local-package"],
     target_compatible_with = ["@platforms//os:linux"],
     size = "medium",
     timeout = "moderate",

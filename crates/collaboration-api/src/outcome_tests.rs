@@ -248,6 +248,7 @@ async fn automatic_verification_checks_protocol_results_and_requires_separate_ho
         binding_evidence: BTreeMap::new(),
         scenarios: vec![],
         outcome_services: vec![service_api::OutcomeService {
+            management: Default::default(),
             id: "verifier".into(),
             kind: OutcomeServiceKind::Verifier,
             endpoint: socket,
@@ -330,6 +331,7 @@ async fn knowledge_scope_bindings_validate_real_groups_and_goals() {
     config.services.clear();
     config.adapters.clear();
     config.outcome_services.push(service_api::OutcomeService {
+        management: Default::default(),
         id: "knowledge".into(),
         kind: OutcomeServiceKind::Knowledge,
         endpoint: root.path().join("knowledge.sock"),

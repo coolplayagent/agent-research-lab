@@ -66,6 +66,7 @@
           ></a>
           <h2 data-i18n="html.638daed1c4"></h2>
           <nav data-i18n-aria-label="workspace.settingsNav">
+            <a href="#settings/knowledge" data-setting="knowledge" data-i18n="knowledge.title"></a>
             <a href="#settings/bindings" data-setting="bindings" data-i18n="workspace.bindings"></a>
             <a href="#settings/status" data-setting="status" data-i18n="workspace.status"></a>
             <details id="advanced-settings">
@@ -303,6 +304,10 @@
               </div>
             </header>
             <div id="service-list" class="cards"></div>
+          </section>
+          <section data-settings-panel="knowledge" hidden>
+            <div id="knowledge-targets"></div>
+            <details><summary data-i18n="knowledge.advancedConnections"></summary><div id="knowledge-services"></div></details>
           </section>
           <section data-settings-panel="adapters" hidden>
             <header>

@@ -28,7 +28,9 @@ pub struct Target {
 impl Target {
     pub fn validate(&self) -> Result<()> {
         ensure!(self.path.is_absolute(), "knowledge_absolute_path_required");
-        relative(&self.content_root)?;
+        if self.content_root != Path::new(".") {
+            relative(&self.content_root)?;
+        }
         ensure!(
             self.credential_env.len() <= 16,
             "knowledge_environment_limit"
@@ -112,6 +114,13 @@ impl Configuration {
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
     List,
+    Inspect {
+        target: Target,
+    },
+    Add {
+        name: String,
+        target: Target,
+    },
     Save {
         configuration: Configuration,
     },

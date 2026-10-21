@@ -55,6 +55,7 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
             "/api/v1/collaboration/services/prepare",
             post(super::services::prepare),
         )
+        .route("/api/v1/knowledge/local", post(crate::knowledge::local))
         .route("/api/v1/messaging/send", post(send))
         .route(
             "/api/v1/collaboration/bindings",

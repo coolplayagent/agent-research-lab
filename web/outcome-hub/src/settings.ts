@@ -6,7 +6,7 @@ import {
   allowSettingsLeave,
   hasUnsavedSettings,
 } from "./settings-guard.js";
-import type { Page, Person } from "./types.js";
+import type { Person } from "./types.js";
 import { ServiceKind, ServiceManagement, ServiceHealth } from "/assets/shared/contracts.js";
 import { api } from "./api.js";
 import { get, actions } from "./dom.js";
@@ -52,7 +52,7 @@ function render(view: ServiceView): void {
   renderExecutionStatus(view, directory, () => loadServices(true));
   renderScenarios(view, save);
   renderOutcomeSettings(view, save);
-  renderKnowledgeSettings(view, save);
+  renderKnowledgeSettings(view, save, () => loadServices(true));
   get("services-status").textContent = view.restart_required
     ? t("services.restart")
     : t("services.activeStorage", {
@@ -159,7 +159,10 @@ function render(view: ServiceView): void {
       storeButton.disabled = false;
     }
   };
-  renderBindings(config, directory, save, () => loadServices(true));
+  renderBindings(config, directory, save, () => loadServices(true), people => {
+    directory = people;
+    renderExecutionStatus(view, directory, () => loadServices(true));
+  });
 }
 export async function loadServices(force = false): Promise<void> {
   if (!force && hasUnsavedSettings()) return;
@@ -167,20 +170,7 @@ export async function loadServices(force = false): Promise<void> {
   get("services-status").textContent = t("services.checking");
   try {
     const view = await api<ServiceView>("/api/v1/collaboration/services");
-    const people: Person[] = [];
-    let cursor = "";
-    do {
-      const page = await api<Page<Person>>(
-        "/api/v1/collaboration/people?after=" + encodeURIComponent(cursor),
-      );
-      if (request !== generation) return;
-      people.push(...page.people);
-      const next = page.next_after || "";
-      if (next === cursor) break;
-      cursor = next;
-    } while (cursor && people.length < 10000);
     if (request !== generation || (!force && hasUnsavedSettings())) return;
-    directory = people;
     render(view);
   } catch (error) {
     if (request === generation)

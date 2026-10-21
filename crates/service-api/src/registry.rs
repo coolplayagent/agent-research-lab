@@ -38,7 +38,7 @@ pub struct Configuration {
 #[path = "registry_tests.rs"]
 mod tests;
 
-fn external_management(value: &contracts::ServiceManagement) -> bool {
+pub(crate) fn external_management(value: &contracts::ServiceManagement) -> bool {
     *value == contracts::ServiceManagement::External
 }
 
@@ -105,6 +105,14 @@ impl Configuration {
                 && self.bindings.len() <= 20000
                 && self.scenarios.len() <= 64,
             "service registry exceeds bound"
+        );
+        ensure!(
+            self.outcome_services
+                .iter()
+                .filter(|s| s.management == contracts::ServiceManagement::LocalManaged)
+                .count()
+                <= 1,
+            "knowledge_local_service_limit"
         );
         let mut ids = std::collections::BTreeSet::new();
         for s in &self.services {

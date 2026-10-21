@@ -79,11 +79,46 @@ impl Service {
             KnowledgeBackend::Directory => knowledge_directory::inspect(target, path, revision),
         }
     }
+    fn prepare_target(&self, mut target: Target) -> Result<(Target, String)> {
+        ensure!(
+            target.path.is_absolute(),
+            "knowledge_absolute_path_required"
+        );
+        target.path = fs::canonicalize(&target.path).context("knowledge_path_unavailable")?;
+        ensure!(target.path.is_dir(), "knowledge_directory_required");
+        if target.kind == KnowledgeBackend::Git {
+            target = knowledge_git::prepare_target(&target, &self.state)?;
+        }
+        self.location(&target)?;
+        let (revision, _) = self.inspect(&target, None, None)?;
+        Ok((target, revision))
+    }
     pub fn manage(&self, request: Request) -> Result<Value> {
         let _lock = storage::lock(&self.state.join("operation.lock"))?;
         let config = self.configuration()?;
         match request {
             Request::List => Ok(json!(config)),
+            Request::Inspect { target } => {
+                let (target, revision) = self.prepare_target(target)?;
+                Ok(json!({"target":target,"revision":revision}))
+            }
+            Request::Add { name, target } => {
+                collaboration_model::id(&name)?;
+                let (target, revision) = self.prepare_target(target)?;
+                let mut next = config;
+                if let Some(old) = next.targets.get(&name) {
+                    ensure!(old == &target, "knowledge_target_exists");
+                } else {
+                    next.targets.insert(name.clone(), target.clone());
+                    next.validate()?;
+                    next.revision = next
+                        .revision
+                        .checked_add(1)
+                        .context("knowledge_revision_limit")?;
+                    storage::write(&self.state.join("targets.json"), &next)?;
+                }
+                Ok(json!({"target":target,"revision":revision,"configuration":next}))
+            }
             Request::Save { mut configuration } => {
                 ensure!(
                     configuration.revision == config.revision,

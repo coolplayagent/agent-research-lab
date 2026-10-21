@@ -6,7 +6,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
-pub(super) struct Child {
+pub(crate) struct Child {
     #[cfg(unix)]
     process: Option<process::Process>,
     #[cfg(windows)]
@@ -17,6 +17,20 @@ impl Child {
     pub fn spawn(binary: &Path, service: &Service, state: &Path) -> Result<Self> {
         let directory = state.join(format!("private/managed-{}", service.id));
         storage::private_dir(&directory)?;
+        let args = vec![
+            "--kind".into(),
+            service.kind.to_string(),
+            "--state-dir".into(),
+            directory.to_string_lossy().into_owned(),
+            "--socket".into(),
+            service.endpoint.to_string_lossy().into_owned(),
+            "--max-seconds".into(),
+            "43200".into(),
+        ];
+        Self::spawn_with(binary, &directory, args)
+    }
+    pub(crate) fn spawn_with(binary: &Path, directory: &Path, args: Vec<String>) -> Result<Self> {
+        storage::private_dir(directory)?;
         let logs = directory.join(format!(
             "launch-{}-{}-{}",
             std::process::id(),
@@ -28,21 +42,11 @@ impl Child {
             process: None,
             logs,
         };
-        let args = vec![
-            "--kind".into(),
-            service.kind.to_string(),
-            "--state-dir".into(),
-            directory.to_string_lossy().into_owned(),
-            "--socket".into(),
-            service.endpoint.to_string_lossy().into_owned(),
-            "--max-seconds".into(),
-            "43200".into(),
-        ];
         #[cfg(unix)]
         let process = process::Process::spawn(
             &binary.to_string_lossy(),
             &args,
-            &directory,
+            directory,
             &child.logs,
             std::time::Duration::from_secs(43200),
             &[],
@@ -62,7 +66,7 @@ impl Child {
             windows_runtime::Process::spawn(
                 None,
                 &command,
-                &directory,
+                directory,
                 &std::env::vars().collect::<Vec<_>>(),
                 false,
                 &null,

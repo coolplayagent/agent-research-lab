@@ -1,4 +1,4 @@
-import type { OutcomeKind, OutcomeReferenceKind, OutcomePublicationState, OutcomeVerificationState, OutcomeAcceptanceState, VerificationRunState, KnowledgeWriteState, OutcomeServiceKind, OutcomeEventKind } from "/assets/shared/contracts.js";
+import type { OutcomeKind, OutcomeReferenceKind, OutcomePublicationState, OutcomeVerificationState, OutcomeAcceptanceState, VerificationRunState, KnowledgeWriteState, OutcomeServiceKind, OutcomeEventKind, ServiceManagement } from "/assets/shared/contracts.js";
 export interface OutcomePath { topic_id: string; goal_id: string; name: string; hypothesis: string }
 export interface OutcomeEvidence { repository: string; commit: string; path: string; sha256: string }
 export interface OutcomeReference { outcome_id: string; kind: OutcomeReferenceKind; reason: string }
@@ -26,5 +26,5 @@ export interface OutcomeView {
 }
 export interface OutcomePage { outcomes: OutcomeSummary[]; snapshot: number; next_after: number | null }
 export interface OutcomeHistory { events: { sequence: number; kind: OutcomeEventKind; record: unknown; created_ms: number }[]; next_after: number | null }
-export interface OutcomeService { id: string; kind: OutcomeServiceKind; endpoint: string; enabled: boolean; protocol_version: number; outcome_kinds: OutcomeKind[]; dependencies: string[]; max_seconds: number }
+export interface OutcomeService { management?: ServiceManagement; id: string; kind: OutcomeServiceKind; endpoint: string; enabled: boolean; protocol_version: number; outcome_kinds: OutcomeKind[]; dependencies: string[]; max_seconds: number }
 export interface OutcomeBinding { verifiers: Partial<Record<OutcomeKind, string>>; knowledge: { service_id: string; repository: string } | null }

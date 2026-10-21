@@ -1,11 +1,12 @@
-import { BindingOperationState, CodingAgent } from "/assets/shared/contracts.js";
+import { BindingOperationState, CodingAgent, Presence } from "/assets/shared/contracts.js";
 import { uuid } from "/assets/shared/identity.js";
 import { api, ApiError } from "./api.js";
-import { get, actions } from "./dom.js";
+import { get, actions, button } from "./dom.js";
 import { element, field, input, select } from "./forms.js";
 import { t, label } from "./i18n.js";
 import { savedSettings, trackSettings } from "./settings-guard.js";
 import { bindingEndpoint, showProgress } from "./binding-progress.js";
+import { openPerson } from "./people.js";
 let generation = 0;
 let preferredAdapter = "";
 export function chooseBinding(id) { preferredAdapter = id; location.hash = "#settings/bindings"; }
@@ -16,11 +17,12 @@ function adapterTitle(config, id) {
     const name = label("CodingAgent", adapter.agent);
     return config.adapters.filter(a => a.agent === adapter.agent).length > 1 || adapter.agent === CodingAgent.Custom ? `${name} · ${id}` : name;
 }
-export function renderBindings(config, people, save, refresh) {
+export function renderBindings(config, people, save, refresh, onDirectory) {
     const render = ++generation, container = get("binding-list");
     container.replaceChildren();
     if (!Object.keys(config.bindings).length)
         container.append(element("p", t("layout.noBindings")));
+    const rowNames = new Map();
     for (const [person, adapter] of Object.entries(config.bindings)) {
         const row = element("div");
         row.className = "binding-row";
@@ -38,7 +40,9 @@ export function renderBindings(config, people, save, refresh) {
                 unbind.disabled = false;
             }
         };
-        row.append(element("span", `${people.find((p) => p.id === person)?.name || person} → ${adapterTitle(config, adapter)}`), element("span", config.binding_evidence?.[person] ? t("binding.verified") : t("binding.unverified")), unbind);
+        const name = element("span", `${people.find((p) => p.id === person)?.name || person} → ${adapterTitle(config, adapter)}`);
+        rowNames.set(person, { node: name, adapter });
+        row.append(name, element("span", config.binding_evidence?.[person] ? t("binding.verified") : t("binding.unverified")), unbind);
         container.append(row);
     }
     const form = element("form");
@@ -62,23 +66,83 @@ export function renderBindings(config, people, save, refresh) {
     container.append(form, progress);
     let pending;
     let records = [];
-    let posting = false, polling = false;
+    let posting = false, polling = false, loadingPeople = false, directoryLoaded = false, directoryGeneration = 0;
+    const directoryStatus = element("p"), hint = element("p");
+    directoryStatus.setAttribute("role", "status");
     const update = () => {
-        submit.disabled = posting || !person.value || !adapter.value || records.some((r) => r.request.person_id === person.value && r.state === BindingOperationState.Running);
+        submit.disabled = posting || loadingPeople || !person.value || !adapter.value || records.some((r) => r.request.person_id === person.value && r.state === BindingOperationState.Running);
         const custom = config.adapters.find((a) => a.id === adapter.value)?.agent === CodingAgent.Custom;
         program.disabled = custom;
         model.disabled = custom;
+        person.disabled = loadingPeople || !person.options.length;
+        hint.replaceChildren();
+        hint.hidden = loadingPeople || (!!person.value && !!adapter.value);
+        if (!hint.hidden) {
+            if (!person.value && directoryLoaded)
+                hint.append(element("span", t("bindings.noPeople")));
+            if (!adapter.value) {
+                const link = element("a", t("workspace.adapters"));
+                link.href = "#settings/adapters";
+                hint.append(element("span", t("bindings.noAdapters")), link);
+            }
+        }
     };
     person.onchange = update;
     adapter.onchange = update;
     update();
-    if (!person.value || !adapter.value) {
-        const hint = element("p", t(!person.value ? "binding.needsPerson" : "binding.needsAdapter"));
-        const link = element("a", t(!person.value ? "workspace.people" : "workspace.adapters"));
-        link.href = !person.value ? "#people" : "#settings/adapters";
-        hint.append(link);
-        form.append(hint);
-    }
+    const loadDirectory = async () => {
+        const request = ++directoryGeneration;
+        loadingPeople = true;
+        directoryStatus.textContent = t("bindings.loading");
+        update();
+        try {
+            const directory = [];
+            let cursor = "";
+            do {
+                const page = await api("/api/v1/collaboration/people?after=" + encodeURIComponent(cursor));
+                if (render !== generation || request !== directoryGeneration || !form.isConnected)
+                    return;
+                directory.push(...page.people);
+                const next = page.next_after || "";
+                if (next === cursor)
+                    break;
+                cursor = next;
+            } while (cursor && directory.length < 10000);
+            const selected = person.value;
+            people = directory;
+            directoryLoaded = true;
+            const eligible = people.filter(p => p.id !== "operator");
+            person.replaceChildren(...select(eligible.map(p => [p.id, p.name]), "").children);
+            person.value = eligible.some(p => p.id === selected) ? selected : eligible[0]?.id || "";
+            for (const [id, row] of rowNames)
+                row.node.textContent = `${people.find(p => p.id === id)?.name || id} → ${adapterTitle(config, row.adapter)}`;
+            onDirectory?.(people);
+            directoryStatus.textContent = "";
+        }
+        catch (error) {
+            if (render === generation && request === directoryGeneration && form.isConnected) {
+                directoryLoaded = false;
+                directoryStatus.textContent = t("bindings.loadFailed", { error: String(error) });
+            }
+        }
+        finally {
+            if (render === generation && request === directoryGeneration && form.isConnected) {
+                loadingPeople = false;
+                update();
+            }
+        }
+    };
+    const create = button(t("bindings.createPerson"), () => openPerson(null, identity => {
+        if (render !== generation || !form.isConnected)
+            return;
+        people = [...people.filter(p => p.id !== identity.id), { ...identity, presence: Presence.Offline, connections: 0 }];
+        person.replaceChildren(...select(people.filter(p => p.id !== "operator").map(p => [p.id, p.name]), "").children);
+        person.value = identity.id;
+        person.dispatchEvent(new Event("change", { bubbles: true }));
+        void loadDirectory();
+    }));
+    form.append(element("p", t("bindings.directoryNote")), actions(create, button(t("bindings.refreshPeople"), loadDirectory)), directoryStatus, hint);
+    void loadDirectory();
     const poll = async () => {
         if (polling || render !== generation)
             return;

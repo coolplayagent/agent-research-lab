@@ -385,6 +385,7 @@ fn dispatch_with_target(
 
 fn prefix(target: Option<&knowledge_model::Target>) -> String {
     target
+        .filter(|t| t.content_root != Path::new("."))
         .map(|t| format!("{}/{}", t.content_root.display(), PREFIX))
         .unwrap_or_else(|| PREFIX.into())
 }
@@ -407,6 +408,63 @@ pub fn dispatch_target(
     )]);
     dispatch_with_target(service, &repositories, state, request, Some(target))
 }
+/// Resolve an existing branch without changing the repository or its worktree.
+pub fn prepare_target(
+    target: &knowledge_model::Target,
+    state: &Path,
+) -> Result<knowledge_model::Target> {
+    let mut target = target.clone();
+    let legacy = GitTarget {
+        path: target.path.clone(),
+        reference: "refs/heads/unused".into(),
+    };
+    let git = Git {
+        target: &legacy,
+        run: tempfile::tempdir_in(state)?,
+        deadline: Instant::now() + Duration::from_secs(30),
+        prefix: prefix(Some(&target)),
+        remote: target.remote.clone(),
+        credential_env: target.credential_env.clone(),
+    };
+    let top = git
+        .call(&["rev-parse", "--show-toplevel"])
+        .context("knowledge_git_repository_required")?;
+    ensure!(
+        fs::canonicalize(top)? == target.path,
+        "knowledge_git_root_required"
+    );
+    if target.reference.is_none() {
+        ensure!(
+            target.access == contracts::KnowledgeAccess::ReadOnly,
+            "knowledge_branch_required"
+        );
+        target.reference = Some(
+            git.call(&["symbolic-ref", "--quiet", "HEAD"])
+                .context("knowledge_branch_required")?,
+        );
+    }
+    if target.access == contracts::KnowledgeAccess::ReadWrite {
+        let worktrees = git.call(&["worktree", "list", "--porcelain"])?;
+        ensure!(!worktrees.lines().any(|line| line == format!("branch {}", target.reference.as_deref().unwrap_or(""))), "knowledge_publish_branch_checked_out");
+    }
+    target.validate()?;
+    let (revision, _) = inspect(&target, state, None, None)?;
+    if target.content_root != Path::new(".") {
+        let entry = git.call(&[
+            "ls-tree",
+            "-d",
+            &revision,
+            "--",
+            target
+                .content_root
+                .to_str()
+                .context("knowledge_invalid_path")?,
+        ])?;
+        ensure!(!entry.is_empty(), "knowledge_content_directory_required");
+    }
+    Ok(target)
+}
+
 pub fn inspect(
     target: &knowledge_model::Target,
     state: &Path,
@@ -433,12 +491,14 @@ pub fn inspect(
     hash(revision)?;
     if let Some(path) = path {
         knowledge_model::relative(path)?;
-        let full = target
-            .content_root
-            .join(path)
-            .to_str()
-            .context("knowledge_invalid_path")?
-            .to_string();
+        let full = if target.content_root == Path::new(".") {
+            path.to_path_buf()
+        } else {
+            target.content_root.join(path)
+        }
+        .to_str()
+        .context("knowledge_invalid_path")?
+        .to_string();
         let entry = git.call(&["ls-tree", revision, "--", &full])?;
         if entry.is_empty() {
             return Ok((head, None));

@@ -4,6 +4,14 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
         return Some(asset);
     }
     match path {
+        "/assets/knowledge-form.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../dist/knowledge-form.js").as_slice(),
+        )),
+        "/assets/outcome-service-settings.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../dist/outcome-service-settings.js").as_slice(),
+        )),
         "/assets/adapter-forms.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/adapter-forms.js").as_slice(),

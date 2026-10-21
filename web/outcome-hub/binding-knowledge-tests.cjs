@@ -1,0 +1,246 @@
+/** Regressions for first-use agent bindings and independent knowledge settings. */
+const assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path");
+const ts = require(process.argv[2]);
+const root = path.join(process.env.TEST_SRCDIR, process.env.TEST_WORKSPACE), base = "web/outcome-hub/src/";
+function load(file, imports = {}, globals = {}) {
+  const module = { exports: {} };
+  const code = ts.transpileModule(fs.readFileSync(path.join(root, file), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  new Function("module", "exports", "require", ...Object.keys(globals), code)(module, module.exports, id => { assert(Object.hasOwn(imports, id), id); return imports[id]; }, ...Object.values(globals));
+  return module.exports;
+}
+class Node extends EventTarget {
+  constructor(tag, text = "") { super(); this.tag = tag; this.textContent = text; this.children = []; this.attributes = new Map(); this.hidden = false; this.disabled = false; this.connected = false; this._value = ""; this.dataset = {}; this.classList = { toggle() {}, remove() {} }; }
+  get isConnected() { return this.connected || !!this.parent?.isConnected; }
+  get childElementCount() { return this.children.length; }
+  get options() { return this.children; }
+  get value() { return this._value; }
+  set value(value) { this._value = this.tag === "select" && !this.children.some(o => o.value === value) ? "" : value; }
+  append(...nodes) { for (const node of nodes) { node.parent = this; this.children.push(node); } }
+  replaceChildren(...nodes) { for (const child of this.children) child.parent = null; this.children = []; this.append(...nodes); }
+  setAttribute(key, value) { this.attributes.set(key, value); }
+  getAttribute(key) { return this.attributes.get(key); }
+  reset() {}
+  querySelector() { return new Node("button"); }
+}
+const nodes = new Map(), get = id => { if (!nodes.has(id)) { const n = new Node("div"); n.connected = true; nodes.set(id, n); } return nodes.get(id); };
+const el = (tag, text) => new Node(tag, text), textOf = n => [n.textContent, ...n.children.map(textOf)].join(" ");
+const find = (node, predicate) => [node, ...node.children.flatMap(n => find(n, predicate))].filter(predicate);
+const buttonIn = (node, text) => find(node, n => n.tag === "button" && n.textContent === text)[0];
+const i18n = { t: (key, params = {}) => key + (Object.keys(params).length ? JSON.stringify(params) : ""), label: (domain, value) => `${domain}.${value}` };
+let box;
+const forms = {
+  element: el, input: (value, type) => Object.assign(el("input"), { value, type }), check: checked => Object.assign(el("input"), { checked }), area: value => Object.assign(el("textarea"), { value }),
+  select: (options, value) => { const node = el("select"); node.append(...options.map(([id, title]) => Object.assign(el("option", title), { value: id }))); node.value = value; return node; },
+  field: (title, control) => { const label = el("label", title); label.append(control); return label; },
+  dialog: () => box = { form: el("form"), dialog: el("dialog"), status: el("p") },
+  finish: (dialog, save) => { dialog.save = save; },
+};
+const field = (node, label) => find(node, n => n.tag === "label" && n.textContent === label)[0].children[0];
+const dom = { el, get, actions: (...controls) => { const n = el("div"); n.append(...controls); return n; }, button: (text, onclick) => Object.assign(el("button", text), { onclick }), notice: () => {}, open: id => get(id).hidden = false, close: id => get(id).hidden = true, presence: v => v, value: id => get(id).value.trim() };
+const feedback = { busy: node => { if (node.pending) return null; node.pending = true; return () => node.pending = false; } };
+const contracts = load("web/shared/src/contracts.ts"), { OutcomeKind, OutcomeServiceKind, Presence } = contracts;
+const tick = () => new Promise(setImmediate), pending = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
+const person = (id, name = id) => ({ id, name, application_id: null, presence: Presence.Offline, connections: 0 });
+const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, { id: "second" }], bindings: {}, outcome_services: [], outcome_bindings: {} });
+(async () => {
+  let bindingWrites = [];
+  let catalog = [person("operator")], failRead = false, failCreate = false, held, saved, changes = [];
+  const api = async (url, body) => {
+    if (url === "/api/v1/collaboration/bindings") {
+      if (!body) return [];
+      bindingWrites.push(body); return { request: body, state: contracts.BindingOperationState.Running };
+    }
+    if (failRead) throw new Error("directory unavailable");
+    if (held) return held.promise;
+    const after = new URL(url, "http://local").searchParams.get("after");
+    const list = catalog.filter(p => p.id > (after || "")).sort((a, b) => a.id.localeCompare(b.id));
+    return { people: list.slice(0, 1), next_after: list.length > 1 ? list[0].id : null };
+  };
+  const document = new EventTarget();
+  const people = load(base + "people.ts", {
+    "/assets/shared/identity.js": { uuid: () => "new" }, "./avatar.js": { avatar: () => el("svg") }, "./feedback.js": feedback,
+    "./i18n.js": i18n, "./dom.js": dom, "./api.js": { api, query: params => new URLSearchParams(params).toString(), change: async value => {
+      if (failCreate) throw new Error("create failed"); changes.push(value); catalog.push(person(value.person.id, value.person.name));
+    } },
+  }, { document });
+  people.initPeople();
+  const bindings = load(base + "binding-settings.ts", {
+    "/assets/shared/contracts.js": contracts, "/assets/shared/identity.js": { uuid: () => "request-new" },
+    "./binding-progress.js": { bindingEndpoint: "/api/v1/collaboration/bindings", showProgress() {} },
+    "./api.js": { api, ApiError: class extends Error {} }, "./dom.js": dom, "./forms.js": forms, "./feedback.js": feedback, "./i18n.js": i18n, "./people.js": people,
+    "./settings-guard.js": { trackSettings() {}, savedSettings() {} },
+  }, { document, window: { setTimeout() {} } });
+  const render = (cfg = config()) => bindings.renderBindings(cfg, [], async next => saved = next, async () => {});
+  render(); await tick();
+  let panel = get("binding-list"), form = panel.children[1], picker = field(form, "services.person"), adapter = field(form, "services.agent");
+  assert.equal(picker.children.length, 0, "The operator is never a bindable digital person");
+  assert(buttonIn(form, "binding.validate").disabled); assert(textOf(form).includes("bindings.noPeople"));
+  adapter.value = "second";
+  field(form, "binding.program").value = "/trusted/program"; field(form, "binding.model").value = "chosen-model";
+  await buttonIn(form, "bindings.createPerson").onclick();
+  assert.equal(get("person-dialog").hidden, false);
+  get("person-name").value = "Ada"; failCreate = true;
+  await get("person-form").onsubmit({ preventDefault() {} });
+  assert.equal(changes.length, 0); assert.equal(adapter.value, "second"); assert.equal(picker.value, "");
+  failCreate = false;
+  await get("person-form").onsubmit({ preventDefault() {} }); await tick();
+  assert.equal(picker.value, "agent-new"); assert.equal(adapter.value, "second"); assert(!buttonIn(form, "binding.validate").disabled);
+  assert.equal(changes[0].operation, "person");
+  await form.onsubmit({ preventDefault() {} });
+  assert.equal(saved, undefined, "Creating a person never bypasses binding validation");
+  assert.equal(bindingWrites[0].revision, 12); assert.equal(bindingWrites[0].person_id, "agent-new");
+  assert.equal(bindingWrites[0].adapter_id, "second");
+  assert.equal(bindingWrites[0].program, "/trusted/program"); assert.equal(bindingWrites[0].model, "chosen-model");
+  await buttonIn(form, "bindings.createPerson").onclick(); dom.close("person-dialog");
+  assert.equal(changes.length, 1, "Canceling creation performs no write"); assert.equal(adapter.value, "second");
+
+  failRead = true; render(); await tick();
+  form = panel.children[1];
+  assert(textOf(form).includes("bindings.loadFailed")); assert(!textOf(form).includes("bindings.noPeople"));
+  failRead = false; await buttonIn(form, "bindings.refreshPeople").onclick();
+  assert.equal(field(form, "services.person").value, "agent-new"); assert(!textOf(form).includes("bindings.loadFailed"));
+  catalog = [person("a"), person("b"), person("operator")];
+  await buttonIn(form, "bindings.refreshPeople").onclick();
+  picker = field(form, "services.person"); assert.deepEqual(picker.children.map(n => n.value), ["a", "b"]);
+  held = pending(); const old = held; const refresh = buttonIn(form, "bindings.refreshPeople").onclick();
+  held = null; render(); await tick();
+  old.resolve({ people: [person("obsolete")], next_after: null }); await refresh;
+  assert.equal(field(panel.children[1], "services.person").value, "a", "Detached responses cannot replace the new form");
+  held = pending(); const initial = held; render();
+  held = null; await buttonIn(panel.children[1], "bindings.refreshPeople").onclick();
+  initial.resolve({ people: [person("late")], next_after: null }); await tick();
+  assert.equal(field(panel.children[1], "services.person").value, "a", "Older refreshes cannot overwrite the latest directory");
+
+  const noAdapters = config(); noAdapters.adapters = []; render(noAdapters); await tick();
+  assert(buttonIn(panel.children[1], "binding.validate").disabled);
+  assert(textOf(panel.children[1]).includes("bindings.noAdapters"));
+  assert.equal(find(panel, n => n.tag === "a")[0].href, "#settings/adapters");
+
+  const kind = Object.values(OutcomeKind)[0], cfg = config();
+  cfg.outcome_services = [
+    { id: "verify", kind: OutcomeServiceKind.Verifier, enabled: true, endpoint: "unix:///verify", max_seconds: 120, dependencies: [], outcome_kinds: [kind] },
+    { id: "knowledge", kind: OutcomeServiceKind.Knowledge, enabled: true, endpoint: "unix:///knowledge", max_seconds: 120, dependencies: [], outcome_kinds: [kind] },
+    { id: "disabled-knowledge", kind: OutcomeServiceKind.Knowledge, enabled: false, endpoint: "unix:///disabled", max_seconds: 120, dependencies: [], outcome_kinds: [kind] },
+  ];
+  cfg.outcome_bindings.topic = { verifiers: { [kind]: "verify" }, knowledge: { service_id: "knowledge", repository: "repo" } };
+  const view = { configuration: cfg, outcome_health: [] }, save = async next => saved = next;
+  const serviceSettings = load(base + "outcome-service-settings.ts", {
+    "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms,
+  }, { confirm: () => true });
+  const verifierPanel = get("outcome-services");
+  const documentWithNodes = { getElementById: get };
+  const outcome = load(base + "outcome-settings.ts", {
+    "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms,
+    "./api.js": { api: async () => ({ topics: [{ topic: { id: "topic", title: "Topic" } }], next_after: null }), query: () => "" },
+    "./outcome-service-settings.js": serviceSettings,
+  }, { document: documentWithNodes });
+  outcome.renderOutcomeSettings(view, save);
+  assert(textOf(verifierPanel).includes("unix:///verify")); assert(!textOf(verifierPanel).includes("unix:///knowledge"));
+  await buttonIn(verifierPanel, "outcome.bind").onclick();
+  field(box.form, `OutcomeKind.${kind}`).value = ""; await box.save();
+  assert.deepEqual(saved.outcome_bindings.topic.knowledge, cfg.outcome_bindings.topic.knowledge);
+  await buttonIn(verifierPanel.children.at(-1), "services.unbind").onclick();
+  assert.deepEqual(saved.outcome_bindings.topic, { verifiers: {}, knowledge: cfg.outcome_bindings.topic.knowledge });
+
+  const targetForms = load(base + "knowledge-form.ts", {
+    "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms,
+    "./settings-guard.js": { trackSettings() {} },
+  });
+  const requests = [];
+  const knowledge = load(base + "knowledge-settings.ts", {
+    "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms,
+    "./knowledge-form.js": targetForms, "./outcome-service-settings.js": serviceSettings, "./api.js": { api: async (_url, body, intent) => {
+      requests.push({ body, intent });
+      return body.request.operation === "probe" ? { revision: "abc123" } : { revision: 8, targets: { repo: { kind: contracts.KnowledgeBackend.Directory, access: contracts.KnowledgeAccess.ReadOnly, enabled: true, path: "/external", content_root: "knowledge" } } };
+    } },
+  }, { confirm: () => true });
+  knowledge.renderKnowledgeSettings(view, save);
+  const knowledgePanel = get("knowledge-services"), targetsPanel = get("knowledge-targets");
+  assert(textOf(knowledgePanel).includes("unix:///knowledge")); assert(!textOf(knowledgePanel).includes("unix:///verify"));
+  assert(textOf(knowledgePanel).includes("disabled-knowledge"), "Disabled services remain editable");
+  await buttonIn(knowledgePanel, "knowledge.addService").onclick();
+  field(box.form, "research.id").value = "verify";
+  await assert.rejects(box.save(), /services.duplicateId/);
+  field(box.form, "research.id").value = "another-knowledge"; field(box.form, "outcome.endpoint").value = "unix:///other";
+  await box.save(); assert.equal(saved.outcome_services.at(-1).kind, OutcomeServiceKind.Knowledge);
+  assert.equal(saved.outcome_services.find(s => s.id === "verify").kind, OutcomeServiceKind.Verifier);
+  await buttonIn(targetsPanel, "knowledge.binding").onclick();
+  field(box.form, "knowledge.scope").value = "topic"; field(box.form, "knowledge.scopeId").value = "topic";
+  field(box.form, "knowledge.scope").onchange();
+  assert.equal(field(box.form, "knowledge.id").value, "repo");
+  field(box.form, "knowledge.id").value = "new-repo"; await box.save();
+  assert.deepEqual(saved.outcome_bindings.topic.verifiers, { [kind]: "verify" });
+  assert.equal(saved.outcome_bindings.topic.knowledge.repository, "new-repo");
+  await buttonIn(targetsPanel, "services.unbind").onclick();
+  assert.deepEqual(saved.outcome_bindings.topic, { verifiers: { [kind]: "verify" }, knowledge: null });
+  const targetServiceCard = targetsPanel.children.at(-1);
+  await buttonIn(targetServiceCard, "knowledge.load").onclick();
+  assert.equal(requests[0].intent, "manage-knowledge"); assert.equal(requests[0].body.configuration_revision, 12);
+  await buttonIn(targetServiceCard, "knowledge.probe").onclick();
+  assert(textOf(targetServiceCard).includes("abc123"));
+  await buttonIn(targetServiceCard, "knowledge.disable").onclick();
+  assert.equal(requests.find(r => r.body.request.operation === "save").body.request.configuration.targets.repo.enabled, false);
+
+  await buttonIn(targetsPanel, "knowledge.binding").onclick();
+  field(box.form, "knowledge.scopeId").value = "group-one";
+  field(box.form, "knowledge.id").value = "group-repo"; await box.save();
+  assert.deepEqual(saved.knowledge_groups["group-one"], { service_id: "knowledge", repository: "group-repo" });
+  assert.deepEqual(saved.outcome_bindings, cfg.outcome_bindings);
+  await buttonIn(targetsPanel, "knowledge.binding").onclick();
+  field(box.form, "knowledge.scope").value = "goal";
+  field(box.form, "knowledge.scopeId").value = "goal-one";
+  field(box.form, "knowledge.id").value = "goal-repo"; await box.save();
+  assert.deepEqual(saved.knowledge_goals["goal-one"], { service_id: "knowledge", repository: "goal-repo" });
+  assert.deepEqual(saved.outcome_bindings, cfg.outcome_bindings);
+
+  let addedTarget, inspected;
+  targetForms.knowledgeForm(contracts.KnowledgeBackend.Directory, async (name, target) => { addedTarget = { name, target }; }, async target => { inspected = target; return { target, revision: "directory-revision" }; });
+  field(box.form, "knowledge.id").value = "team-notes"; field(box.form, "knowledge.path").value = "/external/notes";
+  assert.equal(find(box.form, node => node.tag === "select").length, 0, "Directory creation requires no type or service dropdown");
+  await buttonIn(box.form, "knowledge.checkPath").onclick();
+  assert.equal(inspected.kind, contracts.KnowledgeBackend.Directory); assert.equal(inspected.content_root, ".");
+  await box.save(); assert.equal(addedTarget.target.access, contracts.KnowledgeAccess.ReadOnly); assert.equal(addedTarget.target.reference, null);
+  targetForms.knowledgeForm(contracts.KnowledgeBackend.Git, async (name, target) => { addedTarget = { name, target }; }, async target => ({ target: { ...target, reference: "refs/heads/main" }, revision: "git-revision" }));
+  await buttonIn(box.form, "knowledge.checkPath").onclick();
+  assert.equal(field(box.form, "knowledge.branch").value, "refs/heads/main");
+  const writable = field(box.form, "knowledge.writable"); writable.checked = true; writable.onchange();
+  assert(field(box.form, "knowledge.branch").required, "Writing requires an explicitly prepared branch");
+  assert(find(box.form, node => node.tag === "details")[0].open);
+
+  let servicesLoaded = 0;
+  const settingPanels = ["services", "knowledge", "bindings"].map(name => Object.assign(el("section"), { dataset: { settingsPanel: name } }));
+  const settingLinks = ["services", "knowledge", "bindings"].map(name => Object.assign(el("a"), { dataset: { setting: name } }));
+  const location = { hash: "#settings/knowledge" };
+  const navigation = load(base + "navigation.ts", {
+    "./topics.js": { loadTopics() {} }, "./outcome-detail.js": { showOutcome() {} }, "./dom.js": dom, "./i18n.js": i18n,
+    "./settings.js": { loadServices: () => servicesLoaded++ }, "./icons.js": { icon() {} }, "./people.js": { loadPeople() {} },
+    "./applications.js": { loadApplications() {} }, "./settings-guard.js": { allowSettingsLeave: () => true, initSettingsGuard() {} },
+    "./workspace.js": { revealResearch() {}, syncControls() {} },
+  }, { location, history: { replaceState() { assert.fail("Valid knowledge settings must not redirect"); } }, document: {
+    getElementById: () => null,
+    querySelectorAll: selector => selector === "[data-settings-panel]" ? settingPanels : selector === "[data-setting]" ? settingLinks : [],
+  } });
+  navigation.navigate();
+  assert.equal(get("page-title").textContent, "knowledge.title");
+  assert.deepEqual(settingPanels.map(n => n.hidden), [true, false, true]);
+  assert.equal(settingLinks[1].getAttribute("aria-current"), "page"); assert.equal(servicesLoaded, 1);
+  location.hash = "#settings/services"; navigation.navigate();
+  assert.deepEqual(settingPanels.map(n => n.hidden), [false, true, true]);
+
+  let bindingRendered = false;
+  const settings = load(base + "settings.ts", {
+    "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms, "./feedback.js": feedback,
+    "./api.js": { api: async url => { assert.equal(url, "/api/v1/collaboration/services", "Directory reads must not block service settings"); return { ...view, health: [], restart_required: false }; } },
+    "./settings-guard.js": { trackSettings() {}, savedSettings() {}, allowSettingsLeave: () => true, hasUnsavedSettings: () => false },
+    "./knowledge-settings.js": { renderKnowledgeSettings() {} }, "./outcome-settings.js": { renderOutcomeSettings() {} },
+    "./scenario-settings.js": { renderScenarios() {} }, "./service-forms.js": {}, "./adapter-forms.js": {}, "./execution-status.js": { renderExecutionStatus() {} },
+    "./binding-settings.js": { renderBindings() { bindingRendered = true; } },
+  });
+  await settings.loadServices(); assert(bindingRendered, "Service settings render before independent directory requests");
+
+  const html = fs.readFileSync(path.join(root, "web/outcome-hub/index.html"), "utf8");
+  assert.match(html, /href="#settings\/knowledge" data-setting="knowledge"/);
+  assert.match(html, /data-settings-panel="knowledge" hidden>\s*<div id="knowledge-targets"><\/div>/);
+  assert.match(html, /<details><summary data-i18n="knowledge.advancedConnections"><\/summary><div id="knowledge-services"><\/div><\/details>/);
+  console.log("First-use binding, directory recovery/races, knowledge service ownership and independent topic configuration passed");
+})().catch(error => { console.error(error); process.exit(1); });

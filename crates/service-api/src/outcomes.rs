@@ -12,6 +12,8 @@ pub struct OutcomeService {
     pub kind: OutcomeServiceKind,
     pub endpoint: PathBuf,
     pub enabled: bool,
+    #[serde(default, skip_serializing_if = "crate::registry::external_management")]
+    pub management: contracts::ServiceManagement,
     pub protocol_version: u32,
     pub outcome_kinds: Vec<OutcomeKind>,
     pub dependencies: Vec<String>,
@@ -19,6 +21,11 @@ pub struct OutcomeService {
 }
 impl OutcomeService {
     pub fn validate(&self) -> Result<()> {
+        ensure!(
+            self.management != contracts::ServiceManagement::LocalManaged
+                || self.kind == OutcomeServiceKind::Knowledge,
+            "knowledge_managed_kind_required"
+        );
         collaboration_model::id(&self.id)?;
         rpc::endpoint(&self.endpoint)?;
         ensure!(

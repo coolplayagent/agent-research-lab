@@ -12,6 +12,7 @@ let next: string | null = null,
   generation = 0;
 let editing: Person | null = null;
 let personId = "";
+let onSaved: ((person: Pick<Person, "id" | "name" | "application_id">) => void) | undefined;
 export async function loadPeople(append = false): Promise<void> {
   const request = ++generation;
   try {
@@ -60,7 +61,8 @@ export async function loadPeople(append = false): Promise<void> {
     notice(error);
   }
 }
-function openPerson(person: Person | null): void {
+export function openPerson(person: Person | null, saved?: typeof onSaved): void {
+  onSaved = saved;
   editing = person;
   personId = person?.id || "agent-" + uuid();
   get<HTMLFormElement>("person-form").reset();
@@ -79,19 +81,15 @@ export function initPeople(): void {
     if (!done) return;
     try {
       const name = value("person-name");
-      await change({
-        operation: "person",
-        person: {
-          id: personId,
-          name,
-          application_id: editing?.application_id || null,
-        },
-      });
+      const identity = { id: personId, name, application_id: editing?.application_id || null };
+      const saved = onSaved;
+      await change({ operation: "person", person: identity });
       const person = people.get(personId);
       if (person) people.set(personId, { ...person, name });
       const search = get<HTMLInputElement>("people-search");
       if (!name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase()) && !personId.includes(search.value)) search.value = "";
       close("person-dialog");
+      saved?.(identity);
       await loadPeople();
       document.dispatchEvent(new Event("workspace-people"));
     } catch (error) {

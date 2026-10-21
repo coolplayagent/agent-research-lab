@@ -6,11 +6,12 @@ export async function api<T>(
   path: string,
   body?: unknown,
   intent = "manage-crystal",
+  timeoutMs = 15000,
 ): Promise<T> {
   const response = await fetch(path, {
     method: body === undefined ? "GET" : "POST",
     cache: "no-store",
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(timeoutMs),
     headers:
       body === undefined
         ? {}

@@ -45,7 +45,7 @@ function render(view) {
     renderExecutionStatus(view, directory, () => loadServices(true));
     renderScenarios(view, save);
     renderOutcomeSettings(view, save);
-    renderKnowledgeSettings(view, save);
+    renderKnowledgeSettings(view, save, () => loadServices(true));
     get("services-status").textContent = view.restart_required
         ? t("services.restart")
         : t("services.activeStorage", {
@@ -130,7 +130,10 @@ function render(view) {
             storeButton.disabled = false;
         }
     };
-    renderBindings(config, directory, save, () => loadServices(true));
+    renderBindings(config, directory, save, () => loadServices(true), people => {
+        directory = people;
+        renderExecutionStatus(view, directory, () => loadServices(true));
+    });
 }
 export async function loadServices(force = false) {
     if (!force && hasUnsavedSettings())
@@ -139,21 +142,8 @@ export async function loadServices(force = false) {
     get("services-status").textContent = t("services.checking");
     try {
         const view = await api("/api/v1/collaboration/services");
-        const people = [];
-        let cursor = "";
-        do {
-            const page = await api("/api/v1/collaboration/people?after=" + encodeURIComponent(cursor));
-            if (request !== generation)
-                return;
-            people.push(...page.people);
-            const next = page.next_after || "";
-            if (next === cursor)
-                break;
-            cursor = next;
-        } while (cursor && people.length < 10000);
         if (request !== generation || (!force && hasUnsavedSettings()))
             return;
-        directory = people;
         render(view);
     }
     catch (error) {

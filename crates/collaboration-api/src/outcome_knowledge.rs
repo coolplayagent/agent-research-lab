@@ -41,6 +41,7 @@ pub async fn write(State(web): State<Web>, request: Request) -> Response {
         };
         let service = configured_service(&config,&target.service_id,OutcomeServiceKind::Knowledge)?;
         ensure!(service.enabled && service.outcome_kinds.contains(&entry.outcome.input.kind),"{}",OutcomeErrorCode::Invalid);
+        web.services.as_ref().context(OutcomeErrorCode::NotFound)?.prepare_knowledge(&service).await?;
         let permit = web.outcome_tasks.clone().try_acquire_owned().context(OutcomeErrorCode::Capacity)?;
         let response = web.hub.outcomes(None,OutcomeCommand::BeginWrite {input:KnowledgeWriteInput {
             id:input.request_id,outcome_id:entry.outcome.input.id.clone(),outcome_digest:entry.outcome.digest.clone(),
