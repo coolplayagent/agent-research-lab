@@ -33,6 +33,7 @@ async fn framed_calls_validate_version_and_private_peer() {
         Reply {
             error_os_code: None,
             error_private_details: None,
+            error_knowledge: None,
             protocol_version: 99,
             result: serde_json::json!(true),
             error: None
@@ -58,4 +59,21 @@ fn private_diagnostics_survive_service_hops_without_entering_display() {
     )
     .unwrap();
     assert!(legacy.error_private_details.is_none());
+}
+
+#[test]
+fn structured_knowledge_errors_survive_multiple_service_hops() {
+    let diagnostic = contracts::KnowledgeError::new(contracts::KnowledgeErrorCode::DocumentLimit)
+        .parameter("path", "large.pdf")
+        .parameter("limit", 1024);
+    let first = Reply::from_result(Err(diagnostic.into()))
+        .decode::<bool>()
+        .unwrap_err();
+    let second = Reply::from_result(Err(first)).decode::<bool>().unwrap_err();
+    let diagnostic = knowledge_error(&second).unwrap();
+    assert_eq!(
+        diagnostic.code,
+        contracts::KnowledgeErrorCode::DocumentLimit
+    );
+    assert_eq!(diagnostic.parameters["path"], "large.pdf");
 }

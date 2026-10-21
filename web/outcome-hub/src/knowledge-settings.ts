@@ -1,6 +1,5 @@
-import { KnowledgeBackend, KnowledgeAccess, OutcomeServiceKind } from "/assets/shared/contracts.js";
+import { KnowledgeBackend, KnowledgeAccess, OutcomeServiceKind, ServiceManagement } from "/assets/shared/contracts.js";
 import { knowledgeForm } from "./knowledge-form.js";
-import { renderOutcomeServices } from "./outcome-service-settings.js";
 import { api } from "./api.js";
 import { t, label } from "./i18n.js";
 import { el, button, get, actions } from "./dom.js";
@@ -15,7 +14,6 @@ export function knowledgeRequest<T>(config: Configuration, service: string, requ
   return api<T>("/api/v1/knowledge", { service_id: service, configuration_revision: config.revision, request }, "manage-knowledge", 75000);
 }
 export function renderKnowledgeSettings(view: ServiceView, saveBindings: (next: Configuration) => Promise<void>, refresh: () => Promise<void> = async () => {}): void {
-  renderOutcomeServices(view, get("knowledge-services"), OutcomeServiceKind.Knowledge, saveBindings);
   const panel = get("knowledge-targets"), binding = button(t("knowledge.binding"), () => bindScope(view.configuration, saveBindings));
   const local = async <T>(request: unknown): Promise<T> => {
     const latest = await api<ServiceView>("/api/v1/collaboration/services");
@@ -32,7 +30,7 @@ export function renderKnowledgeSettings(view: ServiceView, saveBindings: (next: 
   binding.title = t("knowledge.bindingPrerequisite");
   panel.replaceChildren(el("h2", t("knowledge.title")), el("p", t("knowledge.note")),
     actions(button(t("knowledge.addGit"), () => add(KnowledgeBackend.Git)), button(t("knowledge.addDirectory"), () => add(KnowledgeBackend.Directory)), binding));
-  const available = (view.configuration.outcome_services || []).filter(s => s.kind === OutcomeServiceKind.Knowledge && s.enabled);
+  const available = (view.configuration.outcome_services || []).filter(s => s.kind === OutcomeServiceKind.Knowledge && s.management === ServiceManagement.LocalManaged && s.enabled);
   if (!available.length) panel.append(el("p", t("knowledge.empty")));
   for (const [scope, bindings] of [["group", view.configuration.knowledge_groups], ["goal", view.configuration.knowledge_goals]] as const) {
     for (const [id, binding] of Object.entries(bindings || {})) {
@@ -51,7 +49,7 @@ export function renderKnowledgeSettings(view: ServiceView, saveBindings: (next: 
         })));
   }
   for (const service of view.configuration.outcome_services || []) {
-    if (service.kind !== OutcomeServiceKind.Knowledge || !service.enabled) continue;
+    if (service.kind !== OutcomeServiceKind.Knowledge || service.management !== ServiceManagement.LocalManaged || !service.enabled) continue;
     const card = el("article", undefined, "card"), status = el("p"), targets = el("section");
     let generation = 0;
     const load = async () => {
@@ -76,7 +74,7 @@ export function renderKnowledgeSettings(view: ServiceView, saveBindings: (next: 
         )); targets.append(row);
       }
     };
-    card.append(el("h3", service.id), button(t("knowledge.load"), load), status, targets); panel.append(card);
+    card.append(el("h3", t("knowledge.localTargets")), button(t("knowledge.load"), load), status, targets); panel.append(card);
     void load().catch(error => { status.textContent = t("knowledge.loadFailed", { error: String(error) }); });
   }
 }
@@ -92,7 +90,7 @@ function edit(config: KnowledgeConfiguration, save: (next: KnowledgeConfiguratio
 function bindScope(config: Configuration, save: (next: Configuration) => Promise<void>, oldScope?: string, oldId?: string): void {
   const box = dialog(t("knowledge.binding"));
   const scope = select([["group", t("knowledge.group")], ["goal", t("knowledge.goal")], ["topic", t("research.topics")]], oldScope || "group");
-  const id = input(oldId || ""), service = select((config.outcome_services || []).filter(s => s.kind === OutcomeServiceKind.Knowledge).map(s => [s.id, s.id]), ""), target = input("");
+  const id = input(oldId || ""), service = select((config.outcome_services || []).filter(s => s.kind === OutcomeServiceKind.Knowledge && s.management === ServiceManagement.LocalManaged && s.enabled).map(s => [s.id, s.id]), ""), target = input("");
   scope.disabled = id.readOnly = !!oldId; id.required = service.required = target.required = true;
   const update = () => {
     const old = scope.value === "topic" ? config.outcome_bindings?.[id.value.trim()]?.knowledge

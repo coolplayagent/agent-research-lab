@@ -13,7 +13,7 @@ struct Input {
     request: knowledge_model::Request,
 }
 pub async fn manage(State(web): State<Web>, request: Request) -> Response {
-    json_response(
+    knowledge_response(
         async {
             intent(request.headers(), web.addr, "manage-knowledge")?;
             let input: Input = serde_json::from_slice(&body(request, 2 * 1024 * 1024).await?)?;
@@ -35,6 +35,12 @@ pub async fn manage(State(web): State<Web>, request: Request) -> Response {
                         && s.enabled
                 })
                 .context("knowledge_service_unavailable")?;
+            ensure!(
+                service.management == contracts::ServiceManagement::LocalManaged,
+                contracts::KnowledgeError::new(
+                    contracts::KnowledgeErrorCode::ExternalServiceRemoved
+                )
+            );
             web.services
                 .as_ref()
                 .unwrap()
@@ -54,7 +60,7 @@ struct LocalInput {
     request: knowledge_model::Request,
 }
 pub async fn local(State(web): State<Web>, request: Request) -> Response {
-    json_response(async {
+    knowledge_response(async {
         intent(request.headers(), web.addr, "manage-knowledge")?;
         let input: LocalInput = serde_json::from_slice(&body(request, 2 * 1024 * 1024).await?)?;
         ensure!(matches!(input.request, knowledge_model::Request::Inspect { .. } | knowledge_model::Request::Add { .. }), "knowledge_local_operation_required");
@@ -64,3 +70,23 @@ pub async fn local(State(web): State<Web>, request: Request) -> Response {
         Ok(json!({"service_id":service.id,"configuration_revision":registry.configuration().revision,"result":result}))
     }.await)
 }
+
+fn knowledge_response(result: Result<serde_json::Value>) -> Response {
+    match result {
+        Ok(value) => json_response(Ok(value)),
+        Err(error) => {
+            let diagnostic = service_protocol::knowledge_error(&error).unwrap_or_else(|| {
+                contracts::KnowledgeError::new(contracts::KnowledgeErrorCode::Failed)
+            });
+            response(
+                axum::http::StatusCode::BAD_REQUEST,
+                "application/json",
+                serde_json::to_vec(&json!({"error":diagnostic})).unwrap(),
+            )
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "knowledge_tests.rs"]
+mod tests;

@@ -96,6 +96,13 @@ fn settings_response(result: Result<serde_json::Value>) -> Response {
     match result {
         Ok(value) => json_response(Ok(value)),
         Err(error) => {
+            if let Some(diagnostic) = service_protocol::knowledge_error(&error) {
+                return response(
+                    StatusCode::BAD_REQUEST,
+                    "application/json",
+                    serde_json::to_vec(&json!({"error":diagnostic})).unwrap(),
+                );
+            }
             let code = error
                 .downcast_ref::<service_api::ConfigurationFailure>()
                 .map(|e| e.0)

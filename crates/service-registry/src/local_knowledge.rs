@@ -14,6 +14,11 @@ pub(super) struct ManagedKnowledge {
 }
 pub(super) fn validate_locations(config: &Configuration, state: &Path) -> Result<()> {
     for service in &config.outcome_services {
+        ensure!(
+            service.kind != OutcomeServiceKind::Knowledge
+                || service.management == ServiceManagement::LocalManaged,
+            contracts::KnowledgeError::new(contracts::KnowledgeErrorCode::ExternalServiceRemoved)
+        );
         if service.management == ServiceManagement::LocalManaged {
             ensure!(
                 !config.services.iter().any(|s| s.id == service.id),
@@ -38,6 +43,11 @@ impl ManagedKnowledge {
         }
     }
     async fn prepare(&mut self, service: &OutcomeService, state: &Path) -> Result<()> {
+        ensure!(
+            service.kind != OutcomeServiceKind::Knowledge
+                || service.management == ServiceManagement::LocalManaged,
+            contracts::KnowledgeError::new(contracts::KnowledgeErrorCode::ExternalServiceRemoved)
+        );
         if service.management != ServiceManagement::LocalManaged {
             return Ok(());
         }

@@ -87,7 +87,15 @@ impl Harness {
             addr,
             stop.clone(),
         );
-        if let Some(config) = config {
+        if let Some(mut config) = config {
+            // Managed knowledge endpoints are owned by this harness's private state.
+            for service in &mut config.outcome_services {
+                if service.management == contracts::ServiceManagement::LocalManaged {
+                    service.endpoint = state
+                        .path()
+                        .join(format!("private/services/{}.sock", service.id));
+                }
+            }
             let registry = service_registry::Registry::open(state.path()).unwrap();
             registry.save(config).unwrap();
             web.services = Some(Arc::new(registry));

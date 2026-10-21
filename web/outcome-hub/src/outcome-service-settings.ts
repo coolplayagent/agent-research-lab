@@ -7,10 +7,11 @@ import type { OutcomeService } from "./outcome-types.js";
 type Save = (config: Configuration) => Promise<void>;
 
 export function renderOutcomeServices(view: ServiceView, panel: HTMLElement, kind: OutcomeServiceKind, save: Save): void {
+  if (kind === OutcomeServiceKind.Knowledge) return;
   const config = view.configuration;
-  panel.replaceChildren(el("h2", t(kind === OutcomeServiceKind.Knowledge ? "knowledge.services" : "outcome.services")),
-    el("p", t(kind === OutcomeServiceKind.Knowledge ? "knowledge.servicesNote" : "outcome.servicesNote")),
-    button(t(kind === OutcomeServiceKind.Knowledge ? "knowledge.addService" : "outcome.addService"), () => editOutcomeService(config, undefined, save, kind)));
+  panel.replaceChildren(el("h2", t("outcome.services")),
+    el("p", t("outcome.servicesNote")),
+    button(t("outcome.addService"), () => editOutcomeService(config, undefined, save, kind)));
   for (const service of config.outcome_services || []) {
     if (service.kind !== kind) continue;
     const card = el("article", undefined, "card"), health = view.outcome_health?.find(h => h.id === service.id);
@@ -25,7 +26,8 @@ export function renderOutcomeServices(view: ServiceView, panel: HTMLElement, kin
 }
 
 export function editOutcomeService(config: Configuration, old: OutcomeService | undefined, save: Save, serviceKind: OutcomeServiceKind): void {
-  const box = dialog(t(serviceKind === OutcomeServiceKind.Knowledge ? "knowledge.addService" : "outcome.addService")), id = input(old?.id || ""), endpoint = input(old?.endpoint || ""), enabled = check(old?.enabled ?? true),
+  if (serviceKind === OutcomeServiceKind.Knowledge) return;
+  const box = dialog(t("outcome.addService")), id = input(old?.id || ""), endpoint = input(old?.endpoint || ""), enabled = check(old?.enabled ?? true),
     kind = select([[serviceKind, label("OutcomeServiceKind", serviceKind)]], serviceKind), seconds = input(String(old?.max_seconds || 120), "number"), dependencies = area(old?.dependencies.join("\n") || "");
   kind.disabled = true;
   id.required = endpoint.required = true; id.readOnly = !!old; seconds.min = "1"; seconds.max = "600";

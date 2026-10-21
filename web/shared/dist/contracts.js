@@ -88,6 +88,23 @@ export const BindingErrorCode = {
     ValidationRequired: "validation_required",
     Superseded: "superseded",
 };
+export const KnowledgeErrorCode = {
+    Failed: "knowledge_failed",
+    ExternalServiceRemoved: "knowledge_external_service_removed",
+    PathUnavailable: "knowledge_path_unavailable",
+    InvalidPath: "knowledge_invalid_path",
+    ExcludedPath: "knowledge_path_excluded",
+    DocumentLimit: "knowledge_document_limit",
+    SnapshotLimit: "knowledge_snapshot_limit",
+    FileLimit: "knowledge_file_limit",
+    DepthLimit: "knowledge_depth_limit",
+    Timeout: "knowledge_timeout",
+    ContentChanged: "knowledge_content_changed",
+    RevisionConflict: "knowledge_revision_conflict",
+    SymlinkRejected: "knowledge_symlink_rejected",
+    SpecialFileRejected: "knowledge_special_file_rejected",
+    IgnoreInvalid: "knowledge_ignore_invalid",
+};
 export const KnowledgeBackend = {
     Git: "git",
     Directory: "directory",

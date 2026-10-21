@@ -9,7 +9,6 @@ use std::{
 };
 
 pub const MAX_DOCUMENT_BYTES: usize = 1024 * 1024;
-pub const MAX_SNAPSHOT_BYTES: usize = 32 * 1024 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Target {

@@ -84,7 +84,12 @@ impl Service {
             target.path.is_absolute(),
             "knowledge_absolute_path_required"
         );
-        target.path = fs::canonicalize(&target.path).context("knowledge_path_unavailable")?;
+        target.path = fs::canonicalize(&target.path).map_err(|error| {
+            anyhow::Error::new(error).context(
+                contracts::KnowledgeError::new(contracts::KnowledgeErrorCode::PathUnavailable)
+                    .parameter("path", target.path.display()),
+            )
+        })?;
         ensure!(target.path.is_dir(), "knowledge_directory_required");
         if target.kind == KnowledgeBackend::Git {
             target = knowledge_git::prepare_target(&target, &self.state)?;

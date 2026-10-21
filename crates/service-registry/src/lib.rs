@@ -2,6 +2,7 @@
 mod binding_flow;
 pub use binding_flow::binding_failure_code;
 mod bindings;
+mod knowledge_migration;
 mod local_knowledge;
 mod managed;
 use anyhow::{Context, Result, ensure};
@@ -25,12 +26,13 @@ impl Registry {
     pub fn open(state: &Path) -> Result<Self> {
         let state = std::fs::canonicalize(state)?;
         let path = state.join("private/services.json");
-        let config: Configuration = if path.exists() {
+        let mut config: Configuration = if path.exists() {
             storage::read(&path)?
         } else {
             Configuration::defaults(&state)
         };
         config.validate()?;
+        knowledge_migration::migrate(&path, &mut config)?;
         let active_storage = config
             .storage_id
             .as_ref()

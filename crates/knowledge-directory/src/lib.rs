@@ -1,11 +1,12 @@
 //! Directory adapter: descriptor-relative paths, optimistic revisions and durable publication receipts.
 use anyhow::{Context, Result, ensure};
 use collaboration_model::{KnowledgeWrite, KnowledgeWriteResult, Outcome};
-use contracts::KnowledgeWriteState;
-use knowledge_model::{MAX_DOCUMENT_BYTES, MAX_SNAPSHOT_BYTES, Target, baseline, result};
+use contracts::{KnowledgeError, KnowledgeErrorCode, KnowledgeWriteState};
+mod scan;
+use knowledge_model::{MAX_DOCUMENT_BYTES, Target, baseline, result};
+use scan::{Budget, snapshot};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
     fs::{self, File, OpenOptions},
     io::Read,
     os::{fd::AsRawFd, unix::fs::OpenOptionsExt},
@@ -76,8 +77,16 @@ fn read(root: &File, path: &Path) -> Result<Option<Vec<u8>>> {
     };
     let metadata = f.metadata()?;
     ensure!(
-        metadata.is_file() && metadata.len() <= MAX_DOCUMENT_BYTES as u64,
-        "knowledge_document_limit"
+        metadata.is_file(),
+        KnowledgeError::new(KnowledgeErrorCode::SpecialFileRejected)
+            .parameter("path", path.display())
+    );
+    ensure!(
+        metadata.len() <= MAX_DOCUMENT_BYTES as u64,
+        KnowledgeError::new(KnowledgeErrorCode::DocumentLimit)
+            .parameter("path", path.display())
+            .parameter("actual", metadata.len())
+            .parameter("limit", MAX_DOCUMENT_BYTES)
     );
     let mut bytes = Vec::new();
     Read::by_ref(&mut f)
@@ -85,72 +94,39 @@ fn read(root: &File, path: &Path) -> Result<Option<Vec<u8>>> {
         .read_to_end(&mut bytes)?;
     ensure!(
         bytes.len() <= MAX_DOCUMENT_BYTES,
-        "knowledge_document_limit"
+        KnowledgeError::new(KnowledgeErrorCode::DocumentLimit)
+            .parameter("path", path.display())
+            .parameter("actual", bytes.len())
+            .parameter("limit", MAX_DOCUMENT_BYTES)
     );
     Ok(Some(bytes))
-}
-fn snapshot(root: &File) -> Result<String> {
-    fn walk(
-        root: &File,
-        prefix: &Path,
-        entries: &mut BTreeMap<String, String>,
-        bytes: &mut usize,
-        depth: usize,
-    ) -> Result<()> {
-        ensure!(depth <= 32, "knowledge_depth_limit");
-        for entry in fs::read_dir(anchored(root))? {
-            let entry = entry?;
-            if prefix.as_os_str().is_empty() && entry.file_name() == ".outcomehub" {
-                continue;
-            }
-            ensure!(entries.len() < 4096, "knowledge_file_limit");
-            let name = PathBuf::from(entry.file_name());
-            knowledge_model::relative(&name)?;
-            let path = prefix.join(&name);
-            let meta = fs::symlink_metadata(entry.path())?;
-            ensure!(!meta.file_type().is_symlink(), "knowledge_symlink_rejected");
-            if meta.is_dir() {
-                entries.insert(format!("{}/", path.display()), String::new());
-                walk(
-                    &child(root, &name, false)?,
-                    &path,
-                    entries,
-                    bytes,
-                    depth + 1,
-                )?;
-            } else {
-                let content = read(root, &name)?.context("knowledge_content_changed")?;
-                *bytes += content.len();
-                ensure!(*bytes <= MAX_SNAPSHOT_BYTES, "knowledge_snapshot_limit");
-                entries.insert(
-                    path.to_str().context("knowledge_invalid_path")?.into(),
-                    storage::digest(&content),
-                );
-            }
-        }
-        Ok(())
-    }
-    let mut entries = BTreeMap::new();
-    walk(root, Path::new(""), &mut entries, &mut 0, 0)?;
-    Ok(storage::digest(&serde_json::to_vec(&entries)?))
 }
 pub fn inspect(
     target: &Target,
     path: Option<&Path>,
     expected: Option<&str>,
 ) -> Result<(String, Option<String>)> {
+    let mut budget = Budget::new();
     let root = root(target)?;
-    let revision = snapshot(&root)?;
+    let revision = snapshot(&root, &mut budget)?;
     if let Some(expected) = expected {
-        ensure!(expected == revision, "knowledge_revision_conflict");
+        ensure!(
+            expected == revision,
+            KnowledgeError::new(KnowledgeErrorCode::RevisionConflict)
+        );
     }
-    let content = path
-        .map(|p| read(&root, p))
-        .transpose()?
-        .flatten()
-        .map(String::from_utf8)
-        .transpose()?;
-    ensure!(snapshot(&root)? == revision, "knowledge_content_changed");
+    if let Some(path) = path {
+        scan::allowed(&root, path, &mut budget)?;
+    }
+    let bytes = path.map(|p| read(&root, p)).transpose()?.flatten();
+    if let Some(bytes) = &bytes {
+        budget.consume(path.unwrap(), bytes.len())?;
+    }
+    let content = bytes.map(String::from_utf8).transpose()?;
+    ensure!(
+        snapshot(&root, &mut budget)? == revision,
+        KnowledgeError::new(KnowledgeErrorCode::ContentChanged)
+    );
     Ok((revision, content))
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -202,6 +178,7 @@ pub fn lookup(
     state: &Path,
     write: &KnowledgeWrite,
 ) -> Result<Option<KnowledgeWriteResult>> {
+    let mut budget = Budget::new();
     let root = root(target)?;
     if let Some(receipt) = receipt(&root, write)? {
         return Ok(Some(receipt));
@@ -217,6 +194,7 @@ pub fn lookup(
         "knowledge_request_conflict"
     );
     let after = serde_json::to_vec_pretty(&journal.after)?;
+    scan::allowed(&root, &journal.path, &mut budget)?;
     let current = read(&root, &journal.path)?;
     if current.as_deref() == Some(after.as_slice()) {
         // Recover the durable local receipt without changing external files or repeating a write.
@@ -228,7 +206,7 @@ pub fn lookup(
                 .to_str()
                 .context("knowledge_invalid_path")?
                 .into(),
-            snapshot(&root)?,
+            snapshot(&root, &mut budget)?,
             "Publication recovered from the durable journal and matching external content",
         )));
     }
@@ -240,6 +218,7 @@ pub fn publish(
     write: &KnowledgeWrite,
     outcome: &Outcome,
 ) -> Result<KnowledgeWriteResult> {
+    let mut budget = Budget::new();
     let root = root(target)?;
     let private = private(&root)?;
     // Lock files are opened without following links, including the final component.
@@ -259,6 +238,7 @@ pub fn publish(
         return Ok(value);
     }
     let path = PathBuf::from(format!("accepted-outcomes/{}.json", outcome.input.id));
+    scan::allowed(&root, &path, &mut budget)?;
     let journal_path = state.join(format!("{}.journal.json", write.input.id));
     let current = read(&root, &path)?;
     let after = serde_json::to_vec_pretty(outcome)?;
@@ -278,8 +258,8 @@ pub fn publish(
         value
     } else {
         ensure!(
-            snapshot(&root)? == baseline(&write.input.expected_revision),
-            "knowledge_revision_conflict"
+            snapshot(&root, &mut budget)? == baseline(&write.input.expected_revision),
+            KnowledgeError::new(KnowledgeErrorCode::RevisionConflict)
         );
         let value = Journal {
             request: write.clone(),
@@ -298,7 +278,7 @@ pub fn publish(
         "knowledge_revision_conflict"
     );
     storage::write(&destination, outcome)?;
-    let revision = snapshot(&root)?;
+    let revision = snapshot(&root, &mut budget)?;
     let result = result(
         write,
         KnowledgeWriteState::Applied,
