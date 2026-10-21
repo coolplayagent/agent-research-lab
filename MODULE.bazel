@@ -17,6 +17,8 @@ crate.from_cargo(
     cargo_lockfile = "//:Cargo.lock",
     manifests = ["//:Cargo.toml"],
 )
+# Streamed directory snapshots must hash large attachments within their fixed deadline.
+crate.annotation(crate = "sha2", rustc_flags = ["-Copt-level=3"])
 use_repo(crate, "crates")
 
 # Pinned frontend toolchain; release packages embed precompiled ES modules.

@@ -3,8 +3,10 @@ import { t, label } from "./i18n.js";
 import { el, button, actions } from "./dom.js";
 import { input, check, select, area, field, dialog, finish } from "./forms.js";
 export function renderOutcomeServices(view, panel, kind, save) {
+    if (kind === OutcomeServiceKind.Knowledge)
+        return;
     const config = view.configuration;
-    panel.replaceChildren(el("h2", t(kind === OutcomeServiceKind.Knowledge ? "knowledge.services" : "outcome.services")), el("p", t(kind === OutcomeServiceKind.Knowledge ? "knowledge.servicesNote" : "outcome.servicesNote")), button(t(kind === OutcomeServiceKind.Knowledge ? "knowledge.addService" : "outcome.addService"), () => editOutcomeService(config, undefined, save, kind)));
+    panel.replaceChildren(el("h2", t("outcome.services")), el("p", t("outcome.servicesNote")), button(t("outcome.addService"), () => editOutcomeService(config, undefined, save, kind)));
     for (const service of config.outcome_services || []) {
         if (service.kind !== kind)
             continue;
@@ -20,7 +22,9 @@ export function renderOutcomeServices(view, panel, kind, save) {
     }
 }
 export function editOutcomeService(config, old, save, serviceKind) {
-    const box = dialog(t(serviceKind === OutcomeServiceKind.Knowledge ? "knowledge.addService" : "outcome.addService")), id = input(old?.id || ""), endpoint = input(old?.endpoint || ""), enabled = check(old?.enabled ?? true), kind = select([[serviceKind, label("OutcomeServiceKind", serviceKind)]], serviceKind), seconds = input(String(old?.max_seconds || 120), "number"), dependencies = area(old?.dependencies.join("\n") || "");
+    if (serviceKind === OutcomeServiceKind.Knowledge)
+        return;
+    const box = dialog(t("outcome.addService")), id = input(old?.id || ""), endpoint = input(old?.endpoint || ""), enabled = check(old?.enabled ?? true), kind = select([[serviceKind, label("OutcomeServiceKind", serviceKind)]], serviceKind), seconds = input(String(old?.max_seconds || 120), "number"), dependencies = area(old?.dependencies.join("\n") || "");
     kind.disabled = true;
     id.required = endpoint.required = true;
     id.readOnly = !!old;

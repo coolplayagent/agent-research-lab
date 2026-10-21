@@ -51,6 +51,10 @@ function checkCalls(source, messages) {
   assert.deepEqual(checkCalls(parse("fixture.ts", 't("greeting", {name: "A"})'), {greeting: "Hello {name}"}), []);
   assert.equal(checkCalls(parse("fixture.ts", 't("greeting", {}); t("missing")'), {greeting: "Hello {name}"}).length, 2);
   const shared = catalog("web/shared/src/locales/zh-CN.ts");
+  const knowledgeLocale = createI18n({ "zh-CN": shared }, "zh-CN", "zh-CN");
+  const knowledgeMessage = knowledgeLocale.describe({ code: "knowledge_document_limit", parameters: { path: "large.pdf", actual: 2048, limit: 1024 } });
+  assert(knowledgeMessage.includes("large.pdf") && knowledgeMessage.includes("2048") && knowledgeMessage.includes("1024"));
+  assert(!knowledgeMessage.includes("service request failed"));
   const contracts = await import(pathToFileURL(path.join(root, "web/shared/dist/contracts.js")));
   for (const [domain, variants] of Object.entries(contracts)) {
     for (const value of Object.values(variants)) {

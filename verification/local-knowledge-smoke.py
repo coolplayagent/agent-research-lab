@@ -24,6 +24,15 @@ def run(archive):
         directory = root / "notes"
         directory.mkdir()
         (directory / "note.md").write_text("original source\n")
+        (directory / ".gitignore").write_text("tmp/\n")
+        (directory / ".git/objects").mkdir(parents=True)
+        (directory / ".git/objects/pack").write_bytes(b"x" * (2 * 1024 * 1024))
+        (directory / "tmp").mkdir()
+        (directory / "tmp/model.bin").write_bytes(b"x" * (2 * 1024 * 1024))
+        (directory / "attachment.pdf").write_bytes(b"x" * (2 * 1024 * 1024))
+        (directory / "many").mkdir()
+        for index in range(4200):
+            (directory / f"many/note-{index}.md").write_text("small note\n")
         repository = root / "repository"
         repository.mkdir()
         (repository / "note.md").write_text("git source\n")
@@ -110,6 +119,27 @@ def run(archive):
             def proxy(request):
                 return api("/api/v1/knowledge", {"service_id":service, "configuration_revision":config()["revision"], "request":request})
             assert proxy({"operation":"read", "target":"notes", "path":"note.md", "revision":None})["content"] == "original source\n"
+            first_revision = proxy({"operation":"probe", "target":"notes"})["revision"]
+            assert first_revision.startswith("directory-v2:")
+            (directory / "tmp/model.bin").write_bytes(b"ignored change")
+            assert proxy({"operation":"probe", "target":"notes"})["revision"] == first_revision
+            for path, expected in [("attachment.pdf", "knowledge_document_limit"), ("tmp/model.bin", "knowledge_path_excluded"), (".git/objects/pack", "knowledge_path_excluded")]:
+                try:
+                    proxy({"operation":"read", "target":"notes", "path":path, "revision":None})
+                    raise AssertionError("A disallowed text read succeeded")
+                except urllib.error.HTTPError as error:
+                    diagnostic = json.load(error)["error"]
+                    assert diagnostic["code"] == expected, diagnostic
+                    assert diagnostic["parameters"]["path"] == path
+            rejected = config()
+            rejected["outcome_services"].append({**rejected["outcome_services"][0], "id":"external-knowledge", "management":"external", "endpoint":str(root / "external.sock")})
+            before_rejected = config()
+            try:
+                api("/api/v1/collaboration/services", rejected, "manage-services")
+                raise AssertionError("External knowledge configuration was accepted")
+            except urllib.error.HTTPError as error:
+                assert json.load(error)["error"]["code"] == "knowledge_external_service_removed"
+            assert config() == before_rejected
             assert proxy({"operation":"read", "target":"repo", "path":"note.md", "revision":None})["content"] == "git source\n"
             reject(lambda: proxy({"operation":"read", "target":"notes", "path":"../outside", "revision":None}))
             saved = proxy({"operation":"list"})

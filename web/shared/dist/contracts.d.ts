@@ -96,6 +96,24 @@ export declare const BindingErrorCode: {
     readonly Superseded: "superseded";
 };
 export type BindingErrorCode = (typeof BindingErrorCode)[keyof typeof BindingErrorCode];
+export declare const KnowledgeErrorCode: {
+    readonly Failed: "knowledge_failed";
+    readonly ExternalServiceRemoved: "knowledge_external_service_removed";
+    readonly PathUnavailable: "knowledge_path_unavailable";
+    readonly InvalidPath: "knowledge_invalid_path";
+    readonly ExcludedPath: "knowledge_path_excluded";
+    readonly DocumentLimit: "knowledge_document_limit";
+    readonly SnapshotLimit: "knowledge_snapshot_limit";
+    readonly FileLimit: "knowledge_file_limit";
+    readonly DepthLimit: "knowledge_depth_limit";
+    readonly Timeout: "knowledge_timeout";
+    readonly ContentChanged: "knowledge_content_changed";
+    readonly RevisionConflict: "knowledge_revision_conflict";
+    readonly SymlinkRejected: "knowledge_symlink_rejected";
+    readonly SpecialFileRejected: "knowledge_special_file_rejected";
+    readonly IgnoreInvalid: "knowledge_ignore_invalid";
+};
+export type KnowledgeErrorCode = (typeof KnowledgeErrorCode)[keyof typeof KnowledgeErrorCode];
 export declare const KnowledgeBackend: {
     readonly Git: "git";
     readonly Directory: "directory";

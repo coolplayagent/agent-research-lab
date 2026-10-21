@@ -119,7 +119,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   const kind = Object.values(OutcomeKind)[0], cfg = config();
   cfg.outcome_services = [
     { id: "verify", kind: OutcomeServiceKind.Verifier, enabled: true, endpoint: "unix:///verify", max_seconds: 120, dependencies: [], outcome_kinds: [kind] },
-    { id: "knowledge", kind: OutcomeServiceKind.Knowledge, enabled: true, endpoint: "unix:///knowledge", max_seconds: 120, dependencies: [], outcome_kinds: [kind] },
+    { id: "knowledge", kind: OutcomeServiceKind.Knowledge, management: contracts.ServiceManagement.LocalManaged, enabled: true, endpoint: "unix:///knowledge", max_seconds: 120, dependencies: [], outcome_kinds: [kind] },
     { id: "disabled-knowledge", kind: OutcomeServiceKind.Knowledge, enabled: false, endpoint: "unix:///disabled", max_seconds: 120, dependencies: [], outcome_kinds: [kind] },
   ];
   cfg.outcome_bindings.topic = { verifiers: { [kind]: "verify" }, knowledge: { service_id: "knowledge", repository: "repo" } };
@@ -156,14 +156,12 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   }, { confirm: () => true });
   knowledge.renderKnowledgeSettings(view, save);
   const knowledgePanel = get("knowledge-services"), targetsPanel = get("knowledge-targets");
-  assert(textOf(knowledgePanel).includes("unix:///knowledge")); assert(!textOf(knowledgePanel).includes("unix:///verify"));
-  assert(textOf(knowledgePanel).includes("disabled-knowledge"), "Disabled services remain editable");
-  await buttonIn(knowledgePanel, "knowledge.addService").onclick();
-  field(box.form, "research.id").value = "verify";
-  await assert.rejects(box.save(), /services.duplicateId/);
-  field(box.form, "research.id").value = "another-knowledge"; field(box.form, "outcome.endpoint").value = "unix:///other";
-  await box.save(); assert.equal(saved.outcome_services.at(-1).kind, OutcomeServiceKind.Knowledge);
-  assert.equal(saved.outcome_services.find(s => s.id === "verify").kind, OutcomeServiceKind.Verifier);
+  assert.equal(knowledgePanel.children.length, 0, "External knowledge service configuration is removed");
+  assert(!textOf(targetsPanel).includes("unix:///knowledge"));
+  assert(!textOf(targetsPanel).includes("disabled-knowledge"));
+  const beforeRetiredEditor = box;
+  serviceSettings.editOutcomeService(cfg, undefined, save, OutcomeServiceKind.Knowledge);
+  assert.equal(box, beforeRetiredEditor, "Generic service editors cannot reopen external knowledge setup");
   await buttonIn(targetsPanel, "knowledge.binding").onclick();
   field(box.form, "knowledge.scope").value = "topic"; field(box.form, "knowledge.scopeId").value = "topic";
   field(box.form, "knowledge.scope").onchange();
@@ -256,6 +254,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   const html = fs.readFileSync(path.join(root, "web/outcome-hub/index.html"), "utf8");
   assert.match(html, /href="#settings\/knowledge" data-setting="knowledge"/);
   assert.match(html, /data-settings-panel="knowledge" hidden>\s*<div id="knowledge-targets"><\/div>/);
-  assert.match(html, /<details><summary data-i18n="knowledge.advancedConnections"><\/summary><div id="knowledge-services"><\/div><\/details>/);
+  assert(!html.includes("knowledge-services"));
+  assert(!html.includes("knowledge.advancedConnections"));
   console.log("First-use binding, directory recovery/races, knowledge service ownership and independent topic configuration passed");
 })().catch(error => { console.error(error); process.exit(1); });

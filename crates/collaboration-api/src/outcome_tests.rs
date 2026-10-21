@@ -331,7 +331,7 @@ async fn knowledge_scope_bindings_validate_real_groups_and_goals() {
     config.services.clear();
     config.adapters.clear();
     config.outcome_services.push(service_api::OutcomeService {
-        management: Default::default(),
+        management: contracts::ServiceManagement::LocalManaged,
         id: "knowledge".into(),
         kind: OutcomeServiceKind::Knowledge,
         endpoint: root.path().join("knowledge.sock"),

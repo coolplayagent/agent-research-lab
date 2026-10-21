@@ -1,6 +1,5 @@
-import { KnowledgeBackend, OutcomeServiceKind } from "/assets/shared/contracts.js";
+import { KnowledgeBackend, OutcomeServiceKind, ServiceManagement } from "/assets/shared/contracts.js";
 import { knowledgeForm } from "./knowledge-form.js";
-import { renderOutcomeServices } from "./outcome-service-settings.js";
 import { api } from "./api.js";
 import { t, label } from "./i18n.js";
 import { el, button, get, actions } from "./dom.js";
@@ -9,7 +8,6 @@ export function knowledgeRequest(config, service, request) {
     return api("/api/v1/knowledge", { service_id: service, configuration_revision: config.revision, request }, "manage-knowledge", 75000);
 }
 export function renderKnowledgeSettings(view, saveBindings, refresh = async () => { }) {
-    renderOutcomeServices(view, get("knowledge-services"), OutcomeServiceKind.Knowledge, saveBindings);
     const panel = get("knowledge-targets"), binding = button(t("knowledge.binding"), () => bindScope(view.configuration, saveBindings));
     const local = async (request) => {
         const latest = await api("/api/v1/collaboration/services");
@@ -26,7 +24,7 @@ export function renderKnowledgeSettings(view, saveBindings, refresh = async () =
     binding.disabled = true;
     binding.title = t("knowledge.bindingPrerequisite");
     panel.replaceChildren(el("h2", t("knowledge.title")), el("p", t("knowledge.note")), actions(button(t("knowledge.addGit"), () => add(KnowledgeBackend.Git)), button(t("knowledge.addDirectory"), () => add(KnowledgeBackend.Directory)), binding));
-    const available = (view.configuration.outcome_services || []).filter(s => s.kind === OutcomeServiceKind.Knowledge && s.enabled);
+    const available = (view.configuration.outcome_services || []).filter(s => s.kind === OutcomeServiceKind.Knowledge && s.management === ServiceManagement.LocalManaged && s.enabled);
     if (!available.length)
         panel.append(el("p", t("knowledge.empty")));
     for (const [scope, bindings] of [["group", view.configuration.knowledge_groups], ["goal", view.configuration.knowledge_goals]]) {
@@ -46,7 +44,7 @@ export function renderKnowledgeSettings(view, saveBindings, refresh = async () =
         })));
     }
     for (const service of view.configuration.outcome_services || []) {
-        if (service.kind !== OutcomeServiceKind.Knowledge || !service.enabled)
+        if (service.kind !== OutcomeServiceKind.Knowledge || service.management !== ServiceManagement.LocalManaged || !service.enabled)
             continue;
         const card = el("article", undefined, "card"), status = el("p"), targets = el("section");
         let generation = 0;
@@ -69,7 +67,7 @@ export function renderKnowledgeSettings(view, saveBindings, refresh = async () =
                 targets.append(row);
             }
         };
-        card.append(el("h3", service.id), button(t("knowledge.load"), load), status, targets);
+        card.append(el("h3", t("knowledge.localTargets")), button(t("knowledge.load"), load), status, targets);
         panel.append(card);
         void load().catch(error => { status.textContent = t("knowledge.loadFailed", { error: String(error) }); });
     }
@@ -88,7 +86,7 @@ function edit(config, save, inspect, name, kind = KnowledgeBackend.Git) {
 function bindScope(config, save, oldScope, oldId) {
     const box = dialog(t("knowledge.binding"));
     const scope = select([["group", t("knowledge.group")], ["goal", t("knowledge.goal")], ["topic", t("research.topics")]], oldScope || "group");
-    const id = input(oldId || ""), service = select((config.outcome_services || []).filter(s => s.kind === OutcomeServiceKind.Knowledge).map(s => [s.id, s.id]), ""), target = input("");
+    const id = input(oldId || ""), service = select((config.outcome_services || []).filter(s => s.kind === OutcomeServiceKind.Knowledge && s.management === ServiceManagement.LocalManaged && s.enabled).map(s => [s.id, s.id]), ""), target = input("");
     scope.disabled = id.readOnly = !!oldId;
     id.required = service.required = target.required = true;
     const update = () => {

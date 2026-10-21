@@ -44,6 +44,7 @@ libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
+ignore = "=0.4.33"
 toml = "0.8"
 serde_yaml = { package = "serde_yaml_ng", version = "0.10" }
 tempfile = "3"
@@ -89,3 +90,7 @@ knowledge_git = { package = "outcome-hub-knowledge-git", path = "crates/knowledg
 knowledge_directory = { package = "outcome-hub-knowledge-directory", path = "crates/knowledge-directory" }
 
 knowledge_service = { package = "outcome-hub-knowledge-service", path = "crates/knowledge-service" }
+
+# Keep the bounded streaming hash path usable in development builds as well.
+[profile.dev.package.sha2]
+opt-level = 3

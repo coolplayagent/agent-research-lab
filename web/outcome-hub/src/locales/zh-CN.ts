@@ -1,8 +1,8 @@
 /** Simplified Chinese presentation resources. */
 export const messages = {
+  "knowledge.localTargets": "本地知识库",
   "knowledge.duplicateId": "知识库标识已存在，请使用其他标识。",
   "knowledge.saveThenProbe": "请保存后使用知识库卡片的“检查连接”。",
-  "knowledge.advancedConnections": "高级：外部知识服务连接",
   "knowledge.loadFailed": "知识库加载失败，可点击“加载知识库”重试：{error}",
   "knowledge.bindingPrerequisite": "请先添加一个已启用的知识库，再设置默认绑定。",
   "knowledge.empty": "尚未添加知识库。点击“添加 Git 仓库”或“添加目录”开始配置。",
@@ -17,9 +17,6 @@ export const messages = {
   "knowledge.writable": "允许写入（默认只读）",
   "knowledge.addDirectory": "添加目录",
   "knowledge.addGit": "添加 Git 仓库",
-  "knowledge.servicesNote": "管理知识服务的连接与启用状态，再加载该服务的仓库目标。核心协作无需配置知识库即可启动。",
-  "knowledge.services": "知识服务连接",
-  "knowledge.addService": "添加或编辑知识服务连接",
   "services.duplicateId": "服务标识已存在，请使用其他标识。",
   "bindings.noAdapters": "请先添加执行适配器。前往：",
   "bindings.noPeople": "尚未创建数字人，请点击“创建数字人”，创建后会自动选中。",

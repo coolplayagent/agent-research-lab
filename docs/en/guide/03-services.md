@@ -26,10 +26,30 @@ store does not clone, create branches, commit, publish, or create a default bind
 
 The Linux local package includes the optional `outcome-hub-knowledge` executable.
 The host starts it on demand with private state and cleans it up on shutdown. Core
-collaboration still starts without it. Externally managed knowledge connections
-remain available under advanced connections and are never silently taken over.
+collaboration still starts without it. Knowledge settings accept only this host-managed
+service; external knowledge service connections are no longer configurable or usable.
+On upgrade, the registry backs up its configuration and removes external knowledge
+connections and their current default bindings. Historical outcomes, receipts,
+local connections and knowledge files are preserved.
 After adding a store, select default bindings explicitly when needed. Legacy
 research adapters retain their original evidence pins and gates.
+
+Directory targets exclude `.git` and `.outcomehub` at every level and apply only
+`.gitignore` files inside the selected content root. Machine-wide ignore files
+are not read. Large attachments participate in version calculation through a
+64 KiB streaming SHA-256 buffer; fetching text still has a 1 MiB response limit.
+The whole operation is bounded to 65,536 directory entries, 8 GiB of input across
+all scan passes, 32 directory levels and 45 seconds. `.gitignore` files have at
+most 4096 lines of 4096 bytes each and the existing 1 MiB document bound. SHA-256
+is optimized in development builds to keep large snapshots within this deadline.
+The same exclusions apply to reads and publication destinations. Symlinks,
+special files, traversal and changes during scanning fail explicitly.
+
+Directory revisions use `directory-v2:` to distinguish the content/ignore policy
+from the old unfiltered snapshot. Old revision preconditions require a new preview;
+historical receipts are not rewritten. Errors contain stable codes and structured
+path/size/limit parameters, rendered by frontend locale resources.
+
 
 ## Advanced deployment
 

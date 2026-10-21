@@ -1,6 +1,6 @@
 use super::*;
 #[test]
-fn managed_knowledge_paths_are_private_and_external_connections_remain_external() {
+fn managed_knowledge_paths_are_private_and_external_connections_are_rejected() {
     let state = tempfile::tempdir().unwrap();
     let mut config = Configuration::defaults(state.path());
     let mut service = OutcomeService {
@@ -15,7 +15,7 @@ fn managed_knowledge_paths_are_private_and_external_connections_remain_external(
         max_seconds: 120,
     };
     config.outcome_services.push(service.clone());
-    assert!(validate_locations(&config, state.path()).is_ok());
+    assert!(validate_locations(&config, state.path()).is_err());
     service.management = ServiceManagement::LocalManaged;
     config.outcome_services = vec![service.clone()];
     assert!(validate_locations(&config, state.path()).is_err());

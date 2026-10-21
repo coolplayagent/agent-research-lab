@@ -32,12 +32,15 @@ pub struct Reply {
     pub error_os_code: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_private_details: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_knowledge: Option<contracts::KnowledgeError>,
 }
 #[derive(Debug)]
 pub struct RemoteError {
     pub message: String,
     pub os_code: Option<i32>,
     pub private_details: Option<String>,
+    pub knowledge_error: Option<contracts::KnowledgeError>,
 }
 impl std::fmt::Display for RemoteError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -81,6 +84,18 @@ pub fn private_details(error: &anyhow::Error) -> Option<String> {
         })
         .map(|s| s.chars().take(8192).collect())
 }
+pub fn knowledge_error(error: &anyhow::Error) -> Option<contracts::KnowledgeError> {
+    error.chain().find_map(|cause| {
+        cause
+            .downcast_ref::<contracts::KnowledgeError>()
+            .cloned()
+            .or_else(|| {
+                cause
+                    .downcast_ref::<RemoteError>()
+                    .and_then(|e| e.knowledge_error.clone())
+            })
+    })
+}
 impl Reply {
     pub fn from_result(result: Result<serde_json::Value>) -> Self {
         match result {
@@ -90,6 +105,7 @@ impl Reply {
                 error: None,
                 error_os_code: None,
                 error_private_details: None,
+                error_knowledge: None,
             },
             Err(error) => Self {
                 protocol_version: VERSION,
@@ -97,6 +113,7 @@ impl Reply {
                 error: Some(error.to_string().chars().take(1000).collect()),
                 error_os_code: os_code(&error),
                 error_private_details: private_details(&error),
+                error_knowledge: knowledge_error(&error),
             },
         }
     }
@@ -109,6 +126,7 @@ impl Reply {
             return Err(RemoteError {
                 message: format!("service request failed: {error}"),
                 os_code: self.error_os_code,
+                knowledge_error: self.error_knowledge,
                 private_details: self
                     .error_private_details
                     .map(|s| s.chars().take(8192).collect()),
