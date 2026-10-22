@@ -66,6 +66,7 @@ const config={revision:1,services:[{id:'executor',kind:contracts.ServiceKind.Exe
   fields['services.sandbox'].value='';await assert.rejects(submit(),/noSandbox/);
   const html=fs.readFileSync(path.join(root,'web/outcome-hub/index.html'),'utf8');
   assert(html.includes('id="advanced-settings"'));
+  assert(html.includes('<div id="adapter-list"></div>'));
   assert(!html.includes('id="advanced-settings" open'));
   assert(!html.includes('data-settings-panel="scenarios"'));
   assert(!html.includes('data-setting="scenarios"'));
@@ -100,6 +101,7 @@ const config={revision:1,services:[{id:'executor',kind:contracts.ServiceKind.Exe
   await latestBox.form.onsubmit({preventDefault(){}});await flush();
   assert(latestBox.dialog.closed);
   assert.equal(calls.filter(c=>c.body).length,1);
+  assert.equal(container.children[0].className,'cards');
   assert.equal(container.children.at(-1).className,'binding-progress-list','Logs follow all adapter controls');
   await nodes(container).find(n=>n.textContent==='adapterTest.cancel').onclick();
   assert(calls.at(-1).url.endsWith('/test-id/cancel'));

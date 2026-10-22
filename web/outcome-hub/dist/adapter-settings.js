@@ -12,6 +12,7 @@ export function renderAdapters(config, save, refresh) {
     const render = ++generation, container = get("adapter-list");
     container.replaceChildren();
     const cards = element("div"), status = element("p"), progress = element("div");
+    cards.className = "cards";
     status.setAttribute("role", "status");
     progress.setAttribute("aria-live", "polite");
     progress.className = "binding-progress-list";

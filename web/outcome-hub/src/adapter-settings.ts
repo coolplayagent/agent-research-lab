@@ -14,6 +14,7 @@ export function renderAdapters(config: Configuration, save: (value: Configuratio
   const render = ++generation, container = get("adapter-list");
   container.replaceChildren();
   const cards = element("div"), status = element("p"), progress = element("div");
+  cards.className = "cards";
   status.setAttribute("role", "status");
   progress.setAttribute("aria-live", "polite"); progress.className = "binding-progress-list";
   const heading = element("h3", t("adapterTest.logs")); heading.hidden = true;
