@@ -22,7 +22,7 @@ fn storage_source(root: &Path, version: u64) -> std::path::PathBuf {
 }
 #[tokio::test]
 async fn every_storage_version_preserves_messages_identity_and_cursors() {
-    for version in 1..=8 {
+    for version in 1..=9 {
         let temp = tempfile::tempdir().unwrap();
         let source = storage_source(temp.path(), version);
         let before = inventory(&source).unwrap();
@@ -146,4 +146,21 @@ fn old_directory_conflicts_and_unknown_fields_are_not_silently_dropped() {
     .unwrap();
     assert!(convert(&source, &temp.path().join("target")).is_err());
     let _: Value = storage::read(&source.join("jobs/legacy-task.json")).unwrap();
+}
+
+#[test]
+fn previously_migrated_storage_can_upgrade_without_overwriting_its_source() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = storage_source(temp.path(), 8);
+    fs::write(source.join(MANIFEST), "previous offline migration receipt").unwrap();
+    let original = inventory(&source).unwrap();
+    inspect(&source).unwrap();
+    let target = temp.path().join("upgraded");
+    let manifest = convert(&source, &target).unwrap();
+    assert_eq!(original, inventory(&source).unwrap());
+    assert!(manifest.source_files.contains_key(MANIFEST));
+    assert!(!manifest.target_files.contains_key(MANIFEST));
+    assert!(manifest.converted.contains(&MANIFEST.into()));
+    verify(&source, &target).unwrap();
+    assert!(convert(&target, &temp.path().join("again")).is_err());
 }

@@ -56,7 +56,6 @@ pub(super) fn scenarios(
     let mut scenarios = collaboration_api::default_scenarios().as_ref().clone();
     if let Some(config) = config {
         scenarios.push(Arc::new(super::research_scenario::Research(config.clone())));
-        scenarios.push(Arc::new(super::software_scenario::Software(config.clone())));
     }
     Arc::new(scenarios)
 }

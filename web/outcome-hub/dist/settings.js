@@ -8,7 +8,6 @@ import { t, label } from "./i18n.js";
 import { editService } from "./service-forms.js";
 import { editAdapter } from "./adapter-forms.js";
 import { renderAdapters } from "./adapter-settings.js";
-import { renderExecutionStatus } from "./execution-status.js";
 import { element, select, field } from "./forms.js";
 import { busy } from "./feedback.js";
 let current;
@@ -41,7 +40,6 @@ async function save(config) {
 function render(view) {
     const config = view.configuration;
     current = view;
-    renderExecutionStatus(view, directory, () => loadServices(true));
     renderKnowledgeSettings(view, save, () => loadServices(true));
     get("services-status").textContent = view.restart_required
         ? t("services.restart")
@@ -110,7 +108,6 @@ function render(view) {
     };
     renderBindings(config, directory, save, () => loadServices(true), people => {
         directory = people;
-        renderExecutionStatus(view, directory, () => loadServices(true));
     });
 }
 export async function loadServices(force = false) {

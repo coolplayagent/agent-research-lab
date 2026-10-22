@@ -16,12 +16,9 @@ import {
   field,
 } from "./forms.js";
 import type { Directory, Group } from "./types.js";
-import type { Goal } from "./goal-types.js";
 import type {
   Topic,
   Subject,
-  EvolutionInput,
-  EvolutionRow,
 } from "./research-types.js";
 const save = (value: unknown) =>
   api("/api/v1/collaboration/coordination", value, "manage-research");
@@ -117,79 +114,6 @@ export function subjectForm(
         revision: old?.revision || 0,
       },
     });
-    await done();
-  });
-}
-export async function nodeForm(
-  subject: Subject,
-  group: string,
-  nodes: EvolutionRow[],
-  done: () => Promise<void>,
-): Promise<void> {
-  const goals: Goal[] = [];
-  let after = "";
-  do {
-    const page = await api<{ goals: Goal[]; next_after: string | null }>(
-      "/api/v1/collaboration/goals?" + query({ group_id: group, after }),
-    );
-    goals.push(...page.goals);
-    after = page.next_after || "";
-  } while (after && goals.length < 4096);
-  const box = dialog(t("research.nodeForm")),
-    id = input("version-" + uuid()),
-    version = input(""),
-    reference = input(subject.reference),
-    goal = select(
-      [
-        ["", t("research.unassessed")],
-        ...goals.map((g) => [g.input.id, g.input.title] as [string, string]),
-      ],
-      "",
-    ),
-    parents = area("");
-  for (const node of [id, version, reference]) node.required = true;
-  const available = nodes.filter((n) => n.subject.id === subject.id);
-  parents.placeholder = available
-    .slice(-4)
-    .map((n) => n.node.input.id)
-    .join("\n");
-  box.form.append(
-    element("p", subject.name),
-    field(t("research.id"), id),
-    field(t("research.version"), version),
-    field(t("research.reference"), reference),
-    field(t("research.parents"), parents),
-    element("p", t("research.parentsNote")),
-    field(t("research.goal"), goal),
-    element("p", t("research.evidenceNote")),
-  );
-  const pins = {
-    source: input(""),
-    prompt: input(""),
-    policy: input(""),
-    superpod: input(""),
-  };
-  for (const [key, node] of Object.entries(pins))
-    box.form.append(field(t("research.pin." + key), node));
-  finish(box, async () => {
-    const input: EvolutionInput = {
-      id: id.value.trim(),
-      subject_id: subject.id,
-      parents: parents.value
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      version: version.value.trim(),
-      reference: reference.value.trim(),
-      goal_id: goal.value || null,
-      pins: {
-        source: pins.source.value.trim() || null,
-        prompt: pins.prompt.value.trim() || null,
-        policy: pins.policy.value.trim() || null,
-        superpod: pins.superpod.value.trim() || null,
-      },
-    };
-    await save({ operation: "node", node: input });
     await done();
   });
 }

@@ -7,7 +7,6 @@ mod design_review;
 pub mod execution;
 mod execution_input;
 mod goals;
-pub mod iteration;
 mod knowledge;
 mod scenarios;
 mod services;

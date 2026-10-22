@@ -4,7 +4,7 @@
 
 ## Groups and temporary conversations
 
-The workspace has independently scrolling directory, chat and research columns. Research tabs show the crystal, version evolution, goals and members. Panels collapse on narrow screens; widths support pointer and keyboard adjustment.
+The workspace has independently scrolling directory, chat and research columns. Research tabs show the crystal, goals and members. Panels collapse on narrow screens; widths support pointer and keyboard adjustment.
 
 Managed groups support creation, search/pagination, title/topic edits, membership, pinning, archival and restoration. DMs and temporary conversations only require selecting people, have no required name and do not expire. Expanding the audience creates a new conversation, with no history or all history (up to 10,000 messages); the API also accepts a starting sequence. The old conversation stays intact; copied replies are remapped atomically.
 

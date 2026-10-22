@@ -25,13 +25,10 @@ mod operator;
 mod personas;
 mod profiles;
 mod research_campaign;
-mod research_lineage;
 mod research_process;
 mod research_scenario;
 mod resources;
 mod sessions;
-mod software_delivery;
-mod software_scenario;
 mod transport;
 
 const MAX_JOBS: usize = 512;
@@ -310,13 +307,6 @@ pub fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<Value> 
                     async move { supervisor_registry.supervise(supervisor_shutdown).await },
                 );
             let scenarios = transport::scenarios(web.config.as_ref());
-            let iterations = tokio::spawn(collaboration_api::iteration::run_with_registry(
-                web.hub.clone(),
-                scenarios.clone(),
-                Some(services.clone()),
-                max_seconds,
-                shutdown.subscribe(),
-            ));
             let execution = tokio::spawn(collaboration_api::execution::run_with_scenarios(
                 web.hub.clone(),
                 services.clone(),
@@ -343,8 +333,6 @@ pub fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<Value> 
             )
             .await;
             execution.abort();
-            iterations.abort();
-            let _ = iterations.await;
             let _ = execution.await;
             let _ = scenario.await;
             supervisor.abort();

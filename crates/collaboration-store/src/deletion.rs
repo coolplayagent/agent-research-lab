@@ -21,7 +21,7 @@ fn ids(db: &Connection, sql: &str, id: &str) -> Result<Vec<String>> {
 fn topic_references(db: &Connection, id: &str) -> Result<Vec<String>> {
     ids(
         db,
-        "SELECT id FROM research_nodes WHERE subject_id IN (SELECT id FROM research_subjects WHERE topic_id=?1) UNION SELECT goal_id FROM outcome_paths WHERE topic_id=?1 UNION SELECT id FROM outcomes WHERE topic_id=?1 LIMIT 100",
+        "SELECT goal_id FROM outcome_paths WHERE topic_id=?1 UNION SELECT id FROM outcomes WHERE topic_id=?1 LIMIT 100",
         id,
     )
 }
@@ -70,7 +70,7 @@ impl Store {
                 }
                 let active = ids(
                     &tx,
-                    "SELECT id FROM goals WHERE group_id=?1 AND active=1 UNION SELECT id FROM evolution_runs WHERE group_id=?1 AND active=1 LIMIT 100",
+                    "SELECT id FROM goals WHERE group_id=?1 AND active=1 LIMIT 100",
                     id,
                 )?;
                 if !active.is_empty() {
@@ -78,7 +78,7 @@ impl Store {
                 }
                 let mut refs = ids(
                     &tx,
-                    "SELECT id FROM evolution_runs WHERE group_id=?1 UNION SELECT goal_id FROM research_nodes WHERE goal_id IN (SELECT id FROM goals WHERE group_id=?1) UNION SELECT goal_id FROM research_assessments WHERE goal_id IN (SELECT id FROM goals WHERE group_id=?1) UNION SELECT goal_id FROM outcome_paths WHERE goal_id IN (SELECT id FROM goals WHERE group_id=?1) UNION SELECT id FROM outcomes WHERE goal_id IN (SELECT id FROM goals WHERE group_id=?1) LIMIT 100",
+                    "SELECT goal_id FROM outcome_paths WHERE goal_id IN (SELECT id FROM goals WHERE group_id=?1) UNION SELECT id FROM outcomes WHERE goal_id IN (SELECT id FROM goals WHERE group_id=?1) LIMIT 100",
                     id,
                 )?;
                 let historical = tx.prepare("SELECT DISTINCT json_extract(event,'$.goal_id') FROM messages WHERE group_id=?1 AND json_extract(event,'$.kind') IN (?2,?3) LIMIT 100")?.query_map(params![id, contracts::GoalEventKind::Submitted.as_str(), contracts::GoalEventKind::Failed.as_str()], |row| row.get::<_, String>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;

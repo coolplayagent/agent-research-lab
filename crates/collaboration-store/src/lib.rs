@@ -8,7 +8,6 @@ mod directory;
 mod goal_work;
 mod goals;
 mod groups;
-mod iteration;
 mod metrics;
 mod outcomes;
 mod schema;
@@ -36,7 +35,6 @@ pub(crate) enum Control {
         credential: Option<String>,
         command: Box<OutcomeCommand>,
     },
-    Evolution(iteration::IterationCommand),
     Research(coordination::ResearchCommand),
     Goal(goals::GoalCommand),
     #[cfg(test)]

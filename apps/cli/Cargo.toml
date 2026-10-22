@@ -12,7 +12,6 @@ service_api.workspace = true
 service_protocol.workspace = true
 serde.workspace = true
 outcome_hub_console.workspace = true
-software_delivery.workspace = true
 
 collaboration_host.workspace = true
 tokio.workspace = true

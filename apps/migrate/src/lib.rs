@@ -1,6 +1,7 @@
 //! Offline conversion. The source is immutable, and only a fully verified copy is published.
 mod database;
 mod records;
+mod retirement;
 mod snapshot;
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
@@ -21,13 +22,27 @@ pub struct Manifest {
 fn identity(files: &BTreeMap<String, String>) -> Result<String> {
     Ok(storage::digest(&serde_json::to_vec(files)?))
 }
+fn require_upgrade(source: &Path, files: &BTreeMap<String, String>) -> Result<()> {
+    if files.contains_key(MANIFEST) {
+        let mut needed = false;
+        for name in files.keys().filter(|name| {
+            Path::new(name)
+                .file_name()
+                .is_some_and(|n| n == "messages.sqlite")
+        }) {
+            needed |= database::needs_upgrade(&source.join(name))?;
+        }
+        ensure!(needed, "source is already migrated");
+    }
+    Ok(())
+}
 pub fn inspect(source: &Path) -> Result<BTreeMap<String, String>> {
     let _offline = Offline::open(source)?;
     let files = inventory(source)?;
-    ensure!(!files.contains_key(MANIFEST), "source is already migrated");
     // Exercise exactly the conversion and validation path in a disposable copy.
     let temp = tempfile::tempdir()?;
     snapshot::copy(source, temp.path(), &files)?;
+    require_upgrade(temp.path(), &files)?;
     convert_copy(temp.path(), &files)?;
     ensure!(
         inventory(source)? == files,
@@ -46,6 +61,12 @@ fn convert_copy(root: &Path, files: &BTreeMap<String, String>) -> Result<Vec<Str
         changed.push(name.clone());
     }
     records::convert(root, files, &mut changed)?;
+    if files.contains_key(MANIFEST) {
+        // A new manifest binds the untouched source (including the old manifest)
+        // and the upgraded copy. The runtime source has not been modified.
+        fs::remove_file(root.join(MANIFEST))?;
+        changed.push(MANIFEST.into());
+    }
     Ok(changed)
 }
 pub fn convert(source: &Path, destination: &Path) -> Result<Manifest> {
@@ -61,11 +82,11 @@ pub fn convert(source: &Path, destination: &Path) -> Result<Manifest> {
         "destination must be outside source"
     );
     let files = inventory(source)?;
-    ensure!(!files.contains_key(MANIFEST), "source is already migrated");
     let temp = tempfile::Builder::new()
         .prefix(".outcome-hub-migrate-")
         .tempdir_in(&parent)?;
     snapshot::copy(source, temp.path(), &files)?;
+    require_upgrade(temp.path(), &files)?;
     let converted = convert_copy(temp.path(), &files)?;
     ensure!(
         inventory(source)? == files,

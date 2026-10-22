@@ -21,7 +21,7 @@ tar -xzf bazel-bin/local-package.tar.gz -C /absolute/private/outcome-hub-install
 
 直接打开 `http://127.0.0.1:4877/` 进入工作空间，无需管理登录。状态跨重启保留。服务只接受回环地址；本地访问边界见[运维指南](07-operations.md)。长期运行可使用 `-c opt` 优化构建。
 
-完整包包含核心、独立存储、执行环境、Agent bridge 和知识服务。新工作空间无需填写服务地址；在“设置 → 本机环境”查看状态或一键准备执行环境。基础聊天启动不需要 Agent 登录。已有部署继续使用原配置与数据；单独运行开发版核心需显式加 `--embedded-development`。Windows 安装见 [Windows 指南](10-windows.md)。
+完整包包含核心、独立存储、执行环境、Agent bridge 和知识服务。新工作空间无需填写服务地址；首次验证数字人或执行任务时自动准备执行环境。基础聊天启动不需要 Agent 登录。已有部署继续使用原配置与数据；单独运行开发版核心需显式加 `--embedded-development`。Windows 安装见 [Windows 指南](10-windows.md)。
 
 ## 第一个协作群
 

@@ -276,8 +276,5 @@ mod goal_tests;
 #[path = "coordination_tests.rs"]
 mod coordination_tests;
 
-#[path = "iteration_tests.rs"]
-mod iteration_tests;
-
 #[path = "outcome_tests.rs"]
 mod outcome_tests;

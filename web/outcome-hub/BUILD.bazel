@@ -37,11 +37,6 @@ node_test(
     script = "bootstrap-tests.cjs",
     data = [":policy_sources"],
 )
-node_test(
-    name = "iteration_tests",
-    script = "iteration-tests.cjs",
-    data = [":policy_sources", "//web/shared:policy_sources"],
-)
 
 load("@rules_rust//rust:defs.bzl", "rust_library")
 exports_files(["Cargo.toml"])
@@ -49,11 +44,6 @@ rust_library(name = "outcome_hub_web", srcs = ["src/lib.rs"], deps = ["//web/sha
 node_test(
     name = "settings_tests",
     script = "settings-tests.cjs",
-    data = [":policy_sources", "//web/shared:policy_sources"],
-)
-node_test(
-    name = "runtime_tests",
-    script = "runtime-tests.cjs",
     data = [":policy_sources", "//web/shared:policy_sources"],
 )
 

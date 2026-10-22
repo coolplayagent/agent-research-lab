@@ -118,11 +118,10 @@ pub async fn run_with_scenarios(
         tokio::select! {_=stop.changed()=>break,Some(result)=tasks.join_next(),if !tasks.is_empty()=>{if let Ok(key)=result{running.remove(&key);}},_=interval.tick()=>{
          let config=registry.configuration();if config.bindings.is_empty(){continue;}
          let Ok(scenarios)=crate::scenarios::configured(&scenarios,Some(registry.as_ref()))else{continue};
-         let suspended=match crate::iteration::suspended_goals(&hub).await{Ok(goals)=>goals,Err(_)=>continue};
          let mut after=String::new();
          'pages: while let Ok(page)=hub.goals("","",&after,true).await {
           let goals:Vec<Goal>=serde_json::from_value(page["goals"].clone()).unwrap_or_default();
-          for goal in goals{if suspended.contains(&goal.input.id){continue;}let Some(scenario)=scenarios.iter().find(|scenario|scenario.descriptor().id==goal.input.scenario && scenario.uses_agent_protocol())else{continue};for work in &goal.work {if tasks.len()>=4{break 'pages;}let key=(goal.input.id.clone(),work.id.clone(),work.attempt);if work.state!=WorkState::Ready || running.contains(&key) || !config.bindings.contains_key(&work.person_id) || !scenario.assignment_ready(&goal,work){continue;}
+          for goal in goals{let Some(scenario)=scenarios.iter().find(|scenario|scenario.descriptor().id==goal.input.scenario && scenario.uses_agent_protocol())else{continue};for work in &goal.work {if tasks.len()>=4{break 'pages;}let key=(goal.input.id.clone(),work.id.clone(),work.attempt);if work.state!=WorkState::Ready || running.contains(&key) || !config.bindings.contains_key(&work.person_id) || !scenario.assignment_ready(&goal,work){continue;}
            running.insert(key.clone());let hub=hub.clone();let config=config.clone();let scenario=scenario.clone();let work=work.clone();let goal=goal.clone();tasks.spawn(async move {let _=advance(hub,config,scenario,goal,work,remaining).await;key});
           }}
           match page["next_after"].as_str(){Some(next)=>after=next.into(),None=>break}

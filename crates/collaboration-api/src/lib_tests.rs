@@ -469,9 +469,6 @@ async fn canonical_routes_preserve_operator_and_actor_authority() {
 #[path = "goal_tests.rs"]
 mod goal_tests;
 
-#[path = "iteration_tests.rs"]
-mod iteration_tests;
-
 #[path = "outcome_tests.rs"]
 mod outcome_tests;
 
@@ -518,5 +515,53 @@ async fn deletion_requires_host_intent_and_preserves_old_message_wire_shape() {
     let history: Value = serde_json::from_str(&history).unwrap();
     assert_eq!(history["messages"][0]["deleted"], true);
     assert_eq!(history["messages"][0]["text"], "");
+    h.close().await;
+}
+
+#[tokio::test]
+async fn retired_pages_and_mutations_are_unavailable() {
+    let h = Harness::new().await;
+    for path in [
+        "/api/v1/collaboration/evolution",
+        "/api/v1/collaboration/iterations",
+        "/assets/evolution.js",
+        "/assets/iterations.js",
+        "/assets/execution-status.js",
+    ] {
+        assert_eq!(h.request(path, None, true, None).await.0, 404, "{path}");
+        assert_eq!(
+            h.request(path, Some(json!({})), true, None).await.0,
+            404,
+            "{path}"
+        );
+    }
+    for operation in ["node", "assessment"] {
+        let (status, body) = h
+            .request_intent(
+                "/api/v1/collaboration/coordination",
+                Some(json!({"operation":operation})),
+                true,
+                None,
+                "manage-research",
+            )
+            .await;
+        assert_eq!(status, 400);
+        let body: Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(
+            body["code"],
+            contracts::ApiErrorCode::InvalidRequest.as_str()
+        );
+    }
+    let (_, page) = h.request("/", None, true, None).await;
+    for retired in [
+        "evolution-page",
+        "iterations-page",
+        "topic-open-graph",
+        "settings/status",
+        "execution-status",
+        "id=\"metrics\"",
+    ] {
+        assert!(!page.contains(retired), "retired markup: {retired}");
+    }
     h.close().await;
 }

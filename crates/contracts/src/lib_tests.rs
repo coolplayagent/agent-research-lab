@@ -18,7 +18,7 @@ fn wire_values_roundtrip_and_reject_unknown_states() {
 }
 
 #[test]
-fn installation_journal_values_remain_distinct_from_service_activation() {
+fn installation_journal_preserves_wire_values() {
     let legacy = [
         "staged",
         "previous_backed_up",
@@ -33,7 +33,6 @@ fn installation_journal_values_remain_distinct_from_service_activation() {
     }
     assert!(InstallationPhase::parse("active").is_err());
     assert!(InstallationPhase::parse("future_phase").is_err());
-    assert!(ActivationPhase::parse("activated").is_err());
 }
 
 #[test]

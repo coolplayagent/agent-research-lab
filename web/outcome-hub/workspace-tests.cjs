@@ -265,8 +265,6 @@ const deferred = () => {
   projectedGoal.revision = 2;
   projectedGoal.work[0].state = contracts.WorkState.Running;
   projectedGoal.work[0].deadline_ms = Date.now() + 60000;
-  goalPages.first.goals[0].iteration_id = "owned-iteration";
-  let focusedIteration = "";
   let holdGoals = null;
   let failCurrent = false, failHistory = false;
   let scheduledRefreshes = 0;
@@ -274,7 +272,6 @@ const deferred = () => {
     "./goal-selection.js": goalSelection, "./task-progress.js": progressModule,
     "/assets/shared/contracts.js":contracts, "./i18n.js":{...i18n,t:(key,params)=>key+(params?JSON.stringify(params):""),label:(_type,value)=>value}, "./dom.js":dom,
     "./people.js":{display:id=>id}, "./workspace.js":{revealResearch:()=>{}}, "./contribution-text.js": { contributionText },
-    "./iterations.js":{focusIteration:async id=>{ focusedIteration=id; }},
     "./api.js":{query:p=>new URLSearchParams(p).toString(),api:async url=>{
       if (holdGoals) return holdGoals.promise;
       const fields = new URL(url,"http://local").searchParams;
@@ -290,10 +287,6 @@ const deferred = () => {
   assert(get("goal-summary").textContent.includes("progress.running"));
   const secondCard = get("goal-list").children[1]; secondCard.open = true;
   const allText = node => [node.textContent, ...node.children.map(allText)].join(" ");
-  assert(!allText(secondCard).includes("goals.bd7dd17c34"), "Iteration-owned work cannot be retried through ordinary goal controls");
-  assert(!allText(secondCard).includes("goals.9a341c73e2"), "Iteration-owned goals cannot bypass candidate acceptance");
-  await secondCard.children.at(-1).onclick();
-  assert.equal(focusedIteration,"owned-iteration");
   secondCard.querySelectorAll("[data-evidence-key]")[0].open = true;
   await goals.loadGoals();
   assert.equal(goals.goalSnapshot().length,3,"Refresh retains loaded pages plus the current projection");
@@ -509,7 +502,6 @@ const deferred = () => {
   const pending = new Map();
   const chosen = [];
   const streams = [];
-  let graphRefreshes = 0, iterationRefreshes = 0;
   class Stream {
     constructor() {
       this.handlers = {};
@@ -555,8 +547,6 @@ const deferred = () => {
         suspendGoals: () => {},
         loadGoals: async () => {},
       },
-      "./evolution.js": { selectEvolution: () => {}, refreshEvolution: () => graphRefreshes++ },
-      "./iterations.js": { selectIterations: () => {}, refreshIterations: () => iterationRefreshes++ },
       "./mentions.js": { selectMentions: () => {} },
       "./collaboration.js": {
         selectCollaboration: () => {},
@@ -575,11 +565,7 @@ const deferred = () => {
   assert.deepEqual(chosen, ["b"]);
   assert.equal(streams.length, 1);
   streams[0].handlers.status({ data: JSON.stringify({ group: b, metrics: {} }) });
-  assert.equal(graphRefreshes, 1, "Goal-only changes must refresh graph assessment states even without catalog changes");
-  assert.equal(iterationRefreshes, 1);
   streams[0].onopen();
-  assert.equal(graphRefreshes, 2, "Reconnect catches missed version changes");
-  assert.equal(iterationRefreshes, 2);
   const again = conversation.select(b);
   await again;
   assert.equal(

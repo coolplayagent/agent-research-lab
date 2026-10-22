@@ -68,27 +68,8 @@ and management writes still require their intent headers. To expose the workspac
 to other computers, provide a separately secured access layer; do not bind this
 unauthenticated service directly to a network interface.
 
-## Storage migration and interrupted activation
+## Storage migration
 
-Collaboration storage schema v6 adds iteration records, request identities,
-goal bindings and immutable research assessments. The storage service remains the
-only writer and applies the additive migration when it starts. Prepare and back up
-its data before changing the storage deployment. The four-service rollout checks
-the new and previous storage binaries against a disposable data copy before
-changing live unit definitions; incompatible migration/rollback compatibility
-blocks the rollout. It never substitutes another database to make a check pass.
+Storage accepts schema 9. Use `outcome-hub-migrate` on an offline copy before changing the storage deployment; a running service never upgrades its database. Schema 9 removes version nodes, assessments and iteration storage. Deploy the matching core and storage binaries together.
 
-If an activation stops after durable admission, inspect its private operation
-directory and run:
-
-```sh
-outcome-hub-cli software-activation-reconcile <operation-dir>
-```
-
-This command checks the actual service health, loaded configuration and executable
-hashes against the saved installation proof. It produces a receipt bound to the
-operation and activation claim only when the candidate or previous installation
-can be verified. The delivery coordinator then settles that receipt through the
-storage API. An uncertain installation remains pending; elapsed time alone does
-not unlock pause/stop or claim success. Reconciliation does not replay deployment,
-change service configuration or edit the collaboration database.
+The upgrade deletes iteration-owned goals (all rounds), retired software-evolution goals, and their result/outcome records. It erases the body and event payload of their system messages while preserving message identities, replies and cursors. Independent goals and chat are checked for byte preservation. Independent outcomes that reference retired evidence block migration for explicit resolution. An earlier migration manifest is replaced only on the prepared copy; its source digest remains recorded.

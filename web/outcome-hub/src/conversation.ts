@@ -1,14 +1,12 @@
 import { deleteObject } from "./deletion.js";
 import { syncControls } from "./workspace.js";
 import { selectMentions } from "./mentions.js";
-import { selectEvolution, refreshEvolution } from "./evolution.js";
-import { selectIterations, refreshIterations } from "./iterations.js";
 import { selectCollaboration, refreshCollaboration } from "./collaboration.js";
 import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { api, change, query } from "./api.js";
 import { close, get, notice, open, value } from "./dom.js";
-import { loadGroups, metrics, setSelected } from "./directory.js";
+import { loadGroups, setSelected } from "./directory.js";
 import {
   incoming,
   resetMessages,
@@ -47,7 +45,6 @@ export function renderHeader(group: Group): void {
     ? t("conversation.cbe48cfa3a")
     : t("conversation.5292ab1a36");
   get<HTMLButtonElement>("new-goal").disabled = group.archived;
-  selectIterations(group);
   updateComposer(group);
 }
 export async function select(group: Group): Promise<void> {
@@ -59,8 +56,6 @@ export async function select(group: Group): Promise<void> {
   }
   suspendMessages();
   suspendGoals();
-  selectEvolution(group.id);
-  selectIterations(null);
   selectCollaboration(null);
   selectMentions("");
   const request = ++generation;
@@ -107,11 +102,8 @@ export async function select(group: Group): Promise<void> {
       const changed = current?.revision !== status.group.revision;
       current = status.group;
       renderHeader(current);
-      metrics(status.metrics);
       void loadGoals();
       refreshCollaboration();
-      refreshEvolution();
-      refreshIterations();
       if (changed) {
         void loadGroups();
         if (current.kind === GroupKind.Board) void api<GroupView>("/api/v1/messaging/view?" + query({ group_id: current.id })).then(page => {
@@ -127,8 +119,6 @@ export async function select(group: Group): Promise<void> {
       if (request === generation) {
         get("connection").textContent = t("conversation.021bd7f674");
         void loadGoals();
-        refreshEvolution();
-        refreshIterations();
       }
     };
     stream.addEventListener("fault", () => {
@@ -152,7 +142,7 @@ export async function refreshCurrent(): Promise<void> {
 export function clearConversation(): void {
   generation++; openGeneration++; stream?.close(); stream = null;
   suspendMessages(); suspendGoals(); current = null; setSelected("");
-  selectEvolution(""); selectIterations(null); selectCollaboration(null); selectMentions("");
+  selectCollaboration(null); selectMentions("");
   get("messages").replaceChildren();
   get("active-conversation").hidden = true; get("empty-conversation").hidden = false;
 }

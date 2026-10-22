@@ -47,6 +47,14 @@ const STEPS: &[(u64, &str)] = &[
     (8, "BEGIN IMMEDIATE;
           ALTER TABLE actors ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
           UPDATE crystal_meta SET value=8 WHERE key='schema'; COMMIT;"),
+    (9, "BEGIN IMMEDIATE;
+          DROP TABLE research_assessments;
+          DROP TABLE research_edges;
+          DROP TABLE research_nodes;
+          DROP TABLE evolution_requests;
+          DROP TABLE evolution_goal_bindings;
+          DROP TABLE evolution_runs;
+"),
 ];
 fn upgrade(connection: &Connection) -> Result<()> {
     let version: u64 = connection.query_row(
@@ -55,12 +63,17 @@ fn upgrade(connection: &Connection) -> Result<()> {
         |r| r.get(0),
     )?;
     ensure!(
-        (1..=8).contains(&version),
+        (1..=9).contains(&version),
         "unsupported collaboration schema"
     );
     for (next, sql) in STEPS {
         if version < *next {
             connection.execute_batch(sql)?;
+            if *next == 9 {
+                connection.execute_batch(crate::retirement::ERASE)?;
+                connection
+                    .execute_batch("UPDATE crystal_meta SET value=9 WHERE key='schema'; COMMIT;")?;
+            }
         }
     }
     Ok(())
@@ -71,6 +84,10 @@ pub(crate) fn fixture_version(connection: &Connection, version: u64) -> Result<(
     for (next, sql) in STEPS {
         if *next <= version {
             connection.execute_batch(sql)?;
+            if *next == 9 {
+                connection
+                    .execute_batch("UPDATE crystal_meta SET value=9 WHERE key='schema'; COMMIT;")?;
+            }
         }
     }
     Ok(())
@@ -120,10 +137,15 @@ fn rows(
 ) -> Result<BTreeMap<String, String>> {
     let mut result = BTreeMap::new();
     for (table, cols) in tables {
-        let selection = cols.iter().map(|c| quoted(c)).collect::<Vec<_>>().join(",");
+        let selection = cols.iter().map(|c| {
+            if table == "messages" && matches!(c.as_str(), "text" | "event") {
+                format!("CASE WHEN sequence IN (SELECT sequence FROM retired_messages) THEN NULL ELSE {} END", quoted(c))
+            } else { quoted(c) }
+        }).collect::<Vec<_>>().join(",");
         let mut query = connection.prepare(&format!(
-            "SELECT {selection} FROM {} ORDER BY {selection}",
-            quoted(table)
+            "SELECT {selection} FROM {} WHERE {} ORDER BY {selection}",
+            quoted(table),
+            crate::retirement::predicate(table)
         ))?;
         let mut cursor = query.query([])?;
         use sha2::{Digest, Sha256};
@@ -165,7 +187,7 @@ pub fn convert(path: &Path) -> Result<()> {
             |r| r.get(0),
         )?;
         ensure!(
-            (1..=8).contains(&version),
+            (1..=9).contains(&version),
             "unsupported database schema {version}"
         );
     } else {
@@ -180,7 +202,13 @@ pub fn convert(path: &Path) -> Result<()> {
             "unrecognized unversioned database"
         );
     }
-    let cols = columns(&connection)?;
+    crate::retirement::prepare(&connection)?;
+    let mut cols = columns(&connection)?;
+    // Schema 9 erases only the prepared iteration scope. Unrelated rows and
+    // message identities remain covered by the preservation digest.
+    for name in RETIRED_TABLES {
+        cols.remove(*name);
+    }
     let before = rows(&connection, &cols)?;
     bootstrap(&connection)?;
     upgrade(&connection)?;
@@ -188,7 +216,8 @@ pub fn convert(path: &Path) -> Result<()> {
         before == rows(&connection, &cols)?,
         "database conversion changed existing rows"
     );
-    connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA journal_mode=DELETE;")?;
+    connection
+        .execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA journal_mode=DELETE; VACUUM;")?;
     drop(connection);
     validate(path)
 }
@@ -199,7 +228,7 @@ pub fn validate(path: &Path) -> Result<()> {
         [],
         |r| r.get(0),
     )?;
-    ensure!(version == 8, "target database is not current");
+    ensure!(version == 9, "target database is not current");
     let integrity: String = connection.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
     ensure!(integrity == "ok", "database integrity failed");
     ensure!(
@@ -219,12 +248,6 @@ pub fn validate(path: &Path) -> Result<()> {
         "goal_assignees",
         "research_topics",
         "research_subjects",
-        "research_nodes",
-        "research_edges",
-        "evolution_runs",
-        "evolution_goal_bindings",
-        "evolution_requests",
-        "research_assessments",
         "outcome_paths",
         "outcomes",
         "outcome_references",
@@ -232,5 +255,46 @@ pub fn validate(path: &Path) -> Result<()> {
     ] {
         connection.prepare(&format!("SELECT * FROM {table} LIMIT 0"))?;
     }
+    for name in RETIRED_TABLES {
+        ensure!(
+            !connection.query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name=?1)",
+                [name],
+                |r| r.get::<_, bool>(0)
+            )?,
+            "retired feature table remains: {name}"
+        );
+    }
     Ok(())
+}
+
+const RETIRED_TABLES: &[&str] = &[
+    "research_nodes",
+    "research_edges",
+    "research_assessments",
+    "evolution_runs",
+    "evolution_goal_bindings",
+    "evolution_requests",
+];
+
+#[cfg(test)]
+#[path = "database_tests.rs"]
+mod tests;
+
+pub(crate) fn needs_upgrade(path: &Path) -> Result<bool> {
+    let db = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let meta: bool = db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='crystal_meta')",
+        [],
+        |r| r.get(0),
+    )?;
+    if !meta {
+        return Ok(true);
+    }
+    let version: u64 = db.query_row(
+        "SELECT value FROM crystal_meta WHERE key='schema'",
+        [],
+        |r| r.get(0),
+    )?;
+    Ok(version < 9)
 }

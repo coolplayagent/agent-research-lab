@@ -30,13 +30,6 @@ pub async fn serve_with_development(
     let (shutdown, _) = tokio::sync::watch::channel(false);
     let mut web = transport::Web::new(hub, addr, shutdown.clone());
     web.services = Some(services.clone());
-    let iterations = tokio::spawn(collaboration_api::iteration::run_with_registry(
-        web.hub.clone(),
-        web.scenarios.clone(),
-        Some(services.clone()),
-        seconds,
-        shutdown.subscribe(),
-    ));
     let supervisor_registry = services.clone();
     let supervisor_shutdown = shutdown.subscribe();
     let supervisor =
@@ -67,8 +60,6 @@ pub async fn serve_with_development(
     )
     .await;
     execution.abort();
-    iterations.abort();
-    let _ = iterations.await;
     let _ = execution.await;
     supervisor.abort();
     let _ = supervisor.await;

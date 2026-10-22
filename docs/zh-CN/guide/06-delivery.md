@@ -43,8 +43,3 @@ GitHub expected-head 前置条件不能原子冻结 base 分支；服务端竞�
 ## 已审查的公开研究输入
 
 经审查的研究输入位于绑定外部知识仓库中的 `knowledge/software/ai-sdlc/insights.md`。新任务要求该文件为已提交的普通文件，并冻结仓库提交和内容摘要；文件缺失时阻止准入，不使用空内容降级。历史证据保留原文，来源绑定过期时重新创建实验。
-
-
-## 软件迭代的验证快照容量
-
-软件 RSI 的私有 `software-delivery.json` 和 `software-activation.json` 各仓库条目可设置 `qualitygate_snapshot_max_file_mib`，仅接受整数 `1..=8`，分别用于候选与合并后源码的完整 Qualitygate 快照采集。省略字段时保持 CLI 默认容量、原策略序列化和摘要；显式配置会改变策略摘要。该容量参数不改变验证范围或验收门禁。应在旧软件轮次和激活操作结算后，成对发布策略并为新轮次冻结新摘要，不能改写旧轮次的摘要来绕过校验。

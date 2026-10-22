@@ -41,7 +41,7 @@ const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" "
       return board;
     } },
     "/assets/shared/contracts.js": contracts, "./dom.js": dom, "./i18n.js": i18n,
-    "./icons.js": { icon: () => new Node("svg") }, "./workspace.js": { revealResearch: () => {} }, "./evolution.js": { loadEvolution: async () => {} }, "./conversation.js": { openGroup: async () => {} },
+    "./icons.js": { icon: () => new Node("svg") }, "./workspace.js": { revealResearch: () => {} }, "./conversation.js": { openGroup: async () => {} },
     "./research-forms.js": { topicForm: async (_old, done) => { editDone = done; }, subjectForm: () => {} },
     "./api.js": { query: params => new URLSearchParams(params).toString(), api: async url => {
       if (url.startsWith("/api/v1/collaboration/topics")) return heldTopics ? heldTopics.promise : { topics: catalog.map(topic => ({ topic, goal_count: 0, subject_count: 1 })), next_after: null };
@@ -57,7 +57,7 @@ const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" "
   catalog = [renamed, b]; await editDone(renamed);
   assert.equal(get("topic-detail-title").textContent, "Renamed topic", "Use the saved topic identity, never search by its obsolete name");
   assert(get("new-subject").disabled);
-  assert(get("subject-list").children[0].children.at(-1).children[1].disabled, "Archived topic edits match backend authority");
+  assert(get("subject-list").children[0].children.at(-1).children[0].disabled, "Archived topic edits match backend authority");
   catalog = [a, b]; await topics.loadTopics();
   heldSubjects = { id: "a", ...pending() };
   const first = get("topic-list").children[0].children.at(-1).children[0].onclick();
@@ -113,7 +113,7 @@ const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" "
   assert(memberIds.includes("researcher")); assert(picker.excluded.has("researcher"));
 
   const workspaceDocument = Object.assign(new EventTarget(), { querySelector: () => null, querySelectorAll: () => [] });
-  const workspace = load(base + "workspace.ts", { "./dom.js": dom, "./i18n.js": i18n, "./evolution.js": { loadEvolution: async () => {} }, "./iterations.js": { loadIterations: async () => {} } }, { document: workspaceDocument, window: new EventTarget(), matchMedia: () => ({ matches: true }) });
+  const workspace = load(base + "workspace.ts", { "./dom.js": dom, "./i18n.js": i18n }, { document: workspaceDocument, window: new EventTarget(), matchMedia: () => ({ matches: true }) });
   workspace.initWorkspace();
   get("workspace").classList.add("research-open", "research-expanded");
   get("toggle-directory").onclick();

@@ -1,10 +1,7 @@
 import type {
   TopicState,
   SubjectKind,
-  EvolutionState,
-  EvolutionOperation,
 } from "/assets/shared/contracts.js";
-import type { Goal } from "./goal-types.js";
 export interface Topic {
   id: string;
   group_id: string;
@@ -28,49 +25,4 @@ export interface TopicRow {
 }
 export interface SubjectRow {
   subject: Subject;
-  node_count: number;
-}
-export interface Pins {
-  source: string | null;
-  prompt: string | null;
-  policy: string | null;
-  superpod: string | null;
-}
-export interface EvolutionInput {
-  id: string;
-  subject_id: string;
-  parents: string[];
-  version: string;
-  reference: string;
-  goal_id: string | null;
-  pins: Pins;
-}
-export interface EvolutionRow {
-  sequence: number;
-  node: { input: EvolutionInput; generation: number; created_ms: number };
-  subject: Subject;
-  topic: Topic;
-  status: EvolutionState;
-  operation: EvolutionOperation;
-  goal: Goal | null;
-  assessment_count?: number;
-  assessments?: {
-    assessment: {
-      input: {
-        id: string;
-        node_id: string;
-        goal_id: string;
-        goal_attempts: Record<string, number>;
-        pins_by_work: Record<string, Pins>;
-      };
-      created_ms: number;
-    };
-    status: EvolutionState;
-    goal_title: string;
-    goal_revision: number;
-  }[];
-}
-export interface GraphPage {
-  nodes: EvolutionRow[];
-  next_after: number | null;
 }

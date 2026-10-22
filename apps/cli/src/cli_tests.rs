@@ -24,3 +24,14 @@ fn summary_is_opt_in_and_only_available_for_status() {
     assert!(Cli::try_parse_from(["lab", "report", "--summary"]).is_err());
     assert!(Cli::try_parse_from(["lab", "run", "--summary"]).is_err());
 }
+
+#[test]
+fn retired_iteration_activation_commands_are_not_available() {
+    for name in [
+        "software-activate",
+        "software-activation-reconcile",
+        "software-activation-worker",
+    ] {
+        assert!(Cli::try_parse_from(["lab", name, "operation"]).is_err());
+    }
+}

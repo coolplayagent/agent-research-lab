@@ -15,10 +15,7 @@ fn assignment<'a>(scope: &Scope, goal: &'a Goal) -> Result<&'a WorkItem> {
     ensure!(
         goal.input.group_id == scope.group_id
             && goal.input.id == scope.goal_id
-            && matches!(
-                goal.input.scenario.as_str(),
-                "research" | "software-evolution"
-            ),
+            && goal.input.scenario == "research",
         "research scope mismatch"
     );
     let work = goal

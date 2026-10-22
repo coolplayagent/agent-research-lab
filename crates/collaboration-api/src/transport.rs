@@ -99,10 +99,6 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
             get(crate::goals::scenarios),
         )
         .route(
-            "/api/v1/collaboration/iterations",
-            get(crate::iteration::list).post(crate::iteration::manage),
-        )
-        .route(
             "/api/v1/collaboration/discussion",
             post(crate::goals::discuss),
         )
@@ -121,10 +117,6 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
         .route(
             "/api/v1/collaboration/subjects",
             get(crate::coordination::subjects),
-        )
-        .route(
-            "/api/v1/collaboration/evolution",
-            get(crate::coordination::graph),
         )
         .route(
             "/api/v1/collaboration/coordination",

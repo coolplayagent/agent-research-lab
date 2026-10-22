@@ -1,7 +1,5 @@
 import { deleteObject } from "./deletion.js";
-import { revealResearch } from "./workspace.js";
 import { outcomeBoard } from "./outcome-board.js";
-import { loadEvolution } from "./evolution.js";
 import { TopicState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
 import { get, el, button, notice, actions } from "./dom.js";
@@ -103,7 +101,7 @@ async function loadSubjects(more = false) {
             edit.disabled = owner.state === TopicState.Archived;
             if (edit.disabled)
                 edit.title = t("layout.archivedTopic");
-            card.append(el("h4", subject.name), el("p", `${label("SubjectKind", subject.kind)} · ${t("research.versions", { p0: row.node_count })}`), el("code", subject.reference), actions(button(t("research.graph"), () => openGraph(owner, subject.id)), edit));
+            card.append(el("h4", subject.name), el("p", label("SubjectKind", subject.kind)), el("code", subject.reference), actions(edit));
             get("subject-list").append(card);
         }
         if (!more && !page.subjects.length)
@@ -143,16 +141,4 @@ export function initTopics() {
             void selectConversation(selected.group_id);
         }
     };
-    get("topic-open-graph").onclick = () => {
-        if (selected) {
-            void openGraph(selected).catch(notice);
-        }
-    };
-}
-async function openGraph(topic, subject = "") {
-    await selectConversation(topic.group_id);
-    sessionStorage.setItem("evolution-topic", topic.id);
-    sessionStorage.setItem("evolution-subject", subject);
-    revealResearch("evolution");
-    await loadEvolution();
 }

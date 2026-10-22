@@ -170,31 +170,6 @@ fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
             }
             result
         }
-        Control::Evolution(command) => {
-            let write = matches!(&command, crate::iteration::IterationCommand::Change(_));
-            let result = store.iteration_command(command)?;
-            if !write {
-                return Ok(result);
-            }
-            let group = result["input"]["group_id"]
-                .as_str()
-                .context("iteration group missing")?;
-            let after = shared
-                .catalog
-                .read()
-                .unwrap()
-                .groups
-                .get(group)
-                .map_or(0, |g| g.last_sequence);
-            let messages = store.history(group, after, 2)?;
-            *shared.catalog.write().unwrap() = store.catalog()?;
-            for message in messages {
-                if let Some(feed) = shared.feeds.lock().unwrap().get(group) {
-                    let _ = feed.send(Arc::new(message));
-                }
-            }
-            result
-        }
         Control::Research(command) => {
             let write = matches!(&command, crate::coordination::ResearchCommand::Change(_));
             let result = store.research_command(command)?;
