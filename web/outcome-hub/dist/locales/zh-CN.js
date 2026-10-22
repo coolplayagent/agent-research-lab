@@ -56,6 +56,7 @@ export const messages = {
     "tasks.coordinatorPending": "尚无协调协议验证记录，可以立即测试；首次任务会自动测试后再执行。",
     "tasks.filter": "任务状态",
     "group.refresh": "刷新",
+    "tasks.refresh": "刷新任务",
     "tasks.more": "加载更多",
     "tasks.all": "全部任务",
     "tasks.followup": "补充信息或退回意见",
