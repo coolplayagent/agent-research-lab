@@ -475,8 +475,7 @@ export const messages = {
   "services.refresh": "刷新健康状态",
   "services.addService": "添加外部连接",
   "services.adapters": "Coding Agent 适配器",
-  "services.adapterNote":
-    "Claude Code、Codex、DeepSeek Harness 和 Pi 统一使用 JSON 标准输入／输出协议。填写对应包装程序后启用；服务健康状态仅表示服务可连接，实际模型执行以任务结果为准。",
+  "services.adapterNote": "选择已安装并登录的 Claude Code、Codex、DeepSeek Harness 或 Pi，点击“测试并启用”。测试日志显示在下方；数字人的创建与绑定在“数字人管理”中完成。",
   "services.addAdapter": "添加适配器",
   "services.bindings": "Agent 与执行器绑定",
   "services.metrics": "协作运行指标",
