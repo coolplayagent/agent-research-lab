@@ -1,7 +1,6 @@
 use super::*;
 use collaboration_model::{EvidencePins, KnowledgeWriteInput, OutcomeInput};
-#[test]
-fn interrupted_publication_recovers_from_journal_without_remote_writes() {
+fn fixture() -> (tempfile::TempDir, Target, PathBuf, KnowledgeWrite, Outcome) {
     let temp = tempfile::tempdir().unwrap();
     let target = Target {
         kind: contracts::KnowledgeBackend::Directory,
@@ -56,6 +55,27 @@ fn interrupted_publication_recovers_from_journal_without_remote_writes() {
         deadline_ms: collaboration_model::now_ms() + 60000,
         result: None,
     };
+    (temp, target, state, write, outcome)
+}
+#[test]
+fn publication_has_a_durable_idempotent_receipt() {
+    let (_temp, mut target, state, write, outcome) = fixture();
+    target.path = fs::canonicalize(&target.path).unwrap();
+    let state = fs::canonicalize(state).unwrap();
+    let applied = publish(&target, &state, &write, &outcome).unwrap();
+    assert_eq!(applied.state, KnowledgeWriteState::Applied);
+    assert_eq!(
+        lookup(&target, &state, &write).unwrap().unwrap().revision,
+        applied.revision
+    );
+    assert_eq!(
+        publish(&target, &state, &write, &outcome).unwrap().revision,
+        applied.revision
+    );
+}
+#[test]
+fn interrupted_publication_recovers_from_journal_without_remote_writes() {
+    let (temp, target, state, write, outcome) = fixture();
     let journal = Journal {
         request: write.clone(),
         path: "accepted-outcomes/outcome.json".into(),

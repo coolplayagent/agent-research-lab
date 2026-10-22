@@ -131,7 +131,11 @@ fn adapters_share_preview_publish_read_and_idempotent_receipt_contract() {
         assert!(preview.expected_revision.contains('@'));
         let write = write(&preview);
         let result = publish(&service, &write).unwrap();
-        assert_eq!(result["state"], KnowledgeWriteState::Applied.as_str());
+        assert_eq!(
+            result["state"],
+            KnowledgeWriteState::Applied.as_str(),
+            "backend git={git}"
+        );
         assert_eq!(publish(&service, &write).unwrap(), result);
         let receipt = service
             .dispatch(OutcomeServiceRequest::LookupWrite {
