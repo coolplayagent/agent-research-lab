@@ -181,7 +181,7 @@ const deferred = () => {
   assert.equal(withContributions[1].message, contribution, "Actual research stays visible, including older attempts");
   assert.equal(withContributions[2].message, ordinary);
   assert.equal(taskTimeline([event(6, contracts.GoalEventKind.Submitted, 2)], [goalResult]).length, 2, "Retain legacy result projections");
-  assert.equal(taskTimeline([event(6, contracts.GoalEventKind.Failed, 2)], [currentFailure]).length, 1, "Failed attempts stay in progress history");
+  assert.equal(taskTimeline([event(6, contracts.GoalEventKind.Failed, 2)], [{...currentFailure, work:[{...currentFailure.work[0], result:{succeeded:false, summary:"Partial answer"}}]}]).length, 2, "Recorded failure answers remain visible alongside progress");
   let reviewed;
   const card = progressCard(compact[0].progress, true, id => reviewed = id);
   assert.equal(card.querySelectorAll("details[open][data-progress-key]").length, 1);
@@ -375,6 +375,7 @@ const deferred = () => {
   const messages = moduleFrom(
     base + "messages.ts",
     {
+      "./deletion.js": { deleteObject: async () => false },
       "/assets/shared/contracts.js": contracts,
       "./i18n.js": i18n,
       "./api.js": {
@@ -524,6 +525,7 @@ const deferred = () => {
   const conversation = moduleFrom(
     base + "conversation.ts",
     {
+      "./deletion.js": { deleteObject: async () => false },
       "./workspace.js": { syncControls() {} },
       "/assets/shared/contracts.js": contracts,
       "./i18n.js": i18n,

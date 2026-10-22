@@ -1,5 +1,10 @@
 /** Simplified Chinese presentation resources. */
 export const messages = {
+  "deletion.action": "永久删除",
+  "deletion.confirm": "永久删除“{title}”？这会清除可删除的内容，无法恢复；有关联研究证据时将阻止删除。",
+  "deletion.announcement": "此条公告",
+  "deletion.deletedAnnouncement": "公告已删除",
+
   "adapterTest.logs": "适配器测试日志",
   "adapterTest.verified": "当前配置已通过独立测试",
   "adapterTest.untested": "尚未独立测试",
@@ -271,10 +276,10 @@ export const messages = {
   "mentions.unresolved": "未找到唯一的群成员：{names}。请确认群成员的名称。",
   "mentions.unavailable": "这些成员的执行场景暂不可用，请检查系统设置。",
   "mentions.unbound": "{names} 尚未绑定执行服务，可在系统设置中绑定后重试。",
-  "mentions.assignment": "以 @{name} 的身份回答群内问题，使用 @成员名 回应前面的成员。给出证据、分歧和限制。",
+  "mentions.assignment": "以 @{name} 的身份独立回答群内问题，给出依据和限制。可以参考已有观点，无需等待其他成员发言。",
   "mentions.hint": "@成员名 邀请讨论 · Ctrl / ⌘ + Enter 发送",
   "discussion.title": "群体研究讨论",
-  "discussion.objective": "围绕群内最近的问题开展研究，回应其他成员的观点，并提出可验证的下一步。",
+  "discussion.objective": "围绕群内最近的问题独立提出有依据的观点和可验证的下一步，可参考已有发言。",
   "discussion.acceptance": "每位成员在群内给出有证据的观点，说明分歧和限制，由主持人验收。",
   "discussion.assignment": "阅读群内已有发言，结合自己的研究提出补充、质疑或改进建议。",
   "goals.notFound": "当前群组中未找到该目标，请刷新后重试。",

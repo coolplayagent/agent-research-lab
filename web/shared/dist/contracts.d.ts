@@ -1,3 +1,12 @@
+export declare const DeletionCode: {
+    readonly Deleted: "deleted";
+    readonly NotFound: "not_found";
+    readonly RevisionConflict: "revision_conflict";
+    readonly ActiveGoals: "active_goals";
+    readonly EvidenceReferences: "evidence_references";
+    readonly Unsupported: "unsupported";
+};
+export type DeletionCode = (typeof DeletionCode)[keyof typeof DeletionCode];
 export declare const CodexEventKind: {
     readonly ThreadStarted: "thread.started";
     readonly TurnStarted: "turn.started";

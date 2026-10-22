@@ -1,3 +1,4 @@
+import { deleteObject } from "./deletion.js";
 import { syncControls } from "./workspace.js";
 import { selectMentions } from "./mentions.js";
 import { selectEvolution, refreshEvolution } from "./evolution.js";
@@ -36,6 +37,7 @@ export function renderHeader(group: Group): void {
           : t("conversation.ff40f5a38d"),
     p2: group.archived ? t("conversation.3788d7bcf0") : "",
   });
+  get("delete-group").hidden = group.kind === GroupKind.Board;
   get("convert-group").hidden =
     group.kind !== GroupKind.Temporary || group.archived;
   get("pin-group").textContent = group.pinned
@@ -101,7 +103,7 @@ export async function select(group: Group): Promise<void> {
         group: Group;
         metrics: Record<string, unknown>;
       };
-      if (!status.group) return;
+      if (!status.group) { clearConversation(); void loadGroups(); return; }
       const changed = current?.revision !== status.group.revision;
       current = status.group;
       renderHeader(current);
@@ -110,7 +112,12 @@ export async function select(group: Group): Promise<void> {
       refreshCollaboration();
       refreshEvolution();
       refreshIterations();
-      if (changed) void loadGroups();
+      if (changed) {
+        void loadGroups();
+        if (current.kind === GroupKind.Board) void api<GroupView>("/api/v1/messaging/view?" + query({ group_id: current.id })).then(page => {
+          if (request === generation && current?.id === page.group.id && current.revision === page.group.revision) resetMessages(current, page.messages);
+        }).catch(notice);
+      }
     });
     stream.onerror = () => {
       if (request === generation)
@@ -142,7 +149,25 @@ export async function refreshCurrent(): Promise<void> {
   renderHeader(current);
   await loadGroups();
 }
+export function clearConversation(): void {
+  generation++; openGeneration++; stream?.close(); stream = null;
+  suspendMessages(); suspendGoals(); current = null; setSelected("");
+  selectEvolution(""); selectIterations(null); selectCollaboration(null); selectMentions("");
+  get("messages").replaceChildren();
+  get("active-conversation").hidden = true; get("empty-conversation").hidden = false;
+}
 export function initConversation(): void {
+  get("delete-group").onclick = async () => {
+    if (!current) return;
+    const target = current, done = busy(get<HTMLButtonElement>("delete-group"));
+    if (!done) return;
+    try {
+      if (await deleteObject({ kind: "group", id: target.id, revision: target.revision }, target.title)) {
+        if (current?.id === target.id) clearConversation();
+        await loadGroups();
+      }
+    } catch (error) { notice(error); } finally { done(); }
+  };
   const menu = get<HTMLDetailsElement>("conversation-menu");
   menu.addEventListener("click", event => {
     if ((event.target as Element).closest("button")) menu.open = false;

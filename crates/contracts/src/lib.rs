@@ -47,6 +47,7 @@ macro_rules! states {
 }
 
 states! {
+    DeletionCode { Deleted => "deleted", NotFound => "not_found", RevisionConflict => "revision_conflict", ActiveGoals => "active_goals", EvidenceReferences => "evidence_references", Unsupported => "unsupported" }
     CodexEventKind { ThreadStarted => "thread.started", TurnStarted => "turn.started", TurnCompleted => "turn.completed", TurnFailed => "turn.failed", ItemStarted => "item.started", ItemUpdated => "item.updated", ItemCompleted => "item.completed", Error => "error" }
     ClaudeResultState { Success => "success", ErrorDuringExecution => "error_during_execution", ErrorMaxTurns => "error_max_turns", ErrorMaxBudget => "error_max_budget_usd", ErrorStructuredOutput => "error_max_structured_output_retries" }
     PiEventKind { Response => "response", AgentStart => "agent_start", AgentEnd => "agent_end", AgentSettled => "agent_settled", TurnStart => "turn_start", TurnEnd => "turn_end", MessageStart => "message_start", MessageUpdate => "message_update", MessageEnd => "message_end", ToolStart => "tool_execution_start", ToolUpdate => "tool_execution_update", ToolEnd => "tool_execution_end", CompactionStart => "auto_compaction_start", CompactionEnd => "auto_compaction_end", RetryStart => "auto_retry_start", RetryEnd => "auto_retry_end" }

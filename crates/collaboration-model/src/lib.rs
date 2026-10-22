@@ -1,4 +1,6 @@
 //! Storage-free collaboration data contracts and deterministic validation.
+mod deletion;
+pub use deletion::*;
 mod model;
 pub use model::*;
 mod goal_model;

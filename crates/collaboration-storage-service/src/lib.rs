@@ -91,6 +91,7 @@ async fn execute(hub: &Hub, request: Request) -> Result<Value> {
             history_from,
         } => Ok(json!(hub.fork(&source, group, history_from).await?)),
         Request::CreateGroup { group } => Ok(json!(hub.create_group(group).await?)),
+        Request::Delete { target } => Ok(json!(hub.delete(target).await?)),
         Request::UpdateGroup { change } => Ok(json!(hub.update_group(change).await?)),
         Request::Membership { group, actor, add } => {
             Ok(json!(hub.membership(&group, &actor, add).await?))

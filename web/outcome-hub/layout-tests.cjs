@@ -34,6 +34,7 @@ const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" "
   const subject = owner => ({ subject: { id: owner + "-subject", topic_id: owner, name: owner + " subject", kind: contracts.SubjectKind.Repository, reference: "source:main", revision: 1 }, node_count: 0 });
   let catalog = [a, b], heldTopics, heldSubjects, editDone;
   const topics = load(base + "topics.ts", {
+    "./deletion.js": { deleteObject: async target => { catalog = catalog.filter(topic => topic.id !== target.id); return true; } },
     "./outcome-board.js": { outcomeBoard: topic => {
       const board = new Node("section", topic.id);
       board.remove = () => { get("topic-detail").children = get("topic-detail").children.filter(node => node !== board); };
@@ -47,7 +48,7 @@ const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" "
       const id = new URL(url, "http://local").searchParams.get("topic_id");
       return heldSubjects?.id === id ? heldSubjects.promise : { subjects: [subject(id)], next_after: null };
     } },
-  }, { location: { hash: "" }, sessionStorage: { setItem() {} }, document: { getElementById: id => get("topic-detail").children.find(node => node.id === id) } });
+  }, { location: { hash: "" }, sessionStorage: { setItem() {} }, document: { addEventListener() {}, getElementById: id => get("topic-detail").children.find(node => node.id === id) } });
   topics.initTopics(); await topics.loadTopics();
   const oldCard = get("topic-list").children[0];
   await oldCard.children.at(-1).children[0].onclick();

@@ -244,6 +244,7 @@ impl Store {
 }
 fn message_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
     Ok(Message {
+        deleted: row.get::<_, String>(4)?.is_empty(),
         sequence: row.get(0)?,
         group_id: row.get(1)?,
         sender_id: row.get(2)?,
@@ -334,6 +335,7 @@ pub(crate) fn append(
     *remaining -= 1;
     Ok(Receipt {
         message: Message {
+            deleted: false,
             event: None,
             sequence,
             group_id: input.group_id.clone(),

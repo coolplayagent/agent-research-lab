@@ -131,9 +131,9 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/api.js").as_slice(),
         )),
-        "/assets/applications.js" => Some((
+        "/assets/deletion.js" => Some((
             "text/javascript; charset=utf-8",
-            include_bytes!("../dist/applications.js").as_slice(),
+            include_bytes!("../dist/deletion.js").as_slice(),
         )),
         "/assets/bootstrap.js" => Some((
             "text/javascript; charset=utf-8",

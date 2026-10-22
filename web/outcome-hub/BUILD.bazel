@@ -62,3 +62,8 @@ node_test(
     script = "binding-knowledge-tests.cjs",
     data = [":policy_sources", "//web/shared:policy_sources"],
 )
+node_test(
+    name = "deletion_tests",
+    script = "deletion-tests.cjs",
+    data = [":policy_sources", "//web/shared:policy_sources"],
+)

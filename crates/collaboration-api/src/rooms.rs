@@ -14,6 +14,9 @@ use std::convert::Infallible;
 #[derive(Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 enum Change {
+    Delete {
+        target: collaboration_model::DeleteTarget,
+    },
     Person {
         person: collaboration_model::Person,
     },
@@ -58,6 +61,7 @@ pub async fn manage(State(web): State<Web>, request: Request) -> Response {
         // This is a host control boundary, never accepted from a coding-agent grant.
 
         match change {
+            Change::Delete { target } => Ok(json!(web.hub.delete(target).await?)),
             Change::Person { person } => { ensure!(person.id != "operator", "operator identity is reserved"); web.hub.save_person(person).await?; Ok(json!({"saved":true})) },
             Change::Send { message } => Ok(json!(web.hub.publish_as("operator", message).await?)),
             Change::Convert { group_id, revision, title } => Ok(json!(web.hub.convert(&group_id, revision, title).await?)),
