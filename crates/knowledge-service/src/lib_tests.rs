@@ -33,7 +33,7 @@ fn fixture(git: bool) -> (tempfile::TempDir, Service, Target) {
         } else {
             KnowledgeBackend::Directory
         },
-        path: target_path,
+        path: fs::canonicalize(target_path).unwrap(),
         content_root: "knowledge".into(),
         enabled: true,
         access: KnowledgeAccess::ReadWrite,
