@@ -77,3 +77,11 @@ stdin 是以换行结尾的单个 UTF-8 JSON：
 ## 验证边界
 
 测试用明确的本地假提供商，并通过真实 workflow/Bubblewrap 覆盖成功、候选写入、错误或缺失/FIFO/超大结果、篡改、超时、暂停及父进程退出后的 `setsid` 子进程。合成凭证夹具检查 HOME/AWS/Codex 和继承环境拒绝。这些证明协议与隔离，不证明第三方编码质量或协作涌现。
+
+## 独立适配器测试
+
+接口包括 `GET/POST /api/v1/collaboration/adapter-tests`、`GET /api/v1/collaboration/adapter-tests/{request_id}` 和 `POST /api/v1/collaboration/adapter-tests/{request_id}/cancel`。启动请求为 `{request_id, adapter_id, revision, program?, model?}`，拒绝人员 ID。写操作沿用来源校验及 `manage-services` 意图校验。
+
+适配器测试与人员绑定共用程序发现、环境准备、配置快照及执行验证机制，使用不同的契约枚举、日志和证据。两类操作共享四个并发名额，单次操作最多 120 秒，执行阶段最多 90 秒。请求重放具备幂等性，取消与保存互斥，配置版本冲突不能覆盖其他更改。重启只在请求和配置证据一致时恢复已提交的成功结果，其余未结束任务标为中断。
+
+`adapter_test_evidence` 只能由宿主写入，记录适配器、可执行程序、关联执行器／沙箱配置、输入、输出的摘要及沙箱 ID。设置请求不能伪造证据，相关配置变更使证据失效。测试成功后保存并启用候选配置，不修改绑定关系，不创建协作记录。绑定证据保持独立并沿用既有失效规则。两类验证在未显式覆盖时均复用已保存的原生启动器参数和模型。公开诊断仅含稳定代码，大小受限的私有详情使用单独的适配器测试诊断文件。

@@ -1,4 +1,8 @@
 //! Host-owned service configuration persistence and health probes.
+mod adapter_flow;
+mod adapter_operations;
+mod validation;
+pub use adapter_flow::adapter_test_failure_code;
 mod binding_flow;
 pub use binding_flow::binding_failure_code;
 mod bindings;
@@ -14,7 +18,7 @@ use service_api::*;
 use service_protocol as rpc;
 use std::{
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 pub struct Registry {
@@ -22,6 +26,8 @@ pub struct Registry {
     config: Mutex<Configuration>,
     active_storage: Option<(String, PathBuf)>,
     bindings: bindings::Operations,
+    adapter_tests: adapter_operations::Operations,
+    validation_slots: Arc<tokio::sync::Semaphore>,
     managed: tokio::sync::Mutex<managed::Managed>,
     knowledge: tokio::sync::Mutex<local_knowledge::ManagedKnowledge>,
     storage: tokio::sync::Mutex<local_storage::ManagedStorage>,
@@ -51,6 +57,8 @@ impl Registry {
             path,
             config: Mutex::new(config.clone()),
             bindings: bindings::Operations::open(&state, &config)?,
+            adapter_tests: adapter_operations::Operations::open(&state, &config)?,
+            validation_slots: Arc::new(tokio::sync::Semaphore::new(4)),
             managed: tokio::sync::Mutex::new(managed::Managed::default()),
             knowledge: tokio::sync::Mutex::new(local_knowledge::ManagedKnowledge::default()),
             storage: tokio::sync::Mutex::new(local_storage::ManagedStorage::default()),
@@ -93,6 +101,7 @@ impl Registry {
                 ConfigurationFailure(contracts::ServiceConfigurationErrorCode::ManagementImmutable)
             );
         }
+        next.adapter_test_evidence = current.adapter_test_evidence.clone();
         // Evidence is server-owned. Clients cannot forge validation by posting it.
         next.binding_evidence = current
             .binding_evidence
@@ -153,6 +162,16 @@ impl Registry {
                         .is_ok_and(|bytes| storage::digest(&bytes) == evidence.adapter_digest)
                 })
         });
+        next.adapter_test_evidence = next
+            .adapter_test_evidence
+            .iter()
+            .filter(|(id, evidence)| {
+                next.adapter_test_configuration(id).is_ok_and(|encoding| {
+                    storage::digest(encoding.as_bytes()) == evidence.configuration_digest
+                })
+            })
+            .map(|(id, evidence)| (id.clone(), evidence.clone()))
+            .collect();
         storage::write(&self.path, &next)?;
         *current = next.clone();
         Ok(next)

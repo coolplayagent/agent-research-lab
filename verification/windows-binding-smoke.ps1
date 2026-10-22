@@ -25,10 +25,10 @@ function Read-Api([string]$Path) { Invoke-RestMethod ($base + $Path) -TimeoutSec
 function Write-Api([string]$Path, $Body, [string]$Intent = 'manage-services') {
     Invoke-RestMethod ($base + $Path) -Method Post -ContentType 'application/json' -Headers @{Origin=$base; 'X-Crystal-Intent'=$Intent} -Body ($Body | ConvertTo-Json -Depth 25 -Compress) -TimeoutSec 12
 }
-function Wait-Binding([string]$Id) {
+function Wait-Binding([string]$Id, [string]$Endpoint = 'bindings') {
     $deadline = [DateTime]::UtcNow.AddSeconds(125); $sequence = -1
     do {
-        $operation = Read-Api "/api/v1/collaboration/bindings/$Id"
+        $operation = Read-Api "/api/v1/collaboration/$Endpoint/$Id"
         if ($operation.sequence -lt $sequence) { throw 'Operation sequence moved backwards.' }
         $sequence = $operation.sequence
         if ($operation.state -ne 'running') { return $operation }
@@ -58,12 +58,26 @@ try {
         $directory = Join-Path $state 'fixture programs'; New-Item -ItemType Directory -Path $directory | Out-Null
         $program = Join-Path $directory 'native-agent.exe'; Copy-Item -LiteralPath $Fixture -Destination $program
     }
+    $before = Read-Api '/api/v1/collaboration/services'
+    $peopleBefore = (Read-Api '/api/v1/collaboration/people') | ConvertTo-Json -Depth 25 -Compress
+    $testProgram = if ($Programs.ContainsKey('codex')) { $Programs['codex'] } else { $program }
+    $testModel = if ($Models.ContainsKey('codex')) { $Models['codex'] } elseif ($Fixture) { 'fixture/saved-model' } else { $null }
+    $test = @{request_id=[guid]::NewGuid().ToString(); adapter_id='codex'; revision=$before.configuration.revision; program=$testProgram; model=$testModel}
+    Write-Api '/api/v1/collaboration/adapter-tests' $test | Out-Null
+    $tested = Wait-Binding $test.request_id 'adapter-tests'
+    if ($tested.state -ne 'succeeded' -or @($tested.steps | Where-Object state -ne 'passed').Count) { throw "Independent adapter test failed: $($tested.diagnostic.code)" }
+    $saved = Read-Api '/api/v1/collaboration/services'
+    if ($saved.configuration.adapter_test_evidence.codex.request_id -ne $test.request_id) { throw 'Adapter evidence was not saved.' }
+    if (($saved.configuration.bindings | ConvertTo-Json -Compress) -ne ($before.configuration.bindings | ConvertTo-Json -Compress)) { throw 'Adapter test changed bindings.' }
+    if (((Read-Api '/api/v1/collaboration/people') | ConvertTo-Json -Depth 25 -Compress) -ne $peopleBefore) { throw 'Adapter test changed people.' }
+    if (@(Read-Api '/api/v1/collaboration/bindings').Count) { throw 'Adapter test created binding history.' }
     foreach ($agent in @('codex', 'cc', 'hds', 'pi')) {
         $person = "binding-$agent"
         Write-Api '/api/v1/messaging/manage' @{operation='person'; person=@{id=$person; name=$person}} 'manage-crystal' | Out-Null
         $view = Read-Api '/api/v1/collaboration/services'
         $model = if ($Models.ContainsKey($agent)) { $Models[$agent] } elseif ($Fixture -and $agent -eq 'hds') { 'fixture/deterministic' } else { $null }
         $selectedProgram = if ($Programs.ContainsKey($agent)) { $Programs[$agent] } else { $program }
+        if ($agent -eq 'codex') { $selectedProgram = $null; $model = $null }
         $request = @{request_id=[guid]::NewGuid().ToString(); person_id=$person; adapter_id=$agent; revision=$view.configuration.revision; program=$selectedProgram; model=$model}
         $operation = Write-Api '/api/v1/collaboration/bindings' $request
         $duplicate = Write-Api '/api/v1/collaboration/bindings' $request
@@ -99,7 +113,13 @@ require("child_process").spawn(executable, process.argv.slice(2), {stdio:"inheri
         Write-Api '/api/v1/collaboration/bindings' $request | Out-Null
         $npmResult = Wait-Binding $request.request_id
         if ($npmResult.state -ne 'succeeded') { Fail-Binding $npmResult 'npm dependency fixture' }
-        Write-Output 'Validated npm launcher with an installed Node runtime and hoisted dependency.'
+        $saved = Read-Api '/api/v1/collaboration/services'
+        $request.request_id = [guid]::NewGuid().ToString(); $request.revision = $saved.configuration.revision; $request.program = $null
+        Write-Api '/api/v1/collaboration/bindings' $request | Out-Null
+        $reused = Wait-Binding $request.request_id
+        if ($reused.state -ne 'succeeded') { Fail-Binding $reused 'saved npm launcher reuse' }
+        if (($reused.program.arguments | ConvertTo-Json -Compress) -ne ($npmResult.program.arguments | ConvertTo-Json -Compress)) { throw 'Saved npm launcher arguments changed.' }
+        Write-Output 'Validated npm launcher, hoisted dependency and saved launcher reuse.'
         $saved = Read-Api '/api/v1/collaboration/services'
         $request = @{request_id=[guid]::NewGuid().ToString(); person_id='binding-codex'; adapter_id='codex'; revision=$saved.configuration.revision; program=(Join-Path $state 'missing.exe'); model=$null}
         Write-Api '/api/v1/collaboration/bindings' $request | Out-Null

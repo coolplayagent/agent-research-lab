@@ -79,7 +79,7 @@ def run(archive, fixture):
                 except OSError: pass
                 time.sleep(.1)
             else: raise AssertionError("Storage did not recover persisted collaboration data")
-            storage_pids = children()
+            storage_pids = {pid for pid in children() if Path(f"/proc/{pid}/exe").resolve().name == "outcome-hub-storage"}
             assert len(storage_pids) == 1
 
             worker = binaries / "outcome-hub-services"
@@ -110,11 +110,60 @@ def run(archive, fixture):
                 if owned:
                     assert owned == current, "Preparation must reuse owned workers"
                 owned = current
+            # Adapter testing works without creating or selecting a digital person.
+            people_before = api("/api/v1/collaboration/people")
+            test_request = {"request_id":"adapter-only", "adapter_id":"codex", "revision":view["configuration"]["revision"], "program":str(peer), "model":"fixture/saved-model"}
+            api("/api/v1/collaboration/adapter-tests", test_request)
+            deadline = time.monotonic() + 30
+            while True:
+                tested = api("/api/v1/collaboration/adapter-tests/adapter-only")
+                if tested["state"] != "running": break
+                assert time.monotonic() < deadline
+                time.sleep(.1)
+            assert tested["state"] == "succeeded", tested
+            assert all(step["state"] == "passed" for step in tested["steps"])
+            assert api("/api/v1/collaboration/people") == people_before
+            view = api("/api/v1/collaboration/services")
+            assert not view["configuration"]["bindings"]
+            assert not view["configuration"].get("binding_evidence")
+            assert view["configuration"]["adapter_test_evidence"]["codex"]["request_id"] == "adapter-only"
+            assert next(a for a in view["configuration"]["adapters"] if a["id"] == "codex")["enabled"]
+            assert api("/api/v1/collaboration/adapter-tests", test_request)["state"] == "succeeded"
+            assert api("/api/v1/collaboration/bindings") == []
+            def wait_test(identifier, executing=False):
+                deadline = time.monotonic() + 15
+                while True:
+                    record = api("/api/v1/collaboration/adapter-tests/" + identifier)
+                    if record["state"] != "running" or (executing and any(s["stage"] == "execute" and s["state"] == "running" for s in record["steps"])):
+                        return record
+                    assert time.monotonic() < deadline, record
+                    time.sleep(.02)
+            # Cancellation during execution must preserve both settings and prior evidence.
+            before = view["configuration"]
+            hang = root / "hang-agent"
+            shutil.copyfile(peer, hang); hang.chmod(0o700)
+            api("/api/v1/collaboration/adapter-tests", {**test_request, "request_id":"adapter-cancel", "revision":before["revision"], "program":str(hang)})
+            assert wait_test("adapter-cancel", executing=True)["state"] == "running"
+            api("/api/v1/collaboration/adapter-tests/adapter-cancel/cancel", {})
+            assert wait_test("adapter-cancel")["state"] == "cancelled"
+            assert api("/api/v1/collaboration/services")["configuration"] == before
+            # A successful task cannot overwrite settings saved while it executes.
+            delay = root / "delay-agent"
+            shutil.copyfile(peer, delay); delay.chmod(0o700)
+            api("/api/v1/collaboration/adapter-tests", {**test_request, "request_id":"adapter-conflict", "revision":before["revision"], "program":str(delay)})
+            assert wait_test("adapter-conflict", executing=True)["state"] == "running"
+            api("/api/v1/collaboration/services", before)
+            concurrent = api("/api/v1/collaboration/services")["configuration"]
+            conflict = wait_test("adapter-conflict")
+            assert conflict["state"] == "failed" and conflict["diagnostic"]["code"] == "revision_conflict", conflict
+            assert api("/api/v1/collaboration/services")["configuration"] == concurrent
+            assert api("/api/v1/collaboration/people") == people_before
+            assert api("/api/v1/collaboration/bindings") == []
             for agent in ("codex", "cc", "hds", "pi"):
                 person = "fixture-" + agent
                 api("/api/v1/messaging/manage", {"operation":"person", "person":{"id":person, "name":person}}, "manage-crystal")
                 config = api("/api/v1/collaboration/services")["configuration"]
-                request = {"request_id":"verify-"+agent,"person_id":person,"adapter_id":agent,"revision":config["revision"],"program":str(peer),"model":"fixture/deterministic" if agent == "hds" else None}
+                request = {"request_id":"verify-"+agent,"person_id":person,"adapter_id":agent,"revision":config["revision"],"program":None if agent == "codex" else str(peer),"model":"fixture/deterministic" if agent == "hds" else None}
                 api("/api/v1/collaboration/bindings", request)
                 deadline = time.monotonic() + 30
                 while True:
@@ -128,6 +177,10 @@ def run(archive, fixture):
                         print(diagnostic.read_text(), file=sys.stderr)
                 assert operation["state"] == "succeeded", operation
                 saved = api("/api/v1/collaboration/services")["configuration"]
+                if agent == "codex":
+                    command = next(a for a in saved["adapters"] if a["id"] == agent)["command"]
+                    assert command[command.index("--model") + 1] == "fixture/saved-model"
+                    assert operation["program"]["executable"] == str(peer)
                 assert saved["bindings"][person] == agent
                 assert saved["binding_evidence"][person]["request_id"] == request["request_id"]
                 assert api("/api/v1/collaboration/bindings", request)["state"] == "succeeded"

@@ -37,6 +37,12 @@ fn main() -> Result<()> {
         std::thread::sleep(std::time::Duration::from_secs(180));
         return Ok(());
     }
+    if std::env::current_exe()?
+        .file_stem()
+        .is_some_and(|name| name.to_string_lossy().contains("delay"))
+    {
+        std::thread::sleep(std::time::Duration::from_secs(2));
+    }
     if args.iter().any(|a| a == "exec") {
         let mut prompt = String::new();
         std::io::stdin().read_to_string(&mut prompt)?;

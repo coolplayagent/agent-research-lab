@@ -168,3 +168,11 @@ results, request tampering, timeout, pause, and detached `setsid` descendants af
 parent exit. The credential fixture checks synthetic HOME/AWS/Codex files and
 inherited environment rejection. These validate protocol and host isolation;
 they do not establish third-party coding quality or emergent collaboration.
+
+## Independent adapter tests
+
+`GET/POST /api/v1/collaboration/adapter-tests`, `GET /api/v1/collaboration/adapter-tests/{request_id}` and `POST /api/v1/collaboration/adapter-tests/{request_id}/cancel` expose adapter-scoped validation. The start request is `{request_id, adapter_id, revision, program?, model?}`; person IDs are rejected. Writes require the `manage-services` intent and the existing origin boundary.
+
+Adapter tests and person bindings share discovery, runtime preparation, configuration snapshots and bounded executor verification. They use separate contract enums, journals and evidence. A shared capacity of four bounds concurrent operations; each operation has a 120-second deadline and execution is capped at 90 seconds. Replay is idempotent, cancellation serializes with persistence, and a configuration revision conflict cannot overwrite another change. Restart recovers a committed result only when its request and configuration evidence match; unfinished work becomes interrupted.
+
+Only the host can write `adapter_test_evidence`. It pins the adapter, executable, relevant executor/sandbox configuration, input, output and sandbox ID. Settings updates cannot forge evidence, and changing relevant configuration invalidates it. A successful adapter test enables and saves its candidate without touching binding relationships or creating collaboration records. Binding evidence remains independent and follows its existing invalidation rules. Saved native launcher arguments and model selection are reused by either flow when no overrides are given. Public diagnostics contain stable codes; bounded private details use separate adapter-test diagnostic files.

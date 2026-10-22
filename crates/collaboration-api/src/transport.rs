@@ -62,6 +62,18 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
         .route("/api/v1/knowledge/local", post(crate::knowledge::local))
         .route("/api/v1/messaging/send", post(send))
         .route(
+            "/api/v1/collaboration/adapter-tests",
+            get(super::adapter_tests::list).post(super::adapter_tests::start),
+        )
+        .route(
+            "/api/v1/collaboration/adapter-tests/{id}",
+            get(super::adapter_tests::get),
+        )
+        .route(
+            "/api/v1/collaboration/adapter-tests/{id}/cancel",
+            post(super::adapter_tests::cancel),
+        )
+        .route(
             "/api/v1/collaboration/bindings",
             get(super::bindings::list).post(super::bindings::start),
         )

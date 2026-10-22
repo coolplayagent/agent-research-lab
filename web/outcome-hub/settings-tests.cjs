@@ -10,13 +10,17 @@ function load(file, imports) {
   return module.exports;
 }
 class Node {
-  constructor(tag,text) { this.tag=tag;this.textContent=text;this.children=[];this.value='';this.hidden=false; }
+  constructor(tag,text) { this.tag=tag;this.textContent=text;this.children=[];this.value='';this.hidden=false;this.isConnected=true; }
   append(...children) { for(const c of children) { c.parent=this;this.children.push(c); } }
   closest() { return this.parent; }
-  close() {}
+  close() {this.closed=true;}
+  showModal() {}
+  setAttribute() {}
+  scrollIntoView() {}
+  replaceChildren(...children) {this.children=[];this.append(...children);}
 }
 const contracts=load('web/shared/src/contracts.ts',{});
-let fields,submit;
+let fields,submit,latestBox;
 const forms={
   element:(tag,text)=>new Node(tag,text),
   input:(value)=>Object.assign(new Node('input'),{value}),
@@ -24,7 +28,7 @@ const forms={
   check:(checked)=>Object.assign(new Node('input'),{checked}),
   select:(options,value)=>Object.assign(new Node('select'),{options,value}),
   field:(title,node)=>{fields[title]=node;const label=new Node('label');label.append(node);return label;},
-  dialog:()=>{fields={};return {form:new Node('form'),dialog:new Node('dialog')}},
+  dialog:()=>{fields={};return latestBox={form:new Node('form'),dialog:new Node('dialog'),status:new Node('p')}},
   finish:(box,save)=>{submit=save;},
 };
 let selected;
@@ -43,7 +47,7 @@ const config={revision:1,services:[{id:'executor',kind:contracts.ServiceKind.Exe
   assert.equal(saved.adapters[0].agent,contracts.CodingAgent.Codex);
   assert.equal(saved.adapters[0].enabled,false);
   assert.deepEqual(saved.adapters[0].command,[]);
-  assert.equal(selected,'codex');
+  assert.equal(selected,undefined, 'Saving an adapter must stay on the adapter page');
   editAdapter(config,undefined,async next=>saved=next);
   fields['services.agent'].value=contracts.CodingAgent.Custom;
   fields['services.id'].value='custom';fields['services.enabled'].checked=true;
@@ -66,5 +70,42 @@ const config={revision:1,services:[{id:'executor',kind:contracts.ServiceKind.Exe
   assert(!html.includes('data-settings-panel="scenarios"'));
   assert(!html.includes('data-setting="scenarios"'));
   assert(!fs.readFileSync(path.join(root,'web/outcome-hub/src/settings.ts'),'utf8').includes('renderOutcomeSettings'));
+  const container=new Node('div'), calls=[], timers=[];
+  let records=[], refreshed=0;
+  global.window={setTimeout:callback=>timers.push(callback)};
+  global.document={dispatchEvent(){}};
+  const operation={request:{request_id:'test-id',adapter_id:'codex'},state:contracts.AdapterTestOperationState.Running,started_unix_ms:Date.now(),steps:[]};
+  const api=async (url,body,intent)=>{
+    calls.push({url,body,intent});
+    if(!body)return records;
+    assert.equal(intent,'manage-services');
+    if(url.endsWith('/cancel')) {records=[{...operation,state:contracts.AdapterTestOperationState.Cancelled}];return records[0];}
+    assert.equal(url,'/api/v1/collaboration/adapter-tests');
+    assert(!('person_id' in body));
+    records=[{...operation,request:body}];return records[0];
+  };
+  const dependencies={...common,'./api.js':{api,ApiError:class extends Error{}},
+    './settings-guard.js':{trackSettings(){},savedSettings(){},hasUnsavedSettings:()=>false},
+    './dom.js':{get:()=>container,actions:(...nodes)=>{const row=new Node('div');row.append(...nodes);return row;},button:(text,onclick)=>Object.assign(new Node('button',text),{onclick})},
+    './adapter-forms.js':{editAdapter(){}},'/assets/shared/identity.js':{uuid:()=> 'test-id'}};
+  const progress=load('web/outcome-hub/src/adapter-progress.ts',dependencies);
+  const {renderAdapters}=load('web/outcome-hub/src/adapter-settings.ts',{...dependencies,'./adapter-progress.js':progress});
+  const nodes=n=>[n,...n.children.flatMap(nodes)];
+  const flush=async()=>{for(let i=0;i<8;i++)await Promise.resolve();};
+  renderAdapters({...config,adapters:[{id:'codex',agent:contracts.CodingAgent.Codex,enabled:false}]},async()=>{},async()=>refreshed++);
+  await flush();
+  assert.equal(calls.filter(c=>c.body).length,0,'Rendering must not invoke a model');
+  nodes(container).find(n=>n.textContent==='adapterTest.start').onclick();
+  assert(!nodes(latestBox.form).some(n=>n.textContent==='binding.person'));
+  await latestBox.form.onsubmit({preventDefault(){}});await flush();
+  assert(latestBox.dialog.closed);
+  assert.equal(calls.filter(c=>c.body).length,1);
+  assert.equal(container.children.at(-1).className,'binding-progress-list','Logs follow all adapter controls');
+  await nodes(container).find(n=>n.textContent==='adapterTest.cancel').onclick();
+  assert(calls.at(-1).url.endsWith('/test-id/cancel'));
+  records=[{...operation,state:contracts.AdapterTestOperationState.Succeeded,configuration_revision:2}];
+  timers.pop()();await flush();
+  assert.equal(refreshed,1,'Success refreshes the saved enabled configuration');
+  assert(calls.every(c=>!c.url.includes('/bindings')));
   console.log('Settings behavior verified');
 })().catch(e=>{console.error(e);process.exitCode=1;});

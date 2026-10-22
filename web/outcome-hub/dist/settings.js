@@ -7,6 +7,7 @@ import { get, actions } from "./dom.js";
 import { t, label } from "./i18n.js";
 import { editService } from "./service-forms.js";
 import { editAdapter } from "./adapter-forms.js";
+import { renderAdapters } from "./adapter-settings.js";
 import { renderExecutionStatus } from "./execution-status.js";
 import { element, select, field } from "./forms.js";
 import { busy } from "./feedback.js";
@@ -73,24 +74,7 @@ function render(view) {
     }
     if (!config.services.length)
         list.append(element("p", t("layout.noServices")));
-    const adapters = get("adapter-list");
-    adapters.replaceChildren();
-    for (const adapter of config.adapters) {
-        const card = element("article");
-        card.className = "card";
-        card.append(element("h3", `${adapter.id} · ${label("CodingAgent", adapter.agent)}`), element("p", adapter.enabled
-            ? t("services.adapterEnabled")
-            : t("services.adapterDisabled")), element("p", `${label("AgentProtocol", adapter.protocol)} · ${adapter.executor_id}`), actions(button(t("services.edit"), () => editAdapter(config, adapter, save)), button(t("services.remove"), async () => {
-            if (!confirm(t("ux.confirmRemove", { title: adapter.id })))
-                return;
-            const next = structuredClone(config);
-            next.adapters = next.adapters.filter((a) => a.id !== adapter.id);
-            await save(next);
-        })));
-        adapters.append(card);
-    }
-    if (!config.adapters.length)
-        adapters.append(element("p", t("layout.noAdapters")));
+    renderAdapters(config, save, () => loadServices(true));
     const storage = get("storage-selection");
     storage.replaceChildren();
     const selected = select([
