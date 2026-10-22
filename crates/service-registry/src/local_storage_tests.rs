@@ -1,7 +1,7 @@
 use super::*;
 fn binary() -> PathBuf {
     std::fs::canonicalize(
-        option_env!("TEST_STORAGE_BINARY").expect("run storage lifecycle tests through Bazel"),
+        std::env::var_os("TEST_STORAGE_BINARY").expect("run storage lifecycle tests through Bazel"),
     )
     .unwrap()
 }
