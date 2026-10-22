@@ -70,7 +70,7 @@ try {
     if ($saved.configuration.adapter_test_evidence.codex.request_id -ne $test.request_id) { throw 'Adapter evidence was not saved.' }
     if (($saved.configuration.bindings | ConvertTo-Json -Compress) -ne ($before.configuration.bindings | ConvertTo-Json -Compress)) { throw 'Adapter test changed bindings.' }
     if (((Read-Api '/api/v1/collaboration/people') | ConvertTo-Json -Depth 25 -Compress) -ne $peopleBefore) { throw 'Adapter test changed people.' }
-    if (@(Read-Api '/api/v1/collaboration/bindings').Count) { throw 'Adapter test created binding history.' }
+    if ((Read-Api '/api/v1/collaboration/bindings').Count -ne 0) { throw 'Adapter test created binding history.' }
     foreach ($agent in @('codex', 'cc', 'hds', 'pi')) {
         $person = "binding-$agent"
         Write-Api '/api/v1/messaging/manage' @{operation='person'; person=@{id=$person; name=$person}} 'manage-crystal' | Out-Null
