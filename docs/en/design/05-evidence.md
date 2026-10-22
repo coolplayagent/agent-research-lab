@@ -1,14 +1,10 @@
-# 05 Research evidence and coordination
+# 05 Outcome coordination and research evidence
 
-[Documentation](../00-index.md) · [Section index](00-index.md) · [简体中文](../../zh-CN/design/05-evidence.md)
+Human intent creates an outcome task owned by a conversation. The built-in coordinator decomposes a bounded dependency graph, assigns available digital people, checks their submitted artifacts and synthesizes a final delivery. Only human acceptance completes the task. Knowledge content remains in external repositories.
 
-Topics reference existing collaboration groups. Subjects describe external repositories, agents, tools, models, workflows, datasets or prompts. Topic and subject edits use optimistic revisions and stable ownership. Knowledge content remains in the bound external repository.
+The `/api/v2/collaboration/tasks` API accepts human operations with optimistic revisions. Runtime-only claims and proposals use the storage service contract. Node attempts, leases and graph revisions reject obsolete results. See [Outcome collaboration](../guide/09-outcomes.md) for budgets and recovery.
 
-The host exposes `GET /api/v1/collaboration/topics`, `GET /api/v1/collaboration/subjects`, and `POST /api/v1/collaboration/coordination` with `manage-research` intent. Coordination writes support topics and subjects only.
-
-Version evolution and improvement iterations have been removed from the UI, HTTP API, storage protocol and research CLI integration. There is no automatic iteration scheduler, version synchronizer or software-evolution activation command. Schema 9 removes their stored history through offline migration.
-
-Ordinary goals still bind every work result to its current attempt. Research receipts retain source, prompt, policy and required SuperPOD pins; a worker submission is not host acceptance. Generic collaboration and design review remain optional scenario choices; research execution keeps its existing admission and evidence gates.
+Topic, subject and outcome-path operations have been removed. Offline schema 10 removes their associated goals and evidence while retaining unrelated goals and ordinary messages. Independent research still enforces its existing admission and evidence gates.
 
 ## Independent gates
 

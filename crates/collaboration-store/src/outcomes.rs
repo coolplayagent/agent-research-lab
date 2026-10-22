@@ -32,10 +32,6 @@ pub(super) fn check(condition: bool, code: Code) -> Result<()> {
     Ok(())
 }
 
-fn read<T: DeserializeOwned>(db: &Connection, sql: &str, id: &str) -> Result<T> {
-    let raw: Option<String> = db.query_row(sql, [id], |r| r.get(0)).optional()?;
-    Ok(serde_json::from_str(&raw.context(Code::NotFound)?)?)
-}
 fn outcome(db: &Connection, id: &str) -> Result<Outcome> {
     let (sequence, raw): (u64, String) = db
         .query_row(
@@ -49,36 +45,26 @@ fn outcome(db: &Connection, id: &str) -> Result<Outcome> {
     value.sequence = sequence;
     Ok(value)
 }
-fn topic(db: &Connection, id: &str) -> Result<CollaborationTopic> {
-    read(db, "SELECT value FROM research_topics WHERE id=?1", id)
-}
-fn authorize(
-    db: &Connection,
-    actor: &str,
-    topic_id: &str,
-    write: bool,
-) -> Result<CollaborationTopic> {
-    let topic = topic(db, topic_id)?;
+fn authorize(db: &Connection, actor: &str, group_id: &str, write: bool) -> Result<String> {
     check(
         db.query_row(
             "SELECT EXISTS(SELECT 1 FROM members WHERE group_id=?1 AND actor_id=?2)",
-            params![topic.group_id, actor],
+            params![group_id, actor],
             |r| r.get(0),
         )?,
         Code::Forbidden,
     )?;
     if write {
-        check(topic.state == TopicState::Active, Code::Conflict)?;
         check(
             db.query_row(
                 "SELECT EXISTS(SELECT 1 FROM groups WHERE id=?1 AND archived=0)",
-                [&topic.group_id],
+                [group_id],
                 |r| r.get(0),
             )?,
             Code::Conflict,
         )?;
     }
-    Ok(topic)
+    Ok(group_id.into())
 }
 fn capacity(db: &Connection, table: &str, limit: u64) -> Result<()> {
     let count: u64 = db.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))?;
@@ -130,55 +116,16 @@ impl Store {
             check(actor == "operator", Code::Forbidden)?;
         }
         let result = match command {
-            OutcomeCommand::LinkPath { path } => {
-                validate_path(&path)?;
-                let owner = authorize(&tx, actor, &path.topic_id, true)?;
-                let goal = goals::read(&tx, &path.goal_id)?;
-                check(goal.input.group_id == owner.group_id, Code::Forbidden)?;
-                let existing: Option<String> = tx
-                    .query_row(
-                        "SELECT value FROM outcome_paths WHERE topic_id=?1 AND goal_id=?2",
-                        params![path.topic_id, path.goal_id],
-                        |r| r.get(0),
-                    )
-                    .optional()?;
-                if let Some(existing) = existing {
-                    check(
-                        serde_json::from_str::<OutcomePath>(&existing)? == path,
-                        Code::Conflict,
-                    )?;
-                } else {
-                    capacity(&tx, "outcome_paths", 100000)?;
-                    tx.execute(
-                        "INSERT INTO outcome_paths(topic_id,goal_id,value) VALUES(?1,?2,?3)",
-                        params![path.topic_id, path.goal_id, serde_json::to_string(&path)?],
-                    )?;
-                }
-                json!(path)
-            }
-            OutcomeCommand::Paths { topic_id, after } => {
-                authorize(&tx, actor, &topic_id, false)?;
-                check(after.len() <= 128, Code::Invalid)?;
-                let mut query = tx.prepare("SELECT value FROM outcome_paths WHERE topic_id=?1 AND goal_id>?2 ORDER BY goal_id LIMIT 33")?;
-                let mut paths = query
-                    .query_map(params![topic_id, after], |r| r.get::<_, String>(0))?
-                    .map(|row| Ok(serde_json::from_str::<OutcomePath>(&row?)?))
-                    .collect::<Result<Vec<_>>>()?;
-                let next = (paths.len() > OUTCOME_PAGE_SIZE)
-                    .then(|| paths[OUTCOME_PAGE_SIZE - 1].goal_id.clone());
-                paths.truncate(OUTCOME_PAGE_SIZE);
-                json!({"paths":paths,"next_after":next})
-            }
             OutcomeCommand::Publish { input } => publish(&tx, actor, credential.is_some(), *input)?,
             OutcomeCommand::Search { query } => search(&tx, actor, &query)?,
             OutcomeCommand::Get { id } => {
                 let entry = outcome(&tx, &id)?;
-                authorize(&tx, actor, &entry.input.topic_id, false)?;
+                authorize(&tx, actor, &entry.input.group_id, false)?;
                 json!(view(&tx, entry)?)
             }
             OutcomeCommand::History { id, after } => {
                 let entry = outcome(&tx, &id)?;
-                authorize(&tx, actor, &entry.input.topic_id, false)?;
+                authorize(&tx, actor, &entry.input.group_id, false)?;
                 check(after <= i64::MAX as u64, Code::Invalid)?;
                 let mut query = tx.prepare("SELECT sequence,kind,value,created_ms FROM outcome_events WHERE outcome_id=?1 AND sequence>?2 ORDER BY sequence LIMIT 33")?;
                 let mut events = query.query_map(params![id,after], |r|Ok((r.get::<_,u64>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,u64>(3)?)))?.map(|row| {
@@ -193,7 +140,7 @@ impl Store {
             OutcomeCommand::Withdraw { id, reason } => {
                 bounded(&reason, 2048)?;
                 let entry = outcome(&tx, &id)?;
-                authorize(&tx, actor, &entry.input.topic_id, true)?;
+                authorize(&tx, actor, &entry.input.group_id, true)?;
                 if let Some(old) = by_request::<String>(&tx, Event::Withdrawn, &id)? {
                     check(old == reason, Code::Conflict)?;
                 } else {
@@ -210,7 +157,8 @@ impl Store {
 
 fn publish(db: &Connection, actor: &str, agent: bool, input: OutcomeInput) -> Result<Value> {
     validate_input(&input)?;
-    let owner = authorize(db, actor, &input.topic_id, true)?;
+    check(input.node_id.is_none(), Code::Forbidden)?;
+    let owner = authorize(db, actor, &input.group_id, true)?;
     if db.query_row(
         "SELECT EXISTS(SELECT 1 FROM outcomes WHERE id=?1)",
         [&input.id],
@@ -221,15 +169,7 @@ fn publish(db: &Connection, actor: &str, agent: bool, input: OutcomeInput) -> Re
         return Ok(json!(view(db, old)?));
     }
     let goal = goals::read(db, &input.goal_id)?;
-    check(goal.input.group_id == owner.group_id, Code::Forbidden)?;
-    check(
-        db.query_row(
-            "SELECT EXISTS(SELECT 1 FROM outcome_paths WHERE topic_id=?1 AND goal_id=?2)",
-            params![input.topic_id, input.goal_id],
-            |r| r.get(0),
-        )?,
-        Code::Invalid,
-    )?;
+    check(goal.input.group_id == owner, Code::Forbidden)?;
     if agent {
         let binding = input.attempt.as_ref().context(Code::StaleAttempt)?;
         check(
@@ -258,7 +198,7 @@ fn publish(db: &Connection, actor: &str, agent: bool, input: OutcomeInput) -> Re
         .chain(input.supersedes.iter())
     {
         let previous = outcome(db, parent)?;
-        check(previous.input.topic_id == input.topic_id, Code::Forbidden)?;
+        check(previous.input.group_id == input.group_id, Code::Forbidden)?;
         if input.supersedes.as_ref() == Some(parent) {
             check(previous.author_id == actor || !agent, Code::Forbidden)?;
         }
@@ -271,7 +211,7 @@ fn publish(db: &Connection, actor: &str, agent: bool, input: OutcomeInput) -> Re
         created_ms: now_ms(),
         sequence: 0,
     };
-    db.execute("INSERT INTO outcomes(id,topic_id,goal_id,author_id,kind,title,summary,value) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)", params![entry.input.id,entry.input.topic_id,entry.input.goal_id,actor,entry.input.kind.as_str(),entry.input.title,entry.input.summary,serde_json::to_string(&entry)?])?;
+    db.execute("INSERT INTO outcomes(id,group_id,goal_id,author_id,kind,title,summary,value) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)", params![entry.input.id,entry.input.group_id,entry.input.goal_id,actor,entry.input.kind.as_str(),entry.input.title,entry.input.summary,serde_json::to_string(&entry)?])?;
     for reference in &entry.input.references {
         db.execute(
             "INSERT INTO outcome_references(child_id,parent_id,kind) VALUES(?1,?2,?3)",
@@ -286,7 +226,7 @@ fn publish(db: &Connection, actor: &str, agent: bool, input: OutcomeInput) -> Re
 }
 
 fn search(db: &Connection, actor: &str, input: &OutcomeQuery) -> Result<Value> {
-    authorize(db, actor, &input.topic_id, false)?;
+    authorize(db, actor, &input.group_id, false)?;
     check(
         input.query.len() <= 256 && input.goal_id.len() <= 128 && input.after <= 100000,
         Code::Invalid,
@@ -298,11 +238,11 @@ fn search(db: &Connection, actor: &str, input: &OutcomeQuery) -> Result<Value> {
     )?);
     check(snapshot <= i64::MAX as u64, Code::Invalid)?;
     // Rank only visible, already-published references inside this frozen result window.
-    let mut query = db.prepare("SELECT o.id, (SELECT COUNT(*) FROM outcome_references r JOIN outcomes child ON child.id=r.child_id WHERE r.parent_id=o.id AND r.kind=?7 AND child.sequence<=?5) AS uses FROM outcomes o WHERE o.topic_id=?1 AND (?2='' OR o.goal_id=?2) AND (?3='' OR o.kind=?3) AND (?4='' OR instr(lower(o.title),lower(?4))>0 OR instr(lower(o.summary),lower(?4))>0) AND o.sequence<=?5 ORDER BY CASE WHEN ?4<>'' AND instr(lower(o.title),lower(?4))>0 THEN 1 ELSE 0 END DESC, MIN(uses,8) DESC, o.sequence DESC LIMIT 33 OFFSET ?6")?;
+    let mut query = db.prepare("SELECT o.id, (SELECT COUNT(*) FROM outcome_references r JOIN outcomes child ON child.id=r.child_id WHERE r.parent_id=o.id AND r.kind=?7 AND child.sequence<=?5) AS uses FROM outcomes o WHERE o.group_id=?1 AND (?2='' OR o.goal_id=?2) AND (?3='' OR o.kind=?3) AND (?4='' OR instr(lower(o.title),lower(?4))>0 OR instr(lower(o.summary),lower(?4))>0) AND o.sequence<=?5 ORDER BY CASE WHEN ?4<>'' AND instr(lower(o.title),lower(?4))>0 THEN 1 ELSE 0 END DESC, MIN(uses,8) DESC, o.sequence DESC LIMIT 33 OFFSET ?6")?;
     let mut entries = query
         .query_map(
             params![
-                input.topic_id,
+                input.group_id,
                 input.goal_id,
                 input.kind.map(|k| k.as_str()).unwrap_or(""),
                 input.query,
@@ -316,7 +256,7 @@ fn search(db: &Connection, actor: &str, input: &OutcomeQuery) -> Result<Value> {
             let entry = view(db, outcome(db, &id?)?)?;
             let input = &entry.outcome.input;
             Ok(
-                json!({"id":input.id,"topic_id":input.topic_id,"goal_id":input.goal_id,
+                json!({"id":input.id,"group_id":input.group_id,"goal_id":input.goal_id,
                 "kind":input.kind,"title":input.title,"summary":input.summary,
                 "author_id":entry.outcome.author_id,"created_ms":entry.outcome.created_ms,
                 "publication":entry.publication,"verification":entry.verification,
@@ -398,4 +338,97 @@ fn view(db: &Connection, entry: Outcome) -> Result<OutcomeView> {
         latest_write,
         reference_count,
     })
+}
+
+/// Node outputs are recorded atomically with the owning task, never via worker authority.
+pub(crate) fn record_task_artifacts(db: &Connection, task: &OutcomeTask) -> Result<()> {
+    if task.kind != TaskKind::Outcome {
+        return Ok(());
+    }
+    for artifact in &task.artifacts {
+        if db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM outcomes WHERE id=?1)",
+            [&artifact.id],
+            |r| r.get::<_, bool>(0),
+        )? {
+            continue;
+        }
+        let node = task
+            .nodes
+            .iter()
+            .chain(task.retired_nodes.iter())
+            .find(|n| n.input.id == artifact.node_id)
+            .context(Code::Invalid)?;
+        let run = node
+            .attempts
+            .iter()
+            .find(|r| r.attempt == artifact.attempt)
+            .context(Code::Invalid)?;
+        let source = run.receipt["input_sha256"]
+            .as_str()
+            .context(Code::Invalid)?
+            .to_owned();
+        let evidence: Vec<OutcomeEvidence> =
+            serde_json::from_value(artifact.evidence["repository_evidence"].clone())
+                .unwrap_or_default();
+        let evidence = if evidence.is_empty() || validate_evidence(&evidence).is_ok() {
+            evidence
+        } else {
+            vec![]
+        };
+        let input = OutcomeInput {
+            node_id: Some(artifact.node_id.clone()),
+            id: artifact.id.clone(),
+            group_id: task.input.group_id.clone(),
+            goal_id: task.input.id.clone(),
+            kind: OutcomeKind::Finding,
+            title: node.input.title.clone(),
+            summary: artifact.summary.clone(),
+            conditions: node.input.acceptance.clone(),
+            evidence,
+            references: artifact
+                .inputs
+                .iter()
+                .map(|id| OutcomeReference {
+                    outcome_id: id.clone(),
+                    kind: OutcomeReferenceKind::Uses,
+                    reason: "Upstream task artifact".into(),
+                })
+                .collect(),
+            supersedes: None,
+            attempt: Some(OutcomeAttempt {
+                goal_id: task.input.id.clone(),
+                work_id: artifact.node_id.clone(),
+                attempt: artifact.attempt,
+                claim_id: run.claim_id.clone(),
+            }),
+            pins: EvidencePins {
+                source: Some(source),
+                prompt: Some(storage::digest(node.input.instruction.as_bytes())),
+                policy: Some(storage::digest(b"outcome-task-protocol-v1")),
+                superpod: None,
+            },
+            knowledge: None,
+        };
+        validate_input(&input)?;
+        let entry = Outcome {
+            digest: digest(&(&artifact.author_id, &input))?,
+            input,
+            author_id: artifact.author_id.clone(),
+            created_ms: artifact.created_ms,
+            sequence: 0,
+        };
+        db.execute("INSERT INTO outcomes(id,group_id,goal_id,author_id,kind,title,summary,value) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",params![entry.input.id,entry.input.group_id,entry.input.goal_id,entry.author_id,entry.input.kind.as_str(),entry.input.title,entry.input.summary,serde_json::to_string(&entry)?])?;
+        for reference in &entry.input.references {
+            db.execute(
+                "INSERT INTO outcome_references(child_id,parent_id,kind) VALUES(?1,?2,?3)",
+                params![
+                    entry.input.id,
+                    reference.outcome_id,
+                    reference.kind.as_str()
+                ],
+            )?;
+        }
+    }
+    Ok(())
 }

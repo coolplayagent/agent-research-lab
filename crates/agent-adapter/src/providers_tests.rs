@@ -49,3 +49,26 @@ fn external_unknown_completion_reasons_are_rejected() {
     assert!(contracts::DshTurnReason::parse("idle").is_err());
     assert!(CodexEventKind::parse("turn.maybe_completed").is_err());
 }
+
+#[test]
+fn native_evidence_preserves_nested_proposals_and_rejects_invalid_content() {
+    let input = AgentInput {
+        protocol_version: 1,
+        request_id: "probe".into(),
+        person_id: "coordinator".into(),
+        goal_id: "task".into(),
+        work_id: "plan".into(),
+        attempt: 1,
+        objective: "Plan".into(),
+        acceptance: "A graph".into(),
+        instruction: "Plan".into(),
+        messages: vec![],
+    };
+    let evidence = json!({"coordinator":{"protocol_version":1,"proposal":{"action":"clarify","question":"Scope?"}}});
+    let mut native = json!({"protocol_version":1,"request_id":"probe","summary":"Ready","succeeded":true,"evidence_json":evidence.to_string()});
+    assert_eq!(decode(&input, native.clone()).unwrap().evidence, evidence);
+    for invalid in ["null", "[]", "invalid"] {
+        native["evidence_json"] = json!(invalid);
+        assert!(decode(&input, native.clone()).is_err());
+    }
+}

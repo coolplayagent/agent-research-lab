@@ -63,7 +63,7 @@ fn core_binary_starts_and_restarts_without_optional_services() {
         let scenarios = body["scenarios"].as_array().unwrap();
         assert!(scenarios.iter().any(|s| s["id"] == "collaboration"));
         assert!(scenarios.iter().all(|s| s["id"] != "cli-research"));
-        let topics = get(addr, "/api/v1/collaboration/topics").unwrap();
+        let topics = get(addr, "/api/v2/collaboration/tasks").unwrap();
         assert!(topics.starts_with("HTTP/1.1 200"));
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {

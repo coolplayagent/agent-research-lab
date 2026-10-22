@@ -6,17 +6,8 @@ use contracts::{
 };
 use serde::{Deserialize, Serialize};
 
-pub const OUTCOME_PROTOCOL_VERSION: u32 = 1;
+pub const OUTCOME_PROTOCOL_VERSION: u32 = 2;
 pub const OUTCOME_PAGE_SIZE: usize = 32;
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct OutcomePath {
-    pub topic_id: String,
-    pub goal_id: String,
-    pub name: String,
-    pub hypothesis: String,
-}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -56,8 +47,10 @@ pub struct OutcomeKnowledgeBinding {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OutcomeInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node_id: Option<String>,
     pub id: String,
-    pub topic_id: String,
+    pub group_id: String,
     pub goal_id: String,
     pub kind: OutcomeKind,
     pub title: String,
@@ -93,7 +86,7 @@ impl Outcome {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OutcomeQuery {
-    pub topic_id: String,
+    pub group_id: String,
     #[serde(default)]
     pub goal_id: String,
     #[serde(default)]
@@ -200,8 +193,6 @@ pub struct OutcomeView {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum OutcomeCommand {
-    LinkPath { path: OutcomePath },
-    Paths { topic_id: String, after: String },
     Publish { input: Box<OutcomeInput> },
     Search { query: OutcomeQuery },
     Get { id: String },
@@ -218,17 +209,13 @@ impl OutcomeCommand {
     pub fn agent_allowed(&self) -> bool {
         matches!(
             self,
-            Self::Publish { .. }
-                | Self::Search { .. }
-                | Self::Get { .. }
-                | Self::Paths { .. }
-                | Self::History { .. }
+            Self::Publish { .. } | Self::Search { .. } | Self::Get { .. } | Self::History { .. }
         )
     }
     pub fn is_read(&self) -> bool {
         matches!(
             self,
-            Self::Search { .. } | Self::Get { .. } | Self::Paths { .. } | Self::History { .. }
+            Self::Search { .. } | Self::Get { .. } | Self::History { .. }
         )
     }
 }

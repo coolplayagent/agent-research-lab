@@ -54,8 +54,9 @@ fn fixture(git: bool) -> (tempfile::TempDir, Service, Target) {
 }
 fn outcome() -> Outcome {
     let input = OutcomeInput {
+        node_id: None,
         id: "finding".into(),
-        topic_id: "topic".into(),
+        group_id: "topic".into(),
         goal_id: "goal".into(),
         kind: OutcomeKind::Finding,
         title: "Validated finding".into(),

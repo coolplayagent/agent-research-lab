@@ -372,7 +372,7 @@ const deferred = () => {
       "/assets/shared/contracts.js": contracts,
       "./i18n.js": i18n,
       "./api.js": {
-        api: (url, payload) => { if (url === "/api/v1/collaboration/discussion") discussionSends.push(payload); return request.promise; },
+        api: (url, payload) => { if (url === "/api/v2/collaboration/questions") discussionSends.push(payload); return request.promise; },
         change: (payload) => { sends.push(payload); return request.promise; },
         query: () => "",
       },
@@ -485,14 +485,14 @@ const deferred = () => {
   oldPage.resolve({messages:[msg(8,"b",null,"b")]}); await staleHistory;
   assert(messages.messageSnapshot().some(m=>m.sequence===14),"A late history page must not undo returning to latest");
 
-  discussionInput = {scenario:"research", assignments:[{person_id:"member",instruction:"Initial instruction"}]};
+  discussionInput = {people:["member"]};
   get("message-text").value = "@member discuss this";
   request = deferred();
   const discussion = submit(); await Promise.resolve();
   request.reject(new Error("lost discussion response")); await discussion;
   messages.suspendMessages(); messages.resetMessages(a,[msg(1,"a")]);
   messages.suspendMessages(); messages.resetMessages(b,[msg(14,"b",null,"b")]);
-  discussionInput = {scenario:"collaboration", assignments:[]};
+  discussionInput = {people:[]};
   request = deferred(); const repeatDiscussion = submit(); await Promise.resolve();
   assert.equal(discussionSends.length,2);
   assert.deepEqual(discussionSends[1],discussionSends[0],"Discussion retries must freeze both the message identity and its original goal input across navigation");
@@ -518,6 +518,7 @@ const deferred = () => {
     base + "conversation.ts",
     {
       "./deletion.js": { deleteObject: async () => false },
+      "./question-runs.js": { selectQuestionRuns() {} },
       "./workspace.js": { syncControls() {} },
       "/assets/shared/contracts.js": contracts,
       "./i18n.js": i18n,

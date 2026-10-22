@@ -60,7 +60,7 @@ pub async fn protect(State(web): State<Web>, request: Request, next: Next) -> Re
             | "/api/v1/messaging/inbox"
             | "/api/v1/messaging/history"
             | "/api/v1/collaboration/work"
-            | "/api/v1/agent/outcomes"
+            | "/api/v2/agent/outcomes"
     );
     if static_get
         || actor_api

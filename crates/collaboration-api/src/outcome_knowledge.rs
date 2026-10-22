@@ -32,11 +32,10 @@ pub async fn write(State(web): State<Web>, request: Request) -> Response {
         let config = web.services.as_ref().context(OutcomeErrorCode::NotFound)?.configuration();
         ensure!(config.revision == input.configuration_revision,"{}",OutcomeErrorCode::BindingChanged);
         let entry: OutcomeView = serde_json::from_value(web.hub.outcomes(None,OutcomeCommand::Get {id:input.outcome_id}).await?)?;
-        let goal = web.hub.goal(&entry.outcome.input.goal_id).await?;
         let selected;
         let target = match (input.service_id,input.repository) {
             (Some(service_id),Some(repository)) => { selected=service_api::KnowledgeTarget {service_id,repository}; &selected },
-            (None,None) => config.knowledge_goals.get(&entry.outcome.input.goal_id).or_else(|| config.knowledge_groups.get(&goal.input.group_id)).context(OutcomeErrorCode::NotFound)?,
+            (None,None) => config.knowledge_goals.get(&entry.outcome.input.goal_id).or_else(|| config.knowledge_groups.get(&entry.outcome.input.group_id)).context(OutcomeErrorCode::NotFound)?,
             _ => anyhow::bail!("{}",OutcomeErrorCode::Invalid),
         };
         let service = configured_service(&config,&target.service_id,OutcomeServiceKind::Knowledge)?;

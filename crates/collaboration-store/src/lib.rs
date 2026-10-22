@@ -2,7 +2,6 @@
 //! Host-authorized membership, ordered logs, bounded live delivery and replay.
 pub use collaboration_model::*;
 mod conversations;
-mod coordination;
 mod deletion;
 mod directory;
 mod goal_work;
@@ -12,6 +11,7 @@ mod metrics;
 mod outcomes;
 mod schema;
 mod store;
+mod tasks;
 mod writer;
 use anyhow::{Context, Result, anyhow, ensure};
 use metrics::Metrics;
@@ -30,12 +30,12 @@ use store::{Catalog, Store};
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 pub(crate) enum Control {
+    Task(Box<TaskCommand>),
     Outcome {
         actor: String,
         credential: Option<String>,
         command: Box<OutcomeCommand>,
     },
-    Research(coordination::ResearchCommand),
     Goal(goals::GoalCommand),
     #[cfg(test)]
     ReadOnlyFault,

@@ -15,12 +15,6 @@ pub(super) fn hash(value: &str, lengths: &[usize]) -> Result<()> {
         Code::Invalid,
     )
 }
-pub(super) fn validate_path(path: &OutcomePath) -> Result<()> {
-    id(&path.topic_id)?;
-    id(&path.goal_id)?;
-    bounded(&path.name, 256)?;
-    bounded(&path.hypothesis, 4096)
-}
 pub(super) fn validate_evidence(evidence: &[OutcomeEvidence]) -> Result<()> {
     check(!evidence.is_empty() && evidence.len() <= 16, Code::Invalid)?;
     for reference in evidence {
@@ -40,13 +34,21 @@ pub(super) fn validate_evidence(evidence: &[OutcomeEvidence]) -> Result<()> {
 }
 pub(super) fn validate_input(input: &OutcomeInput) -> Result<()> {
     id(&input.id)?;
-    id(&input.topic_id)?;
+    id(&input.group_id)?;
     id(&input.goal_id)?;
     bounded(&input.title, 256)?;
-    bounded(&input.summary, 4096)?;
+    bounded(
+        &input.summary,
+        if input.node_id.is_some() { 16000 } else { 4096 },
+    )?;
     bounded(&input.conditions, 4096)?;
-    validate_evidence(&input.evidence)?;
-    check(input.references.len() <= 16, Code::Invalid)?;
+    if input.node_id.is_none() || !input.evidence.is_empty() {
+        validate_evidence(&input.evidence)?;
+    }
+    check(
+        input.references.len() <= if input.node_id.is_some() { 128 } else { 16 },
+        Code::Invalid,
+    )?;
     let mut seen = std::collections::BTreeSet::new();
     for reference in &input.references {
         id(&reference.outcome_id)?;
@@ -89,6 +91,15 @@ pub(super) fn current_attempt(db: &Connection, entry: &Outcome) -> Result<bool> 
     let Some(binding) = &entry.input.attempt else {
         return Ok(true);
     };
+    if let Some(node_id) = &entry.input.node_id {
+        let task = crate::tasks::read(db, &binding.goal_id)?;
+        return Ok(task.state != TaskState::Cancelled
+            && task.nodes.iter().any(|n| {
+                n.input.id == *node_id
+                    && n.artifact_id.as_deref() == Some(&entry.input.id)
+                    && n.attempt == binding.attempt
+            }));
+    }
     let goal = goals::read(db, &binding.goal_id)?;
     Ok(goal.state != GoalState::Cancelled
         && goal.work.iter().any(|work| {

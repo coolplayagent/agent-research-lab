@@ -1,3 +1,56 @@
+export declare const TaskKind: {
+    readonly Outcome: "outcome";
+    readonly Question: "question";
+};
+export type TaskKind = (typeof TaskKind)[keyof typeof TaskKind];
+export declare const TaskState: {
+    readonly Planning: "planning";
+    readonly Running: "running";
+    readonly WaitingInput: "waiting_input";
+    readonly Paused: "paused";
+    readonly Review: "review";
+    readonly Completed: "completed";
+    readonly Cancelled: "cancelled";
+};
+export type TaskState = (typeof TaskState)[keyof typeof TaskState];
+export declare const TaskNodeState: {
+    readonly Pending: "pending";
+    readonly Running: "running";
+    readonly Submitted: "submitted";
+    readonly Approved: "approved";
+    readonly Failed: "failed";
+    readonly Stale: "stale";
+};
+export type TaskNodeState = (typeof TaskNodeState)[keyof typeof TaskNodeState];
+export declare const TaskEventKind: {
+    readonly Created: "created";
+    readonly Claimed: "claimed";
+    readonly Submitted: "submitted";
+    readonly Checked: "checked";
+    readonly Planned: "planned";
+    readonly Revised: "revised";
+    readonly Clarification: "clarification";
+    readonly Supplemented: "supplemented";
+    readonly Paused: "paused";
+    readonly BudgetChanged: "budget_changed";
+    readonly Delivered: "delivered";
+    readonly Accepted: "accepted";
+    readonly Returned: "returned";
+    readonly Cancelled: "cancelled";
+    readonly Expired: "expired";
+};
+export type TaskEventKind = (typeof TaskEventKind)[keyof typeof TaskEventKind];
+export declare const TaskErrorCode: {
+    readonly Invalid: "task_invalid";
+    readonly Conflict: "task_conflict";
+    readonly StaleAttempt: "task_stale_attempt";
+    readonly Budget: "task_budget_exhausted";
+    readonly Unavailable: "task_executor_unavailable";
+    readonly NotFound: "task_not_found";
+    readonly Forbidden: "task_forbidden";
+    readonly Protocol: "task_protocol_invalid";
+};
+export type TaskErrorCode = (typeof TaskErrorCode)[keyof typeof TaskErrorCode];
 export declare const DeletionCode: {
     readonly Deleted: "deleted";
     readonly NotFound: "not_found";
@@ -311,11 +364,6 @@ export declare const ContentIntegrityState: {
     readonly Degraded: "degraded";
 };
 export type ContentIntegrityState = (typeof ContentIntegrityState)[keyof typeof ContentIntegrityState];
-export declare const TopicState: {
-    readonly Active: "active";
-    readonly Archived: "archived";
-};
-export type TopicState = (typeof TopicState)[keyof typeof TopicState];
 export declare const OutcomeKind: {
     readonly Finding: "finding";
     readonly Experiment: "experiment";
@@ -380,6 +428,7 @@ export declare const OutcomeEventKind: {
 };
 export type OutcomeEventKind = (typeof OutcomeEventKind)[keyof typeof OutcomeEventKind];
 export declare const OutcomeErrorCode: {
+    readonly ProtocolUpgradeRequired: "outcome_protocol_upgrade_required";
     readonly Invalid: "outcome_invalid";
     readonly Forbidden: "outcome_forbidden";
     readonly Conflict: "outcome_conflict";
@@ -390,17 +439,6 @@ export declare const OutcomeErrorCode: {
     readonly BindingChanged: "outcome_binding_changed";
 };
 export type OutcomeErrorCode = (typeof OutcomeErrorCode)[keyof typeof OutcomeErrorCode];
-export declare const SubjectKind: {
-    readonly Repository: "repository";
-    readonly Agent: "agent";
-    readonly Tool: "tool";
-    readonly Model: "model";
-    readonly Workflow: "workflow";
-    readonly Dataset: "dataset";
-    readonly Prompt: "prompt";
-    readonly Other: "other";
-};
-export type SubjectKind = (typeof SubjectKind)[keyof typeof SubjectKind];
 export declare const ApiErrorCode: {
     readonly InvalidRequest: "invalid_request";
     readonly Backpressure: "backpressure";

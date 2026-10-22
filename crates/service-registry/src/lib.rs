@@ -1,6 +1,7 @@
 //! Host-owned service configuration persistence and health probes.
 mod adapter_flow;
 mod adapter_operations;
+mod coordinator;
 mod validation;
 pub use adapter_flow::adapter_test_failure_code;
 mod binding_flow;
@@ -22,6 +23,7 @@ use std::{
 };
 
 pub struct Registry {
+    coordinator_probe: tokio::sync::Mutex<()>,
     path: PathBuf,
     config: Mutex<Configuration>,
     active_storage: Option<(String, PathBuf)>,
@@ -40,6 +42,7 @@ impl Registry {
         let state = std::fs::canonicalize(state)?;
         let path = state.join("private/services.json");
         let mut config = initialization::load(&state, development)?;
+        knowledge_migration::upgrade_local_protocol(&path, &mut config)?;
         config.validate()?;
         knowledge_migration::migrate(&path, &mut config)?;
         let active_storage = config
@@ -54,6 +57,7 @@ impl Registry {
         managed::validate_locations(&config, &state)?;
         local_knowledge::validate_locations(&config, &state)?;
         Ok(Self {
+            coordinator_probe: tokio::sync::Mutex::new(()),
             path,
             config: Mutex::new(config.clone()),
             bindings: bindings::Operations::open(&state, &config)?,
@@ -100,6 +104,17 @@ impl Registry {
                     ),
                 ConfigurationFailure(contracts::ServiceConfigurationErrorCode::ManagementImmutable)
             );
+        }
+        if let Some(selected) = &mut next.coordinator {
+            selected.protocol_evidence = current
+                .coordinator
+                .as_ref()
+                .filter(|old| {
+                    old.adapter_id == selected.adapter_id
+                        && old.model == selected.model
+                        && old.adapter_digest == selected.adapter_digest
+                })
+                .and_then(|old| old.protocol_evidence.clone());
         }
         next.adapter_test_evidence = current.adapter_test_evidence.clone();
         // Evidence is server-owned. Clients cannot forge validation by posting it.

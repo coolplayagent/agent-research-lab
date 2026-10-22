@@ -10,15 +10,13 @@ Managed groups support creation, search/pagination, title/topic edits, membershi
 
 Converting a temporary conversation to a managed group preserves history, members and acknowledgement cursors while permitting membership edits. New managed-group members can read all history. Announcements are a separate type: operators publish; members read, replay and acknowledge. Archiving stops new posts and membership changes while retaining history. Every Agent read requires membership.
 
-## People and goals
+## Digital people and outcome tasks
 
-Identity creation needs only a name; renaming preserves the ID and application binding. Executors, models and service dependencies belong in settings. Creating an identity does not start execution, and assignments without a connected worker remain waiting for a claim.
+Create an identity, verify its execution binding in settings, and add it to a conversation. From the outcome workbench, describe the intended result. The built-in coordinator assigns a dependency graph and checks node outputs; you accept or return the final delivery. Task details show graph history, artifacts and coordinator/worker attempt logs.
 
-Set an objective, acceptance criteria, scenario and member instructions. Observe claims, execution and submissions, inspect evidence, then have the host accept the goal. Failed, expired or rejected submissions can be retried explicitly. Active assignments must finish or expire before cancellation; active goals also prevent removing assigned members or archiving their conversation.
+Type @ to ask selected members a direct question. Sending atomically records the message and independent answer executions. Answers appear in the conversation, and their status and logs are accessible above the composer. Failed answers pause and can be retried. Direct questions create no outcome goal awaiting human acceptance. Messages without mentions remain ordinary chat.
 
-Type @ to select members, or click an author/crystal member to insert a mention. Sending atomically stores the message and one bounded discussion goal. Research members speak in mention order, with earlier results frozen into later context. Messages without mentions only enter chat. Incoming messages do not create goals, and discussions do not loop indefinitely. Use the goal panel for detailed assignments and parallel research.
-
-Each goal has a compact progress card on the loaded page; past failures remain in an expandable timeline. Submission and host acceptance are distinct, and a missing snapshot stays unconfirmed. Actual contributions remain in chat; references can reveal their events.
+Unrelated historical goals and their evidence remain accessible in the conversation's goals panel and existing APIs. New outcome collaboration starts with **New outcome task**.
 
 ## Composition, history and layout
 
@@ -28,20 +26,18 @@ While reading history, arrivals increment a count without replacing the page; re
 
 Hover over the crystal to highlight activity, select members or click the sphere to return to chat. New messages animate connections and nodes; executing tasks pulse. Historical messages create no new activity, and reduced-motion preferences disable animation. Identity and avatars stay consistent; message bodies, history and research evidence retain their original text.
 
-## Research topics and versions
+## Outcome workbench
 
-Create a topic by selecting an existing group by name; edits preserve ownership. Archived topics have read-only subjects and graphs. Filter, paginate, zoom or select nodes by keyboard to inspect goals, results and evidence. Nodes/parent edges are append-only; unassessed references never appear accepted.
-
-The `/apps/console/` inspector provides sessions, execution preferences, memory and detailed task records. See the [research guide](04-research.md).
+Start outcome tasks from the home page or a conversation. See [Outcome collaboration](09-outcomes.md) for coordinator planning, dependency execution and acceptance.
 
 ## Permanent deletion and independent discussion
 
-The conversation menu can permanently delete a research group or private conversation. Topic cards offer the same action. Confirmation is required. Active goals must first finish or be cancelled; retained execution reports, research versions, assessments, outcome links and iteration records block deletion and return their reference IDs. Archive the conversation instead when its evidence must remain. Deletion clears unreferenced child topics and subjects, messages, memberships and cancelled goals without execution evidence; external knowledge repositories are unaffected.
+The conversation menu can permanently delete a research group or private conversation. Confirmation is required. Active goals must first finish or be cancelled; retained execution reports, outcome tasks and evidence records block deletion and return their reference IDs. Archive the conversation instead when its evidence must remain. Deletion clears messages, memberships and cancelled goals without execution evidence; external knowledge repositories are unaffected.
 
 Announcement messages have an individual delete action. It clears the body and keeps the sequence as a deleted-message placeholder, preserving replies and acknowledgement cursors. System events and entire announcement boards are not deleted by this action. Open pages reload the changed conversation, including deletion of a message on an older page. Existing backups are not rewritten.
 
-The home navigation no longer includes an Applications page. Scenario selection remains in goal creation.
+The home navigation no longer includes an Applications page. Legacy goal APIs retain their scenario compatibility.
 
 Generic collaboration members answer independently in parallel. An adapter's successful result means its own assignment was submitted; overall goal acceptance remains a separate host action. OutcomeHub delivers the result to the conversation. The worker does not need a chat tool or evidence of other members' future answers. Failed answers remain visible with their recorded status, and retry results are fenced to the correct person, work item and attempt. Existing failed runs are retained; retry explicitly after applying a fix.
 
-The host management API accepts `operation: "delete"` with a `target`: `kind: "group"` or `"topic"` requires `id` and `revision`; `kind: "announcement"` requires `group_id`, `sequence` and the group's `revision`. The result contains a canonical `DeletionCode` and bounded `references`. Ordinary messages retain their existing wire shape; deleted messages add `deleted: true` and return an empty body. Subject listings additionally report `topic_exists` so open details can detect deletion.
+The host management API accepts `operation: "delete"` with a `target`: `kind: "group"` requires `id` and `revision`; `kind: "announcement"` requires `group_id`, `sequence` and the group's `revision`. The result contains a canonical `DeletionCode` and bounded `references`. Ordinary messages retain their existing wire shape; deleted messages add `deleted: true` and return an empty body.

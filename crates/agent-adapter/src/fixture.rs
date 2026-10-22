@@ -17,7 +17,7 @@ fn output(prompt: &str) -> Result<Value> {
         std::fs::copy("binding-input.txt", "binding-result.txt")?;
     }
     Ok(
-        json!({"protocol_version":1,"request_id":request["request_id"],"summary":"Deterministic fixture completed.","succeeded":true,"evidence":{}}),
+        json!({"protocol_version":1,"request_id":request["request_id"],"summary":"Deterministic fixture completed.","succeeded":true,"evidence_json":"{\"fixture\":true}"}),
     )
 }
 fn main() -> Result<()> {

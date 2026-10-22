@@ -422,8 +422,8 @@ async fn canonical_routes_preserve_operator_and_actor_authority() {
     for (old, new, expected) in [
         ("/api/im/people", "/api/v1/collaboration/people", 200),
         ("/api/crystal/view", "/api/v1/messaging/view", 200),
-        ("/api/im/outcomes", "/api/v1/collaboration/outcomes", 404),
-        ("/api/im/topics", "/api/v1/collaboration/topics", 200),
+        ("/api/im/outcomes", "/api/v1/collaboration/outcomes", 410),
+        ("/api/im/topics", "/api/v1/collaboration/topics", 404),
     ] {
         for operator in [false, true] {
             assert_eq!(h.request(old, None, operator, None).await.0, 404);
@@ -527,29 +527,16 @@ async fn retired_pages_and_mutations_are_unavailable() {
         "/assets/evolution.js",
         "/assets/iterations.js",
         "/assets/execution-status.js",
+        "/api/v1/collaboration/coordination",
+        "/api/v1/collaboration/topics",
+        "/api/v1/collaboration/subjects",
+        "/assets/topics.js",
     ] {
         assert_eq!(h.request(path, None, true, None).await.0, 404, "{path}");
         assert_eq!(
             h.request(path, Some(json!({})), true, None).await.0,
             404,
             "{path}"
-        );
-    }
-    for operation in ["node", "assessment"] {
-        let (status, body) = h
-            .request_intent(
-                "/api/v1/collaboration/coordination",
-                Some(json!({"operation":operation})),
-                true,
-                None,
-                "manage-research",
-            )
-            .await;
-        assert_eq!(status, 400);
-        let body: Value = serde_json::from_str(&body).unwrap();
-        assert_eq!(
-            body["code"],
-            contracts::ApiErrorCode::InvalidRequest.as_str()
         );
     }
     let (_, page) = h.request("/", None, true, None).await;

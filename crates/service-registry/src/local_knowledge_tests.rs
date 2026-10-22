@@ -9,7 +9,7 @@ fn managed_knowledge_paths_are_private_and_external_connections_are_rejected() {
         endpoint: state.path().join("external.sock"),
         enabled: true,
         management: ServiceManagement::External,
-        protocol_version: 1,
+        protocol_version: service_api::OUTCOME_PROTOCOL_VERSION,
         outcome_kinds: OutcomeKind::ALL.to_vec(),
         dependencies: vec![],
         max_seconds: 120,

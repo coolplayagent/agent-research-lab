@@ -70,6 +70,6 @@ unauthenticated service directly to a network interface.
 
 ## Storage migration
 
-Storage accepts schema 9. Use `outcome-hub-migrate` on an offline copy before changing the storage deployment; a running service never upgrades its database. Schema 9 removes version nodes, assessments and iteration storage. Deploy the matching core and storage binaries together.
+Storage accepts schema 10. Use `outcome-hub-migrate` on an offline copy before changing the storage deployment; a running service never upgrades its database. Schema 10 removes version nodes, assessments and iteration storage. Deploy the matching core and storage binaries together.
 
 The upgrade deletes iteration-owned goals (all rounds), retired software-evolution goals, and their result/outcome records. It erases the body and event payload of their system messages while preserving message identities, replies and cursors. Independent goals and chat are checked for byte preservation. Independent outcomes that reference retired evidence block migration for explicit resolution. An earlier migration manifest is replaced only on the prepared copy; its source digest remains recorded.

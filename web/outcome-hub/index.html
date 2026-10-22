@@ -13,7 +13,7 @@
     <div id="workspace" hidden="">
       <aside id="left-sidebar" class="sidebar">
         <div id="workspace-navigation">
-          <a class="brand" href="#groups"
+          <a class="brand" href="#tasks"
             ><span class="orb small">◈</span
             ><span data-i18n="workspace.brand"></span
           ></a>
@@ -40,10 +40,7 @@
             ></button>
           </div>
           <nav class="workspace-links" data-i18n-aria-label="html.9bae680405">
-            <a
-              href="#topics"
-              data-page="topics"
-            ><span id="topic-nav-icon" class="nav-icon"></span><span data-i18n="research.topics"></span></a>
+            <a href="#tasks" data-page="tasks"><span id="task-nav-icon" class="nav-icon"></span><span data-i18n="tasks.title"></span></a>
             <a
               href="#people"
               data-page="people"
@@ -64,6 +61,7 @@
           <nav data-i18n-aria-label="workspace.settingsNav">
             <a href="#settings/knowledge" data-setting="knowledge" data-i18n="knowledge.title"></a>
             <a href="#settings/bindings" data-setting="bindings" data-i18n="workspace.bindings"></a>
+            <a href="#settings/coordinator" data-setting="coordinator" data-i18n="tasks.coordinator"></a>
             <details id="advanced-settings">
               <summary data-i18n="settings.advanced"></summary>
               <a href="#settings/services" data-setting="services" data-i18n="workspace.services"></a>
@@ -161,7 +159,8 @@
                 aria-live="polite"
                 data-i18n-aria-label="html.5e7ce1f7e5"
               ></div>
-              <form id="composer">
+              <div id="question-runs" hidden role="status"></div>
+            <form id="composer">
                 <div id="mention-menu" class="mention-menu" role="listbox" data-i18n-aria-label="mentions.choose" hidden=""></div>
                 <label
                   for="message-text"
@@ -224,47 +223,15 @@
             data-i18n="html.435e8f4a1f"
           ></button>
         </section>
-        <section id="topics-page" class="content-page" hidden>
-          <header>
-            <div><h2 data-i18n="research.topics"></h2><p data-i18n="research.topicsNote"></p></div>
-            <button
-              id="new-topic"
-              class="primary"
-              data-i18n="research.newTopic"
-            ></button>
-          </header>
-          <div class="search-row">
-            <input
-              id="topic-search" type="search"
-              data-i18n-placeholder="research.search"
-              data-i18n-aria-label="research.search"
-            /><button
-              id="topic-search-button"
-              data-i18n="research.search"
-            ></button>
+        <section id="tasks-page" class="content-page" hidden>
+          <p id="tasks-status" role="status"></p>
+          <div id="task-list-view">
+            <header><div><h2 data-i18n="tasks.title"></h2><p data-i18n="tasks.note"></p></div><div class="toolbar"><button id="refresh-tasks" data-i18n="services.refresh"></button><button id="new-task" class="primary" data-i18n="tasks.new"></button></div></header>
+            <label class="task-filter"><span data-i18n="tasks.filter"></span><select id="task-filter">
+              <option value="" data-i18n="tasks.all"></option><option value="planning" data-i18n="TaskState.planning"></option><option value="running" data-i18n="TaskState.running"></option><option value="waiting_input" data-i18n="TaskState.waiting_input"></option><option value="paused" data-i18n="TaskState.paused"></option><option value="review" data-i18n="TaskState.review"></option><option value="completed" data-i18n="TaskState.completed"></option><option value="cancelled" data-i18n="TaskState.cancelled"></option>
+            </select></label><div id="task-list" class="task-cards"></div><button id="more-tasks" hidden data-i18n="tasks.more"></button>
           </div>
-          <div id="topic-list" class="cards"></div>
-          <button id="more-topics" hidden data-i18n="research.more"></button>
-          <section id="topic-detail" hidden class="research-detail">
-            <header><h3 id="topic-detail-title"></h3><button id="close-topic" data-i18n="layout.closeDetail"></button></header>
-            <p id="topic-detail-objective"></p>
-            <div class="toolbar">
-              <button
-                id="topic-open-group"
-                data-i18n="research.openGroup"
-              ></button
-              ><button
-                id="new-subject"
-                data-i18n="research.newSubject"
-              ></button>
-            </div>
-            <div id="subject-list" class="cards"></div>
-            <button
-              id="more-subjects"
-              hidden
-              data-i18n="research.more"
-            ></button>
-          </section>
+          <div id="task-detail-view" hidden><div id="task-detail-content"></div><section id="task-followup"><label><span data-i18n="tasks.followup"></span><textarea id="task-note" rows="3" maxlength="8000"></textarea></label><div class="toolbar"><button id="task-followup-send" class="primary" data-i18n="tasks.supplement"></button><button id="task-budget" data-i18n="tasks.budget"></button></div></section></div>
         </section>
 
         <section id="settings-page" class="content-page" hidden>
@@ -301,6 +268,7 @@
             <h2 data-i18n="workspace.bindings"></h2>
             <div id="binding-list"></div>
           </section>
+          <section data-settings-panel="coordinator" hidden><div id="coordinator-settings"></div></section>
           <section data-settings-panel="storage" hidden>
             <h2 data-i18n="workspace.storage"></h2>
             <div id="storage-selection"></div>
@@ -360,7 +328,7 @@
             <div class="toolbar">
               <button
                 id="refresh-collaboration"
-                data-i18n="research.refresh"
+                data-i18n="group.refresh"
               ></button
               ><button
                 id="more-collaboration"

@@ -5,7 +5,6 @@ import { t } from "./i18n.js";
 import { people } from "./people.js";
 import { mentionText, resolveMentions, mentionNames } from "./mention-model.js";
 import type { Person, GroupView, Page } from "./types.js";
-import type { Scenario } from "./goal-types.js";
 import type { ServiceView } from "./service-types.js";
 let selected = "", generation = 0;
 let members: Person[] = [], ready: Promise<void> = Promise.resolve();
@@ -93,14 +92,8 @@ export async function prepareDiscussion(groupId: string, text: string): Promise<
   if (selected !== groupId || context !== generation) throw new Error(t("mentions.changed"));
   const resolved = resolveMentions(text, members);
   if (resolved.unresolved.length) throw new Error(t("mentions.unresolved", { names: resolved.unresolved.map((name) => `@${name}`).join("、") }));
-  const result = await api<{ scenarios: Scenario[] }>("/api/v1/collaboration/scenarios");
-  const research = resolved.people.every((person) => person.application_id === "research");
-  const scenario = result.scenarios.find((item) => item.id === (research ? "research" : "collaboration"));
-  if (!scenario?.conversation) throw new Error(t("mentions.unavailable"));
-  if (!research) {
-    const { configuration } = await api<ServiceView>("/api/v1/collaboration/services");
-    const missing = resolved.people.filter((person) => !configuration.adapters.some((adapter) => adapter.id === configuration.bindings[person.id] && adapter.enabled));
-    if (missing.length) throw new Error(t("mentions.unbound", { names: missing.map((person) => `@${person.name}`).join("、") }));
-  }
-  return { id: "assigned-by-server", group_id: groupId, title: text.slice(0, 70), objective: text, acceptance: t("discussion.acceptance"), scenario: scenario.id, parameters: scenario.conversation.parameters, max_seconds: scenario.conversation.max_seconds, assignments: resolved.people.map((person) => ({ person_id: person.id, instruction: t("mentions.assignment", { name: person.name }) })) };
+  const { configuration } = await api<ServiceView>("/api/v1/collaboration/services");
+  const missing = resolved.people.filter(person => !configuration.adapters.some(adapter => adapter.id === configuration.bindings[person.id] && adapter.enabled));
+  if (missing.length) throw new Error(t("mentions.unbound", { names: missing.map(person => `@${person.name}`).join(", ") }));
+  return { people: resolved.people.map(person => person.id) };
 }

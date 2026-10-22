@@ -28,6 +28,6 @@ export async function publishKnowledge(config: Configuration, view: OutcomeView,
     content.replaceChildren(el("p", preview.path), el("h4", t("knowledge.before")), el("pre", preview.before || t("knowledge.new")), el("h4", t("knowledge.after")), el("pre", preview.after));
   }), content, el("p", t("outcome.writeNote")));
   const request_id = "write-" + uuid();
-  finish(box, async () => { if (!preview) throw new Error(t("knowledge.previewRequired")); await api("/api/v1/collaboration/outcomes/write", { request_id, outcome_id: view.outcome.input.id, expected_revision: preview.expected_revision, configuration_revision: config.revision, service_id: service.value, repository: target.value }, "manage-outcomes"); await reload(); });
+  finish(box, async () => { if (!preview) throw new Error(t("knowledge.previewRequired")); await api("/api/v2/collaboration/outcomes/write", { request_id, outcome_id: view.outcome.input.id, expected_revision: preview.expected_revision, configuration_revision: config.revision, service_id: service.value, repository: target.value }, "manage-outcomes"); await reload(); });
   await load();
 }

@@ -273,8 +273,5 @@ mod messaging_tests;
 #[path = "goal_tests.rs"]
 mod goal_tests;
 
-#[path = "coordination_tests.rs"]
-mod coordination_tests;
-
 #[path = "outcome_tests.rs"]
 mod outcome_tests;

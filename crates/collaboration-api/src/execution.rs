@@ -106,6 +106,12 @@ pub async fn run_with_scenarios(
     seconds: u64,
     mut stop: tokio::sync::watch::Receiver<bool>,
 ) {
+    let task_runner = tokio::spawn(crate::task_execution::run(
+        hub.clone(),
+        registry.clone(),
+        seconds,
+        stop.clone(),
+    ));
     let started = Instant::now();
     let mut tasks = tokio::task::JoinSet::new();
     let mut running = BTreeSet::new();
@@ -129,4 +135,6 @@ pub async fn run_with_scenarios(
         }}
     }
     tasks.shutdown().await;
+    task_runner.abort();
+    let _ = task_runner.await;
 }

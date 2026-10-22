@@ -1,4 +1,4 @@
-import { loadTopics } from "./topics.js";
+import { loadTasks, loadCoordinator } from "./tasks.js";
 import { showOutcome } from "./outcome-detail.js";
 import { notice } from "./dom.js";
 import { loadServices } from "./settings.js";
@@ -13,7 +13,7 @@ const titles = {
     groups: t("navigation.f3f8bcf3f5"),
     direct: t("navigation.484c0ffc97"),
     boards: t("navigation.ca4773c5ff"),
-    topics: t("research.topics"),
+    tasks: t("tasks.title"),
     people: t("workspace.people"),
 };
 const settings = {
@@ -21,14 +21,15 @@ const settings = {
     knowledge: t("knowledge.title"),
     adapters: t("workspace.adapters"),
     bindings: t("workspace.bindings"),
+    coordinator: t("tasks.coordinator"),
     storage: t("workspace.storage"),
 };
-let previous = "", workspaceRoute = "#groups", scroll = 0;
+let previous = "", workspaceRoute = "#tasks", scroll = 0;
 export function navigate() {
     let requested = location.hash.slice(1);
     if (["applications", "evolution", "iterations"].includes(requested)) {
-        requested = "groups";
-        history.replaceState(null, "", "#groups");
+        requested = "tasks";
+        history.replaceState(null, "", "#tasks");
     }
     if (requested === "settings" ||
         (requested.startsWith("settings/") && !settings[requested.split("/")[1]])) {
@@ -46,13 +47,11 @@ export function navigate() {
     const setting = requested.startsWith("settings/")
         ? requested.split("/")[1]
         : "";
-    const page = setting
-        ? "settings"
-        : requested.startsWith("topics/outcomes/")
-            ? "topics"
-            : titles[requested]
-                ? requested
-                : "groups";
+    if (!requested || requested.startsWith("topics") || ["evolution", "iterations"].includes(requested)) {
+        requested = "tasks";
+        history.replaceState(null, "", "#tasks");
+    }
+    const page = setting ? "settings" : requested.startsWith("tasks/") || requested.startsWith("outcomes/") ? "tasks" : titles[requested] ? requested : "tasks";
     const conversation = ["groups", "direct", "boards"].includes(page);
     if (!get("conversations").hidden)
         scroll = get("messages").scrollTop;
@@ -70,7 +69,7 @@ export function navigate() {
     }
     if (setting)
         get("workspace").classList.remove("left-collapsed");
-    for (const name of ["people", "settings", "topics"])
+    for (const name of ["people", "settings", "tasks"])
         get(name + "-page").hidden = name !== page;
     get("conversations").hidden = !conversation;
     if (conversation) {
@@ -78,15 +77,17 @@ export function navigate() {
         workspaceRoute = "#" + page;
         get("return-workspace").href = workspaceRoute;
     }
-    if (page === "topics")
-        void loadTopics();
-    if (requested.startsWith("topics/outcomes/")) {
-        void showOutcome(decodeURIComponent(requested.slice("topics/outcomes/".length))).catch(notice);
+    if (page === "tasks")
+        void loadTasks();
+    if (requested.startsWith("outcomes/")) {
+        void showOutcome(decodeURIComponent(requested.slice("outcomes/".length))).catch(notice);
     }
     else
         document.getElementById("outcome-dialog")?.remove();
     if (page === "people")
         void loadPeople();
+    if (setting === "coordinator")
+        void loadCoordinator();
     if (setting) {
         if (["services", "adapters", "storage"].includes(setting))
             get("advanced-settings").open = true;
@@ -103,7 +104,7 @@ export function navigate() {
     syncControls();
 }
 export function initNavigation() {
-    get("topic-nav-icon").replaceChildren(icon("topic"));
+    get("task-nav-icon").replaceChildren(icon("topic"));
     get("people-nav-icon").replaceChildren(icon("people"));
     initSettingsGuard();
     document.addEventListener("click", (event) => {

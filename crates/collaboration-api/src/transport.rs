@@ -90,6 +90,22 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
         .route("/api/v1/messaging/presence", post(presence))
         .route("/api/v1/messaging/manage", post(super::rooms::manage))
         .route("/api/v1/messaging/view", get(super::rooms::view))
+        .route(
+            "/api/v2/collaboration/tasks",
+            get(crate::tasks::list).post(crate::tasks::manage),
+        )
+        .route(
+            "/api/v2/collaboration/questions",
+            get(crate::tasks::questions).post(crate::tasks::question),
+        )
+        .route(
+            "/api/v2/collaboration/coordinator",
+            get(crate::tasks::coordinator).post(crate::tasks::configure),
+        )
+        .route(
+            "/api/v2/collaboration/coordinator/test",
+            post(crate::tasks::test_coordinator),
+        )
         .route("/api/v1/messaging/events", get(super::rooms::events))
         .route("/api/v1/messaging/inbox", get(crate::agents::inbox))
         .route("/api/v1/messaging/history", get(crate::agents::history))
@@ -111,34 +127,27 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
             get(crate::goals::assigned).post(crate::goals::work),
         )
         .route(
-            "/api/v1/collaboration/topics",
-            get(crate::coordination::topics),
-        )
-        .route(
-            "/api/v1/collaboration/subjects",
-            get(crate::coordination::subjects),
-        )
-        .route(
-            "/api/v1/collaboration/coordination",
-            post(crate::coordination::change),
-        )
-        .route(
             "/api/v1/collaboration/outcomes",
+            get(crate::outcomes::retired).post(crate::outcomes::retired),
+        )
+        .route("/api/v1/agent/outcomes", post(crate::outcomes::retired))
+        .route(
+            "/api/v2/collaboration/outcomes",
             get(crate::outcomes::list).post(crate::outcomes::manage),
         )
         .route(
-            "/api/v1/collaboration/outcomes/host-verify",
+            "/api/v2/collaboration/outcomes/host-verify",
             post(crate::outcomes::host_verify),
         )
         .route(
-            "/api/v1/collaboration/outcomes/write",
+            "/api/v2/collaboration/outcomes/write",
             post(crate::outcome_knowledge::write),
         )
         .route(
-            "/api/v1/collaboration/outcomes/reconcile",
+            "/api/v2/collaboration/outcomes/reconcile",
             post(crate::outcome_knowledge::reconcile),
         )
-        .route("/api/v1/agent/outcomes", post(crate::outcomes::agent))
+        .route("/api/v2/agent/outcomes", post(crate::outcomes::agent))
         .route("/api/v1/knowledge", post(super::knowledge::manage))
         .merge(application)
         .fallback(resource)

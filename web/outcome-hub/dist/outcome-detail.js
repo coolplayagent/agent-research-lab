@@ -1,30 +1,20 @@
 import { publishKnowledge } from "./knowledge-publish.js";
 import { uuid } from "/assets/shared/identity.js";
-import { OutcomeAcceptanceState, OutcomeVerificationState, OutcomePublicationState, OutcomeReferenceKind, OutcomeServiceKind, KnowledgeWriteState, VerificationRunState } from "/assets/shared/contracts.js";
+import { OutcomeAcceptanceState, OutcomeVerificationState, OutcomePublicationState, OutcomeServiceKind, KnowledgeWriteState, VerificationRunState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
 import { t, label } from "./i18n.js";
 import { el, button, actions } from "./dom.js";
 import { dialog, area, check, select, field, finish } from "./forms.js";
-import { outcomeCommand, publicationForm } from "./outcome-forms.js";
-export async function outcomePaths(topic_id) {
-    const paths = [];
-    let after = "";
-    do {
-        const page = await outcomeCommand({ operation: "paths", topic_id, after });
-        paths.push(...page.paths);
-        after = page.next_after || "";
-    } while (after && paths.length < 4096);
-    return paths;
-}
+const outcomeCommand = (command) => api("/api/v2/collaboration/outcomes", command, "manage-outcomes");
 export function outcomeLink(id, title = id) {
     const link = el("a", title);
-    link.href = "#topics/outcomes/" + encodeURIComponent(id);
+    link.href = "#outcomes/" + encodeURIComponent(id);
     link.onclick = () => { if (location.hash === link.hash)
         void showOutcome(id).catch(error => { document.getElementById("notice").textContent = String(error); }); };
     return link;
 }
 export async function showOutcome(id) {
-    const view = await api("/api/v1/collaboration/outcomes?" + query({ id }));
+    const view = await api("/api/v2/collaboration/outcomes?" + query({ id }));
     document.getElementById("outcome-dialog")?.remove();
     const box = dialog(view.outcome.input.title), entry = view.outcome.input;
     box.dialog.id = "outcome-dialog";
@@ -55,9 +45,7 @@ export async function showOutcome(id) {
     if (view.latest_decision)
         box.form.append(el("h3", t("outcome.decision")), el("p", view.latest_decision.reason));
     const reload = async () => { box.dialog.close(); await showOutcome(id); };
-    const controls = actions(button(t("outcome.refresh"), reload), button(t("outcome.copyLink"), async () => { await navigator.clipboard.writeText(location.href.split("#")[0] + "#topics/outcomes/" + encodeURIComponent(id)); box.status.textContent = t("outcome.linkCopied"); }));
-    controls.append(button(t("outcome.reuse"), async () => { const paths = await outcomePaths(entry.topic_id); box.dialog.close(); publicationForm({ id: entry.topic_id }, paths, async () => showOutcome(id), { outcome_id: id, kind: OutcomeReferenceKind.Uses, reason: "" }); }));
-    controls.append(button(t("outcome.newVersion"), async () => { const paths = await outcomePaths(entry.topic_id); box.dialog.close(); publicationForm({ id: entry.topic_id }, paths, async () => showOutcome(id), undefined, entry); }));
+    const controls = actions(button(t("outcome.refresh"), reload), button(t("outcome.copyLink"), async () => { await navigator.clipboard.writeText(location.href.split("#")[0] + "#outcomes/" + encodeURIComponent(id)); box.status.textContent = t("outcome.linkCopied"); }));
     if (view.publication === OutcomePublicationState.Published) {
         controls.append(button(t("outcome.hostVerify"), () => hostVerify(view, reload)));
         controls.append(button(t("outcome.withdraw"), () => reasonForm(t("outcome.withdraw"), async (reason) => { await outcomeCommand({ operation: "withdraw", id, reason }); await reload(); })));
@@ -114,7 +102,7 @@ function renderServices(panel, view, services, reload) {
         if (write.result?.reference)
             panel.append(el("pre", write.result.reference + "\n" + write.result.revision));
         if ((state === KnowledgeWriteState.Pending || state === KnowledgeWriteState.Unknown))
-            panel.append(button(t("outcome.reconcile"), async () => { await api("/api/v1/collaboration/outcomes/reconcile", { outcome_id: entry.id, request_id: write.input.id }, "manage-outcomes"); await reload(); }));
+            panel.append(button(t("outcome.reconcile"), async () => { await api("/api/v2/collaboration/outcomes/reconcile", { outcome_id: entry.id, request_id: write.input.id }, "manage-outcomes"); await reload(); }));
     }
     if (!(config.outcome_services || []).some(s => s.enabled && s.kind === OutcomeServiceKind.Knowledge)) {
         panel.append(el("p", t("outcome.unbound")));
@@ -141,7 +129,7 @@ function hostVerify(view, reload) {
         const evidence_indices = selections.filter(item => item.node.checked).map(item => item.index);
         if (!evidence_indices.length)
             throw new Error(t("outcome.evidenceRequired"));
-        await api("/api/v1/collaboration/outcomes/host-verify", { request_id, outcome_id: view.outcome.input.id, state: state.value, summary: summary.value.trim(), evidence_indices }, "manage-outcomes");
+        await api("/api/v2/collaboration/outcomes/host-verify", { request_id, outcome_id: view.outcome.input.id, state: state.value, summary: summary.value.trim(), evidence_indices }, "manage-outcomes");
         await reload();
     });
 }

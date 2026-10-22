@@ -9,6 +9,9 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    Task {
+        command: Box<TaskCommand>,
+    },
     Goal {
         id: String,
     },
@@ -19,17 +22,6 @@ pub enum Request {
     Discuss {
         input: GoalInput,
         message: Publish,
-    },
-    ResearchChange {
-        change: ResearchChange,
-    },
-    Topics {
-        after: String,
-        query: String,
-    },
-    Subjects {
-        topic: String,
-        after: String,
     },
     Probe,
     Metrics,
@@ -208,6 +200,15 @@ impl Client {
         }
     }
 
+    pub async fn tasks(&self, command: TaskCommand) -> Result<Value> {
+        self.call(
+            &Request::Task {
+                command: Box::new(command),
+            },
+            Duration::from_secs(10),
+        )
+        .await
+    }
     pub async fn outcomes(&self, token: Option<&str>, command: OutcomeCommand) -> Result<Value> {
         self.call(
             &Request::Outcomes {
@@ -218,31 +219,6 @@ impl Client {
         )
         .await
     }
-    pub async fn research_change(&self, change: ResearchChange) -> Result<Value> {
-        self.call(&Request::ResearchChange { change }, Duration::from_secs(10))
-            .await
-    }
-    pub async fn topics(&self, after: &str, query: &str) -> Result<Value> {
-        self.call(
-            &Request::Topics {
-                after: after.into(),
-                query: query.into(),
-            },
-            Duration::from_secs(10),
-        )
-        .await
-    }
-    pub async fn subjects(&self, topic: &str, after: &str) -> Result<Value> {
-        self.call(
-            &Request::Subjects {
-                topic: topic.into(),
-                after: after.into(),
-            },
-            Duration::from_secs(10),
-        )
-        .await
-    }
-
     pub fn remote(path: PathBuf) -> Result<Self> {
         rpc::endpoint(&path)?;
         Ok(Self::Remote(path))

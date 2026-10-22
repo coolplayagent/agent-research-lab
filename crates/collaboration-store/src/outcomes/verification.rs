@@ -2,7 +2,7 @@ use super::*;
 
 fn available(db: &Connection, actor: &str, id: &str) -> Result<OutcomeView> {
     let entry = outcome(db, id)?;
-    authorize(db, actor, &entry.input.topic_id, true)?;
+    authorize(db, actor, &entry.input.group_id, true)?;
     check(current_attempt(db, &entry)?, Code::StaleAttempt)?;
     let view = view(db, entry)?;
     check(
@@ -62,7 +62,7 @@ pub(super) fn change(db: &Connection, actor: &str, command: OutcomeCommand) -> R
                 by_request::<OutcomeVerification>(db, Event::VerificationStarted, &result.id)?
                     .context(Code::NotFound)?;
             let entry = outcome(db, &run.input.outcome_id)?;
-            authorize(db, actor, &entry.input.topic_id, false)?;
+            authorize(db, actor, &entry.input.group_id, false)?;
             check(
                 result.request_digest == run.request_digest,
                 Code::BindingChanged,
@@ -195,7 +195,7 @@ pub(super) fn change(db: &Connection, actor: &str, command: OutcomeCommand) -> R
                 .context(Code::NotFound)?;
             let entry = outcome(db, &write.input.outcome_id)?;
             // Reconciliation must remain possible after cancellation or archival.
-            authorize(db, actor, &entry.input.topic_id, false)?;
+            authorize(db, actor, &entry.input.group_id, false)?;
             check(
                 result.request_digest == write.request_digest,
                 Code::BindingChanged,

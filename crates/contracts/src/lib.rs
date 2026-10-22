@@ -47,6 +47,12 @@ macro_rules! states {
 }
 
 states! {
+    TaskKind { Outcome => "outcome", Question => "question" }
+    TaskState { Planning => "planning", Running => "running", WaitingInput => "waiting_input", Paused => "paused", Review => "review", Completed => "completed", Cancelled => "cancelled" }
+    TaskNodeState { Pending => "pending", Running => "running", Submitted => "submitted", Approved => "approved", Failed => "failed", Stale => "stale" }
+    TaskEventKind { Created => "created", Claimed => "claimed", Submitted => "submitted", Checked => "checked", Planned => "planned", Revised => "revised", Clarification => "clarification", Supplemented => "supplemented", Paused => "paused", BudgetChanged => "budget_changed", Delivered => "delivered", Accepted => "accepted", Returned => "returned", Cancelled => "cancelled", Expired => "expired" }
+    TaskErrorCode { Invalid => "task_invalid", Conflict => "task_conflict", StaleAttempt => "task_stale_attempt", Budget => "task_budget_exhausted", Unavailable => "task_executor_unavailable", NotFound => "task_not_found", Forbidden => "task_forbidden", Protocol => "task_protocol_invalid" }
+
     DeletionCode { Deleted => "deleted", NotFound => "not_found", RevisionConflict => "revision_conflict", ActiveGoals => "active_goals", EvidenceReferences => "evidence_references", Unsupported => "unsupported" }
     CodexEventKind { ThreadStarted => "thread.started", TurnStarted => "turn.started", TurnCompleted => "turn.completed", TurnFailed => "turn.failed", ItemStarted => "item.started", ItemUpdated => "item.updated", ItemCompleted => "item.completed", Error => "error" }
     ClaudeResultState { Success => "success", ErrorDuringExecution => "error_during_execution", ErrorMaxTurns => "error_max_turns", ErrorMaxBudget => "error_max_budget_usd", ErrorStructuredOutput => "error_max_structured_output_retries" }
@@ -84,7 +90,6 @@ states! {
     TrialVariant { Baseline => "baseline", Candidate => "candidate" }
     PromptEvaluationKind { Promotion => "promotion", Novelty => "novelty" }
     ContentIntegrityState { Complete => "complete", Degraded => "degraded" }
-    TopicState { Active => "active", Archived => "archived" }
     OutcomeKind { Finding => "finding", Experiment => "experiment", Counterexample => "counterexample", Artifact => "artifact" }
     OutcomeReferenceKind { Uses => "uses", Supports => "supports", Challenges => "challenges" }
     OutcomePublicationState { Published => "published", Withdrawn => "withdrawn" }
@@ -94,8 +99,7 @@ states! {
     KnowledgeWriteState { Pending => "pending", Applied => "applied", Failed => "failed", Unknown => "unknown" }
     OutcomeServiceKind { Verifier => "verifier", Knowledge => "knowledge" }
     OutcomeEventKind { Withdrawn => "withdrawn", VerificationStarted => "verification_started", VerificationFinished => "verification_finished", Decision => "decision", WriteStarted => "write_started", WriteFinished => "write_finished", WriteReconciled => "write_reconciled" }
-    OutcomeErrorCode { Invalid => "outcome_invalid", Forbidden => "outcome_forbidden", Conflict => "outcome_conflict", StaleAttempt => "outcome_stale_attempt", NotFound => "outcome_not_found", Capacity => "outcome_capacity", VerificationRequired => "outcome_verification_required", BindingChanged => "outcome_binding_changed" }
-    SubjectKind { Repository => "repository", Agent => "agent", Tool => "tool", Model => "model", Workflow => "workflow", Dataset => "dataset", Prompt => "prompt", Other => "other" }
+    OutcomeErrorCode { ProtocolUpgradeRequired => "outcome_protocol_upgrade_required", Invalid => "outcome_invalid", Forbidden => "outcome_forbidden", Conflict => "outcome_conflict", StaleAttempt => "outcome_stale_attempt", NotFound => "outcome_not_found", Capacity => "outcome_capacity", VerificationRequired => "outcome_verification_required", BindingChanged => "outcome_binding_changed" }
     ApiErrorCode { InvalidRequest => "invalid_request", Backpressure => "backpressure", StorageUnavailable => "storage_unavailable" }
     InstallationPhase { Staged => "staged", PreviousBackedUp => "previous_backed_up", Activated => "activated", Verified => "verified", RolledBack => "rolled_back" }
     ScenarioCapability { Execute => "execute", Evaluate => "evaluate", Deliver => "deliver", Activate => "activate", Rollback => "rollback" }

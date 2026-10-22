@@ -44,7 +44,7 @@ pub struct Page {
     #[serde(default)]
     pub id: String,
     #[serde(default)]
-    pub topic_id: String,
+    pub group_id: String,
     #[serde(default)]
     pub goal_id: String,
     #[serde(default)]
@@ -60,7 +60,7 @@ pub async fn list(State(web): State<Web>, Query(page): Query<Page>) -> Response 
     let command = if page.id.is_empty() {
         OutcomeCommand::Search {
             query: OutcomeQuery {
-                topic_id: page.topic_id,
+                group_id: page.group_id,
                 goal_id: page.goal_id,
                 query: page.query,
                 after: page.after,
@@ -226,11 +226,10 @@ async fn validate_source_binding(web: &Web, command: &OutcomeCommand) -> Result<
             .as_ref()
             .context(OutcomeErrorCode::NotFound)?
             .configuration();
-        let goal = web.hub.goal(&input.goal_id).await?;
         let target = config
             .knowledge_goals
             .get(&input.goal_id)
-            .or_else(|| config.knowledge_groups.get(&goal.input.group_id));
+            .or_else(|| config.knowledge_groups.get(&input.group_id));
         ensure!(
             target.is_some_and(|target| target.service_id == binding.service_id
                 && target.repository == binding.repository),
@@ -272,4 +271,8 @@ pub(super) async fn service_ready(web: &Web, service: &service_api::OutcomeServi
         Ok(())
     })
     .await?
+}
+
+pub async fn retired() -> Response {
+    (StatusCode::GONE,axum::Json(json!({"error":{"code":OutcomeErrorCode::ProtocolUpgradeRequired,"parameters":{}},"code":OutcomeErrorCode::ProtocolUpgradeRequired}))).into_response()
 }

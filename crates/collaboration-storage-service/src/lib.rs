@@ -52,10 +52,8 @@ fn info() -> rpc::ServiceInfo {
 }
 async fn execute(hub: &Hub, request: Request) -> Result<Value> {
     match request {
+        Request::Task { command } => hub.tasks(*command).await,
         Request::Outcomes { token, command } => hub.outcomes(token.as_deref(), *command).await,
-        Request::ResearchChange { change } => hub.research_change(change).await,
-        Request::Topics { after, query } => hub.topics(&after, &query).await,
-        Request::Subjects { topic, after } => hub.subjects(&topic, &after).await,
         Request::Probe => Ok(json!(info())),
         Request::Metrics => Ok(hub.metrics()),
         Request::Receives { actor, group } => {

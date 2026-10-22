@@ -73,10 +73,11 @@ dependencies and Agent bindings. Validate references and configuration revisions
 Storage endpoint changes require a deliberate restart against prepared data;
 never silently replace a live store. Preserve the existing research evidence gates.
 
-## Coordination and lineage
+## Outcome coordination
 
-Keep research topics and subject/version lineage as coordination metadata linked
-to collaboration groups and goals. Knowledge contents remain in the bound external repository, including SuperPOD when selected.
-Version nodes and parent edges are append-only, scoped to one subject and acyclic.
-Derive graph assessment states from recorded goal execution and host acceptance;
-never present an unassessed reference or a worker's claim as verified promotion.
+Coordination is scoped to conversations and outcome tasks. Research topics and
+subject/version registries have been retired. A built-in coordinator proposes
+bounded dependency graphs; the storage owner validates and commits transitions.
+Workers consume recorded upstream artifacts. Keep submissions, coordinator checks,
+independent evidence verification and human acceptance as separate lifecycles.
+Never present a worker or coordinator claim as verified evidence or human approval.

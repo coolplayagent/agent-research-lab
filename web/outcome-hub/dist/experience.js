@@ -54,5 +54,4 @@ export function initExperience() {
         get("dismiss-notice").hidden = true;
     };
     searchKeys(get("people-search"), () => get("search-people").click());
-    searchKeys(get("topic-search"), () => get("topic-search-button").click());
 }

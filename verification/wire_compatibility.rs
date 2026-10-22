@@ -14,7 +14,7 @@ fn extracted_contracts_keep_original_wire_bytes_and_defaults() {
         "4fd42de092b8af96913c7df64de0c0b82e9123d0"
     );
     let records = fixture["records"].as_array().unwrap();
-    assert_eq!(records.len(), 14);
+    assert_eq!(records.len(), 10);
     for record in records {
         let input = &record["input"];
         let actual = match record["kind"].as_str().unwrap() {
@@ -22,7 +22,6 @@ fn extracted_contracts_keep_original_wire_bytes_and_defaults() {
             "group" => wire::<collaboration_model::NewGroup>(input),
             "goal" => wire::<collaboration_model::GoalInput>(input),
             "outcome_command" => wire::<collaboration_model::OutcomeCommand>(input),
-            "coordination" => wire::<collaboration_model::ResearchChange>(input),
             "storage_request" => wire::<collaboration_client::Request>(input),
             "agent_input" => wire::<service_api::AgentInput>(input),
             "configuration" => wire::<service_api::Configuration>(input),

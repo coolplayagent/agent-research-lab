@@ -34,8 +34,9 @@ fn setup() -> (tempfile::TempDir, BTreeMap<String, GitTarget>, String) {
 }
 fn proposal(head: &str) -> (KnowledgeWrite, Outcome) {
     let input = OutcomeInput {
+        node_id: None,
         id: "finding".into(),
-        topic_id: "topic".into(),
+        group_id: "topic".into(),
         goal_id: "goal".into(),
         kind: OutcomeKind::Finding,
         title: "Validated finding".into(),

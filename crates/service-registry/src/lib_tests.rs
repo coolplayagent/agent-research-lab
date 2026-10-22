@@ -113,7 +113,7 @@ fn retired_configuration_is_rejected_without_rewriting_private_state() {
         id: "planning".into(),
         endpoint: root.path().join("private/planning.sock"),
         enabled: false,
-        protocol_version: 1,
+        protocol_version: service_api::OUTCOME_PROTOCOL_VERSION,
         capabilities: vec![contracts::ScenarioCapability::Execute],
         dependencies: vec![],
     });
@@ -142,7 +142,7 @@ fn retired_configuration_is_rejected_without_rewriting_private_state() {
         management: contracts::ServiceManagement::External,
         endpoint: root.path().join("private/verifier.sock"),
         enabled: false,
-        protocol_version: 1,
+        protocol_version: service_api::OUTCOME_PROTOCOL_VERSION,
         outcome_kinds: vec![contracts::OutcomeKind::Finding],
         dependencies: vec![],
         max_seconds: 10,

@@ -10,12 +10,14 @@ mod goals;
 mod knowledge;
 mod scenarios;
 mod services;
+mod task_execution;
+mod task_prompt;
+mod tasks;
 pub use scenarios::{
     Collaboration, ConversationDefaults, Scenario, ScenarioAdapter, ScenarioField,
     default_scenarios,
 };
 mod assets;
-mod coordination;
 pub mod operator;
 mod outcome_knowledge;
 mod outcomes;
