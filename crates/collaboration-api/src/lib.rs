@@ -5,6 +5,7 @@ mod agents;
 mod bindings;
 mod design_review;
 pub mod execution;
+mod execution_input;
 mod goals;
 pub mod iteration;
 mod knowledge;

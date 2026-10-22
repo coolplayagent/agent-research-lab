@@ -1,3 +1,4 @@
+import { deleteObject } from "./deletion.js";
 import { GroupKind } from "/assets/shared/contracts.js";
 import { t } from "./i18n.js";
 import { goalSnapshot, focusGoal } from "./goals.js";
@@ -139,6 +140,17 @@ function renderMessages(): void {
     }
     const { message } = item;
     root.append(messageRow(message, messages, goals, {
+      remove: group?.kind === GroupKind.Board && !message.event && !message.deleted ? async () => {
+        if (!group) return;
+        const owner = group, request = generation;
+        try {
+          if (!await deleteObject({ kind: "announcement", group_id: owner.id, sequence: message.sequence, revision: owner.revision }, t("deletion.announcement"))) return;
+          if (request !== generation) return;
+          const deleted = { ...message, text: "", deleted: true };
+          messages.set(message.sequence, deleted); liveMessages.set(message.sequence, deleted);
+          renderMessages();
+        } catch (error) { notice(error); }
+      } : undefined,
       mention: insertMention,
       locate: locateMessage,
       review: focusGoal,

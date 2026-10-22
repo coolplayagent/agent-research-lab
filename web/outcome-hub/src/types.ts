@@ -30,6 +30,7 @@ export interface Member {
   connections: number;
 }
 export interface Message {
+  deleted?: boolean;
   event?: {
     kind: GoalEventKind;
     goal_id: string;

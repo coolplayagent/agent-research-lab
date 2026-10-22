@@ -365,3 +365,45 @@ async fn embedded_and_remote_clients_share_delivery_and_idempotency_contracts() 
     remote.abort();
     let _ = remote.await;
 }
+
+#[tokio::test]
+async fn remote_deletion_uses_the_storage_owner_and_returns_structured_results() {
+    let root = tempfile::tempdir().unwrap();
+    let socket = root.path().join("private/delete.sock");
+    let state = root.path().join("db");
+    let service = tokio::spawn({
+        let socket = socket.clone();
+        async move { serve(&state, &socket, 30).await }
+    });
+    let client = Client::remote(socket.clone()).unwrap();
+    for _ in 0..100 {
+        if socket.exists() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    client.register_operator().await.unwrap();
+    client
+        .create_group(NewGroup {
+            id: "delete-room".into(),
+            title: "Disposable".into(),
+            topic: "Deletion".into(),
+            kind: GroupKind::Conversation,
+            private: false,
+            members: vec!["operator".into()],
+        })
+        .await
+        .unwrap();
+    let outcome = client
+        .delete(DeleteTarget::Group {
+            id: "delete-room".into(),
+            revision: 1,
+        })
+        .await
+        .unwrap();
+    assert_eq!(outcome.code, contracts::DeletionCode::Deleted);
+    assert!(outcome.references.is_empty());
+    assert!(client.group("delete-room").await.is_err());
+    service.abort();
+    let _ = service.await;
+}

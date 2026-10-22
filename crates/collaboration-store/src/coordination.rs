@@ -123,7 +123,13 @@ impl Store {
                 }
                 let next = (rows.len() > 64).then(|| rows[63]["subject"]["id"].clone());
                 rows.truncate(64);
-                Ok(json!({"subjects":rows,"next_after":next}))
+                let topic_exists = topic.is_empty()
+                    || self.connection.query_row(
+                        "SELECT EXISTS(SELECT 1 FROM research_topics WHERE id=?1)",
+                        [&topic],
+                        |r| r.get::<_, bool>(0),
+                    )?;
+                Ok(json!({"subjects":rows,"next_after":next,"topic_exists":topic_exists}))
             }
             ResearchCommand::Graph {
                 topic,

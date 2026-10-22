@@ -7,7 +7,6 @@ import { t } from "./i18n.js";
 import { get } from "./dom.js";
 import { icon } from "./icons.js";
 import { loadPeople } from "./people.js";
-import { loadApplications } from "./applications.js";
 import { allowSettingsLeave, initSettingsGuard } from "./settings-guard.js";
 import { revealResearch, syncControls } from "./workspace.js";
 const titles = {
@@ -16,7 +15,6 @@ const titles = {
     boards: t("navigation.ca4773c5ff"),
     topics: t("research.topics"),
     people: t("workspace.people"),
-    applications: t("navigation.28f6b6e645"),
 };
 const settings = {
     services: t("workspace.services"),
@@ -29,6 +27,10 @@ const settings = {
 let previous = "", workspaceRoute = "#groups", scroll = 0;
 export function navigate() {
     let requested = location.hash.slice(1);
+    if (requested === "applications") {
+        requested = "groups";
+        history.replaceState(null, "", "#groups");
+    }
     if (requested === "settings" ||
         (requested.startsWith("settings/") && !settings[requested.split("/")[1]])) {
         requested = "settings/bindings";
@@ -71,7 +73,7 @@ export function navigate() {
     }
     if (setting)
         get("workspace").classList.remove("left-collapsed");
-    for (const name of ["people", "applications", "settings", "topics"])
+    for (const name of ["people", "settings", "topics"])
         get(name + "-page").hidden = name !== page;
     get("conversations").hidden = !conversation;
     if (conversation) {
@@ -90,8 +92,6 @@ export function navigate() {
         document.getElementById("outcome-dialog")?.remove();
     if (page === "people")
         void loadPeople();
-    if (page === "applications")
-        void loadApplications();
     if (setting) {
         if (["services", "adapters", "storage"].includes(setting))
             get("advanced-settings").open = true;
@@ -110,7 +110,6 @@ export function navigate() {
 export function initNavigation() {
     get("topic-nav-icon").replaceChildren(icon("topic"));
     get("people-nav-icon").replaceChildren(icon("people"));
-    get("applications-nav-icon").replaceChildren(icon("applications"));
     initSettingsGuard();
     document.addEventListener("click", (event) => {
         const link = event.target.closest("a[href^='#']");

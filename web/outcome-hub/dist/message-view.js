@@ -6,6 +6,8 @@ import { display } from "./people.js";
 import { contributionText } from "./contribution-text.js";
 import { resultForMessage } from "./message-results.js";
 function preview(message) {
+    if (message.deleted)
+        return t("deletion.deletedAnnouncement");
     if (message.event && message.sender_id !== message.event.person_id)
         return t("GoalEvent." + message.event.kind, { title: message.event.title, person: display(message.event.person_id || "operator"), attempt: message.event.attempt });
     return contributionText(message.text, display(message.sender_id));
@@ -17,6 +19,10 @@ export function messageRow(message, history, goals, actions) {
     const system = message.event && !contribution && !submission;
     const row = el("article", undefined, "message" + (author === "operator" ? " own" : "") + (system ? " system-event" : "") + (contribution ? " agent-contribution" : ""));
     row.dataset.sequence = String(message.sequence);
+    if (message.deleted) {
+        row.append(el("p", t("deletion.deletedAnnouncement")));
+        return row;
+    }
     if (system) {
         row.append(el("p", t("GoalEvent." + message.event.kind, { title: message.event.title, person: display(message.event.person_id || "operator"), attempt: message.event.attempt })));
         return row;
@@ -42,9 +48,13 @@ export function messageRow(message, history, goals, actions) {
         quote.append(el("strong", parent ? `@${display(parent.sender_id)}` : t("messages.a40f9e2d59", { p0: message.reply_to })), el("span", parent ? preview(parent).replace(/\s+/gu, " ").slice(0, 120) : t("messages.previousPage")));
         bubble.append(quote);
     }
-    const content = submission && !contribution ? (submission.result.code ? label("WorkResultCode", submission.result.code) : submission.result.summary) : message.text;
+    const content = submission ? (submission.result.code ? label("WorkResultCode", submission.result.code) : submission.result.summary) : message.text;
     bubble.append(el("p", author === "operator" ? content : contributionText(content, display(author)), "message-text"));
     const footer = el("footer", undefined, "message-actions");
+    if (submission)
+        footer.append(el("span", label("WorkState", submission.work.state)));
+    if (actions.remove)
+        footer.append(button(t("deletion.action"), actions.remove));
     footer.append(button(t("messages.cf945e21dd"), actions.reply));
     if (contribution || submission)
         footer.append(button(t("messages.reviewResult"), () => actions.review(message.event.goal_id)));

@@ -474,3 +474,49 @@ mod iteration_tests;
 
 #[path = "outcome_tests.rs"]
 mod outcome_tests;
+
+#[tokio::test]
+async fn deletion_requires_host_intent_and_preserves_old_message_wire_shape() {
+    let h = Harness::new().await;
+    h.manage(json!({"operation":"person","person":{"id":"worker","name":"Worker","application_id":null}})).await;
+    h.manage(json!({"operation":"create","group":{"id":"board","kind":"board","title":"Board","topic":"News","members":["worker"]}})).await;
+    let receipt = h.manage(json!({"operation":"send","message":{"group_id":"board","request_id":"post","text":"Remove this announcement"}})).await;
+    assert!(receipt["message"].get("deleted").is_none());
+    let target = json!({"operation":"delete","target":{"kind":"announcement","group_id":"board","sequence":receipt["message"]["sequence"],"revision":1}});
+    let grant = h
+        .manage(json!({"operation":"grant","person_id":"worker","lifetime_seconds":60}))
+        .await;
+    assert_eq!(
+        h.request(
+            "/api/v1/messaging/manage",
+            Some(target.clone()),
+            false,
+            grant["token"].as_str()
+        )
+        .await
+        .0,
+        401
+    );
+    assert_ne!(
+        h.request_intent(
+            "/api/v1/messaging/manage",
+            Some(target.clone()),
+            true,
+            None,
+            "wrong-intent"
+        )
+        .await
+        .0,
+        200
+    );
+    assert_eq!(h.manage(target.clone()).await["code"], "deleted");
+    assert_eq!(h.manage(target).await["code"], "revision_conflict");
+    let (status, history) = h
+        .request("/api/v1/messaging/view?group_id=board", None, true, None)
+        .await;
+    assert_eq!(status, 200);
+    let history: Value = serde_json::from_str(&history).unwrap();
+    assert_eq!(history["messages"][0]["deleted"], true);
+    assert_eq!(history["messages"][0]["text"], "");
+    h.close().await;
+}

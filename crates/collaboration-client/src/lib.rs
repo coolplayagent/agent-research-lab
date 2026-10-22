@@ -82,6 +82,9 @@ pub enum Request {
     CreateGroup {
         group: NewGroup,
     },
+    Delete {
+        target: DeleteTarget,
+    },
     UpdateGroup {
         change: GroupChange,
     },
@@ -361,6 +364,10 @@ impl Client {
     }
     pub async fn create_group(&self, group: NewGroup) -> Result<Group> {
         self.call(&Request::CreateGroup { group }, Duration::from_secs(10))
+            .await
+    }
+    pub async fn delete(&self, target: DeleteTarget) -> Result<DeletionResult> {
+        self.call(&Request::Delete { target }, Duration::from_secs(10))
             .await
     }
     pub async fn update_group(&self, change: GroupChange) -> Result<()> {

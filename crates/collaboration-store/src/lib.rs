@@ -3,6 +3,7 @@
 pub use collaboration_model::*;
 mod conversations;
 mod coordination;
+mod deletion;
 mod directory;
 mod goal_work;
 mod goals;
@@ -55,6 +56,7 @@ pub(crate) enum Control {
     },
     Create(NewGroup),
     Update(GroupChange),
+    Delete(DeleteTarget),
     Membership {
         group: String,
         actor: String,
@@ -577,12 +579,22 @@ impl Subscription {
         Ok(())
     }
     pub async fn recv(&mut self) -> Result<Option<Arc<Message>>> {
+        ensure!(
+            !self.receiver.is_closed(),
+            "conversation feed changed; reconnect"
+        );
         let received = tokio::select! {
             result = self.receiver.recv() => result,
             _ = self.control.changed() => return Ok(None),
         };
         match received {
-            Ok(message) => Ok(Some(message)),
+            Ok(message) => {
+                ensure!(
+                    !self.receiver.is_closed(),
+                    "conversation feed changed; reconnect"
+                );
+                Ok(Some(message))
+            }
             Err(broadcast::error::RecvError::Lagged(_)) => {
                 self.shared.metrics.lagged.fetch_add(1, Ordering::Relaxed);
                 Ok(None)
@@ -609,10 +621,9 @@ impl Drop for Subscription {
         drop(connections);
         let mut feeds = self.shared.feeds.lock().unwrap();
         // The dropping receiver still contributes one to receiver_count.
-        if feeds
-            .get(&self.group)
-            .is_some_and(|feed| feed.receiver_count() == 1)
-        {
+        if feeds.get(&self.group).is_some_and(|feed| {
+            feed.receiver_count() == 1 && self.receiver.same_channel(&feed.subscribe())
+        }) {
             feeds.remove(&self.group);
         }
         drop(feeds);

@@ -33,3 +33,15 @@ Hover over the crystal to highlight activity, select members or click the sphere
 Create a topic by selecting an existing group by name; edits preserve ownership. Archived topics have read-only subjects and graphs. Filter, paginate, zoom or select nodes by keyboard to inspect goals, results and evidence. Nodes/parent edges are append-only; unassessed references never appear accepted.
 
 The `/apps/console/` inspector provides sessions, execution preferences, memory and detailed task records. See the [research guide](04-research.md).
+
+## Permanent deletion and independent discussion
+
+The conversation menu can permanently delete a research group or private conversation. Topic cards offer the same action. Confirmation is required. Active goals must first finish or be cancelled; retained execution reports, research versions, assessments, outcome links and iteration records block deletion and return their reference IDs. Archive the conversation instead when its evidence must remain. Deletion clears unreferenced child topics and subjects, messages, memberships and cancelled goals without execution evidence; external knowledge repositories are unaffected.
+
+Announcement messages have an individual delete action. It clears the body and keeps the sequence as a deleted-message placeholder, preserving replies and acknowledgement cursors. System events and entire announcement boards are not deleted by this action. Open pages reload the changed conversation, including deletion of a message on an older page. Existing backups are not rewritten.
+
+The home navigation no longer includes an Applications page. Scenario selection remains in goal creation.
+
+Generic collaboration members answer independently in parallel. An adapter's successful result means its own assignment was submitted; overall goal acceptance remains a separate host action. OutcomeHub delivers the result to the conversation. The worker does not need a chat tool or evidence of other members' future answers. Failed answers remain visible with their recorded status, and retry results are fenced to the correct person, work item and attempt. Existing failed runs are retained; retry explicitly after applying a fix.
+
+The host management API accepts `operation: "delete"` with a `target`: `kind: "group"` or `"topic"` requires `id` and `revision`; `kind: "announcement"` requires `group_id`, `sequence` and the group's `revision`. The result contains a canonical `DeletionCode` and bounded `references`. Ordinary messages retain their existing wire shape; deleted messages add `deleted: true` and return an empty body. Subject listings additionally report `topic_exists` so open details can detect deletion.

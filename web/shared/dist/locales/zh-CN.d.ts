@@ -1,4 +1,10 @@
 export declare const messages: {
+    readonly "DeletionCode.deleted": "已删除";
+    readonly "DeletionCode.not_found": "对象已不存在，请刷新页面。";
+    readonly "DeletionCode.revision_conflict": "内容已发生变化，请刷新后重试。";
+    readonly "DeletionCode.active_goals": "请先完成或取消关联的活动任务，再删除。关联编号：";
+    readonly "DeletionCode.evidence_references": "存在研究版本或执行证据关联，无法永久删除；可以改为归档。关联编号：";
+    readonly "DeletionCode.unsupported": "此类型不支持该删除操作。";
     readonly "AdapterTestStage.discover": "查找 Agent 程序";
     readonly "AdapterTestStage.runtime": "检查运行环境与隔离服务";
     readonly "AdapterTestStage.configuration": "准备配置与登录";

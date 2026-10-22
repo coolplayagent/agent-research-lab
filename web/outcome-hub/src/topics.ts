@@ -1,3 +1,4 @@
+import { deleteObject } from "./deletion.js";
 import { revealResearch } from "./workspace.js";
 import { outcomeBoard } from "./outcome-board.js";
 import { loadEvolution } from "./evolution.js";
@@ -47,7 +48,13 @@ export async function loadTopics(more = false): Promise<void> {
               await loadTopics();
               if (selected?.id === updated.id) await openTopic(updated);
             }),
-        )),
+        ), button(t("deletion.action"), async () => {
+          try {
+            if (!await deleteObject({ kind: "topic", id: topic.id, revision: topic.revision }, topic.title)) return;
+            if (selected?.id === topic.id) { selected = undefined; subjectRequest++; get("topic-detail").hidden = true; }
+            await loadTopics();
+          } catch (error) { notice(error); }
+        })),
       );
       get("topic-list").append(card);
     }
@@ -81,12 +88,14 @@ async function loadSubjects(more = false): Promise<void> {
   try {
     const page = await api<{
       subjects: SubjectRow[];
+      topic_exists?: boolean;
       next_after: string | null;
     }>(
       "/api/v1/collaboration/subjects?" +
         query({ topic_id: owner.id, after: more ? subjectAfter || "" : "" }),
     );
     if (request !== subjectRequest || selected?.id !== owner.id) return;
+    if (page.topic_exists === false) { selected = undefined; subjectRequest++; get("topic-detail").hidden = true; return; }
     if (!more) get("subject-list").replaceChildren();
     for (const row of page.subjects) {
       const subject = row.subject,
@@ -115,6 +124,12 @@ async function loadSubjects(more = false): Promise<void> {
   }
 }
 export function initTopics(): void {
+  document.addEventListener("workspace-directory", () => {
+    if (location.hash === "#topics") {
+      void loadTopics();
+      if (selected) void loadSubjects();
+    }
+  });
   get("new-topic").onclick = () =>
     void topicForm(undefined, () => loadTopics()).catch(notice);
   get("topic-search-button").onclick = () => void loadTopics();

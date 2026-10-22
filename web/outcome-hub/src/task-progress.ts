@@ -30,8 +30,8 @@ export function taskTimeline(messages: Message[], goals: Goal[]): TimelineItem[]
       }
       progress.events.push(message);
       // Legacy submission events can still project their matching recorded result.
-      if (event.kind !== GoalEventKind.Submitted ||
-          (message.sender_id !== event.person_id && !resultForMessage(message, goals))) continue;
+      if (event.kind !== GoalEventKind.Submitted && event.kind !== GoalEventKind.Failed) continue;
+      if (message.sender_id !== event.person_id && !resultForMessage(message, goals)) continue;
     }
     timeline.push({ message });
   }

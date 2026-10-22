@@ -137,6 +137,8 @@ impl Publish {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub deleted: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event: Option<GoalEvent>,
     pub sequence: u64,
@@ -146,6 +148,9 @@ pub struct Message {
     pub text: String,
     pub reply_to: Option<u64>,
     pub accepted_ms: u64,
+}
+fn is_false(value: &bool) -> bool {
+    !value
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Receipt {

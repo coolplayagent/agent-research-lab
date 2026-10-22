@@ -57,6 +57,7 @@ async function start(): Promise<void> {
       revision = changed;
       refreshEvolution();
       void loadGroups();
+      document.dispatchEvent(new Event("workspace-directory"));
     }
   });
   directory.onerror = () => {

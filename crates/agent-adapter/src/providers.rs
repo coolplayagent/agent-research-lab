@@ -48,7 +48,7 @@ pub fn execute(options: &Options, input: &AgentInput) -> Result<AgentOutput> {
     }
     let agent = CodingAgent::parse(&options.agent)?;
     let prompt = format!(
-        "Perform the following OutcomeHub task in the current disposable workspace. Return ONLY a JSON object matching this schema: {}. Copy protocol_version and request_id exactly from the request. Do not claim success unless the acceptance criteria are satisfied. Request:\n{}",
+        "Perform the following OutcomeHub task in the current disposable workspace. Return ONLY a JSON object matching this schema: {}. Copy protocol_version and request_id exactly from the request. Set succeeded only when this request's assigned work and acceptance criteria are satisfied. This reports your execution result; only the host can accept the overall goal. Request:\n{}",
         schema(),
         serde_json::to_string(input)?
     );

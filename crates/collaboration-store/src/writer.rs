@@ -299,6 +299,23 @@ fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
             catalog.groups.insert(group.id, result.clone());
             json!(result)
         }
+        Control::Delete(target) => {
+            let result = store.delete(&target)?;
+            if result.code != contracts::DeletionCode::Deleted {
+                return Ok(json!(result));
+            }
+            *shared.catalog.write().unwrap() = store.catalog()?;
+            if let DeleteTarget::Group { id, .. }
+            | DeleteTarget::Announcement { group_id: id, .. } = &target
+            {
+                // Drop buffered pre-deletion payloads. Subscribers reconnect and replay durable state.
+                shared.feeds.lock().unwrap().remove(id);
+                for signal in shared.controls.lock().unwrap().values() {
+                    signal.send_modify(|v| *v = v.wrapping_add(1));
+                }
+            }
+            json!(result)
+        }
         Control::Update(change) => {
             store.update_group(&change)?;
             let mut catalog = shared.catalog.write().unwrap();
