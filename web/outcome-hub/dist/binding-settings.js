@@ -8,6 +8,11 @@ import { savedSettings, trackSettings } from "./settings-guard.js";
 import { bindingEndpoint, showProgress } from "./binding-progress.js";
 import { openPerson } from "./people.js";
 let generation = 0;
+let selectedRequestId;
+export function resetBindingProgress() {
+    selectedRequestId = undefined;
+    get("binding-list").querySelector(".binding-progress-list")?.replaceChildren();
+}
 function adapterTitle(config, id) {
     const adapter = config.adapters.find(a => a.id === id);
     if (!adapter)
@@ -181,7 +186,7 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
             if (render !== generation)
                 return;
             records = next;
-            showProgress(progress, records);
+            showProgress(progress, records, selectedRequestId);
             update();
             const own = pending && records.find((r) => r.request.request_id === pending.request_id);
             if (own?.state === BindingOperationState.Succeeded || records.some((r) => r.state === BindingOperationState.Succeeded && (r.configuration_revision ?? 0) > config.revision)) {
@@ -207,6 +212,8 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
         const candidate = { person_id: personId, adapter_id: adapterId, revision: config.revision, program: selectedProgram, model: selectedModel };
         if (!pending || JSON.stringify(candidate) !== JSON.stringify({ person_id: pending.person_id, adapter_id: pending.adapter_id, revision: pending.revision, program: pending.program, model: pending.model }))
             pending = { request_id: uuid(), ...candidate };
+        selectedRequestId = pending.request_id;
+        showProgress(progress, records, selectedRequestId);
         posting = true;
         status.textContent = t("binding.starting");
         update();
@@ -215,7 +222,7 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
             records = records.filter((r) => r.request.person_id !== record.request.person_id).concat(record);
             savedSettings(form);
             status.textContent = "";
-            showProgress(progress, records);
+            showProgress(progress, records, selectedRequestId);
         }
         catch (error) {
             if (error instanceof ApiError)
