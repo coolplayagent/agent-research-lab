@@ -278,3 +278,36 @@ fn failed_questions_pause_and_retry_with_a_fresh_attempt() {
     assert_eq!(t.state, TaskState::Completed);
     assert!(t.deliveries.is_empty());
 }
+
+#[test]
+fn transient_coordinator_failures_retry_within_the_attempt_bound() {
+    let mut t = task();
+    for attempt in 1..=3 {
+        t.transition(
+            TaskAction::Claim {
+                node_id: None,
+                claim_id: format!("claim-{attempt}"),
+            },
+            &members(),
+            1000 + attempt * 2,
+        )
+        .unwrap();
+        t.transition(
+            TaskAction::Fail {
+                node_id: None,
+                claim_id: format!("claim-{attempt}"),
+                code: TaskErrorCode::Unavailable,
+            },
+            &members(),
+            1001 + attempt * 2,
+        )
+        .unwrap();
+        assert_eq!(t.needs_coordinator(), attempt < 3);
+    }
+    assert_eq!(t.state, TaskState::Paused);
+    assert!(
+        t.coordinator_attempts
+            .iter()
+            .all(|a| a.finished_ms.is_some())
+    );
+}

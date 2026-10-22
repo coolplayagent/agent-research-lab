@@ -1,6 +1,18 @@
 //! A separate system role reuses an explicitly pinned execution configuration.
 use crate::*;
 impl Registry {
+    pub fn record_task_diagnostic(&self, task: &str, claim: &str, error: &anyhow::Error) {
+        let name = format!(
+            "task-{}.diagnostic.json",
+            &storage::digest(task.as_bytes())[..32]
+        );
+        let details: String = format!("{error:#}").chars().take(8192).collect();
+        let _ = storage::write(
+            &self.path.with_file_name(name),
+            &serde_json::json!({"task_id":task,"claim_id":claim,"details":details,"execution":service_protocol::private_details(error)}),
+        );
+    }
+
     pub async fn coordinator_probe_lock(&self) -> tokio::sync::MutexGuard<'_, ()> {
         self.coordinator_probe.lock().await
     }

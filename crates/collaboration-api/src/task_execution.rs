@@ -124,7 +124,10 @@ async fn advance(
     task: OutcomeTask,
     node_id: Option<String>,
 ) -> Result<()> {
-    if node_id.is_none() && probe(&registry, false).await.is_err() {
+    if node_id.is_none()
+        && let Err(error) = probe(&registry, false).await
+    {
+        registry.record_task_diagnostic(&task.input.id, "coordinator-probe", &error);
         let _ = commit(
             &hub,
             &task.input.id,
@@ -226,16 +229,20 @@ async fn advance(
         }
         _ => None,
     };
-    let action = outcome.unwrap_or_else(|e| TaskAction::Fail {
-        node_id: node_id.clone(),
-        claim_id: claim_id.clone(),
-        code: if e.to_string().contains(Code::Protocol.as_str()) {
-            Code::Protocol
-        } else {
-            Code::Unavailable
-        },
+    let action = outcome.unwrap_or_else(|e| {
+        registry.record_task_diagnostic(&task.input.id, &claim_id, &e);
+        TaskAction::Fail {
+            node_id: node_id.clone(),
+            claim_id: claim_id.clone(),
+            code: if e.to_string().contains(Code::Protocol.as_str()) {
+                Code::Protocol
+            } else {
+                Code::Unavailable
+            },
+        }
     });
     if let Err(e) = commit(&hub, &task.input.id, action).await {
+        registry.record_task_diagnostic(&task.input.id, &claim_id, &e);
         let code = if e.to_string().contains(Code::Budget.as_str()) {
             Code::Budget
         } else {

@@ -145,7 +145,7 @@ impl OutcomeTask {
             .as_ref()
             .is_some_and(|l| l.deadline_ms <= now)
         {
-            self.pause(TaskErrorCode::Unavailable, now);
+            self.fail_coordinator(TaskErrorCode::Unavailable, now);
         }
         let mut expired = vec![];
         for n in &mut self.nodes {
@@ -165,6 +165,25 @@ impl OutcomeTask {
         self.finish_question(now);
         if self.active() && self.coordinator_calls >= 64 && self.coordinator_lease.is_none() {
             self.pause(TaskErrorCode::Budget, now);
+        }
+    }
+    fn fail_coordinator(&mut self, code: TaskErrorCode, now: u64) {
+        if let Some(a) = self.coordinator_attempts.last_mut() {
+            a.finished_ms = Some(now);
+            a.error = Some(code);
+        }
+        self.coordinator_lease = None;
+        let failures = self
+            .coordinator_attempts
+            .iter()
+            .rev()
+            .take_while(|a| a.error.is_some())
+            .count();
+        if code == TaskErrorCode::Unavailable && failures < self.input.budget.max_attempts as usize
+        {
+            self.record(TaskEventKind::Submitted, None, code.to_string(), now);
+        } else {
+            self.pause(code, now);
         }
     }
     fn finish_question(&mut self, now: u64) {
@@ -361,11 +380,7 @@ impl OutcomeTask {
                     a.error = Some(code);
                     self.record(TaskEventKind::Submitted, Some(id), code.to_string(), now);
                 } else {
-                    if let Some(a) = self.coordinator_attempts.last_mut() {
-                        a.finished_ms = Some(now);
-                        a.error = Some(code);
-                    }
-                    self.pause(code, now);
+                    self.fail_coordinator(code, now);
                 }
             }
             TaskAction::Submit {

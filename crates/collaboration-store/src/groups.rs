@@ -54,7 +54,7 @@ impl Store {
         if change.archived {
             ensure!(
                 !self.connection.query_row(
-                    "SELECT EXISTS(SELECT 1 FROM goals WHERE group_id=?1 AND active=1)",
+                    "SELECT EXISTS(SELECT 1 FROM goals WHERE group_id=?1 AND active=1 UNION ALL SELECT 1 FROM outcome_tasks WHERE group_id=?1 AND active=1)",
                     [&change.id],
                     |r| r.get::<_, bool>(0)
                 )?,
@@ -112,6 +112,10 @@ impl Store {
                 params![group, actor],
             )?;
         } else {
+            ensure!(
+                !crate::tasks::member_active(&tx, group, actor)?,
+                "finish or cancel the member's active goals before removal"
+            );
             ensure!(!tx.query_row("SELECT EXISTS(SELECT 1 FROM goals g WHERE g.group_id=?1 AND g.active=1 AND (?2='operator' OR EXISTS(SELECT 1 FROM goal_assignees a WHERE a.goal_id=g.id AND a.actor_id=?2)))", params![group,actor], |r| r.get::<_, bool>(0))?, "finish or cancel the member's active goals before removal");
             tx.execute(
                 "DELETE FROM members WHERE group_id=?1 AND actor_id=?2",
@@ -123,3 +127,7 @@ impl Store {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "groups_tests.rs"]
+mod tests;

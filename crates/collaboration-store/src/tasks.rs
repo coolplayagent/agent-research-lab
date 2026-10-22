@@ -16,6 +16,16 @@ pub(crate) fn read(db: &Connection, id: &str) -> Result<OutcomeTask> {
         &raw.context(contracts::TaskErrorCode::NotFound)?,
     )?)
 }
+pub(crate) fn member_active(db: &Connection, group: &str, actor: &str) -> Result<bool> {
+    let mut query = db.prepare("SELECT value FROM outcome_tasks WHERE group_id=?1 AND active=1")?;
+    for raw in query.query_map([group], |r| r.get::<_, String>(0))? {
+        let task: OutcomeTask = serde_json::from_str(&raw?)?;
+        if actor == "operator" || task.nodes.iter().any(|n| n.input.person_id == actor) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
 fn members(db: &Connection, group: &str) -> Result<BTreeSet<String>> {
     Ok(db.prepare("SELECT m.actor_id FROM members m JOIN actors a ON a.id=m.actor_id WHERE m.group_id=?1 AND a.archived=0")?.query_map([group],|r|r.get(0))?.collect::<rusqlite::Result<_>>()?)
 }
