@@ -1,10 +1,32 @@
 use super::*;
 fn binary() -> PathBuf {
-    std::fs::canonicalize(
-        std::env::var_os("TEST_STORAGE_BINARY").expect("run storage lifecycle tests through Bazel"),
-    )
-    .unwrap()
+    let logical =
+        std::env::var("TEST_STORAGE_BINARY").expect("run storage lifecycle tests through Bazel");
+    if let Some(manifest) = std::env::var_os("RUNFILES_MANIFEST_FILE") {
+        for line in std::fs::read_to_string(manifest).unwrap().lines() {
+            let escaped = line.starts_with(' ');
+            if let Some((key, value)) = line.trim_start_matches(' ').split_once(' ') {
+                let decode = |value: &str| {
+                    if escaped {
+                        value
+                            .replace("\\s", " ")
+                            .replace("\\n", "\n")
+                            .replace("\\b", "\\")
+                    } else {
+                        value.into()
+                    }
+                };
+                if decode(key) == logical {
+                    return std::fs::canonicalize(decode(value)).unwrap();
+                }
+            }
+        }
+        panic!("storage fixture missing from runfiles manifest");
+    }
+    std::fs::canonicalize(PathBuf::from(std::env::var_os("TEST_SRCDIR").unwrap()).join(logical))
+        .unwrap()
 }
+
 fn service(root: &Path) -> Service {
     service_api::Configuration::local(root)
         .services

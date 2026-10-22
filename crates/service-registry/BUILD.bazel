@@ -9,5 +9,5 @@ rust_library(
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
 )
-rust_test(name = "tests", crate = ":service_registry", data = ["//crates/collaboration-storage-service:outcome-hub-storage"], env = {"TEST_STORAGE_BINARY": "$(rootpath //crates/collaboration-storage-service:outcome-hub-storage)"}, aliases = aliases(normal_dev = True, proc_macro_dev = True), deps = [] + all_crate_deps(normal_dev = True), proc_macro_deps = all_crate_deps(proc_macro_dev = True), visibility = ["//visibility:public"])
+rust_test(name = "tests", crate = ":service_registry", data = ["//crates/collaboration-storage-service:outcome-hub-storage"], env = {"TEST_STORAGE_BINARY": "$(rlocationpath //crates/collaboration-storage-service:outcome-hub-storage)"}, aliases = aliases(normal_dev = True, proc_macro_dev = True), deps = [] + all_crate_deps(normal_dev = True), proc_macro_deps = all_crate_deps(proc_macro_dev = True), visibility = ["//visibility:public"])
 filegroup(name = "policy_sources", srcs = glob(["src/**/*.rs", "src/dashboard/*.html", "src/dashboard/*.css"], allow_empty = True), visibility = ["//visibility:public"])
