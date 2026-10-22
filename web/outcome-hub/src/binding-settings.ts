@@ -11,6 +11,11 @@ import type { Configuration } from "./service-types.js";
 import { openPerson } from "./people.js";
 import type { Page, Person } from "./types.js";
 let generation = 0;
+let selectedRequestId: string | undefined;
+export function resetBindingProgress(): void {
+  selectedRequestId = undefined;
+  get("binding-list").querySelector(".binding-progress-list")?.replaceChildren();
+}
 function adapterTitle(config: Configuration, id: string): string {
   const adapter = config.adapters.find(a => a.id === id);
   if (!adapter) return id;
@@ -129,7 +134,7 @@ export function renderBindings(config: Configuration, people: Person[], save: (n
     try {
       const next = await api<BindingOperation[]>(bindingEndpoint);
       if (render !== generation) return;
-      records = next; showProgress(progress, records); update();
+      records = next; showProgress(progress, records, selectedRequestId); update();
       const own = pending && records.find((r) => r.request.request_id === pending!.request_id);
       if (own?.state === BindingOperationState.Succeeded || records.some((r) => r.state === BindingOperationState.Succeeded && (r.configuration_revision ?? 0) > config.revision)) { pending = undefined; document.dispatchEvent(new Event("workspace-services")); await refresh(); return; }
       if (own && own.state !== BindingOperationState.Running) pending = undefined;
@@ -142,11 +147,13 @@ export function renderBindings(config: Configuration, people: Person[], save: (n
   const startValidation = async (personId: string, adapterId: string, selectedProgram: string | null, selectedModel: string | null) => {
     const candidate = { person_id: personId, adapter_id: adapterId, revision: config.revision, program: selectedProgram, model: selectedModel };
     if (!pending || JSON.stringify(candidate) !== JSON.stringify({ person_id: pending.person_id, adapter_id: pending.adapter_id, revision: pending.revision, program: pending.program, model: pending.model })) pending = { request_id: uuid(), ...candidate };
+    selectedRequestId = pending.request_id;
+    showProgress(progress, records, selectedRequestId);
     posting = true; status.textContent = t("binding.starting"); update();
     try {
       const record = await api<BindingOperation>(bindingEndpoint, pending, "manage-services");
       records = records.filter((r) => r.request.person_id !== record.request.person_id).concat(record);
-      savedSettings(form); status.textContent = ""; showProgress(progress, records);
+      savedSettings(form); status.textContent = ""; showProgress(progress, records, selectedRequestId);
     } catch (error) { if (error instanceof ApiError) pending = undefined; status.textContent = t("binding.startError", { error: String(error) }); }
     finally { posting = false; update(); void poll(); }
   };

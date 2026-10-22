@@ -2,6 +2,7 @@ import { loadTopics } from "./topics.js";
 import { showOutcome } from "./outcome-detail.js";
 import { notice } from "./dom.js";
 import { loadServices } from "./settings.js";
+import { resetBindingProgress } from "./binding-settings.js";
 import { t } from "./i18n.js";
 import { get } from "./dom.js";
 import { icon } from "./icons.js";
@@ -39,6 +40,8 @@ export function navigate() {
         history.replaceState(null, "", previous);
         return;
     }
+    if (previous !== "#settings/bindings" || location.hash !== "#settings/bindings")
+        resetBindingProgress();
     const setting = requested.startsWith("settings/")
         ? requested.split("/")[1]
         : "";

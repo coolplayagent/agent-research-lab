@@ -46,7 +46,8 @@ const tick = () => new Promise(setImmediate), pending = () => { let resolve; con
 const person = (id, name = id) => ({ id, name, application_id: null, presence: Presence.Offline, connections: 0 });
 const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, { id: "second" }], bindings: {}, outcome_services: [] });
 (async () => {
-  let bindingWrites = [], bindingRecords = [];
+  let bindingWrites = [], bindingRecords = [], visibleProgress = [], requestSequence = 0;
+  const timers = [];
   let catalog = [person("operator")], failRead = false, failCreate = false, held, saved, changes = [];
   const api = async (url, body) => {
     if (url === "/api/v1/collaboration/bindings") {
@@ -71,13 +72,15 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   }, { document });
   people.initPeople();
   const bindings = load(base + "binding-settings.ts", {
-    "/assets/shared/contracts.js": contracts, "/assets/shared/identity.js": { uuid: () => "request-new" },
-    "./binding-progress.js": { bindingEndpoint: "/api/v1/collaboration/bindings", showProgress() {} },
+    "/assets/shared/contracts.js": contracts, "/assets/shared/identity.js": { uuid: () => "request-" + ++requestSequence },
+    "./binding-progress.js": { bindingEndpoint: "/api/v1/collaboration/bindings", showProgress(_container, records, id) { visibleProgress = records.filter(record => record.request.request_id === id); } },
     "./api.js": { api, ApiError: class extends Error {} }, "./dom.js": dom, "./forms.js": forms, "./feedback.js": feedback, "./i18n.js": i18n, "./people.js": people,
     "./settings-guard.js": { trackSettings() {}, savedSettings() {} },
-  }, { document, window: { setTimeout() {} } });
+  }, { document, window: { setTimeout(callback) { timers.push(callback); } } });
   const render = (cfg = config()) => bindings.renderBindings(cfg, [], async next => saved = next, async () => {});
+  bindingRecords = [{ request: { request_id: "historical", person_id: "old-person" }, state: contracts.BindingOperationState.Succeeded }];
   render(); await tick();
+  assert.deepEqual(visibleProgress, [], "Historical validation logs are hidden on entry");
   let panel = get("binding-list"), form = bindingForm(panel), picker = field(form, "services.person"), adapter = field(form, "services.agent");
   assert(panel.children.indexOf(form) < panel.children.findIndex(n => n.className === "binding-progress-list"), "The binding form precedes validation logs");
   assert.equal(picker.children.length, 0, "The operator is never a bindable digital person");
@@ -97,6 +100,8 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   assert.equal(saved, undefined, "Creating a person never bypasses binding validation");
   assert.equal(bindingWrites[0].revision, 12); assert.equal(bindingWrites[0].person_id, "agent-new");
   assert.equal(bindingWrites[0].adapter_id, "second");
+  assert.equal(visibleProgress.length, 1);
+  assert.equal(visibleProgress[0].request.request_id, bindingWrites[0].request_id, "The form selects only its new validation log");
   assert.equal(bindingWrites[0].program, "/trusted/program"); assert.equal(bindingWrites[0].model, "chosen-model");
   await buttonIn(form, "bindings.createPerson").onclick(); dom.close("person-dialog");
   assert.equal(changes.length, 1, "Canceling creation performs no write"); assert.equal(adapter.value, "second");
@@ -130,6 +135,17 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   assert.equal(bindingWrites.at(-1).program, null);
   assert.equal(bindingWrites.at(-1).model, null);
   assert(buttonIn(panel, "binding.reverify").disabled, "Running validation cannot be started twice");
+  assert.equal(visibleProgress.length, 1);
+  const selected = bindingWrites.at(-1).request_id;
+  assert.equal(visibleProgress[0].request.request_id, selected, "Reverify replaces the previous person's displayed log");
+  bindingRecords = bindingRecords.map(record => ({ ...record, state: contracts.BindingOperationState.Succeeded }));
+  timers.pop()(); await tick();
+  assert.equal(visibleProgress.length, 1);
+  assert.equal(visibleProgress[0].request.request_id, selected, "Earlier completed operations cannot take over the selected log");
+  render(configured); await tick();
+  assert.equal(visibleProgress[0].request.request_id, selected, "A settings refresh retains the selected completed log");
+  bindings.resetBindingProgress(); render(configured); await tick();
+  assert.deepEqual(visibleProgress, [], "Re-entering the page does not restore historical logs");
 
   const noAdapters = config(); noAdapters.adapters = []; render(noAdapters); await tick();
   assert(buttonIn(bindingForm(panel), "binding.validate").disabled);
@@ -239,12 +255,13 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   assert.equal(addedTarget.target.reference, null); assert.equal(field(box.form, "knowledge.branch").required, false);
   assert(field(box.form, "knowledge.branch").disabled, "Hidden Git fields cannot block directory submission");
 
-  let servicesLoaded = 0;
+  let servicesLoaded = 0, progressResets = 0;
   const settingPanels = ["services", "knowledge", "bindings"].map(name => Object.assign(el("section"), { dataset: { settingsPanel: name } }));
   const settingLinks = ["services", "knowledge", "bindings"].map(name => Object.assign(el("a"), { dataset: { setting: name } }));
   const location = { hash: "#settings/knowledge" };
   const navigation = load(base + "navigation.ts", {
     "./topics.js": { loadTopics() {} }, "./outcome-detail.js": { showOutcome() {} }, "./dom.js": dom, "./i18n.js": i18n,
+    "./binding-settings.js": { resetBindingProgress: () => progressResets++ },
     "./settings.js": { loadServices: () => servicesLoaded++ }, "./icons.js": { icon() {} }, "./people.js": { loadPeople() {} },
     "./applications.js": { loadApplications() {} }, "./settings-guard.js": { allowSettingsLeave: () => true, initSettingsGuard() {} },
     "./workspace.js": { revealResearch() {}, syncControls() {} },
@@ -258,6 +275,12 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   assert.equal(settingLinks[1].getAttribute("aria-current"), "page"); assert.equal(servicesLoaded, 1);
   location.hash = "#settings/services"; navigation.navigate();
   assert.deepEqual(settingPanels.map(n => n.hidden), [false, true, true]);
+  const previousResets = progressResets;
+  location.hash = "#settings/bindings"; navigation.navigate();
+  assert.equal(progressResets, previousResets + 1);
+  navigation.navigate(); assert.equal(progressResets, previousResets + 1, "Refreshing the current route preserves the selected log");
+  location.hash = "#settings/knowledge"; navigation.navigate();
+  assert.equal(progressResets, previousResets + 2, "Leaving digital person management clears the log selection");
 
   let bindingRendered = false;
   const settings = load(base + "settings.ts", {
@@ -277,14 +300,20 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   const attempt = (person, id, started, adapter = "codex") => ({ request: { person_id: person, request_id: id, adapter_id: adapter }, started_unix_ms: started, state: contracts.BindingOperationState.Failed, steps: [] });
   const attempts = [attempt("same-person", "old", 1, "cc"), attempt("same-person", "latest", 2)];
   progressView.showProgress(logPanel, attempts);
+  assert.equal(logPanel.children.length, 0, "No log is shown without an explicit selection");
+  progressView.showProgress(logPanel, attempts, "latest");
   assert.equal(logPanel.children.length, 1);
-  assert(textOf(logPanel).includes("binding.logTitle"), "A visible log heading identifies the validation attempt");
+  assert(textOf(logPanel).includes("binding.logTitle"));
   assert(!textOf(logPanel).includes('"adapter":"cc"'));
   assert(textOf(logPanel).includes('"adapter":"codex"'));
   assert.equal(attempts.length, 2, "Rendering never mutates the poll response");
-  progressView.showProgress(logPanel, [...attempts, ...Array.from({ length: 12 }, (_, index) => attempt(`person-${index}`, `id-${index}`, index + 3))]);
-  assert.equal(logPanel.children.length, 13, "Latest records for other people are not hidden by the old ten-attempt limit");
-  progressView.showProgress(logPanel, []); assert.equal(logPanel.children.length, 0);
+  const many = [...attempts, ...Array.from({ length: 12 }, (_, index) => attempt(`person-${index}`, `id-${index}`, index + 3))];
+  progressView.showProgress(logPanel, many, "id-8");
+  assert.equal(logPanel.children.length, 1, "The page has exactly one log across all people");
+  assert(textOf(logPanel).includes('"person":"person-8"'));
+  progressView.showProgress(logPanel, many, "not-returned-yet"); assert.equal(logPanel.children.length, 0, "A newly clicked validation immediately clears the previous log");
+  progressView.showProgress(logPanel, many); assert.equal(logPanel.children.length, 0);
+
 
   const html = fs.readFileSync(path.join(root, "web/outcome-hub/index.html"), "utf8");
   assert.match(html, /href="#settings\/knowledge" data-setting="knowledge"/);
