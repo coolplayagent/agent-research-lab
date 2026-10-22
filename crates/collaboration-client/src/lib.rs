@@ -65,6 +65,9 @@ pub enum Request {
     SavePerson {
         person: Person,
     },
+    ArchiveUnbound {
+        retained: std::collections::BTreeSet<String>,
+    },
     RegisterOperator {},
     Convert {
         group: String,
@@ -314,6 +317,16 @@ impl Client {
     pub async fn save_person(&self, person: Person) -> Result<()> {
         self.call(&Request::SavePerson { person }, Duration::from_secs(10))
             .await
+    }
+    pub async fn archive_unbound(
+        &self,
+        retained: std::collections::BTreeSet<String>,
+    ) -> Result<usize> {
+        self.call(
+            &Request::ArchiveUnbound { retained },
+            Duration::from_secs(15),
+        )
+        .await
     }
     pub async fn register_operator(&self) -> Result<()> {
         self.call(&Request::RegisterOperator {}, Duration::from_secs(10))

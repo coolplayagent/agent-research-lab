@@ -1,6 +1,6 @@
 BEGIN IMMEDIATE;
 CREATE TABLE crystal_meta(key TEXT PRIMARY KEY,value INTEGER NOT NULL);
-CREATE TABLE actors(id TEXT PRIMARY KEY,presence TEXT NOT NULL DEFAULT 'online', name TEXT NOT NULL DEFAULT '', application_id TEXT);
+CREATE TABLE actors(id TEXT PRIMARY KEY,presence TEXT NOT NULL DEFAULT 'online', name TEXT NOT NULL DEFAULT '', application_id TEXT, archived INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE groups(id TEXT PRIMARY KEY,title TEXT NOT NULL,topic TEXT NOT NULL,private INTEGER NOT NULL,archived INTEGER NOT NULL DEFAULT 0,pinned INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 1,created_ms INTEGER NOT NULL,last_sequence INTEGER NOT NULL DEFAULT 0, kind TEXT NOT NULL DEFAULT 'conversation');
 CREATE TABLE members(group_id TEXT NOT NULL REFERENCES groups(id),actor_id TEXT NOT NULL REFERENCES actors(id),cursor INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(group_id,actor_id));
 CREATE INDEX memberships ON members(actor_id,group_id);
@@ -33,5 +33,5 @@ CREATE TABLE outcome_references(child_id TEXT NOT NULL REFERENCES outcomes(id),p
 CREATE INDEX outcome_references_parent ON outcome_references(parent_id,child_id);
 CREATE TABLE outcome_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,outcome_id TEXT NOT NULL REFERENCES outcomes(id),kind TEXT NOT NULL,request_id TEXT NOT NULL,value TEXT NOT NULL,created_ms INTEGER NOT NULL,UNIQUE(kind,request_id));
 CREATE INDEX outcome_events_owner ON outcome_events(outcome_id,sequence);
-INSERT INTO crystal_meta VALUES('schema',7);
+INSERT INTO crystal_meta VALUES('schema',8);
 COMMIT;

@@ -258,8 +258,14 @@ fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
                 .actors
                 .entry(person.id.clone())
                 .or_insert(Presence::Online);
+            catalog.archived_people.remove(&person.id);
             catalog.people.insert(person.id.clone(), person);
             json!({"saved":true})
+        }
+        Control::ArchiveUnbound(retained) => {
+            let count = store.archive_unbound(&retained)?;
+            *shared.catalog.write().unwrap() = store.catalog()?;
+            json!(count)
         }
         Control::Convert {
             group,

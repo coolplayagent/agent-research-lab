@@ -44,6 +44,9 @@ const STEPS: &[(u64, &str)] = &[
           CREATE TABLE outcome_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,outcome_id TEXT NOT NULL REFERENCES outcomes(id),kind TEXT NOT NULL,request_id TEXT NOT NULL,value TEXT NOT NULL,created_ms INTEGER NOT NULL,UNIQUE(kind,request_id));
           CREATE INDEX outcome_events_owner ON outcome_events(outcome_id,sequence);
           UPDATE crystal_meta SET value=7 WHERE key='schema'; COMMIT;"),
+    (8, "BEGIN IMMEDIATE;
+          ALTER TABLE actors ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
+          UPDATE crystal_meta SET value=8 WHERE key='schema'; COMMIT;"),
 ];
 fn upgrade(connection: &Connection) -> Result<()> {
     let version: u64 = connection.query_row(
@@ -52,7 +55,7 @@ fn upgrade(connection: &Connection) -> Result<()> {
         |r| r.get(0),
     )?;
     ensure!(
-        (1..=7).contains(&version),
+        (1..=8).contains(&version),
         "unsupported collaboration schema"
     );
     for (next, sql) in STEPS {
@@ -162,7 +165,7 @@ pub fn convert(path: &Path) -> Result<()> {
             |r| r.get(0),
         )?;
         ensure!(
-            (1..=7).contains(&version),
+            (1..=8).contains(&version),
             "unsupported database schema {version}"
         );
     } else {
@@ -196,7 +199,7 @@ pub fn validate(path: &Path) -> Result<()> {
         [],
         |r| r.get(0),
     )?;
-    ensure!(version == 7, "target database is not current");
+    ensure!(version == 8, "target database is not current");
     let integrity: String = connection.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
     ensure!(integrity == "ok", "database integrity failed");
     ensure!(
