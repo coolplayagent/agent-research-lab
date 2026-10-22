@@ -78,6 +78,7 @@ export const BindingErrorCode = {
     ServiceUnavailable: "service_unavailable",
     IsolationUnavailable: "isolation_unavailable",
     VerificationFailed: "verification_failed",
+    AuthenticationRequired: "authentication_required",
     InvalidResponse: "invalid_response",
     Timeout: "timeout",
     Cancelled: "cancelled",
