@@ -264,6 +264,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
     "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms, "./feedback.js": feedback,
     "./api.js": { api: async url => { assert.equal(url, "/api/v1/collaboration/services", "Directory reads must not block service settings"); return { ...view, health: [], restart_required: false }; } },
     "./settings-guard.js": { trackSettings() {}, savedSettings() {}, allowSettingsLeave: () => true, hasUnsavedSettings: () => false },
+    "./adapter-settings.js": { renderAdapters() {} },
     "./knowledge-settings.js": { renderKnowledgeSettings() {} }, "./service-forms.js": {}, "./adapter-forms.js": {}, "./execution-status.js": { renderExecutionStatus() {} },
     "./binding-settings.js": { renderBindings() { bindingRendered = true; } },
   });

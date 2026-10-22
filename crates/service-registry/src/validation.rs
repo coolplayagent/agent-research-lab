@@ -164,7 +164,7 @@ pub(super) async fn configure(
         }
         adapter.enabled = true;
         adapter.env_names = agent_adapter::environment_names(agent);
-        adapter.read_only_paths = agent_adapter::runtime_paths(&resolved)?;
+        adapter.read_only_paths = agent_adapter::runtime_paths(resolved)?;
         adapter.read_only_paths.push(bridge);
     }
     adapter.enabled = true;
