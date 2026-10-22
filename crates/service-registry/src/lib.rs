@@ -2,9 +2,12 @@
 mod binding_flow;
 pub use binding_flow::binding_failure_code;
 mod bindings;
+mod initialization;
 mod knowledge_migration;
 mod local_knowledge;
+mod local_storage;
 mod managed;
+mod runtime_status;
 use anyhow::{Context, Result, ensure};
 use contracts::{ServiceHealth, ServiceKind};
 use service_api::*;
@@ -21,16 +24,16 @@ pub struct Registry {
     bindings: bindings::Operations,
     managed: tokio::sync::Mutex<managed::Managed>,
     knowledge: tokio::sync::Mutex<local_knowledge::ManagedKnowledge>,
+    storage: tokio::sync::Mutex<local_storage::ManagedStorage>,
 }
 impl Registry {
     pub fn open(state: &Path) -> Result<Self> {
+        Self::open_with_development(state, false)
+    }
+    pub fn open_with_development(state: &Path, development: bool) -> Result<Self> {
         let state = std::fs::canonicalize(state)?;
         let path = state.join("private/services.json");
-        let mut config: Configuration = if path.exists() {
-            storage::read(&path)?
-        } else {
-            Configuration::defaults(&state)
-        };
+        let mut config = initialization::load(&state, development)?;
         config.validate()?;
         knowledge_migration::migrate(&path, &mut config)?;
         let active_storage = config
@@ -50,6 +53,7 @@ impl Registry {
             bindings: bindings::Operations::open(&state, &config)?,
             managed: tokio::sync::Mutex::new(managed::Managed::default()),
             knowledge: tokio::sync::Mutex::new(local_knowledge::ManagedKnowledge::default()),
+            storage: tokio::sync::Mutex::new(local_storage::ManagedStorage::default()),
             active_storage,
         })
     }
@@ -75,6 +79,19 @@ impl Registry {
                     )
                 );
             }
+        }
+        for service in &next.services {
+            ensure!(
+                current
+                    .services
+                    .iter()
+                    .find(|old| old.id == service.id)
+                    .map_or(
+                        service.management == contracts::ServiceManagement::External,
+                        |old| old.management == service.management
+                    ),
+                ConfigurationFailure(contracts::ServiceConfigurationErrorCode::ManagementImmutable)
+            );
         }
         // Evidence is server-owned. Clients cannot forge validation by posting it.
         next.binding_evidence = current
@@ -175,6 +192,7 @@ impl Registry {
             tokio::select! {
                 _ = shutdown.changed() => break,
                 _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
+                    self.storage.lock().await.recover().await;
                     self.managed.lock().await.maintain(&self.configuration());
                     self.knowledge.lock().await.maintain(&self.configuration());
                 }
@@ -182,6 +200,7 @@ impl Registry {
         }
         *self.managed.lock().await = managed::Managed::default();
         *self.knowledge.lock().await = local_knowledge::ManagedKnowledge::default();
+        *self.storage.lock().await = local_storage::ManagedStorage::default();
     }
     pub async fn view(&self) -> Result<serde_json::Value> {
         let config = self.configuration();
@@ -244,7 +263,7 @@ impl Registry {
         }
         outcome_health.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
         Ok(
-            serde_json::json!({"configuration":config,"health":health,"outcome_health":outcome_health,"restart_required":pending!=self.active_storage,"active_storage":self.active_storage,"protocol_version":rpc::VERSION}),
+            serde_json::json!({"local_runtime":self.runtime_status(&config, &health, &outcome_health).await?,"configuration":config,"health":health,"outcome_health":outcome_health,"restart_required":pending!=self.active_storage,"active_storage":self.active_storage,"protocol_version":rpc::VERSION}),
         )
     }
 }

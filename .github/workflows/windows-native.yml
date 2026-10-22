@@ -15,13 +15,13 @@ jobs:
         with:
           toolchain: 1.97.1
       - name: Check native core
-        run: cargo check --locked -p outcome-hub -p outcome-hub-service-workers -p outcome-hub-agent-adapter
+        run: cargo check --locked -p outcome-hub -p outcome-hub-service-workers -p outcome-hub-agent-adapter -p outcome-hub-knowledge-service
       - name: Test native storage and protocol boundaries
-        run: cargo test --locked -p outcome-hub-filesystem-store -p outcome-hub-service-protocol -p outcome-hub-service-api
+        run: cargo test --locked -p outcome-hub-filesystem-store -p outcome-hub-service-protocol -p outcome-hub-service-api -p outcome-hub-knowledge-directory -p outcome-hub-knowledge-git -p outcome-hub-knowledge-service
       - name: Build and smoke-test native core
         shell: pwsh
         run: |
-          cargo build --locked -p outcome-hub
+          cargo build --locked -p outcome-hub -p outcome-hub-collaboration-storage-service
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./verification/windows-core-smoke.ps1
       - uses: bazel-contrib/setup-bazel@0.15.0
@@ -40,7 +40,8 @@ jobs:
           $binary = Join-Path $unpacked 'outcome-hub/outcome-hub.exe'
           if (-not (Test-Path -LiteralPath $binary)) { throw 'Native package lacks outcome-hub.exe' }
           ./verification/windows-core-smoke.ps1 -Binary $binary
-          bazel test --lockfile_mode=error //crates/windows-runtime:tests //crates/service-protocol:tests //crates/service-api:tests //crates/service-registry:tests //crates/agent-adapter:tests //crates/agent-adapter:protocol_tests //crates/sandbox-service:tests
+          ./verification/windows-knowledge-smoke.ps1 -Binary $binary
+          bazel test --lockfile_mode=error //crates/windows-runtime:tests //crates/service-protocol:tests //crates/service-api:tests //crates/service-registry:tests //crates/agent-adapter:tests //crates/agent-adapter:protocol_tests //crates/sandbox-service:tests //crates/knowledge-directory:tests //crates/knowledge-git:tests //crates/knowledge-service:tests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           bazel build --lockfile_mode=error //crates/agent-adapter:outcome-hub-agent-fixture
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

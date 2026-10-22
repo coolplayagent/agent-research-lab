@@ -38,3 +38,24 @@ fn legacy_knowledge_connections_preserve_wire_bytes_and_remain_external() {
     assert_eq!(service.management, contracts::ServiceManagement::External);
     assert_eq!(serde_json::to_value(service).unwrap(), value);
 }
+
+#[test]
+fn new_local_installation_selects_separate_storage_and_preserves_wire_values() {
+    let root = tempfile::tempdir().unwrap();
+    let config = Configuration::local(root.path());
+    config.validate().unwrap();
+    let service = config
+        .service(config.storage_id.as_deref().unwrap(), ServiceKind::Storage)
+        .unwrap();
+    assert_eq!(
+        service.management,
+        contracts::ServiceManagement::LocalManaged
+    );
+    assert_eq!(
+        service.endpoint,
+        root.path().join("private/services/storage.sock")
+    );
+    let wire = serde_json::to_value(&config).unwrap();
+    let restored: Configuration = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(serde_json::to_value(restored).unwrap(), wire);
+}

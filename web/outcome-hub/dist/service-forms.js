@@ -14,9 +14,7 @@ export function editService(config, old, save) {
     box.form.append(note);
     const update = () => {
         const executor = kind.value === ServiceKind.Executor;
-        management.disabled = kind.value === ServiceKind.Storage;
-        if (management.disabled)
-            management.value = ServiceManagement.External;
+        management.disabled = true;
         endpoint.readOnly = management.value === ServiceManagement.LocalManaged && !!old;
         dependency.hidden = !executor;
         sandbox.required = executor && enabled.checked;
@@ -31,8 +29,8 @@ export function editService(config, old, save) {
         if (kind.value === ServiceKind.Executor && enabled.checked && !sandbox.value)
             throw new Error(t("settings.noSandbox"));
         const value = { id: id.value.trim(), kind: old?.kind || kind.value,
-            endpoint: endpoint.value.trim(), enabled: enabled.checked, management: management.value,
-            sandbox_id: kind.value === ServiceKind.Executor ? sandbox.value || null : null };
+            endpoint: endpoint.value.trim(), enabled: enabled.checked, management: old?.management || ServiceManagement.External,
+            sandbox_id: (old?.kind || kind.value) === ServiceKind.Executor ? sandbox.value || null : null };
         const next = structuredClone(config);
         next.services = next.services.filter(s => s.id !== old?.id);
         next.services.push(value);

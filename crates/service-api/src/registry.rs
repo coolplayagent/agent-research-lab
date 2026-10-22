@@ -43,6 +43,20 @@ pub(crate) fn external_management(value: &contracts::ServiceManagement) -> bool 
 }
 
 impl Configuration {
+    /// Complete installations own a separate storage process from first startup.
+    pub fn local(state: &Path) -> Self {
+        let mut config = Self::defaults(state);
+        config.storage_id = Some("storage".into());
+        config.services.push(Service {
+            id: "storage".into(),
+            kind: ServiceKind::Storage,
+            endpoint: state.join("private/services/storage.sock"),
+            enabled: true,
+            management: contracts::ServiceManagement::LocalManaged,
+            sandbox_id: None,
+        });
+        config
+    }
     pub fn defaults(state: &Path) -> Self {
         let services = [ServiceKind::Executor, ServiceKind::Sandbox]
             .iter()
@@ -124,11 +138,6 @@ impl Configuration {
             collaboration_model::id(&s.id)?;
             ensure!(ids.insert(&s.id), "duplicate service ID");
             rpc::endpoint(&s.endpoint)?;
-            ensure!(
-                s.management != contracts::ServiceManagement::LocalManaged
-                    || s.kind != ServiceKind::Storage,
-                "storage cannot be locally managed by the execution host"
-            );
             ensure!(
                 s.kind == ServiceKind::Executor || s.sandbox_id.is_none(),
                 "only executors depend on sandboxes"

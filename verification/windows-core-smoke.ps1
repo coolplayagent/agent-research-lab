@@ -33,7 +33,7 @@ try {
     if ($LASTEXITCODE -ne 0 -or $link -ne "http://$listen/") {
         throw 'The native core did not provide its direct loopback workspace URL.'
     }
-    foreach ($path in @($state, (Join-Path $state 'dashboard'), (Join-Path $state 'crystal'))) {
+    foreach ($path in @($state, (Join-Path $state 'dashboard'), (Join-Path $state 'private/managed-storage'))) {
         if ((Get-Acl -LiteralPath $path).Sddl -notmatch 'D:P') {
             throw "State directory has an inherited DACL: $path"
         }

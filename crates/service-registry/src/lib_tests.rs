@@ -4,6 +4,7 @@ fn configuration_write_failure_preserves_the_live_revision() {
     let root = tempfile::tempdir().unwrap();
     let registry = Registry::open(root.path()).unwrap();
     let initial = registry.configuration();
+    std::fs::remove_file(root.path().join("private/services.json")).unwrap();
     std::fs::create_dir(root.path().join("private/services.json")).unwrap();
     assert!(registry.save(initial.clone()).is_err());
     assert_eq!(
@@ -183,7 +184,7 @@ fn changing_an_existing_service_role_is_rejected_atomically() {
         serde_json::to_value(registry.configuration()).unwrap(),
         serde_json::to_value(initial).unwrap()
     );
-    assert!(!root.path().join("private/services.json").exists());
+    assert!(root.path().join("private/services.json").is_file());
 }
 #[test]
 fn builtin_adapter_templates_save_but_cannot_be_enabled_by_settings() {
@@ -205,4 +206,31 @@ fn builtin_adapter_templates_save_but_cannot_be_enabled_by_settings() {
         contracts::ServiceConfigurationErrorCode::ValidationRequired
     );
     assert_eq!(registry.configuration().revision, saved.revision);
+}
+
+#[test]
+fn settings_cannot_reassign_managed_ownership_or_create_managed_endpoints() {
+    let root = tempfile::tempdir().unwrap();
+    let registry = Registry::open(root.path()).unwrap();
+    let before = registry.configuration();
+    let mut next = before.clone();
+    next.services[0].management = contracts::ServiceManagement::External;
+    assert_eq!(
+        registry
+            .save_settings(next)
+            .unwrap_err()
+            .downcast_ref::<ConfigurationFailure>()
+            .unwrap()
+            .0,
+        contracts::ServiceConfigurationErrorCode::ManagementImmutable
+    );
+    let mut next = before.clone();
+    let mut forged = next.services[0].clone();
+    forged.id = "forged".into();
+    next.services.push(forged);
+    assert!(registry.save_settings(next).is_err());
+    assert_eq!(
+        serde_json::to_value(registry.configuration()).unwrap(),
+        serde_json::to_value(before).unwrap()
+    );
 }

@@ -32,7 +32,7 @@ fn core_binary_starts_and_restarts_without_optional_services() {
         let addr = reservation.local_addr().unwrap();
         drop(reservation);
         let child = Command::new(env!("CARGO_BIN_EXE_outcome-hub"))
-            .args(["serve", "--state-dir"])
+            .args(["serve", "--embedded-development", "--state-dir"])
             .arg(root.path())
             .args(["--listen", &addr.to_string(), "--max-seconds", "3"])
             .stdout(Stdio::null())

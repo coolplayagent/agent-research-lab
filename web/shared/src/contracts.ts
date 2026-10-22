@@ -451,6 +451,7 @@ export const ServiceManagement = {
 } as const;
 export type ServiceManagement = (typeof ServiceManagement)[keyof typeof ServiceManagement];
 export const ServiceConfigurationErrorCode = {
+  ManagementImmutable: "service_management_immutable",
   KindImmutable: "service_kind_immutable",
   CommandRequired: "adapter_command_required",
   ValidationRequired: "adapter_validation_required",
@@ -467,6 +468,33 @@ export const ServiceHealth = {
   RestartRequired: "restart_required",
 } as const;
 export type ServiceHealth = (typeof ServiceHealth)[keyof typeof ServiceHealth];
+export const LocalRuntimeComponent = {
+  Storage: "storage",
+  Execution: "execution",
+  Knowledge: "knowledge",
+} as const;
+export type LocalRuntimeComponent = (typeof LocalRuntimeComponent)[keyof typeof LocalRuntimeComponent];
+export const LocalRuntimeState = {
+  Ready: "ready",
+  Standby: "standby",
+  Failed: "failed",
+  Missing: "missing",
+  Disabled: "disabled",
+  External: "external",
+  Development: "development",
+  Unsupported: "unsupported",
+} as const;
+export type LocalRuntimeState = (typeof LocalRuntimeState)[keyof typeof LocalRuntimeState];
+export const LocalRuntimeErrorCode = {
+  PackageMissing: "runtime_package_missing",
+  EndpointInUse: "runtime_endpoint_in_use",
+  StartupFailed: "runtime_startup_failed",
+  ReadinessTimeout: "runtime_readiness_timeout",
+  DataMissing: "runtime_data_missing",
+  RecoveryExhausted: "runtime_recovery_exhausted",
+  PlatformUnsupported: "runtime_platform_unsupported",
+} as const;
+export type LocalRuntimeErrorCode = (typeof LocalRuntimeErrorCode)[keyof typeof LocalRuntimeErrorCode];
 export const CodingAgent = {
   ClaudeCode: "cc",
   Codex: "codex",

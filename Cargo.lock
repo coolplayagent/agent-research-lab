@@ -1265,6 +1265,7 @@ dependencies = [
  "outcome-hub-process",
  "outcome-hub-service-api",
  "outcome-hub-service-protocol",
+ "outcome-hub-windows-runtime",
  "serde",
  "serde_json",
  "tempfile",

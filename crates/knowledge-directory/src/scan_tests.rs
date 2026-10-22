@@ -2,6 +2,8 @@ use super::*;
 use crate::{inspect, root};
 use contracts::{KnowledgeAccess, KnowledgeBackend};
 use knowledge_model::Target;
+#[cfg(unix)]
+use std::fs::OpenOptions;
 fn target(path: &Path) -> Target {
     Target {
         kind: KnowledgeBackend::Directory,
@@ -133,20 +135,23 @@ fn entry_byte_deadline_depth_and_special_file_limits_are_explicit() {
         code(snapshot(&root, &mut budget).unwrap_err()),
         Code::Timeout
     );
-    std::os::unix::fs::symlink("/etc/passwd", temp.path().join("link")).unwrap();
-    assert_eq!(
-        code(snapshot(&root, &mut Budget::new()).unwrap_err()),
-        Code::SymlinkRejected
-    );
-    fs::remove_file(temp.path().join("link")).unwrap();
-    let path =
-        std::ffi::CString::new(temp.path().join("pipe").as_os_str().as_encoded_bytes()).unwrap();
-    assert_eq!(unsafe { libc::mkfifo(path.as_ptr(), 0o600) }, 0);
-    assert_eq!(
-        code(snapshot(&root, &mut Budget::new()).unwrap_err()),
-        Code::SpecialFileRejected
-    );
-    fs::remove_file(temp.path().join("pipe")).unwrap();
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink("/etc/passwd", temp.path().join("link")).unwrap();
+        assert_eq!(
+            code(snapshot(&root, &mut Budget::new()).unwrap_err()),
+            Code::SymlinkRejected
+        );
+        fs::remove_file(temp.path().join("link")).unwrap();
+        let path = std::ffi::CString::new(temp.path().join("pipe").as_os_str().as_encoded_bytes())
+            .unwrap();
+        assert_eq!(unsafe { libc::mkfifo(path.as_ptr(), 0o600) }, 0);
+        assert_eq!(
+            code(snapshot(&root, &mut Budget::new()).unwrap_err()),
+            Code::SpecialFileRejected
+        );
+        fs::remove_file(temp.path().join("pipe")).unwrap();
+    }
     let nested = (0..34).fold(temp.path().to_path_buf(), |p, _| p.join("level"));
     fs::create_dir_all(nested).unwrap();
     assert_eq!(
@@ -169,6 +174,7 @@ fn global_ignore_configuration_is_never_consulted_and_rules_are_versioned() {
 }
 
 #[test]
+#[cfg(unix)]
 fn concurrent_file_changes_never_produce_a_successful_stable_revision() {
     use std::os::unix::fs::FileExt;
     use std::sync::{

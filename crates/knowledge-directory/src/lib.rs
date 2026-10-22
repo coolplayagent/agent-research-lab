@@ -3,57 +3,25 @@ use anyhow::{Context, Result, ensure};
 use collaboration_model::{KnowledgeWrite, KnowledgeWriteResult, Outcome};
 use contracts::{KnowledgeError, KnowledgeErrorCode, KnowledgeWriteState};
 mod scan;
+#[cfg(unix)]
+mod unix;
+#[cfg(windows)]
+mod windows;
 use knowledge_model::{MAX_DOCUMENT_BYTES, Target, baseline, result};
+use platform::{Directory, anchored, child, root};
 use scan::{Budget, snapshot};
 use serde::{Deserialize, Serialize};
 use std::{
-    fs::{self, File, OpenOptions},
+    fs,
     io::Read,
-    os::{fd::AsRawFd, unix::fs::OpenOptionsExt},
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
 };
+#[cfg(unix)]
+use unix as platform;
+#[cfg(windows)]
+use windows as platform;
 
-fn open_directory(path: &Path) -> Result<File> {
-    Ok(OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
-        .open(path)?)
-}
-fn anchored(file: &File) -> PathBuf {
-    PathBuf::from(format!("/proc/self/fd/{}", file.as_raw_fd()))
-}
-fn child(root: &File, path: &Path, create: bool) -> Result<File> {
-    let mut current = root.try_clone()?;
-    for c in path.components() {
-        let Component::Normal(name) = c else {
-            anyhow::bail!("knowledge_path_escape")
-        };
-        let next = anchored(&current).join(name);
-        if create && !next.exists() {
-            match fs::create_dir(&next) {
-                Ok(()) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-                Err(e) => return Err(e.into()),
-            }
-        }
-        current = open_directory(&next)?;
-    }
-    Ok(current)
-}
-fn root(target: &Target) -> Result<File> {
-    target.validate()?;
-    let base = child(
-        &open_directory(Path::new("/"))?,
-        target.path.strip_prefix("/")?,
-        false,
-    )?;
-    if target.content_root == Path::new(".") {
-        Ok(base)
-    } else {
-        child(&base, &target.content_root, false)
-    }
-}
-fn read(root: &File, path: &Path) -> Result<Option<Vec<u8>>> {
+fn read(root: &Directory, path: &Path) -> Result<Option<Vec<u8>>> {
     knowledge_model::relative(path)?;
     let parent = match child(root, path.parent().unwrap_or(Path::new("")), false) {
         Ok(v) => v,
@@ -66,14 +34,15 @@ fn read(root: &File, path: &Path) -> Result<Option<Vec<u8>>> {
         Err(e) => return Err(e),
     };
     let p = anchored(&parent).join(path.file_name().context("knowledge_invalid_path")?);
-    let mut f = match OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(p)
-    {
+    let mut f = match platform::open_file(&p) {
         Ok(f) => f,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(e.into()),
+        Err(e)
+            if e.downcast_ref::<std::io::Error>()
+                .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound) =>
+        {
+            return Ok(None);
+        }
+        Err(e) => return Err(e),
     };
     let metadata = f.metadata()?;
     ensure!(
@@ -142,10 +111,10 @@ struct Receipt {
     result: KnowledgeWriteResult,
     content_digest: String,
 }
-fn private(root: &File) -> Result<File> {
+fn private(root: &Directory) -> Result<Directory> {
     child(root, Path::new(".outcomehub"), true)
 }
-fn receipt(root: &File, write: &KnowledgeWrite) -> Result<Option<KnowledgeWriteResult>> {
+fn receipt(root: &Directory, write: &KnowledgeWrite) -> Result<Option<KnowledgeWriteResult>> {
     let private = match child(root, Path::new(".outcomehub"), false) {
         Ok(v) => v,
         Err(e)
@@ -160,7 +129,10 @@ fn receipt(root: &File, write: &KnowledgeWrite) -> Result<Option<KnowledgeWriteR
     if !p.exists() {
         return Ok(None);
     }
-    let entry: Receipt = storage::read(&p)?;
+    let entry: Receipt = serde_json::from_slice(
+        &read(&private, Path::new(&format!("{}.json", write.input.id)))?
+            .context("knowledge_receipt_missing")?,
+    )?;
     ensure!(
         entry.request.request_digest == write.request_digest && entry.request.input == write.input,
         "knowledge_request_conflict"
@@ -223,17 +195,7 @@ pub fn publish(
     let private = private(&root)?;
     // Lock files are opened without following links, including the final component.
     let lock_path = anchored(&private).join("writer.lock");
-    let lock = OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(&lock_path)?;
-    ensure!(
-        unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-        "knowledge_target_busy"
-    );
+    let _lock = platform::lock(&lock_path)?;
     if let Some(value) = receipt(&root, write)? {
         return Ok(value);
     }

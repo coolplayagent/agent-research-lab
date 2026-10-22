@@ -30,11 +30,13 @@
 使用 Rust 实现，Bazel 是构建、测试与打包入口。
 
 ```bash
-bazel build //:outcome-hub //:outcome-hub-cli //:outcome-hub-package
-bazel run //:outcome-hub -- serve --state-dir /absolute/path/to/state --listen 127.0.0.1:4877
+bazel build --lockfile_mode=error //:local-package
+mkdir -p /absolute/private/outcome-hub-install
+tar -xzf bazel-bin/local-package.tar.gz -C /absolute/private/outcome-hub-install
+/absolute/private/outcome-hub-install/outcome-hub/outcome-hub serve --state-dir /absolute/path/to/state --listen 127.0.0.1:4877
 ```
 
-启动后直接打开 `http://127.0.0.1:4877/` 进入工作空间，无需管理凭据；服务只绑定本机回环地址。兼容既有数据目录，不因更名自动搬迁数据库。
+启动后直接打开 `http://127.0.0.1:4877/` 进入工作空间，无需管理凭据；服务只绑定本机回环地址。新工作空间自动启动独立存储，执行与知识服务按需准备，无需填写服务地址。兼容既有数据目录，不自动搬迁数据库。
 
 | 应用 | 源码目录 | 用途 |
 | --- | --- | --- |

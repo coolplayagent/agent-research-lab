@@ -105,6 +105,14 @@ fn settings_response(result: Result<serde_json::Value>) -> Response {
     match result {
         Ok(value) => json_response(Ok(value)),
         Err(error) => {
+            if let Some(failure) = error.downcast_ref::<service_api::LocalRuntimeFailure>() {
+                return response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "application/json",
+                    serde_json::to_vec(&json!({"error":{"code":failure.0,"parameters":{}}}))
+                        .unwrap(),
+                );
+            }
             if let Some(diagnostic) = service_protocol::knowledge_error(&error) {
                 return response(
                     StatusCode::BAD_REQUEST,

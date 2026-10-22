@@ -28,9 +28,7 @@ struct Receipt {
 impl Service {
     pub fn open(id: &str, state: &Path) -> Result<Self> {
         collaboration_model::id(id)?;
-        fs::create_dir_all(state)?;
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(state, fs::Permissions::from_mode(0o700))?;
+        storage::private_dir(state)?;
         Ok(Self {
             id: id.into(),
             state: fs::canonicalize(state)?,

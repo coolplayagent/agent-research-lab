@@ -10,8 +10,13 @@ no management credential is needed. The default state is under
 %LOCALAPPDATA%\OutcomeHub\state. Use --state-dir to choose an alternate
 private directory. Back up the state directory before upgrading.
 
-This v0.2.1 package includes outcome-hub-services.exe and
-outcome-hub-agent.exe. Keep these beside outcome-hub.exe. Windows CI verifies
+This package includes outcome-hub-storage.exe, outcome-hub-services.exe,
+outcome-hub-agent.exe and outcome-hub-knowledge.exe. Keep them beside
+outcome-hub.exe. New workspaces start separate storage automatically; execution
+and knowledge start on demand. Settings > Local environment shows readiness
+and can prepare execution without a model call. No service address is required.
+Git knowledge targets require Git for Windows; directory targets do not.
+Existing deployments keep their previous storage choice and data. Windows CI verifies
 core startup, isolation and deterministic binding fixtures. The maintainer
 confirmed authenticated Windows model acceptance for all four Agents on
 2026-10-21 for v0.2.1. This is a maintainer attestation; private live-run reports are not included in this package.
@@ -31,8 +36,7 @@ binding. Existing bindings remain marked unverified until validated.
 Use a local NTFS state directory on Windows 10/11 x64. Isolation failures do not
 fall back to unrestricted execution. Public errors show the failed stage,
 OS error code and diagnostic ID; private diagnostic files are under the state
-private directory. Research and knowledge services remain optional external
-services.
+private directory. Research remains optional. Knowledge is managed locally on demand.
 
 Keep credentials and state out of Git. Verify the archive
 against the SHA256SUMS file from the same GitHub release before use.

@@ -11,6 +11,7 @@ use std::{
 #[derive(Default)]
 pub(super) struct ManagedKnowledge {
     child: Option<(OutcomeService, Child)>,
+    pub error: Option<contracts::LocalRuntimeErrorCode>,
 }
 pub(super) fn validate_locations(config: &Configuration, state: &Path) -> Result<()> {
     for service in &config.outcome_services {
@@ -43,6 +44,14 @@ impl ManagedKnowledge {
         }
     }
     async fn prepare(&mut self, service: &OutcomeService, state: &Path) -> Result<()> {
+        let result = self.prepare_inner(service, state).await;
+        self.error = result.as_ref().err().map(|e| {
+            e.downcast_ref::<service_api::LocalRuntimeFailure>()
+                .map_or(contracts::LocalRuntimeErrorCode::StartupFailed, |e| e.0)
+        });
+        result
+    }
+    async fn prepare_inner(&mut self, service: &OutcomeService, state: &Path) -> Result<()> {
         ensure!(
             service.kind != OutcomeServiceKind::Knowledge
                 || service.management == ServiceManagement::LocalManaged,
@@ -52,7 +61,7 @@ impl ManagedKnowledge {
             return Ok(());
         }
         ensure!(
-            cfg!(target_os = "linux"),
+            cfg!(any(target_os = "linux", windows)),
             "knowledge_local_platform_unsupported"
         );
         ensure!(
@@ -73,11 +82,14 @@ impl ManagedKnowledge {
         }
         if self.child.is_none() {
             ensure!(
-                service_api::probe_outcome_service(service).await.is_err(),
-                "knowledge_managed_endpoint_in_use"
+                service_protocol::connect(&service.endpoint).await.is_err(),
+                service_api::LocalRuntimeFailure(contracts::LocalRuntimeErrorCode::EndpointInUse)
             );
-            let binary = std::env::current_exe()?.with_file_name("outcome-hub-knowledge");
-            ensure!(binary.is_file(), "knowledge_runtime_missing");
+            let binary = crate::runtime_status::binary("outcome-hub-knowledge")?;
+            ensure!(
+                binary.is_file(),
+                service_api::LocalRuntimeFailure(contracts::LocalRuntimeErrorCode::PackageMissing)
+            );
             let directory = state.join(format!("private/managed-{}", service.id));
             let args = vec![
                 "--id".into(),

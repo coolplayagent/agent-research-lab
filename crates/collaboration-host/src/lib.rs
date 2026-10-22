@@ -4,13 +4,25 @@ use std::future::IntoFuture;
 use std::{net::SocketAddr, path::Path, sync::Arc, time::Duration};
 /// A bounded standalone host. A supervisor can restart it against the same durable state.
 pub async fn serve(state: &Path, listen: SocketAddr, seconds: u64) -> Result<()> {
+    serve_with_development(state, listen, seconds, false).await
+}
+pub async fn serve_with_development(
+    state: &Path,
+    listen: SocketAddr,
+    seconds: u64,
+    development: bool,
+) -> Result<()> {
     validate_listen(listen)?;
     ensure!(
         (1..=43200).contains(&seconds),
         "service lifetime must be 1..43200 seconds"
     );
     storage::private_dir(state)?;
-    let services = Arc::new(service_registry::Registry::open(state)?);
+    let services = Arc::new(service_registry::Registry::open_with_development(
+        state,
+        development,
+    )?);
+    services.prepare_storage().await?;
     let hub = storage(&services.configuration(), state)?;
     hub.register_operator().await?;
     let listener = tokio::net::TcpListener::bind(listen).await?;

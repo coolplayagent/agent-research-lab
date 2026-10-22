@@ -229,23 +229,26 @@ fn directory_conflict_symlink_and_readonly_reconciliation_never_claim_success() 
         fs::read(target.path.join("knowledge/note.md")).unwrap(),
         before
     );
-    std::os::unix::fs::symlink("/etc", target.path.join("knowledge/escape")).unwrap();
-    assert!(
-        service
-            .manage(Request::Probe {
-                target: "external".into()
-            })
-            .is_err()
-    );
-    assert!(
-        service
-            .manage(Request::Read {
-                target: "external".into(),
-                path: "escape/passwd".into(),
-                revision: None
-            })
-            .is_err()
-    );
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink("/etc", target.path.join("knowledge/escape")).unwrap();
+        assert!(
+            service
+                .manage(Request::Probe {
+                    target: "external".into()
+                })
+                .is_err()
+        );
+        assert!(
+            service
+                .manage(Request::Read {
+                    target: "external".into(),
+                    path: "escape/passwd".into(),
+                    revision: None
+                })
+                .is_err()
+        );
+    }
 }
 #[test]
 fn target_configuration_never_accepts_embedded_store_or_inline_credentials() {
