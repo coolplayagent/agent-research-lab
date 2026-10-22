@@ -259,7 +259,11 @@ impl Registry {
             },
             Duration::from_secs(95),
         )
-        .await?;
+        .await
+        .map_err(|error| {
+            let code = execution_failure_code(agent, &error);
+            error.context(Failure(code))
+        })?;
         ensure!(
             receipt.challenge_verified && receipt.execution.output.succeeded,
             Failure(Code::VerificationFailed)
@@ -340,3 +344,20 @@ pub fn binding_failure_code(error: &anyhow::Error) -> Code {
         .downcast_ref::<Failure>()
         .map_or(Code::ConfigurationInvalid, |failure| failure.0)
 }
+
+fn execution_failure_code(agent: CodingAgent, error: &anyhow::Error) -> Code {
+    if agent == CodingAgent::Codex
+        && let Some(details) = rpc::private_details(error)
+        && ((details.contains("codex_login::auth") && details.contains("refresh_token_reused"))
+            || (details.contains("401") && details.contains("token_expired")))
+    {
+        // Map known provider failures to a public code, never public stderr.
+        // Unknown failures retain the failed validation state and private details.
+        return Code::AuthenticationRequired;
+    }
+    Code::VerificationFailed
+}
+
+#[cfg(test)]
+#[path = "binding_flow_tests.rs"]
+mod tests;

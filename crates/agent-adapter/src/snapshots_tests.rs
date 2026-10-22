@@ -76,3 +76,66 @@ fn network_routing_is_forwarded_by_name_only() {
         assert!(names.iter().all(|name| !name.contains("://")));
     }
 }
+
+#[test]
+fn codex_uses_current_login_without_copying_user_configuration_or_memories() {
+    let root = tempfile::tempdir().unwrap();
+    let service = root.path().join("service");
+    let login = root.path().join("login");
+    fs::create_dir_all(&service).unwrap();
+    fs::create_dir_all(&login).unwrap();
+    fs::write(service.join("config.toml"), "model = 'service-model'").unwrap();
+    fs::write(service.join("auth.json"), "obsolete").unwrap();
+    fs::write(login.join("config.toml"), "model = 'desktop-model'").unwrap();
+    fs::write(login.join("sessions.sqlite"), "private history").unwrap();
+    let auth = login.join("auth.json");
+    fs::write(&auth, "current-login").unwrap();
+    let first = root.path().join("first");
+    codex_configuration(&service, Some(&auth), &first).unwrap();
+    assert_eq!(
+        fs::read_to_string(first.join("auth.json")).unwrap(),
+        "current-login"
+    );
+    assert_eq!(
+        fs::read_to_string(first.join("config.toml")).unwrap(),
+        "model = 'service-model'"
+    );
+    assert_eq!(fs::read_dir(&first).unwrap().count(), 2);
+    fs::write(first.join("auth.json"), "task-local-change").unwrap();
+    assert_eq!(fs::read_to_string(&auth).unwrap(), "current-login");
+    fs::write(&auth, "renewed-login").unwrap();
+    let second = root.path().join("second");
+    codex_configuration(&service, Some(&auth), &second).unwrap();
+    assert_eq!(
+        fs::read_to_string(second.join("auth.json")).unwrap(),
+        "renewed-login"
+    );
+    assert_eq!(
+        fs::read_to_string(service.join("auth.json")).unwrap(),
+        "obsolete"
+    );
+}
+
+#[test]
+fn explicit_codex_login_never_falls_back_to_a_stale_copy() {
+    let root = tempfile::tempdir().unwrap();
+    let target = root.path().join("target");
+    fs::write(root.path().join("auth.json"), "default-login").unwrap();
+    codex_configuration(root.path(), None, &target).unwrap();
+    assert_eq!(
+        fs::read_to_string(target.join("auth.json")).unwrap(),
+        "default-login"
+    );
+    let missing = root.path().join("missing.json");
+    assert!(codex_configuration(root.path(), Some(&missing), &target).is_err());
+    assert!(codex_configuration(root.path(), Some(Path::new("auth.json")), &target).is_err());
+    assert!(codex_configuration(root.path(), Some(root.path()), &target).is_err());
+    fs::write(&missing, vec![0; 1024 * 1024 + 1]).unwrap();
+    assert!(codex_configuration(root.path(), Some(&missing), &target).is_err());
+    #[cfg(unix)]
+    {
+        let link = root.path().join("link.json");
+        std::os::unix::fs::symlink(root.path().join("auth.json"), &link).unwrap();
+        assert!(codex_configuration(root.path(), Some(&link), &target).is_err());
+    }
+}

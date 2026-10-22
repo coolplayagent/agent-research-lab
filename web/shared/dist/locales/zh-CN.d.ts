@@ -499,6 +499,7 @@ export declare const messages: {
     readonly "BindingErrorCode.configuration_invalid": "配置不可用，请确认 Agent 已登录并选择模型。";
     readonly "BindingErrorCode.service_unavailable": "执行服务不可用，请检查服务状态和安装包完整性。";
     readonly "BindingErrorCode.isolation_unavailable": "无法启用隔离环境，请检查 Windows 权限和本地磁盘支持。";
+    readonly "BindingErrorCode.authentication_required": "Codex 登录已失效，未保存新绑定。请在执行服务使用的登录环境中重新登录 Codex，然后重试验证。";
     readonly "BindingErrorCode.verification_failed": "验证任务未通过，未保存新绑定。请根据诊断编号检查执行服务的私有诊断后重试。";
     readonly "BindingErrorCode.superseded": "该验证已被新的验证替代，请查看该数字人的最新验证记录。";
     readonly "BindingErrorCode.invalid_response": "Agent 返回了无法验证的结果，请检查版本兼容性。";

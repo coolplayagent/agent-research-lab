@@ -85,6 +85,7 @@ export declare const BindingErrorCode: {
     readonly ServiceUnavailable: "service_unavailable";
     readonly IsolationUnavailable: "isolation_unavailable";
     readonly VerificationFailed: "verification_failed";
+    readonly AuthenticationRequired: "authentication_required";
     readonly InvalidResponse: "invalid_response";
     readonly Timeout: "timeout";
     readonly Cancelled: "cancelled";

@@ -93,6 +93,21 @@ fn copy_file(source: &Path, target: &Path) -> Result<()> {
     storage::private_file(target)?;
     Ok(())
 }
+fn codex_configuration(root: &Path, auth_file: Option<&Path>, target: &Path) -> Result<()> {
+    copy_file(&root.join("config.toml"), &target.join("config.toml"))?;
+    let default_auth = root.join("auth.json");
+    let source = auth_file.unwrap_or(&default_auth);
+    if auth_file.is_some() {
+        ensure!(
+            source.is_absolute() && source.is_file(),
+            "configured Codex authentication file must be an existing absolute file"
+        );
+    }
+    // Read the operator-selected login on every run. A dedicated service config
+    // must not force authentication to come from an obsolete copied login.
+    // The source remains read-only; sessions and memories stay disposable.
+    copy_file(source, &target.join("auth.json"))
+}
 /// Returns only environment paths and an optional model route, never credentials.
 pub fn prepare_home(command: &[String], target: &Path) -> Result<Vec<(String, String)>> {
     storage::private_dir(target)?;
@@ -120,9 +135,8 @@ pub fn prepare_home(command: &[String], target: &Path) -> Result<Vec<(String, St
             let root = std::env::var_os("CODEX_HOME")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| home.join(".codex"));
-            for file in ["config.toml", "auth.json"] {
-                copy_file(&root.join(file), &target.join(".codex").join(file))?;
-            }
+            let auth_file = std::env::var_os("OUTCOME_HUB_CODEX_AUTH_FILE").map(PathBuf::from);
+            codex_configuration(&root, auth_file.as_deref(), &target.join(".codex"))?;
             environment.push((
                 "CODEX_HOME".into(),
                 target.join(".codex").to_string_lossy().into_owned(),
