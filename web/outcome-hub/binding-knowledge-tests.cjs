@@ -28,6 +28,7 @@ const nodes = new Map(), get = id => { if (!nodes.has(id)) { const n = new Node(
 const el = (tag, text) => new Node(tag, text), textOf = n => [n.textContent, ...n.children.map(textOf)].join(" ");
 const find = (node, predicate) => [node, ...node.children.flatMap(n => find(n, predicate))].filter(predicate);
 const buttonIn = (node, text) => find(node, n => n.tag === "button" && n.textContent === text)[0];
+const bindingForm = panel => find(panel, n => n.tag === "form" && n.className === "settings-form binding-form")[0];
 const i18n = { t: (key, params = {}) => key + (Object.keys(params).length ? JSON.stringify(params) : ""), label: (domain, value) => `${domain}.${value}` };
 let box;
 const forms = {
@@ -45,12 +46,15 @@ const tick = () => new Promise(setImmediate), pending = () => { let resolve; con
 const person = (id, name = id) => ({ id, name, application_id: null, presence: Presence.Offline, connections: 0 });
 const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, { id: "second" }], bindings: {}, outcome_services: [] });
 (async () => {
-  let bindingWrites = [];
+  let bindingWrites = [], bindingRecords = [];
   let catalog = [person("operator")], failRead = false, failCreate = false, held, saved, changes = [];
   const api = async (url, body) => {
     if (url === "/api/v1/collaboration/bindings") {
-      if (!body) return [];
-      bindingWrites.push(body); return { request: body, state: contracts.BindingOperationState.Running };
+      if (!body) return bindingRecords;
+      bindingWrites.push(body);
+      const record = { request: body, state: contracts.BindingOperationState.Running };
+      bindingRecords = bindingRecords.filter(r => r.request.person_id !== body.person_id).concat(record);
+      return record;
     }
     if (failRead) throw new Error("directory unavailable");
     if (held) return held.promise;
@@ -74,7 +78,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   }, { document, window: { setTimeout() {} } });
   const render = (cfg = config()) => bindings.renderBindings(cfg, [], async next => saved = next, async () => {});
   render(); await tick();
-  let panel = get("binding-list"), form = panel.children[1], picker = field(form, "services.person"), adapter = field(form, "services.agent");
+  let panel = get("binding-list"), form = bindingForm(panel), picker = field(form, "services.person"), adapter = field(form, "services.agent");
   assert.equal(picker.children.length, 0, "The operator is never a bindable digital person");
   assert(buttonIn(form, "binding.validate").disabled); assert(textOf(form).includes("bindings.noPeople"));
   adapter.value = "second";
@@ -97,7 +101,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   assert.equal(changes.length, 1, "Canceling creation performs no write"); assert.equal(adapter.value, "second");
 
   failRead = true; render(); await tick();
-  form = panel.children[1];
+  form = bindingForm(panel);
   assert(textOf(form).includes("bindings.loadFailed")); assert(!textOf(form).includes("bindings.noPeople"));
   failRead = false; await buttonIn(form, "bindings.refreshPeople").onclick();
   assert.equal(field(form, "services.person").value, "agent-new"); assert(!textOf(form).includes("bindings.loadFailed"));
@@ -107,23 +111,27 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   held = pending(); const old = held; const refresh = buttonIn(form, "bindings.refreshPeople").onclick();
   held = null; render(); await tick();
   old.resolve({ people: [person("obsolete")], next_after: null }); await refresh;
-  assert.equal(field(panel.children[1], "services.person").value, "a", "Detached responses cannot replace the new form");
+  assert.equal(field(bindingForm(panel), "services.person").value, "a", "Detached responses cannot replace the new form");
   held = pending(); const initial = held; render();
-  held = null; await buttonIn(panel.children[1], "bindings.refreshPeople").onclick();
+  held = null; await buttonIn(bindingForm(panel), "bindings.refreshPeople").onclick();
   initial.resolve({ people: [person("late")], next_after: null }); await tick();
-  assert.equal(field(panel.children[1], "services.person").value, "a", "Older refreshes cannot overwrite the latest directory");
+  assert.equal(field(bindingForm(panel), "services.person").value, "a", "Older refreshes cannot overwrite the latest directory");
 
   const configured = config(); configured.bindings = { b: "second" };
   render(configured); await tick();
-  form = panel.children[1];
+  form = bindingForm(panel);
+  const writesBeforeReverify = bindingWrites.length;
   await buttonIn(panel, "binding.reverify").onclick();
-  assert.equal(field(form, "services.person").value, "b");
-  assert.equal(field(form, "services.agent").value, "second");
-  assert.equal(buttonIn(form, "binding.validate").focused, true);
+  assert.equal(bindingWrites.length, writesBeforeReverify + 1, "Reverify starts a fresh validation request");
+  assert.equal(bindingWrites.at(-1).person_id, "b");
+  assert.equal(bindingWrites.at(-1).adapter_id, "second");
+  assert.equal(bindingWrites.at(-1).program, null);
+  assert.equal(bindingWrites.at(-1).model, null);
+  assert(buttonIn(panel, "binding.reverify").disabled, "Running validation cannot be started twice");
 
   const noAdapters = config(); noAdapters.adapters = []; render(noAdapters); await tick();
-  assert(buttonIn(panel.children[1], "binding.validate").disabled);
-  assert(textOf(panel.children[1]).includes("bindings.noAdapters"));
+  assert(buttonIn(bindingForm(panel), "binding.validate").disabled);
+  assert(textOf(bindingForm(panel)).includes("bindings.noAdapters"));
   assert.equal(find(panel, n => n.tag === "a")[0].href, "#settings/adapters");
 
   const kind = Object.values(OutcomeKind)[0], cfg = config();
@@ -267,6 +275,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   const attempts = [attempt("same-person", "old", 1, "cc"), attempt("same-person", "latest", 2)];
   progressView.showProgress(logPanel, attempts);
   assert.equal(logPanel.children.length, 1);
+  assert(textOf(logPanel).includes("binding.logTitle"), "A visible log heading identifies the validation attempt");
   assert(!textOf(logPanel).includes('"adapter":"cc"'));
   assert(textOf(logPanel).includes('"adapter":"codex"'));
   assert.equal(attempts.length, 2, "Rendering never mutates the poll response");
