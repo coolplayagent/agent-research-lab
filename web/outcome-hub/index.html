@@ -64,7 +64,6 @@
           <nav data-i18n-aria-label="workspace.settingsNav">
             <a href="#settings/knowledge" data-setting="knowledge" data-i18n="knowledge.title"></a>
             <a href="#settings/bindings" data-setting="bindings" data-i18n="workspace.bindings"></a>
-            <a href="#settings/status" data-setting="status" data-i18n="workspace.status"></a>
             <details id="advanced-settings">
               <summary data-i18n="settings.advanced"></summary>
               <a href="#settings/services" data-setting="services" data-i18n="workspace.services"></a>
@@ -254,7 +253,6 @@
                 id="topic-open-group"
                 data-i18n="research.openGroup"
               ></button
-              ><button id="topic-open-graph" data-i18n="research.graph"></button
               ><button
                 id="new-subject"
                 data-i18n="research.newSubject"
@@ -307,11 +305,6 @@
             <h2 data-i18n="workspace.storage"></h2>
             <div id="storage-selection"></div>
           </section>
-          <section data-settings-panel="status" hidden>
-            <h2 data-i18n="workspace.status"></h2>
-            <div id="execution-status"></div>
-            <dl id="metrics" class="metrics"></dl>
-          </section>
         </section>
       </main>
       <aside id="research-panel" aria-labelledby="research-title">
@@ -345,25 +338,11 @@
             data-i18n="workspace.crystal"
           ></button>
           <button
-            id="tab-evolution"
-            role="tab"
-            aria-controls="evolution-page"
-            data-tab="evolution"
-            data-i18n="workspace.evolution"
-          ></button>
-          <button
             id="tab-goals"
             role="tab"
             aria-controls="goals-page"
             data-tab="goals"
             data-i18n="workspace.goals"
-          ></button>
-          <button
-            id="tab-iterations"
-            role="tab"
-            aria-controls="iterations-page"
-            data-tab="iterations"
-            data-i18n="iterations.title"
           ></button>
           <button
             id="tab-members"
@@ -374,19 +353,6 @@
           ></button>
         </div>
         <div class="research-body">
-          <section id="iterations-page" class="research-tab" hidden>
-            <div class="toolbar">
-              <h2 data-i18n="iterations.title"></h2>
-              <button id="new-iteration" class="primary" disabled data-i18n="iterations.create"></button>
-              <button id="refresh-iterations" data-i18n="research.refresh"></button>
-            </div>
-            <p data-i18n="iterations.description"></p>
-            <p id="iteration-status" role="status"></p>
-            <div id="iteration-list"></div>
-            <button id="more-iterations" hidden data-i18n="research.more"></button>
-            <button id="close-iteration" data-i18n="iterations.closeDetail"></button>
-            <section id="iteration-detail" class="research-detail" hidden></section>
-          </section>
           <section id="collaboration-page" class="research-tab">
             <p id="collaboration-status" role="status"></p>
             <div id="collaboration-graph"></div>
@@ -403,47 +369,6 @@
               ></button>
             </div>
             <div id="collaboration-detail"></div>
-          </section>
-          <section id="evolution-page" class="research-tab" hidden>
-            <div class="toolbar">
-              <h2 data-i18n="research.graph"></h2>
-              <button
-                id="new-evolution-node"
-                class="primary"
-                disabled
-                data-i18n="research.newNode"
-              ></button>
-            </div>
-            <p data-i18n="research.graphNote"></p>
-            <div id="evolution-filters" class="toolbar"></div>
-            <div class="toolbar">
-              <button
-                id="refresh-evolution"
-                data-i18n="research.refresh"
-              ></button
-              ><button
-                id="evolution-zoom-out"
-                data-i18n="research.zoomOut"
-              ></button
-              ><button
-                id="evolution-zoom-in"
-                data-i18n="research.zoomIn"
-              ></button>
-            </div>
-            <p id="evolution-summary"></p>
-            <div class="evolution-layout">
-              <div id="evolution-canvas" class="graph-viewport"></div>
-              <aside
-                id="evolution-detail"
-                class="research-detail"
-                hidden
-              ></aside>
-            </div>
-            <button
-              id="more-evolution"
-              hidden
-              data-i18n="research.more"
-            ></button>
           </section>
           <section id="goals-page" class="research-tab" hidden>
             <section id="goal-section" class="goal-section">

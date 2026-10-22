@@ -14,7 +14,7 @@ fn extracted_contracts_keep_original_wire_bytes_and_defaults() {
         "4fd42de092b8af96913c7df64de0c0b82e9123d0"
     );
     let records = fixture["records"].as_array().unwrap();
-    assert_eq!(records.len(), 16);
+    assert_eq!(records.len(), 14);
     for record in records {
         let input = &record["input"];
         let actual = match record["kind"].as_str().unwrap() {
@@ -24,8 +24,6 @@ fn extracted_contracts_keep_original_wire_bytes_and_defaults() {
             "outcome_command" => wire::<collaboration_model::OutcomeCommand>(input),
             "coordination" => wire::<collaboration_model::ResearchChange>(input),
             "storage_request" => wire::<collaboration_client::Request>(input),
-            "iteration" => wire::<collaboration_model::EvolutionRunInput>(input),
-            "lineage" => wire::<collaboration_model::EvolutionNode>(input),
             "agent_input" => wire::<service_api::AgentInput>(input),
             "configuration" => wire::<service_api::Configuration>(input),
             unknown => panic!("unhandled fixture kind: {unknown}"),

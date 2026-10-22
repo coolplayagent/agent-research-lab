@@ -3,7 +3,7 @@ load(":dependencies.bzl", "dependency_boundary_test")
 _OPTIONAL_SCENARIOS = ["//crates/" + name + ":" for name in [
     "execution-runtime", "execution-config", "execution-model", "collaboration-proposals", "agent-teams", "collaboration-evaluation",
     "prompt-evolution", "prompt-evolution-cli", "knowledge-publication", "delivery-outbox", "delivery-adapters", "execution-inputs", "source-freshness",
-    "execution-targets", "agent-backend", "workflow-adapter", "software-delivery",
+    "execution-targets", "agent-backend", "workflow-adapter",
 ]] + ["//apps/cli:", "//apps/console:", "//apps/migrate:"]
 _DATABASE = ["//crates/collaboration-store:", "//crates/collaboration-storage-service:", "rusqlite", "libsqlite3"]
 _ADAPTERS = ["//crates/" + name + ":" for name in ["codex-adapter", "sandbox-service", "executor-service", "service-workers", "knowledge-service", "knowledge-git", "knowledge-directory"]]
@@ -59,15 +59,9 @@ dependency_boundary_test(
 dependency_boundary_test(
     name = "console_does_not_depend_on_cli",
     subject = "//apps/console:outcome_hub_console",
-    forbidden = ["//apps/cli:", "//apps/cli:", "//crates/software-delivery:"],
+    forbidden = ["//apps/cli:", "//apps/cli:"],
 )
 
-dependency_boundary_test(
-    name = "software_delivery_does_not_own_runtime_or_storage",
-    subject = "//crates/software-delivery:software_delivery",
-    forbidden = _DATABASE + ["//crates/execution-runtime:"],
-    required = ["//crates/collaboration-client:collaboration_client", "//crates/execution-model:task", "//crates/software-verification:software_verification"],
-)
 
 load("@crates//:defs.bzl", "all_crate_deps")
 load("@rules_rust//rust:defs.bzl", "rust_test")

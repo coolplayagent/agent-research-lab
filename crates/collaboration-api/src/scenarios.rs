@@ -55,17 +55,6 @@ pub trait ScenarioAdapter: Send + Sync {
     ) -> bool {
         true
     }
-    /// Reconcile scenario-owned evidence or optional delivery/activation hooks.
-    /// Implementations must fence results to current attempts and use durable
-    /// request identities before issuing external effects. Worker claims alone
-    /// never authorize evaluation, acceptance or activation.
-    fn reconcile<'a>(
-        &'a self,
-        _hub: &'a collaboration_client::Client,
-        _run: &'a collaboration_model::EvolutionRun,
-    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
-        Box::pin(async { Ok(()) })
-    }
     fn status(&self) -> Value {
         json!({"available":true,"status":contracts::ScenarioStatus::Ready})
     }

@@ -96,15 +96,7 @@ states! {
     OutcomeEventKind { Withdrawn => "withdrawn", VerificationStarted => "verification_started", VerificationFinished => "verification_finished", Decision => "decision", WriteStarted => "write_started", WriteFinished => "write_finished", WriteReconciled => "write_reconciled" }
     OutcomeErrorCode { Invalid => "outcome_invalid", Forbidden => "outcome_forbidden", Conflict => "outcome_conflict", StaleAttempt => "outcome_stale_attempt", NotFound => "outcome_not_found", Capacity => "outcome_capacity", VerificationRequired => "outcome_verification_required", BindingChanged => "outcome_binding_changed" }
     SubjectKind { Repository => "repository", Agent => "agent", Tool => "tool", Model => "model", Workflow => "workflow", Dataset => "dataset", Prompt => "prompt", Other => "other" }
-    EvolutionState { Unassessed => "unassessed", Pending => "pending", Running => "running", Submitted => "submitted", Accepted => "accepted", Failed => "failed", Cancelled => "cancelled" }
-    EvolutionOperation { Baseline => "baseline", Mutation => "mutation", Recombination => "recombination" }
-    IterationState { Running => "running", Paused => "paused", Stopped => "stopped", Completed => "completed", BudgetExhausted => "budget_exhausted" }
-    RoundState { Running => "running", Assessed => "assessed", Accepted => "accepted", Completed => "completed", Failed => "failed", NoImprovement => "no_improvement", Cancelled => "cancelled" }
-    CandidateState { Proposed => "proposed", Accepted => "accepted", Rejected => "rejected" }
-    EvaluationState { Passed => "passed", Failed => "failed" }
-    ActivationState { Pending => "pending", Active => "active", Failed => "failed", RolledBack => "rolled_back" }
     ApiErrorCode { InvalidRequest => "invalid_request", Backpressure => "backpressure", StorageUnavailable => "storage_unavailable" }
-    ActivationPhase { Prepared => "prepared", Building => "building", Draining => "draining", Switching => "switching", Checking => "checking", Active => "active", RolledBack => "rolled_back", Blocked => "blocked" }
     InstallationPhase { Staged => "staged", PreviousBackedUp => "previous_backed_up", Activated => "activated", Verified => "verified", RolledBack => "rolled_back" }
     ScenarioCapability { Execute => "execute", Evaluate => "evaluate", Deliver => "deliver", Activate => "activate", Rollback => "rollback" }
     CodingTaskRole { Research => "research", Implement => "implement", Review => "review" }

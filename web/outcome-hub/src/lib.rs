@@ -32,10 +32,6 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/adapter-forms.js").as_slice(),
         )),
-        "/assets/execution-status.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/execution-status.js").as_slice(),
-        )),
         "/assets/binding-types.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/binding-types.js").as_slice(),
@@ -69,26 +65,6 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
         "/assets/scenario-catalog.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/scenario-catalog.js").as_slice(),
-        )),
-        "/assets/iteration-review.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/iteration-review.js").as_slice(),
-        )),
-        "/assets/iteration-types.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/iteration-types.js").as_slice(),
-        )),
-        "/assets/iteration-render.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/iteration-render.js").as_slice(),
-        )),
-        "/assets/iteration-form.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/iteration-form.js").as_slice(),
-        )),
-        "/assets/iterations.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/iterations.js").as_slice(),
         )),
         "/" => Some((
             "text/html; charset=utf-8",
@@ -259,17 +235,9 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/topics.js").as_slice(),
         )),
-        "/assets/evolution-render.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/evolution-render.js").as_slice(),
-        )),
         "/assets/research-types.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/research-types.js").as_slice(),
-        )),
-        "/assets/evolution.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/evolution.js").as_slice(),
         )),
         "/assets/forms.js" => Some((
             "text/javascript; charset=utf-8",

@@ -22,20 +22,6 @@ pub(crate) enum Commands {
         #[command(subcommand)]
         command: crate::knowledge_cli::Command,
     },
-    /// Stage and activate a verified merged software candidate through host policy.
-    SoftwareActivate {
-        input: PathBuf,
-        #[arg(long)]
-        policy_digest: String,
-    },
-    /// Verify actual installation after an interrupted activation without replaying deployment.
-    SoftwareActivationReconcile {
-        operation: PathBuf,
-    },
-    #[command(hide = true)]
-    SoftwareActivationWorker {
-        operation: PathBuf,
-    },
     /// Exercise real durable TCP/SSE communication in a new private state directory.
     CrystalBench {
         #[arg(long)]

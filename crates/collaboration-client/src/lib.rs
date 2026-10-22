@@ -16,18 +16,6 @@ pub enum Request {
         token: Option<String>,
         command: Box<OutcomeCommand>,
     },
-    EvolutionChange {
-        change: EvolutionChange,
-    },
-    EvolutionRun {
-        run_id: String,
-    },
-    EvolutionRuns {
-        group: String,
-        scenario: String,
-        after: String,
-        active: bool,
-    },
     Discuss {
         input: GoalInput,
         message: Publish,
@@ -42,11 +30,6 @@ pub enum Request {
     Subjects {
         topic: String,
         after: String,
-    },
-    Graph {
-        topic: String,
-        subject: String,
-        after: u64,
     },
     Probe,
     Metrics,
@@ -224,40 +207,7 @@ impl Client {
             Self::Remote(path) => rpc::call(path, request, timeout).await,
         }
     }
-    pub async fn evolution_change(&self, change: EvolutionChange) -> Result<EvolutionRun> {
-        self.call(
-            &Request::EvolutionChange { change },
-            Duration::from_secs(10),
-        )
-        .await
-    }
-    pub async fn evolution_run(&self, run_id: &str) -> Result<EvolutionRun> {
-        self.call(
-            &Request::EvolutionRun {
-                run_id: run_id.into(),
-            },
-            Duration::from_secs(10),
-        )
-        .await
-    }
-    pub async fn evolution_runs(
-        &self,
-        group: &str,
-        scenario: &str,
-        after: &str,
-        active: bool,
-    ) -> Result<Value> {
-        self.call(
-            &Request::EvolutionRuns {
-                group: group.into(),
-                scenario: scenario.into(),
-                after: after.into(),
-                active,
-            },
-            Duration::from_secs(10),
-        )
-        .await
-    }
+
     pub async fn outcomes(&self, token: Option<&str>, command: OutcomeCommand) -> Result<Value> {
         self.call(
             &Request::Outcomes {
@@ -292,17 +242,7 @@ impl Client {
         )
         .await
     }
-    pub async fn graph(&self, topic: &str, subject: &str, after: u64) -> Result<Value> {
-        self.call(
-            &Request::Graph {
-                topic: topic.into(),
-                subject: subject.into(),
-                after,
-            },
-            Duration::from_secs(10),
-        )
-        .await
-    }
+
     pub fn remote(path: PathBuf) -> Result<Self> {
         rpc::endpoint(&path)?;
         Ok(Self::Remote(path))

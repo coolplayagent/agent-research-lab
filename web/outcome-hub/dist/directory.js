@@ -74,21 +74,6 @@ function render() {
         root.append(empty);
     }
 }
-export function metrics(data) {
-    const root = get("metrics");
-    root.replaceChildren();
-    for (const [label, key] of [
-        ["Agent", "actors"],
-        [t("directory.0a29c2ff50"), "groups"],
-        [t("directory.4cc404a451"), "stored_messages"],
-        [t("directory.a1b56411cc"), "subscriptions"],
-        [t("directory.e1fa4a08fc"), "queue_depth"],
-        [t("directory.56eb5b282c"), "replayed"],
-        [t("directory.1e55edfca7"), "rejected"],
-    ])
-        root.append(el("dt", label), el("dd", String(data[key] ?? "—")));
-    root.append(el("dt", t("directory.f0f4fa0c46")), el("dd", data.healthy ? t("directory.296de0e31f") : t("directory.20f8e5ca6d")));
-}
 export async function loadGroups(append = false) {
     const request = ++generation;
     get("group-list").setAttribute("aria-busy", "true");
@@ -107,7 +92,6 @@ export async function loadGroups(append = false) {
             : result.directory.groups;
         next = result.directory.next_after;
         get("more-groups").hidden = !next;
-        metrics(result.metrics);
         render();
         if (!restored) {
             restored = true;

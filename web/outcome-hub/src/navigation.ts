@@ -8,7 +8,7 @@ import { get } from "./dom.js";
 import { icon } from "./icons.js";
 import { loadPeople } from "./people.js";
 import { allowSettingsLeave, initSettingsGuard } from "./settings-guard.js";
-import { revealResearch, syncControls } from "./workspace.js";
+import { syncControls } from "./workspace.js";
 const titles: Record<string, string> = {
   groups: t("navigation.f3f8bcf3f5"),
   direct: t("navigation.484c0ffc97"),
@@ -22,14 +22,13 @@ const settings: Record<string, string> = {
   adapters: t("workspace.adapters"),
   bindings: t("workspace.bindings"),
   storage: t("workspace.storage"),
-  status: t("workspace.status"),
 };
 let previous = "",
   workspaceRoute = "#groups",
   scroll = 0;
 export function navigate(): void {
   let requested = location.hash.slice(1);
-  if (requested === "applications") { requested = "groups"; history.replaceState(null, "", "#groups"); }
+  if (["applications", "evolution", "iterations"].includes(requested)) { requested = "groups"; history.replaceState(null, "", "#groups"); }
   if (
     requested === "settings" ||
     (requested.startsWith("settings/") && !settings[requested.split("/")[1]])
@@ -53,8 +52,6 @@ export function navigate(): void {
     ? "settings"
     : requested.startsWith("topics/outcomes/")
       ? "topics"
-    : requested === "evolution"
-      ? "groups"
       : titles[requested]
         ? requested
         : "groups";
@@ -81,7 +78,6 @@ export function navigate(): void {
     workspaceRoute = "#" + page;
     get<HTMLAnchorElement>("return-workspace").href = workspaceRoute;
   }
-  if (requested === "evolution") revealResearch("evolution");
   if (page === "topics") void loadTopics();
   if (requested.startsWith("topics/outcomes/")) {
     void showOutcome(decodeURIComponent(requested.slice("topics/outcomes/".length))).catch(notice);

@@ -223,46 +223,6 @@
     },
     {
       "input": {
-        "acceptance": "Score",
-        "assignments": [
-          {
-            "instruction": "Measure",
-            "person_id": "worker"
-          }
-        ],
-        "baseline_version_id": "baseline",
-        "group_id": "room",
-        "id": "run",
-        "max_rounds": 2,
-        "max_seconds": 60,
-        "objective": "Improve",
-        "scenario_id": "plan-comparison",
-        "subject_id": "subject",
-        "title": "Plans",
-        "total_budget_seconds": 120
-      },
-      "kind": "iteration",
-      "wire": "{\"id\":\"run\",\"group_id\":\"room\",\"subject_id\":\"subject\",\"scenario_id\":\"plan-comparison\",\"title\":\"Plans\",\"objective\":\"Improve\",\"acceptance\":\"Score\",\"assignments\":[{\"person_id\":\"worker\",\"instruction\":\"Measure\"}],\"baseline_version_id\":\"baseline\",\"parameters\":null,\"max_rounds\":2,\"max_seconds\":60,\"total_budget_seconds\":120}"
-    },
-    {
-      "input": {
-        "created_ms": 42,
-        "generation": 0,
-        "input": {
-          "goal_id": null,
-          "id": "node",
-          "parents": [],
-          "pins": {},
-          "reference": "source/ref",
-          "subject_id": "subject",
-          "version": "v1"
-        }
-      },
-      "kind": "lineage",
-      "wire": "{\"input\":{\"id\":\"node\",\"subject_id\":\"subject\",\"parents\":[],\"version\":\"v1\",\"reference\":\"source/ref\",\"goal_id\":null,\"pins\":{\"source\":null,\"prompt\":null,\"policy\":null,\"superpod\":null}},\"generation\":0,\"created_ms\":42}"
-    },
-    {
-      "input": {
         "acceptance": "Evidence",
         "attempt": 1,
         "goal_id": "goal",

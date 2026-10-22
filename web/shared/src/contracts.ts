@@ -402,75 +402,12 @@ export const SubjectKind = {
   Other: "other",
 } as const;
 export type SubjectKind = (typeof SubjectKind)[keyof typeof SubjectKind];
-export const EvolutionState = {
-  Unassessed: "unassessed",
-  Pending: "pending",
-  Running: "running",
-  Submitted: "submitted",
-  Accepted: "accepted",
-  Failed: "failed",
-  Cancelled: "cancelled",
-} as const;
-export type EvolutionState = (typeof EvolutionState)[keyof typeof EvolutionState];
-export const EvolutionOperation = {
-  Baseline: "baseline",
-  Mutation: "mutation",
-  Recombination: "recombination",
-} as const;
-export type EvolutionOperation = (typeof EvolutionOperation)[keyof typeof EvolutionOperation];
-export const IterationState = {
-  Running: "running",
-  Paused: "paused",
-  Stopped: "stopped",
-  Completed: "completed",
-  BudgetExhausted: "budget_exhausted",
-} as const;
-export type IterationState = (typeof IterationState)[keyof typeof IterationState];
-export const RoundState = {
-  Running: "running",
-  Assessed: "assessed",
-  Accepted: "accepted",
-  Completed: "completed",
-  Failed: "failed",
-  NoImprovement: "no_improvement",
-  Cancelled: "cancelled",
-} as const;
-export type RoundState = (typeof RoundState)[keyof typeof RoundState];
-export const CandidateState = {
-  Proposed: "proposed",
-  Accepted: "accepted",
-  Rejected: "rejected",
-} as const;
-export type CandidateState = (typeof CandidateState)[keyof typeof CandidateState];
-export const EvaluationState = {
-  Passed: "passed",
-  Failed: "failed",
-} as const;
-export type EvaluationState = (typeof EvaluationState)[keyof typeof EvaluationState];
-export const ActivationState = {
-  Pending: "pending",
-  Active: "active",
-  Failed: "failed",
-  RolledBack: "rolled_back",
-} as const;
-export type ActivationState = (typeof ActivationState)[keyof typeof ActivationState];
 export const ApiErrorCode = {
   InvalidRequest: "invalid_request",
   Backpressure: "backpressure",
   StorageUnavailable: "storage_unavailable",
 } as const;
 export type ApiErrorCode = (typeof ApiErrorCode)[keyof typeof ApiErrorCode];
-export const ActivationPhase = {
-  Prepared: "prepared",
-  Building: "building",
-  Draining: "draining",
-  Switching: "switching",
-  Checking: "checking",
-  Active: "active",
-  RolledBack: "rolled_back",
-  Blocked: "blocked",
-} as const;
-export type ActivationPhase = (typeof ActivationPhase)[keyof typeof ActivationPhase];
 export const InstallationPhase = {
   Staged: "staged",
   PreviousBackedUp: "previous_backed_up",

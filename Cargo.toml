@@ -15,7 +15,6 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Secur
 
 outcome_hub_cli = { package = "outcome-hub-cli", path = "apps/cli" }
 outcome_hub_console = { package = "outcome-hub-console", path = "apps/console" }
-software_delivery = { package = "outcome-hub-software-delivery", path = "crates/software-delivery" }
 software_verification = { package = "outcome-hub-software-verification", path = "crates/software-verification" }
 executor_service = { package = "outcome-hub-executor-service", path = "crates/executor-service" }
 sandbox_service = { package = "outcome-hub-sandbox-service", path = "crates/sandbox-service" }

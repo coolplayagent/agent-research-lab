@@ -19,7 +19,7 @@ tar -xzf bazel-bin/local-package.tar.gz -C /absolute/private/outcome-hub-install
 
 Open `http://127.0.0.1:4877/` directly to enter OutcomeHub; there is no management login. The state persists across restarts. The service accepts only loopback addresses; see [operations](07-operations.md) for the local access boundary. Use `-c opt` for long-running deployments.
 
-The complete package includes the core, separate storage, execution environment, Agent bridge and knowledge service. New workspaces require no service addresses. Open **Settings → Local environment** to inspect readiness or prepare execution. Core chat needs no Agent login. Existing deployments retain their configuration and data; a standalone development core requires explicit `--embedded-development`. See the [Windows guide](10-windows.md).
+The complete package includes the core, separate storage, execution environment, Agent bridge and knowledge service. New workspaces require no service addresses. Execution services prepare automatically on the first digital-person validation or task. Core chat needs no Agent login. Existing deployments retain their configuration and data; a standalone development core requires explicit `--embedded-development`. See the [Windows guide](10-windows.md).
 
 ## Your first group
 

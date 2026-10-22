@@ -401,75 +401,12 @@ export declare const SubjectKind: {
     readonly Other: "other";
 };
 export type SubjectKind = (typeof SubjectKind)[keyof typeof SubjectKind];
-export declare const EvolutionState: {
-    readonly Unassessed: "unassessed";
-    readonly Pending: "pending";
-    readonly Running: "running";
-    readonly Submitted: "submitted";
-    readonly Accepted: "accepted";
-    readonly Failed: "failed";
-    readonly Cancelled: "cancelled";
-};
-export type EvolutionState = (typeof EvolutionState)[keyof typeof EvolutionState];
-export declare const EvolutionOperation: {
-    readonly Baseline: "baseline";
-    readonly Mutation: "mutation";
-    readonly Recombination: "recombination";
-};
-export type EvolutionOperation = (typeof EvolutionOperation)[keyof typeof EvolutionOperation];
-export declare const IterationState: {
-    readonly Running: "running";
-    readonly Paused: "paused";
-    readonly Stopped: "stopped";
-    readonly Completed: "completed";
-    readonly BudgetExhausted: "budget_exhausted";
-};
-export type IterationState = (typeof IterationState)[keyof typeof IterationState];
-export declare const RoundState: {
-    readonly Running: "running";
-    readonly Assessed: "assessed";
-    readonly Accepted: "accepted";
-    readonly Completed: "completed";
-    readonly Failed: "failed";
-    readonly NoImprovement: "no_improvement";
-    readonly Cancelled: "cancelled";
-};
-export type RoundState = (typeof RoundState)[keyof typeof RoundState];
-export declare const CandidateState: {
-    readonly Proposed: "proposed";
-    readonly Accepted: "accepted";
-    readonly Rejected: "rejected";
-};
-export type CandidateState = (typeof CandidateState)[keyof typeof CandidateState];
-export declare const EvaluationState: {
-    readonly Passed: "passed";
-    readonly Failed: "failed";
-};
-export type EvaluationState = (typeof EvaluationState)[keyof typeof EvaluationState];
-export declare const ActivationState: {
-    readonly Pending: "pending";
-    readonly Active: "active";
-    readonly Failed: "failed";
-    readonly RolledBack: "rolled_back";
-};
-export type ActivationState = (typeof ActivationState)[keyof typeof ActivationState];
 export declare const ApiErrorCode: {
     readonly InvalidRequest: "invalid_request";
     readonly Backpressure: "backpressure";
     readonly StorageUnavailable: "storage_unavailable";
 };
 export type ApiErrorCode = (typeof ApiErrorCode)[keyof typeof ApiErrorCode];
-export declare const ActivationPhase: {
-    readonly Prepared: "prepared";
-    readonly Building: "building";
-    readonly Draining: "draining";
-    readonly Switching: "switching";
-    readonly Checking: "checking";
-    readonly Active: "active";
-    readonly RolledBack: "rolled_back";
-    readonly Blocked: "blocked";
-};
-export type ActivationPhase = (typeof ActivationPhase)[keyof typeof ActivationPhase];
 export declare const InstallationPhase: {
     readonly Staged: "staged";
     readonly PreviousBackedUp: "previous_backed_up";

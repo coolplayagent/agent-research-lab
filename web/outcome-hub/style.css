@@ -568,19 +568,6 @@ main {
 .empty .orb {
   margin: 0 auto 18px;
 }
-.metrics {
-  display: grid;
-  grid-template-columns: minmax(85px, 1fr) minmax(0, 1.5fr);
-  gap: 1px;
-}
-.metrics dt,
-.metrics dd {
-  margin: 0;
-  padding: 8px;
-  background: #f5f9f6;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
 dialog {
   max-width: 600px;
   width: calc(100% - 32px);
@@ -674,17 +661,6 @@ dialog p {
 .research-tab h2 {
   font-size: 14px;
 }
-.iteration-card { margin-bottom: 10px; }
-.iteration-card > button { text-align: left; font-weight: 600; }
-.iteration-round { margin-top: 12px; overflow-wrap: anywhere; }
-.iteration-facts { display: grid; grid-template-columns: minmax(80px, 1fr) 2fr; gap: 7px 12px; }
-.iteration-facts dt { color: var(--muted); }
-.iteration-facts dd { margin: 0; overflow-wrap: anywhere; }
-.iteration-round pre { max-height: 260px; overflow: auto; white-space: pre-wrap; }
-.iteration-assignment { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
-.iteration-assignments details { padding: 7px 0; }
-.iteration-feedback { white-space: pre-wrap; }
-#iteration-detail { margin-top: 14px; }
 .research-tab p {
   font-size: 12px;
 }
@@ -1021,80 +997,11 @@ dialog p {
   overflow: auto;
   font-size: 12px;
 }
-.evolution-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-}
-.graph-viewport {
-  overflow: auto;
-  max-height: 680px;
-  min-width: 0;
-  border: 1px solid #dce3df;
-  border-radius: 16px;
-  background: #f7faf8;
-  padding: 12px;
-}
-.evolution-svg {
-  display: block;
-  max-width: none;
-}
-.evolution-node {
-  cursor: pointer;
-  outline: none;
-}
-.evolution-node rect {
-  fill: white;
-  stroke: #bdcfc4;
-  stroke-width: 1.5;
-}
-.evolution-node:hover rect,
-.evolution-node:focus rect,
-.evolution-node[aria-pressed="true"] rect {
-  stroke: #14724e;
-  stroke-width: 3;
-}
-.evolution-node[data-state="accepted"] rect {
-  fill: #e8f5ed;
-}
-.evolution-node[data-state="failed"] rect {
-  fill: #fff0ee;
-}
-.evolution-node text {
-  fill: #173e2c;
-  font-size: 13px;
-  pointer-events: none;
-}
-.evolution-node .evolution-version,
-.evolution-node .evolution-status {
-  font-size: 11px;
-  fill: #587163;
-}
-.evolution-edge {
-  fill: none;
-  stroke: #94b4a2;
-  stroke-width: 2;
-}
-.generation {
-  fill: #587163;
-  font-size: 12px;
-}
-#evolution-filters select {
-  max-width: 330px;
-}
 
 .research-detail {
   padding: 12px;
   margin-top: 12px;
   border-radius: 7px;
-}
-.graph-viewport {
-  max-height: none;
-  border-radius: 6px;
-  padding: 4px;
-}
-.evolution-layout {
-  display: block;
 }
 #settings-page {
   max-width: none;
@@ -1201,11 +1108,6 @@ dialog header h2 { overflow-wrap: anywhere; }
 #advanced-settings { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
 #advanced-settings summary { cursor: pointer; padding: 10px 12px; font-weight: 600; }
 #advanced-settings a { display: block; }
-#execution-status { display: grid; gap: 18px; margin-bottom: 20px; max-width: 1000px; }
-.runtime-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 16px; }
-.runtime-card { min-width: 0; gap: 12px; }
-.runtime-card h3 { margin: 0; }
-#execution-status p { margin: 0; }
 
 /* Knowledge management keeps connection plumbing below the everyday workflow. */
 #knowledge-targets { display: grid; gap: 28px; }

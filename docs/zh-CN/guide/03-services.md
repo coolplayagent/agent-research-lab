@@ -6,7 +6,7 @@
 
 系统设置默认打开 **数字人管理**。先创建数字人，选择 Claude Code、Codex、DeepSeek Harness 或 Pi，然后点击**验证并绑定**。本机 Agent 需已安装并登录；验证会调用模型，可能消耗额度，页面会展示进度及失败步骤。绑定验证成功后启用适配器并保存绑定证据。创建身份或保存适配器模板不会调用模型。
 
-完整安装使用 Linux `//:local-package` 或 Windows `//:windows-package`。将 `outcome-hub`、`outcome-hub-storage`、`outcome-hub-services`、`outcome-hub-agent`、`outcome-hub-knowledge` 保持在同一目录（Windows 带 `.exe`）。新工作空间自动启动独立存储服务，执行器、沙箱和知识服务按需启动，无需填写地址。**本机环境 → 一键准备**可提前准备执行环境，不调用模型。首次绑定或执行任务也会自动准备；已启用适配器在重启后恢复服务。Agent CLI 仍需自行安装并登录。
+完整安装使用 Linux `//:local-package` 或 Windows `//:windows-package`。将 `outcome-hub`、`outcome-hub-storage`、`outcome-hub-services`、`outcome-hub-agent`、`outcome-hub-knowledge` 保持在同一目录（Windows 带 `.exe`）。新工作空间自动启动独立存储服务，执行器、沙箱和知识服务按需启动，无需填写地址。首次绑定或执行任务也会自动准备；已启用适配器在重启后恢复服务。Agent CLI 仍需自行安装并登录。
 
 已有 `services.json`、外部部署和旧 `crystal` 数据目录保留原选择，不会自动迁移数据库。独立存储崩溃后最多重试三次，重新打开原数据；数据丢失或恢复失败会明确报错。只有显式使用 `serve --embedded-development` 才为全新工作空间选择嵌入式开发存储。缺少执行或知识程序不会阻止基础聊天；新安装缺少存储程序则拒绝启动，并提示重新安装完整包。
 

@@ -1,12 +1,9 @@
 import { get } from "./dom.js";
 import { t } from "./i18n.js";
-import { loadEvolution } from "./evolution.js";
-import { loadIterations } from "./iterations.js";
 
 let tab = "collaboration";
 export function selectTab(name: string): void {
   if (!document.querySelector(`[data-tab="${name}"]`)) return;
-  const changed = tab !== name;
   tab = name;
   for (const item of document.querySelectorAll<HTMLButtonElement>(
     "[data-tab]",
@@ -19,8 +16,6 @@ export function selectTab(name: string): void {
     panel.setAttribute("role", "tabpanel");
     panel.setAttribute("aria-labelledby", item.id);
   }
-  if (changed && tab === "evolution") void loadEvolution();
-  if (changed && tab === "iterations") void loadIterations();
 }
 export function revealResearch(name: string): void {
   const root = get("workspace");

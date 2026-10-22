@@ -204,21 +204,7 @@ pub(crate) fn available(connection: &Connection, group: &str) -> Result<()> {
 }
 impl Store {
     fn goal_projection(&self, goals: &[Goal], next: Option<String>) -> Result<Value> {
-        let mut projection = serde_json::to_value(goals)?;
-        for goal in projection.as_array_mut().unwrap() {
-            let iteration: Option<String> = self
-                .connection
-                .query_row(
-                    "SELECT run_id FROM evolution_goal_bindings WHERE goal_id=?1",
-                    [goal["input"]["id"].as_str().unwrap()],
-                    |row| row.get(0),
-                )
-                .optional()?;
-            if let Some(iteration) = iteration {
-                goal["iteration_id"] = json!(iteration);
-            }
-        }
-        Ok(json!({"goals":projection,"next_after":next}))
+        Ok(json!({"goals":goals,"next_after":next}))
     }
 
     fn current_goal(&self, group: &str) -> Result<Value> {
@@ -348,14 +334,6 @@ impl Store {
             "goal changed; refresh before editing"
         );
         available(&tx, &goal.input.group_id)?;
-        ensure!(
-            !tx.query_row(
-                "SELECT EXISTS(SELECT 1 FROM evolution_goal_bindings WHERE goal_id=?1)",
-                [&goal.input.id],
-                |row| row.get::<_, bool>(0)
-            )?,
-            "iteration-owned goals require iteration operations; retry in a new round"
-        );
         let mut changed_work = None;
         let kind = match change {
             GoalChange::Accept { .. } => {

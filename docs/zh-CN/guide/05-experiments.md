@@ -83,16 +83,6 @@ claim 的 `knowledge_update` 指向**已有 SuperPOD 文件**。收集器只输�
 
 ## 策略谱系回执
 
-`evolution lineage REQUEST.json --output STATE/evolution/lineage.json` 基于既有 `PromptRegistry` 生成可重算回执。请求包含 `registry_file` 和 `study`；后者带有 `task_kind`、固定的 `policy_version` / `superpod_commit`、宿主冻结的 `expected` 快照绑定、开发观测 `observations`、待评估/扩展项及评估预算。研究观察应用的**系统设置 → 群体演化**投影已校验回执，不暴露提示词正文或试验输入；OutcomeHub 右侧版本演化展示当前群关联主题的版本与评估状态。
+`evolution lineage REQUEST.json --output STATE/evolution/lineage.json` 基于既有 `PromptRegistry` 生成可重算回执。请求包含 `registry_file` 和 `study`；后者带有 `task_kind`、固定的 `policy_version` / `superpod_commit`、宿主冻结的 `expected` 快照绑定、开发观测 `observations`、待评估/扩展项及评估预算。研究观察应用的**系统设置 → 群体演化**投影已校验回执，不暴露提示词正文或试验输入。
 
 报告区分策略自身表现和后代汇总表现，对重组谱系共享后代去重，未完成工作也计入预算。验证/保留集观测、变化绑定和重复试验会被拒绝。这是受 HGM 启发的谱系诊断，不是 HGM Thompson sampling 调度器复现。候选激活继续受评估、保留集隔离、晋级、发布和安装门禁约束；策略分支不会创建新数字人身份或共享可变实验记忆。
-
-## 多场景演进迭代
-
-在所选会话的**演进迭代** Tab 选择场景、已有对象和基线、参与者及指令、轮次上限、执行时限与总预算。场景描述提供可选分工角色和推荐时限，界面不把软件角色强加给其他场景。软件演化声明研究、实现、独立评审角色，其他场景可声明不同 ID；原有资源/分工限制继续适用。必填角色的场景通过迭代表单配置，普通目标选择器只展示可配置的场景。
-
-详情分别展示候选评估、独立评价和实际激活。主持人评审引用评估者工作证据及当前目标 revision，候选作者不能评价自己。场景声明是否允许手动评审；策略管理的软件演化在 HTTP 边界拒绝手动候选、评估、验收和激活，由其适配器负责门禁转换。
-
-验收不代表部署，无候选、未评估、失败、未知分别显示。迭代完成也可能仅表示已到轮数上限，须检查每轮结果。仅声明 `public_process` 的场景显示公开工具过程，继续执行脱敏与尝试隔离。
-
-暂停、继续和停止使用迭代控制；迭代内目标不能走普通目标验收、取消、重试。已领取切换阶段的激活须经宿主核对结算后才能暂停/停止。详见[迭代设计](../design/05-evidence.md)及[激活恢复](07-operations.md)。

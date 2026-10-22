@@ -30,7 +30,6 @@ export interface Work {
   } | null;
 }
 export interface Goal {
-  iteration_id?: string | null;
   input: {
     id: string;
     group_id: string;

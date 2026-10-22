@@ -10,7 +10,7 @@ pub(crate) fn validate(connection: &Connection) -> Result<()> {
         )
         .context("migration_required: use outcome-hub-migrate on an offline copy")?;
     ensure!(
-        version == 8,
+        version == 9,
         "migration_required: unsupported storage schema {version}; use outcome-hub-migrate"
     );
     Ok(())

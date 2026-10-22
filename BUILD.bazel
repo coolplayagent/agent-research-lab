@@ -29,7 +29,6 @@ test_suite(
     name = "tests",
     tests = [
         "//crates/software-verification:tests",
-        "//crates/software-delivery:tests",
         "//crates/service-registry:tests",
         "//crates/sandbox-service:tests",
         "//crates/executor-service:tests",
@@ -112,7 +111,6 @@ filegroup(name = "policy_sources", srcs = [
     "//crates/executor-service:policy_sources",
     "//apps/console:policy_sources",
     "//crates/software-verification:policy_sources",
-    "//crates/software-delivery:policy_sources",
     "//apps/outcome-hub:policy_sources",
     "//crates/service-workers:policy_sources",
     "//crates/service-api:policy_sources",

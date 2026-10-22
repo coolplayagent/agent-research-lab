@@ -21,7 +21,6 @@ OutcomeHub 负责数字人身份、群聊、持久消息、目标与分工。CLI
 | `service-registry`, `collaboration-host` | 配置持久化与健康探测；应用启动和存储装配 |
 | `executor-service`, `sandbox-service` | 可替换执行器与有界沙箱；`service-workers` 保留组合启动器 |
 | `codex-adapter`, `knowledge-service` | 可选厂商桥接及仓外知识库更新 |
-| `software-delivery`, `software-verification` | 研究软件交付/激活及共享验证参数，保留原门禁 |
 | `contracts` | 跨服务共享状态枚举及前端契约生成 |
 | `execution-config`, `execution-model` | 配置声明及冻结的任务、尝试记录 |
 | `agent-policy`, `agent-backend`, `isolation` | 权限、执行适配与 Linux 进程隔离 |
@@ -66,14 +65,6 @@ runtime 负责准入、尝试、结算与恢复；协作实验通过显式宿主
 `collaboration-proposals` 的 crate 根保留公开 `Board` 和协议类型。内部 `board` 协调宿主操作并持有分片锁，单个 `store` 拥有权限路径、运行身份预留和派生视图发布；`authority` 在记录参与读写授权前完成校验。
 
 `protocol` 负责协议记录和语法校验，`admission` 消费有界 outbox 槽位，`audience` 共用可见性与回复受众规则。`projection` 从已验证记录生成视图与冻结上下文，`presence` 维护宿主拥有的投递生命周期，`files` 负责锚定目录下的有界读取，`limits` 定义既有配额与容量错误。v1 序列化、消息身份、研究提案 TTL、配额和退役标记均保留。详见[提案边界评审](../../../qualitygate/reviews/proposal-boundaries.md)。
-
-## 研究软件激活
-
-`software-delivery` 保留公开的 `request`、`worker` 和 `reconcile` 函数；内部入口模块分别负责请求受理、有界执行和实际安装状态核对。`model` 集中定义冻结策略、请求与切换凭据，生命周期枚举继续来自 `contracts`。
-
-`build` 验证合并源码及完整门禁；`cli` 负责技能包准备、配置切换和回滚；`platform` 负责有序服务发布、离线存储兼容检查和 unit 回滚。两种路径共用 `admission` 的持久目标认领与原生任务排空、`journal` 的本地意图和回执、`service` 的服务身份和健康观测，以及 `host` 的有界命令与文件操作。本地日志不能代替持久认领；事后核对读取安装凭据，不重复执行切换。详见[激活边界评审](../../../qualitygate/reviews/activation-boundaries.md)。
-
-该 crate 经 `execution-model` 读取原生任务记录，经 `collaboration-client` 访问持久迭代状态，不依赖研究调度器或协作存储实现。Bazel 分析测试检查其传递依赖，防止重新引入这些实现依赖。
 
 ## 研究协作评估
 
@@ -135,6 +126,6 @@ Cargo 和 Bazel 同时声明每个 crate 的依赖，`rules_rust` 从锁文件�
 
 - 数据契约和存储客户端不依赖 `collaboration-store`、`collaboration-storage-service` 或 SQLite；HTTP 库也不依赖存储实现。`collaboration-store` 重新导出旧数据类型名称以兼容已有 Rust 调用方。
 - `collaboration-host` 是装配位置：生产模式连接已配置的存储服务；开发模式显式创建独立本地存储适配器。两者使用同一个 `collaboration-client` 请求契约。
-- 消息、目标、成果与主题谱系保留同一存储事务边界，维护成员权限、尝试隔离和验收一致性。研究执行、提示词演化、SuperPOD 研究发布属于可选研究扩展，不进入最小协作包。
+- 消息、目标、成果与主题元数据保留同一存储事务边界，维护成员权限、尝试隔离和验收一致性。研究执行、提示词演化、SuperPOD 研究发布属于可选研究扩展，不进入最小协作包。
 - `//:outcome-hub-package` 只包含核心应用与存储服务；可选服务单独发布为 `//:adapter-package`。完整研究发行版继续使用 `//:package`。
 - `verification` 的 Bazel 分析测试遍历真实传递依赖并检查包内容；原版本协议样本、双客户端行为、核心启动/重启及全仓回归共同验证边界。语义评审记录在 `qualitygate/reviews/module-boundaries.md`。

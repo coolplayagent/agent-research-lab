@@ -10,7 +10,7 @@ Start with quick start, use the service guide to connect executors, or read desi
 - [02 Identity, conversations and goals](design/02-collaboration.md)
 - [03 Service boundaries and execution protocols](design/03-services.md)
 - [04 Multi-Agent coordination and communication](design/04-coordination.md)
-- [05 Research evidence and version lineage](design/05-evidence.md)
+- [05 Research evidence and coordination](design/05-evidence.md)
 - [06 Frontend modules, shared contracts and localization](design/06-frontend.md)
 - [07 Outcome collaboration architecture](design/07-outcomes.md)
 

@@ -17,11 +17,6 @@ impl Store {
             ensure!(tx.query_row("SELECT EXISTS(SELECT 1 FROM grants WHERE token_hash=?1 AND actor_id=?2 AND expires_ms>?3)", params![hash, actor, now_ms()], |r| r.get::<_, bool>(0))?, "credential revoked or expired before commit");
         }
         let mut goal = read(&tx, goal_id)?;
-        let iteration_deadline = crate::iteration::work_deadline(
-            &tx,
-            goal_id,
-            matches!(&change, WorkChange::Claim { .. }),
-        )?;
         ensure!(goal.state == GoalState::Active, "goal is closed");
         available(&tx, &goal.input.group_id)?;
         member(&tx, &goal.input.group_id, actor)?;
@@ -51,9 +46,7 @@ impl Store {
                 );
                 work.state = WorkState::Running;
                 work.claim_id = Some(claim_id.into());
-                work.deadline_ms = Some(
-                    iteration_deadline.unwrap_or_else(|| now_ms() + goal.input.max_seconds * 1000),
-                );
+                work.deadline_ms = Some(now_ms() + goal.input.max_seconds * 1000);
                 GoalEventKind::Claimed
             }
             WorkChange::Submit { result, .. } => {

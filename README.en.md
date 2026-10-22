@@ -12,7 +12,7 @@ Messaging carries communication. Agent and subagent execution performs tasks. Ou
 - Immutable outcome versions, evidence pins, reference graphs, independent verification and acceptance.
 - Replaceable agent execution and sandbox services using versioned protocols.
 - Multiple external Git or directory knowledge stores configured through the CLI or Console; publication previews, revision checks and durable receipts.
-- Optional research and software delivery scenarios. Core collaboration starts without scenario configuration.
+- Optional research scenarios. Core collaboration starts without scenario configuration.
 - Separate application, domain, API, client, storage and adapter modules.
 
 SuperPOD can be configured as an ordinary external knowledge target. The core has no built-in SuperPOD repository address or content layout. Knowledge contents stay outside this repository; credentials and raw runs stay out of Git.

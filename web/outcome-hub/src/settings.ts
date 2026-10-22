@@ -14,7 +14,6 @@ import { t, label } from "./i18n.js";
 import { editService } from "./service-forms.js";
 import { editAdapter } from "./adapter-forms.js";
 import { renderAdapters } from "./adapter-settings.js";
-import { renderExecutionStatus } from "./execution-status.js";
 import { element, select, field } from "./forms.js";
 import type { Configuration, ServiceView } from "./service-types.js";
 import { busy } from "./feedback.js";
@@ -48,7 +47,6 @@ async function save(config: Configuration): Promise<void> {
 function render(view: ServiceView): void {
   const config = view.configuration;
   current = view;
-  renderExecutionStatus(view, directory, () => loadServices(true));
   renderKnowledgeSettings(view, save, () => loadServices(true));
   get("services-status").textContent = view.restart_required
     ? t("services.restart")
@@ -129,7 +127,6 @@ function render(view: ServiceView): void {
   };
   renderBindings(config, directory, save, () => loadServices(true), people => {
     directory = people;
-    renderExecutionStatus(view, directory, () => loadServices(true));
   });
 }
 export async function loadServices(force = false): Promise<void> {

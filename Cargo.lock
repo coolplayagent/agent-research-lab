@@ -845,7 +845,6 @@ dependencies = [
  "outcome-hub-prompt-evolution-cli",
  "outcome-hub-service-api",
  "outcome-hub-service-protocol",
- "outcome-hub-software-delivery",
  "outcome-hub-source-freshness",
  "outcome-hub-workflow-adapter",
  "serde",
@@ -1484,28 +1483,6 @@ dependencies = [
  "outcome-hub-sandbox-service",
  "outcome-hub-service-api",
  "outcome-hub-service-protocol",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "outcome-hub-software-delivery"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "chrono",
- "outcome-hub-collaboration-client",
- "outcome-hub-collaboration-model",
- "outcome-hub-contracts",
- "outcome-hub-delivery-adapters",
- "outcome-hub-execution-config",
- "outcome-hub-execution-model",
- "outcome-hub-filesystem-store",
- "outcome-hub-process",
- "outcome-hub-software-verification",
- "outcome-hub-source-freshness",
  "serde",
  "serde_json",
  "tempfile",

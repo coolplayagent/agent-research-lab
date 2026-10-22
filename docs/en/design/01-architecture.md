@@ -20,7 +20,6 @@ use the `outcome-hub-` prefix, while Rust library names retain the existing modu
 | `service-registry`, `collaboration-host` | Configuration persistence/probes and application/storage composition |
 | `executor-service`, `sandbox-service` | Replaceable execution and bounded sandbox; `service-workers` retains the combined launcher |
 | `codex-adapter`, `knowledge-service` | Optional vendor bridge and external knowledge updates |
-| `software-delivery`, `software-verification` | Research software delivery/activation and shared verification parameters; original gates retained |
 | `contracts` | Shared state enums and frontend contract generation |
 | `execution-config`, `execution-model` | Configuration declarations and frozen task/attempt records |
 | `agent-policy`, `agent-backend`, `isolation` | Permissions, execution adapters and Linux process boundaries |
@@ -127,26 +126,6 @@ bounded filesystem reads, while `limits` defines existing quotas and capacity er
 These modules preserve v1 serialization and message identities. Proposal TTLs,
 quotas and retirement markers retain their existing research semantics. See the
 [proposal boundary review](../../../qualitygate/reviews/proposal-boundaries.md).
-
-## Research software activation
-
-`software-delivery` preserves the public `request`, `worker` and `reconcile`
-functions. Private entry modules separate request admission, bounded execution
-and inspection of the actual installation. `model` owns frozen policy/request
-records and switch proofs; shared lifecycle enums still come from `contracts`.
-
-`build` verifies the merged source and its full gate. `cli` owns skill-package
-preparation and configuration rollback; `platform` owns ordered service rollout,
-offline storage compatibility and unit rollback. Both use `admission` for durable
-goal claims and native-work draining, `journal` for local intent and receipts,
-`service` for unit identity and health, and `host` for bounded commands and files.
-Local journal intent does not establish durable admission. Reconciliation checks
-installation proofs without repeating the switch. See the
-[activation boundary review](../../../qualitygate/reviews/activation-boundaries.md).
-The crate reads native job records through `execution-model` and accesses durable
-iteration state through `collaboration-client`; it does not depend on the research
-scheduler or collaboration storage implementation. A Bazel analysis test checks
-that boundary across its transitive dependencies.
 
 ## Research collaboration evaluation
 
@@ -300,6 +279,6 @@ Outcome collaboration connects goal paths within topics through immutable public
 
 - Models and clients do not depend on `collaboration-store`, `collaboration-storage-service` or SQLite. The HTTP library also excludes storage implementations. `collaboration-store` re-exports the previous model names for Rust callers.
 - `collaboration-host` selects the configured production storage endpoint or explicitly creates an independent embedded development adapter. Both use the same `collaboration-client` request contract.
-- Messages, goals, outcomes and coordination lineage retain their shared transaction boundary for membership, attempt fencing and acceptance consistency. Research execution, prompt evolution and SuperPOD research publication remain optional extensions outside the core package.
+- Messages, goals, outcomes and topic coordination retain their shared transaction boundary for membership, attempt fencing and acceptance consistency. Research execution, prompt evolution and SuperPOD research publication remain optional extensions outside the core package.
 - `//:outcome-hub-package` contains core collaboration and storage; `//:adapter-package` contains optional services; `//:package` remains the complete research distribution.
 - Bazel analysis tests in `verification` traverse actual transitive dependencies and package contents. Pre-refactor protocol samples, client transport parity, standalone startup/restart and repository regression tests verify behavior. Semantic review is recorded in `qualitygate/reviews/module-boundaries.md`.

@@ -89,30 +89,6 @@ These retained design references inform the protocol, not evidence of this proje
 
 ## Policy lineage receipts
 
-`evolution lineage REQUEST.json --output STATE/evolution/lineage.json` uses `PromptRegistry` to produce a recomputable receipt. The request has `registry_file` and `study`: `task_kind`, fixed `policy_version`/`superpod_commit`, frozen `expected` bindings, development `observations`, evaluation/expansion candidates and budget. The research inspector's population-evolution settings show validated receipts without prompt bodies or trial inputs; OutcomeHub shows versions for the selected group's topic.
+`evolution lineage REQUEST.json --output STATE/evolution/lineage.json` uses `PromptRegistry` to produce a recomputable receipt. The request has `registry_file` and `study`: `task_kind`, fixed `policy_version`/`superpod_commit`, frozen `expected` bindings, development `observations`, evaluation/expansion candidates and budget. The research inspector's population-evolution settings show validated receipts without prompt bodies or trial inputs.
 
 Reports distinguish policy performance from descendant aggregates, deduplicate shared descendants and charge unfinished work. Validation/holdout observations, changed bindings and repeated trials fail. This is HGM-inspired diagnosis, not HGM Thompson sampling reproduction. Activation still requires evaluation, holdout, promotion, publication and installation gates; branches do not create identities or share mutable experiment memory.
-
-## Multi-scenario improvement runs
-
-The **Improvement iterations** tab starts a run in the selected conversation. Choose a scenario,
-an existing subject and baseline, the participants and their instructions, a round
-limit, an execution limit and a total budget. Scenario descriptors declare optional
-assignment roles and recommended execution seconds; the UI renders these values
-without imposing software roles on other scenarios. Software evolution declares
-research, implementation and independent review roles; other adapters may
-declare different identifiers. Existing assignment and resource bounds remain.
-Scenarios with required assignment roles use the iteration form; the ordinary
-goal picker only offers scenarios that it can configure.
-
-The detail panel presents candidate assessment, independent evaluation and actual
-activation separately. Its host review dialog references the evaluator's recorded
-work evidence and current goal revision. Candidate authors cannot evaluate their
-own candidates. Scenarios declare whether manual review is allowed. Policy-managed
-software evolution rejects manual candidate, evaluation, acceptance and activation operations at the HTTP boundary; its adapter owns those gated transitions. An accepted result does not imply deployment; no-candidate,
-unassessed, failed and unknown results remain distinct. A completed iteration may
-also mean its configured round limit has been reached, so inspect its individual
-round outcomes. Public tool traces are shown only for scenarios advertising the
-`public_process` capability, with existing sanitization and attempt fences.
-
-Use iteration controls for pause, resume and stop. Iteration-owned goals cannot be accepted, cancelled or retried through ordinary goal controls. A claimed activation must settle through host reconciliation before pause/stop can proceed. See [iteration architecture](../design/05-evidence.md) and [activation recovery](07-operations.md).

@@ -88,38 +88,6 @@ async fn deletes_group_and_private_chat_durably_with_revision_guard() {
     }
 }
 #[tokio::test]
-async fn topics_and_groups_cannot_delete_append_only_lineage() {
-    let (_root, hub) = setup(GroupKind::Conversation).await;
-    topic(&hub).await;
-    hub.research_change(ResearchChange::Node {
-        node: EvolutionInput {
-            id: "version".into(),
-            subject_id: "subject".into(),
-            parents: vec![],
-            version: "v1".into(),
-            reference: "external/v1".into(),
-            goal_id: None,
-            pins: EvidencePins::default(),
-        },
-    })
-    .await
-    .unwrap();
-    let blocked = hub
-        .delete(DeleteTarget::Topic {
-            id: "topic".into(),
-            revision: 1,
-        })
-        .await
-        .unwrap();
-    assert_eq!(blocked.code, DeletionCode::EvidenceReferences);
-    assert_eq!(blocked.references, vec!["version"]);
-    assert_eq!(
-        hub.delete(group(1)).await.unwrap().code,
-        DeletionCode::EvidenceReferences
-    );
-    assert!(hub.group("group").is_ok());
-}
-#[tokio::test]
 async fn unreferenced_topic_and_subject_are_removed() {
     let (_root, hub) = setup(GroupKind::Conversation).await;
     topic(&hub).await;

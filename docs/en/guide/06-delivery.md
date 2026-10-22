@@ -45,7 +45,3 @@ Runs, `.lab/`, `.qualitygate/`, local configuration, databases, logs and credent
 ## Reviewed public research inputs
 
 Reviewed reusable inputs belong to the bound external knowledge repository at `knowledge/software/ai-sdlc/insights.md`. New tasks require that committed regular file and pin its repository revision and content digest. Missing inputs block admission; no empty fallback is used. Preserve original historical evidence and enqueue a new experiment when its source binding is obsolete.
-
-## Software-iteration verification snapshot capacity
-
-Repository entries in private `software-delivery.json` and `software-activation.json` may set integer `qualitygate_snapshot_max_file_mib` in `1..=8`, controlling full Qualitygate acquisition for candidate and merged source respectively. Omission preserves CLI defaults and prior policy serialization/digests; explicit configuration changes the policy digest. Capacity does not change verification scope or acceptance gates. Settle old software rounds/activation operations, publish both policies together and freeze new digests for new rounds. Never rewrite old digests to bypass validation.

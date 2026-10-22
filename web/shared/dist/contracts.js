@@ -354,65 +354,10 @@ export const SubjectKind = {
     Prompt: "prompt",
     Other: "other",
 };
-export const EvolutionState = {
-    Unassessed: "unassessed",
-    Pending: "pending",
-    Running: "running",
-    Submitted: "submitted",
-    Accepted: "accepted",
-    Failed: "failed",
-    Cancelled: "cancelled",
-};
-export const EvolutionOperation = {
-    Baseline: "baseline",
-    Mutation: "mutation",
-    Recombination: "recombination",
-};
-export const IterationState = {
-    Running: "running",
-    Paused: "paused",
-    Stopped: "stopped",
-    Completed: "completed",
-    BudgetExhausted: "budget_exhausted",
-};
-export const RoundState = {
-    Running: "running",
-    Assessed: "assessed",
-    Accepted: "accepted",
-    Completed: "completed",
-    Failed: "failed",
-    NoImprovement: "no_improvement",
-    Cancelled: "cancelled",
-};
-export const CandidateState = {
-    Proposed: "proposed",
-    Accepted: "accepted",
-    Rejected: "rejected",
-};
-export const EvaluationState = {
-    Passed: "passed",
-    Failed: "failed",
-};
-export const ActivationState = {
-    Pending: "pending",
-    Active: "active",
-    Failed: "failed",
-    RolledBack: "rolled_back",
-};
 export const ApiErrorCode = {
     InvalidRequest: "invalid_request",
     Backpressure: "backpressure",
     StorageUnavailable: "storage_unavailable",
-};
-export const ActivationPhase = {
-    Prepared: "prepared",
-    Building: "building",
-    Draining: "draining",
-    Switching: "switching",
-    Checking: "checking",
-    Active: "active",
-    RolledBack: "rolled_back",
-    Blocked: "blocked",
 };
 export const InstallationPhase = {
     Staged: "staged",

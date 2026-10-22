@@ -10,7 +10,7 @@ HTTP 使用 `/api/v1/collaboration/*`、`/api/v1/messaging/*`、`/api/v1/agent/o
 
 ## 离线工具
 
-`outcome-hub-migrate` 是单独分发的 Rust 工具，核心服务不依赖它。它支持数据库 schema 1–7、旧 `dashboard/personas.json`、任务身份关联以及已知的旧完成日志。未知版本、损坏数据、未知完成状态、无法绑定冻结任务或缺失必要回执均拒绝转换。
+`outcome-hub-migrate` 是单独分发的 Rust 工具，核心服务不依赖它。它支持数据库 schema 1–9、旧 `dashboard/personas.json`、任务身份关联以及已知的旧完成日志。未知版本、损坏数据、未知完成状态、无法绑定冻结任务或缺失必要回执均拒绝转换。
 
 ```sh
 bazel build --lockfile_mode=error //:migration-package
@@ -35,10 +35,14 @@ bazel run //:outcome-hub-migrate -- verify --source /ABS/old-state --destination
 4. 检查服务健康、身份、消息、游标及任务关联。旧工作目录和冻结机器路径不自动改写；需要新执行环境时创建新任务，不能绕过原有策略摘要检查。
 5. 回退时停止新服务，使用旧二进制和原目录／一致备份。不得让旧程序读取新运行后改变的数据，也不执行反向迁移。
 
-主存储仅创建和接受 schema 7，旧版本在修改数据库之前拒绝。研究控制器与控制台在启动前拒绝旧人员目录和不完整完成日志。
+主存储仅创建和接受 schema 9，旧版本在修改数据库之前拒绝。研究控制器与控制台在启动前拒绝旧人员目录和不完整完成日志。
 
 ## 内容归属
 
 仓库不再包含 `skills/`、`research/`、`IM.md` 或根级 `architecture/`。技能从外部分发源安装并记录版本证据；研究知识由外部知识仓库管理。新研究输入要求绑定仓库中已提交的 `knowledge/software/ai-sdlc/insights.md`；文件不存在时明确失败，不削弱 SuperPOD pins 或门禁。本次代码变更不写入外部知识库。
 
 可执行架构边界与 wire 回归检查位于 `verification/`，继续参与 `bazel test //...`。历史数据 fixture 保留在离线迁移工具的测试目录，当前协议 fixture 保留在验证目录。
+
+## 删除版本演化与迭代数据
+
+schema 9 离线升级会删除版本节点、父边、评估、迭代记录和关联目标、任务结果与成果。关联系统消息仅保留身份及引用位置，清空正文与事件载荷；普通聊天和独立目标保持完整。新版本仅接受 schema 9；回退必须同时恢复旧二进制与离线备份。存在引用待删证据的独立成果时，迁移会停止。已有迁移记录的旧数据库支持再次升级，来源文件始终保持不变。

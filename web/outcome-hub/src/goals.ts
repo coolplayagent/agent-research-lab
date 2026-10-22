@@ -1,5 +1,4 @@
 import { revealResearch } from "./workspace.js";
-import { focusIteration } from "./iterations.js";
 import { contributionText } from "./contribution-text.js";
 import { currentGoal, overdueWork, runningWork } from "./goal-selection.js";
 import { progressSummary } from "./task-progress.js";
@@ -134,7 +133,7 @@ function card(goal: Goal): HTMLDetailsElement {
       row.append(evidence);
     }
     if (
-      !goal.iteration_id && goal.state === GoalState.Active &&
+      goal.state === GoalState.Active &&
       (expired(work) ||
         work.state === WorkState.Submitted ||
         work.state === WorkState.Failed)
@@ -147,9 +146,7 @@ function card(goal: Goal): HTMLDetailsElement {
       );
     details.append(row);
   }
-  if (goal.iteration_id) {
-    details.append(button(t("iterations.manageRun"), () => focusIteration(goal.iteration_id!)));
-  } else if (goal.state === GoalState.Active) {
+  if (goal.state === GoalState.Active) {
     const actions = el("div", undefined, "actions");
     const accept = button(
       t("goals.9a341c73e2"),

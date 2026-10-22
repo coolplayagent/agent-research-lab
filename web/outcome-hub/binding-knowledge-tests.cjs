@@ -265,7 +265,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
     "./settings.js": { loadServices: () => servicesLoaded++ }, "./icons.js": { icon() {} }, "./people.js": { loadPeople() {} },
     "./applications.js": { loadApplications() {} }, "./settings-guard.js": { allowSettingsLeave: () => true, initSettingsGuard() {} },
     "./workspace.js": { revealResearch() {}, syncControls() {} },
-  }, { location, history: { replaceState() { assert.fail("Valid knowledge settings must not redirect"); } }, document: {
+  }, { location, history: { replaceState(_state, _title, hash) { location.hash = hash; } }, document: {
     getElementById: () => null,
     querySelectorAll: selector => selector === "[data-settings-panel]" ? settingPanels : selector === "[data-setting]" ? settingLinks : [],
   } });
@@ -281,6 +281,12 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   navigation.navigate(); assert.equal(progressResets, previousResets + 1, "Refreshing the current route preserves the selected log");
   location.hash = "#settings/knowledge"; navigation.navigate();
   assert.equal(progressResets, previousResets + 2, "Leaving digital person management clears the log selection");
+
+  for (const hash of ["#evolution", "#iterations", "#settings/status"]) {
+    location.hash = hash; navigation.navigate();
+    assert.equal(location.hash, hash.startsWith("#settings/") ? "#settings/bindings" : "#groups");
+    assert.equal(get("page-title").textContent, hash.startsWith("#settings/") ? "workspace.bindings" : "navigation.f3f8bcf3f5");
+  }
 
   let bindingRendered = false;
   const settings = load(base + "settings.ts", {
