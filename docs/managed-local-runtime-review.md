@@ -19,6 +19,7 @@ This is a local implementation and architecture review by Codex, not independent
 ## Windows knowledge boundary
 
 - Linux retains descriptor-relative traversal. Windows pins every traversed directory using opened handles that deny write/delete sharing, and rejects reparse points on the actual opened handle. Reads deny write/delete sharing until bounded reads and metadata checks finish. Junction traversal and ancestor replacement have native regression tests.
+- Windows publication flushes an owned temporary file and renames that handle within the same pinned directory. This avoids reopening a protected parent for write access. An existing open reader prevents replacement; failed replacement preserves the original file.
 - Directory revisions retain the `directory-v2` format and use forward-slash logical paths. Ignore rules, document/snapshot/entry/depth/time bounds, read-only targets and publication receipts remain enforced on both platforms.
 - Git runs with an explicit environment, empty global configuration, disabled hooks and signing, a disposable index, bounded output and a deadline. Windows uses the existing Job Object process owner, which contains descendants on cancellation/drop. Git for Windows is needed only for Git targets; directory targets need no Git installation.
 

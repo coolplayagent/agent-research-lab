@@ -229,17 +229,17 @@ pub fn publish(
             before,
             after: outcome.clone(),
         };
-        storage::write(&journal_path, &value)?;
+        storage::write(&journal_path, &value).context("persist knowledge journal")?;
         value
     };
     let parent = child(&root, path.parent().unwrap(), true)?;
-    let destination = anchored(&parent).join(path.file_name().unwrap());
     let now = read(&root, &path)?.map(|v| storage::digest(&v));
     ensure!(
         now == journal.before || now == Some(storage::digest(&after)),
         "knowledge_revision_conflict"
     );
-    storage::write(&destination, outcome)?;
+    platform::write(&parent, Path::new(path.file_name().unwrap()), outcome)
+        .context("publish knowledge content")?;
     let revision = snapshot(&root, &mut budget)?;
     let result = result(
         write,
@@ -248,14 +248,16 @@ pub fn publish(
         revision,
         "Accepted outcome published to the configured directory",
     );
-    storage::write(
-        &anchored(&private).join(format!("{}.json", write.input.id)),
+    platform::write(
+        &private,
+        Path::new(&format!("{}.json", write.input.id)),
         &Receipt {
             request: write.clone(),
             result: result.clone(),
             content_digest: storage::digest(&after),
         },
-    )?;
+    )
+    .context("persist knowledge receipt")?;
     fs::remove_file(journal_path)?;
     Ok(result)
 }

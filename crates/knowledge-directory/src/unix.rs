@@ -10,6 +10,9 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 pub(super) type Directory = File;
+pub(super) fn write<T: serde::Serialize>(parent: &Directory, name: &Path, value: &T) -> Result<()> {
+    storage::write(&anchored(parent).join(name), value)
+}
 pub(super) fn open_directory(path: &Path) -> Result<File> {
     Ok(OpenOptions::new()
         .read(true)

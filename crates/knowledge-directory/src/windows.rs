@@ -11,6 +11,9 @@ use std::{
 const REPARSE: u32 = 0x400;
 const OPEN_REPARSE: u32 = 0x0020_0000;
 const BACKUP_SEMANTICS: u32 = 0x0200_0000;
+#[path = "windows_write.rs"]
+mod publication;
+pub(super) use publication::write;
 pub(super) struct Directory {
     path: PathBuf,
     // Ancestors cannot be renamed or replaced while any traversal is in progress.
