@@ -23,7 +23,7 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
     if (!Object.keys(config.bindings).length)
         container.append(element("p", t("layout.noBindings")));
     const rowNames = new Map();
-    let focusBinding = async () => { };
+    let verifyBinding = async () => { };
     for (const [person, adapter] of Object.entries(config.bindings)) {
         const row = element("div");
         row.className = "binding-row";
@@ -42,8 +42,17 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
             }
         };
         const name = element("span", `${people.find((p) => p.id === person)?.name || person} → ${adapterTitle(config, adapter)}`);
-        rowNames.set(person, { node: name, adapter });
-        row.append(name, element("span", config.binding_evidence?.[person] ? t("binding.verified") : t("binding.unverified")), button(t("binding.reverify"), () => focusBinding(person, adapter)), unbind);
+        const state = element("span", config.binding_evidence?.[person] ? t("binding.verified") : t("binding.unverified"));
+        state.className = "binding-row-state";
+        const verify = button(t("binding.reverify"), () => verifyBinding(person, adapter));
+        verify.className = "primary";
+        rowNames.set(person, { node: name, state, verify, adapter });
+        const identity = element("div");
+        identity.className = "binding-row-identity";
+        identity.append(name, state);
+        const controls = actions(verify, unbind);
+        controls.className += " binding-row-actions";
+        row.append(identity, controls);
         container.append(row);
     }
     const form = element("form");
@@ -61,10 +70,12 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
     submit.className = "primary";
     const status = element("p");
     status.setAttribute("role", "status");
+    status.className = "binding-request-status";
     const progress = element("div");
     progress.setAttribute("aria-live", "polite");
-    form.append(field(t("services.person"), person), field(t("services.agent"), adapter), field(t("binding.program"), program), field(t("binding.model"), model), element("p", t("binding.cost")), actions(submit), status);
-    container.append(form, progress);
+    form.append(element("h3", t("binding.formTitle")), field(t("services.person"), person), field(t("services.agent"), adapter), field(t("binding.program"), program), field(t("binding.model"), model), element("p", t("binding.cost")), actions(submit));
+    progress.className = "binding-progress-list";
+    container.append(status, progress, form);
     let pending;
     let records = [];
     let posting = false, polling = false, loadingPeople = false, directoryLoaded = false, directoryGeneration = 0;
@@ -76,6 +87,11 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
         program.disabled = custom;
         model.disabled = custom;
         person.disabled = loadingPeople || !person.options.length;
+        for (const [id, row] of rowNames) {
+            const running = records.find(r => r.request.person_id === id && r.state === BindingOperationState.Running);
+            row.verify.disabled = posting || !!running;
+            row.state.textContent = running ? t("binding.running") : config.binding_evidence?.[id] ? t("binding.verified") : t("binding.unverified");
+        }
         hint.replaceChildren();
         hint.hidden = loadingPeople || (!!person.value && !!adapter.value);
         if (!hint.hidden) {
@@ -88,13 +104,11 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
             }
         }
     };
-    focusBinding = async (personId, adapterId) => {
-        await loadDirectory();
-        person.value = personId;
-        adapter.value = adapterId;
-        update();
-        form.scrollIntoView({ block: "center" });
-        submit.focus();
+    verifyBinding = async (personId, adapterId) => {
+        if (posting || records.some(r => r.request.person_id === personId && r.state === BindingOperationState.Running))
+            return;
+        await startValidation(personId, adapterId, null, null);
+        progress.scrollIntoView({ block: "nearest" });
     };
     person.onchange = update;
     adapter.onchange = update;
@@ -191,12 +205,8 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
                 window.setTimeout(() => void poll(), 1000);
         }
     };
-    form.onsubmit = async (event) => {
-        event.preventDefault();
-        if (submit.disabled)
-            return;
-        const custom = config.adapters.find((a) => a.id === adapter.value)?.agent === CodingAgent.Custom;
-        const candidate = { person_id: person.value, adapter_id: adapter.value, revision: config.revision, program: custom ? null : program.value.trim() || null, model: custom ? null : model.value.trim() || null };
+    const startValidation = async (personId, adapterId, selectedProgram, selectedModel) => {
+        const candidate = { person_id: personId, adapter_id: adapterId, revision: config.revision, program: selectedProgram, model: selectedModel };
         if (!pending || JSON.stringify(candidate) !== JSON.stringify({ person_id: pending.person_id, adapter_id: pending.adapter_id, revision: pending.revision, program: pending.program, model: pending.model }))
             pending = { request_id: uuid(), ...candidate };
         posting = true;
@@ -219,6 +229,13 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
             update();
             void poll();
         }
+    };
+    form.onsubmit = async (event) => {
+        event.preventDefault();
+        if (submit.disabled)
+            return;
+        const custom = config.adapters.find((a) => a.id === adapter.value)?.agent === CodingAgent.Custom;
+        await startValidation(person.value, adapter.value, custom ? null : program.value.trim() || null, custom ? null : model.value.trim() || null);
     };
     void poll();
 }

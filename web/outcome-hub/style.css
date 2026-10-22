@@ -1134,9 +1134,20 @@ button[aria-busy="true"] { cursor: progress; }
 .settings-form { max-width: 680px; padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: white; }
 .settings-form > label:first-child { margin-top: 0; }
 .settings-form .card-actions { margin-top: 20px; }
-.binding-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; margin-bottom: 10px; max-width: 680px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
-.binding-row > span { min-width: 0; overflow-wrap: anywhere; }
-.binding-row button { flex: none; }
+#binding-list { max-width: 900px; }
+.binding-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 14px 18px; margin-bottom: 10px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.binding-row-identity { min-width: 0; display: grid; gap: 4px; overflow-wrap: anywhere; }
+.binding-row-state { color: var(--muted); font-size: 12px; }
+.binding-row-actions { flex-wrap: nowrap; margin: 0; }
+.binding-row-actions > button { min-width: 88px; }
+.binding-request-status:empty, .binding-progress-list:empty { display: none; }
+.binding-request-status { margin: 16px 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; background: #f0f6f2; }
+.binding-progress-list { display: grid; gap: 12px; margin: 20px 0 24px; }
+.binding-progress { max-width: none; }
+.binding-progress h3 { margin: 0; }
+.binding-progress > p { margin: 8px 0; }
+.binding-log-steps { margin: 12px 0; padding-left: 24px; }
+.binding-log-steps li { padding: 4px 0; }
 #services-status { padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; background: #f0f6f2; overflow-wrap: anywhere; }
 .form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; position: sticky; bottom: -20px; background: #fff; border-top: 1px solid var(--line); padding: 14px 0 0; margin-top: 20px; }
 dialog form { min-width: 0; }
@@ -1159,10 +1170,16 @@ dialog header h2 { overflow-wrap: anywhere; }
   .form-actions { bottom: -16px; }
 }
 
-#binding-list .binding-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 680px; }
+#binding-list .binding-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: none; margin-top: 24px; }
 .binding-form > label { margin: 0; }
-.binding-form > .card-actions, .binding-form > p { grid-column: 1 / -1; margin: 0; }
+.binding-form > h3, .binding-form > .card-actions, .binding-form > p { grid-column: 1 / -1; margin: 0; }
+.binding-form > h3 { font-size: 16px; }
 @media (max-width: 599px) { #binding-list .binding-form { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 599px) {
+  .binding-row { grid-template-columns: minmax(0, 1fr); }
+  .binding-row-actions { justify-content: stretch; }
+  .binding-row-actions > button { flex: 1 1 0; }
+}
 .checkbox-field { display: flex; align-items: center; gap: 9px; }
 .checkbox-field input { order: -1; flex: none; margin: 0; }
 @media (max-height: 600px) {

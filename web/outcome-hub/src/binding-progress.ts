@@ -12,7 +12,7 @@ export function showProgress(container: HTMLElement, records: BindingOperation[]
   }
   for (const record of latest.values()) {
     const card = element("article"); card.className = "card binding-progress";
-    card.append(element("h3", t("binding.operation", { person: record.request.person_id, adapter: record.request.adapter_id })), element("p", label("BindingOperationState", record.state)));
+    card.append(element("h3", t("binding.logTitle", { person: record.request.person_id, adapter: record.request.adapter_id })), element("p", label("BindingOperationState", record.state)));
     const steps = element("ol");
     let previous = 0;
     for (const step of record.steps) {
@@ -20,6 +20,7 @@ export function showProgress(container: HTMLElement, records: BindingOperation[]
       previous += step.elapsed_ms;
       steps.append(element("li", t("binding.step", { stage: label("BindingStage", step.stage), state: label("BindingStepState", step.state), seconds: (elapsed / 1000).toFixed(1) })));
     }
+    steps.className = "binding-log-steps";
     card.append(steps);
     if (record.program) card.append(element("p", t("binding.found", { agent: label("CodingAgent", record.program.agent), version: record.program.version })), element("code", record.program.executable));
     if (record.diagnostic) {
