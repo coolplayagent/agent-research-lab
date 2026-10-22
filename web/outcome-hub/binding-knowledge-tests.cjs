@@ -79,6 +79,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   const render = (cfg = config()) => bindings.renderBindings(cfg, [], async next => saved = next, async () => {});
   render(); await tick();
   let panel = get("binding-list"), form = bindingForm(panel), picker = field(form, "services.person"), adapter = field(form, "services.agent");
+  assert(panel.children.indexOf(form) < panel.children.findIndex(n => n.className === "binding-progress-list"), "The binding form precedes validation logs");
   assert.equal(picker.children.length, 0, "The operator is never a bindable digital person");
   assert(buttonIn(form, "binding.validate").disabled); assert(textOf(form).includes("bindings.noPeople"));
   adapter.value = "second";
@@ -120,6 +121,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   const configured = config(); configured.bindings = { b: "second" };
   render(configured); await tick();
   form = bindingForm(panel);
+  assert(panel.children.indexOf(form) < panel.children.findIndex(n => n.className === "binding-progress-list"), "Existing bindings keep the form above validation logs");
   const writesBeforeReverify = bindingWrites.length;
   await buttonIn(panel, "binding.reverify").onclick();
   assert.equal(bindingWrites.length, writesBeforeReverify + 1, "Reverify starts a fresh validation request");

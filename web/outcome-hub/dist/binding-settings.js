@@ -75,7 +75,7 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
     progress.setAttribute("aria-live", "polite");
     form.append(element("h3", t("binding.formTitle")), field(t("services.person"), person), field(t("services.agent"), adapter), field(t("binding.program"), program), field(t("binding.model"), model), element("p", t("binding.cost")), actions(submit));
     progress.className = "binding-progress-list";
-    container.append(status, progress, form);
+    container.append(form, status, progress);
     let pending;
     let records = [];
     let posting = false, polling = false, loadingPeople = false, directoryLoaded = false, directoryGeneration = 0;
