@@ -22,7 +22,7 @@ Messages can link outcomes; a parent can delegate production or verification to 
 | OutcomePath | Goal ID, name, hypothesis | Goal belongs to the topic's group; association is immutable |
 | Outcome | Kind, conclusion, conditions, evidence, author, pins, attempt | Immutable; revision has a new ID and `supersedes` |
 | OutcomeReference | Source outcome, `uses` / `supports` / `challenges`, reason | Existing same-topic sources make the graph acyclic |
-| OutcomeVerification | Outcome digest, verifier configuration digest, request digest, deadline, receipt | Independent of the author's claim; fenced terminal receipt |
+| OutcomeVerification | Outcome digest, host review policy digest, request digest, deadline, receipt | Independent of the author's claim; fenced terminal receipt |
 | OutcomeDecision | Verification request, accepted/returned, reason | Host only; does not complete a Goal |
 | KnowledgeWrite | Acceptance, outcome, target, expected revision, service digest, receipt | Optional explicit update; reconcile uncertain effects |
 
@@ -35,23 +35,23 @@ flowchart TB
   U[UI or Agent API] --> H[AI IM collaboration service]
   H --> S[im storage sole durable owner]
   S --> P[Topics paths outcomes references audit events]
-  H --> V[Replaceable verifier]
-  V --> X[Separate sandbox and host configured checks]
+  H --> V[Host verification review]
+  V --> S
   H --> K[Optional knowledge service]
   K --> E[SuperPOD or another external knowledge repository]
 ```
 
-`contracts` owns lifecycle enums and generates frontend contracts. `collaboration-store` owns domain transactions within `collaboration-storage-service`; other services use its API. `collaboration-api` supplies authorization, verification dispatch and UI APIs. Services communicate over versioned private Unix sockets. The development embedded adapter uses the same client contract and a separate local store.
+`contracts` owns lifecycle enums and generates frontend contracts. `collaboration-store` owns domain transactions within `collaboration-storage-service`; other services use its API. `collaboration-api` supplies authorization, host verification and UI APIs. Services communicate over versioned private Unix sockets. The development embedded adapter uses the same client contract and a separate local store.
 
-Core collaboration starts without research CLI configuration, SuperPOD, a verifier or knowledge binding. Publishing, discovery and referencing remain available without verification services; unverified outcomes cannot be accepted. Service settings track endpoint, enabled state, protocol, supported kinds, dependencies and deadline. Configuration, protocol health and actual task results remain distinct. Automatic verification is bound by topic and outcome kind; knowledge binding is optional per topic.
+Core collaboration starts without research CLI configuration or SuperPOD. Publishing, discovery and referencing remain available before host verification; unverified outcomes cannot be accepted. The host reviews the pinned outcome and selects at least one of its evidence references for a written passed or failed receipt. Knowledge services and group/goal bindings remain optional; no topic-level service binding is used.
 
 ## Lifecycles and transactions
 
 Publication uses `published / withdrawn`; verification uses `unverified / running / passed / failed / unavailable / unknown`; acceptance uses `pending / accepted / returned`. Knowledge updates use their own `pending / applied / failed / unknown`. Withdrawal retains history. New versions require new verification and acceptance. Starting a new verification invalidates the current projection of an old acceptance. Cancelled or retried source attempts cannot retain a current verification, while historical records remain readable.
 
-Bearer publication rechecks credentials, group membership, Goal, WorkItem, attempt, claim and live execution lease inside the storage transaction. Agents cannot create verifier receipts, host acceptance or knowledge receipts. Hosts may publish manually with their own provenance. Management HTTP endpoints also reject forged internal receipt commands; only service orchestration can use them.
+Bearer publication rechecks credentials, group membership, Goal, WorkItem, attempt, claim and live execution lease inside the storage transaction. Agents cannot create verifier receipts, host acceptance or knowledge receipts. Hosts may publish manually with their own provenance. Management HTTP endpoints also reject forged internal receipt commands; only the host verification and knowledge orchestration paths can use them.
 
-Verifiers receive the pinned outcome and request and return a matching structured receipt. Passed and failed receipts require evidence. Unknown protocol states, unavailable services, timeouts, mismatches and stale attempts never imply success. The host accepts only the current successful verification. Existing research assessment and promotion gates remain independent.
+Host verification records the current outcome digest, a fixed review-policy digest, request digest, selected pinned evidence and conclusion. Passed and failed receipts require evidence. An interrupted or stale review never implies success. Acceptance requires the current passed verification; research assessment and promotion gates remain independent.
 
 Publication and references commit atomically. Equal ID/content/author retries are idempotent; mutations conflict. Service requests are durable before dispatch. After a host crash, unfinished verification becomes unknown at its deadline and can be replaced by a new request. Potentially applied knowledge writes are never automatically replayed.
 
@@ -65,7 +65,7 @@ Ranking prefers title matches, then references within the frozen window capped a
 
 SuperPOD and other stores implement the replaceable knowledge protocol. Unbinding preserves historical provenance and receipts. A write freezes acceptance, outcome digest, target, expected revision and service configuration.
 
-The supplied `outcome-hub-outcomes` Git adapter writes accepted records and receipts to a prepared import branch in an external repository. It builds a commit with an isolated temporary index and atomically compares and swaps the branch's old revision. It refuses checked-out branches, does not push or merge the default branch, and does not edit SuperPOD knowledge maps. The repository maintainer consumes the import branch through existing review, indexing and publication workflows. Other adapters may implement their target system's native update transaction.
+The supplied Git knowledge adapter writes accepted records and receipts to a prepared import branch in an external repository. It builds a commit with an isolated temporary index and atomically compares and swaps the branch's old revision. It refuses checked-out branches, does not push or merge the default branch, and does not edit SuperPOD knowledge maps. The repository maintainer consumes the import branch through existing review, indexing and publication workflows. Other adapters may implement their target system's native update transaction.
 
 Private service state retains idempotency receipts, and the target commit contains the request digest. Disconnects and interruptions require receipt lookup without replaying the write. Confirmed failure permits a new corrected request; unknown effects block another write. A later withdrawal cannot erase an external update that already happened. Corrections require a subsequent knowledge version.
 

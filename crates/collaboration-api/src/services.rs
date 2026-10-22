@@ -31,25 +31,6 @@ pub async fn save(State(web): State<Web>, request: Request) -> Response {
             for person in next.bindings.keys() {
                 web.hub.person(person).await?;
             }
-            for topic_id in next.outcome_bindings.keys() {
-                web.hub
-                    .outcomes(
-                        None,
-                        collaboration_model::OutcomeCommand::Paths {
-                            topic_id: topic_id.clone(),
-                            after: String::new(),
-                        },
-                    )
-                    .await?;
-            }
-            for registration in &next.scenarios {
-                ensure!(
-                    !web.scenarios
-                        .iter()
-                        .any(|scenario| scenario.descriptor().id == registration.id),
-                    "registered scenario conflicts with an installed adapter"
-                );
-            }
             Ok(json!(
                 web.services
                     .as_ref()

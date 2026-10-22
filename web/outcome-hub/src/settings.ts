@@ -17,8 +17,6 @@ import { renderExecutionStatus } from "./execution-status.js";
 import { element, select, field } from "./forms.js";
 import type { Configuration, ServiceView } from "./service-types.js";
 import { busy } from "./feedback.js";
-import { renderScenarios } from "./scenario-settings.js";
-import { renderOutcomeSettings } from "./outcome-settings.js";
 let current: ServiceView | undefined;
 let directory: Person[] = [];
 let generation = 0;
@@ -50,8 +48,6 @@ function render(view: ServiceView): void {
   const config = view.configuration;
   current = view;
   renderExecutionStatus(view, directory, () => loadServices(true));
-  renderScenarios(view, save);
-  renderOutcomeSettings(view, save);
   renderKnowledgeSettings(view, save, () => loadServices(true));
   get("services-status").textContent = view.restart_required
     ? t("services.restart")

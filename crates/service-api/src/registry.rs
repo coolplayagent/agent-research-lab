@@ -100,11 +100,16 @@ impl Configuration {
     }
     pub fn validate(&self) -> Result<()> {
         ensure!(
-            self.services.len() <= 64
-                && self.adapters.len() <= 64
-                && self.bindings.len() <= 20000
-                && self.scenarios.len() <= 64,
+            self.services.len() <= 64 && self.adapters.len() <= 64 && self.bindings.len() <= 20000,
             "service registry exceeds bound"
+        );
+        ensure!(
+            self.scenarios.is_empty(),
+            "legacy scenario services must be removed from private/services.json before startup"
+        );
+        ensure!(
+            self.outcome_bindings.is_empty(),
+            "legacy topic bindings must be removed from private/services.json before startup"
         );
         ensure!(
             self.outcome_services
@@ -161,28 +166,16 @@ impl Configuration {
                 "binding references missing adapter"
             );
         }
-        ids.clear();
-        for scenario in &self.scenarios {
-            scenario.validate()?;
-            ensure!(ids.insert(&scenario.id), "duplicate scenario ID");
-            for dependency in &scenario.dependencies {
-                let service = self
-                    .services
-                    .iter()
-                    .find(|service| service.id == *dependency)
-                    .context("scenario dependency is missing")?;
-                ensure!(
-                    !scenario.enabled || service.enabled,
-                    "scenario dependency is disabled"
-                );
-            }
-        }
         ensure!(
-            self.outcome_services.len() <= 64 && self.outcome_bindings.len() <= 2048,
+            self.outcome_services.len() <= 64,
             "outcome registry exceeds bound"
         );
         ids.clear();
         for service in &self.outcome_services {
+            ensure!(
+                service.kind == contracts::OutcomeServiceKind::Knowledge,
+                "legacy verifier services must be removed from private/services.json before startup"
+            );
             service.validate()?;
             ensure!(ids.insert(&service.id), "duplicate outcome service ID");
             for dependency in &service.dependencies {
@@ -211,30 +204,6 @@ impl Configuration {
                         && s.kind == contracts::OutcomeServiceKind::Knowledge),
                 "invalid knowledge binding"
             );
-        }
-        for (topic, binding) in &self.outcome_bindings {
-            collaboration_model::id(topic)?;
-            for (kind, id) in &binding.verifiers {
-                ensure!(
-                    self.outcome_services.iter().any(|service| service.id == *id
-                        && service.kind == contracts::OutcomeServiceKind::Verifier
-                        && service.outcome_kinds.contains(kind)),
-                    "invalid verifier binding"
-                );
-            }
-            if let Some(target) = &binding.knowledge {
-                ensure!(
-                    !target.repository.trim().is_empty() && target.repository.len() <= 1024,
-                    "invalid knowledge repository"
-                );
-                ensure!(
-                    self.outcome_services
-                        .iter()
-                        .any(|service| service.id == target.service_id
-                            && service.kind == contracts::OutcomeServiceKind::Knowledge),
-                    "invalid knowledge binding"
-                );
-            }
         }
         Ok(())
     }

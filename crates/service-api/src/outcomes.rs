@@ -1,8 +1,6 @@
-//! Optional verifier and external knowledge services. Configuration is not execution evidence.
+//! External knowledge service protocol. Configuration is not execution evidence.
 use crate::*;
-use collaboration_model::{
-    KnowledgeWrite, KnowledgeWriteResult, Outcome, OutcomeVerification, OutcomeVerificationResult,
-};
+use collaboration_model::{KnowledgeWrite, KnowledgeWriteResult, Outcome};
 use contracts::{OutcomeKind, OutcomeServiceKind};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -95,14 +93,9 @@ pub enum OutcomeServiceRequest {
     Knowledge {
         request: knowledge_model::Request,
     },
-    /// A verifier reads pinned inputs and returns evidence; it cannot accept a goal.
-    Verify {
-        run: OutcomeVerification,
-        outcome: Box<Outcome>,
-    },
     /// Idempotent compare-and-swap against expected_revision. Credentials remain in the service.
     Write {
-        write: KnowledgeWrite,
+        write: Box<KnowledgeWrite>,
         outcome: Box<Outcome>,
     },
     /// Read-only reconciliation must never repeat a remote write.
@@ -136,32 +129,6 @@ pub async fn probe_outcome_service(service: &OutcomeService) -> Result<OutcomeSe
     ensure!(info.ready, "outcome service is not ready");
     Ok(info)
 }
-pub async fn verify_outcome(
-    service: &OutcomeService,
-    run: OutcomeVerification,
-    outcome: Outcome,
-) -> Result<OutcomeVerificationResult> {
-    ensure!(
-        service.kind == OutcomeServiceKind::Verifier
-            && service.outcome_kinds.contains(&outcome.input.kind),
-        "unsupported verifier kind"
-    );
-    ensure!(
-        service.digest()? == run.input.verifier_digest
-            && service.id == run.input.verifier_id
-            && outcome.digest == run.input.outcome_digest,
-        "outcome verifier binding changed"
-    );
-    rpc::call(
-        &service.endpoint,
-        &OutcomeServiceRequest::Verify {
-            run,
-            outcome: Box::new(outcome),
-        },
-        Duration::from_secs(service.max_seconds),
-    )
-    .await
-}
 pub async fn write_outcome(
     service: &OutcomeService,
     write: KnowledgeWrite,
@@ -181,7 +148,7 @@ pub async fn write_outcome(
     rpc::call(
         &service.endpoint,
         &OutcomeServiceRequest::Write {
-            write,
+            write: Box::new(write),
             outcome: Box::new(outcome),
         },
         Duration::from_secs(service.max_seconds),

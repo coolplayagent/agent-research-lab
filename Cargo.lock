@@ -1368,25 +1368,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "outcome-hub-outcome-service"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "clap",
- "outcome-hub-collaboration-model",
- "outcome-hub-contracts",
- "outcome-hub-filesystem-store",
- "outcome-hub-knowledge-git",
- "outcome-hub-process",
- "outcome-hub-service-api",
- "outcome-hub-service-protocol",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
 name = "outcome-hub-process"
 version = "0.2.1"
 dependencies = [

@@ -19,7 +19,6 @@ software_delivery = { package = "outcome-hub-software-delivery", path = "crates/
 software_verification = { package = "outcome-hub-software-verification", path = "crates/software-verification" }
 executor_service = { package = "outcome-hub-executor-service", path = "crates/executor-service" }
 sandbox_service = { package = "outcome-hub-sandbox-service", path = "crates/sandbox-service" }
-outcome_service = { package = "outcome-hub-outcome-service", path = "crates/outcome-service" }
 codex_adapter = { package = "outcome-hub-codex-adapter", path = "crates/codex-adapter" }
 collaboration_host = { package = "outcome-hub-collaboration-host", path = "crates/collaboration-host" }
 collaboration_client = { package = "outcome-hub-collaboration-client", path = "crates/collaboration-client" }

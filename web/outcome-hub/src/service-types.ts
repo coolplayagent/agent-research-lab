@@ -4,9 +4,8 @@ import type {
   ServiceKind,
   ServiceHealth,
   ServiceManagement,
-  ScenarioCapability,
 } from "/assets/shared/contracts.js";
-import type { OutcomeService, OutcomeBinding } from "./outcome-types.js";
+import type { OutcomeService } from "./outcome-types.js";
 export interface Service {
   id: string;
   kind: ServiceKind;
@@ -34,19 +33,9 @@ export interface Configuration {
   adapters: Adapter[];
   bindings: Record<string, string>;
   binding_evidence?: Record<string, { request_id: string; verified_unix_ms: number; adapter_digest: string }>;
-  scenarios?: ScenarioRegistration[];
   outcome_services?: OutcomeService[];
-  outcome_bindings?: Record<string, OutcomeBinding>;
   knowledge_groups?: Record<string, { service_id: string; repository: string }>;
   knowledge_goals?: Record<string, { service_id: string; repository: string }>;
-}
-export interface ScenarioRegistration {
-  id: string;
-  endpoint: string;
-  enabled: boolean;
-  protocol_version: number;
-  capabilities: ScenarioCapability[];
-  dependencies: string[];
 }
 export interface ServiceView {
   configuration: Configuration;
@@ -60,11 +49,5 @@ export interface ServiceView {
   restart_required: boolean;
   active_storage: [string, string] | null;
   protocol_version: number;
-  scenario_health?: {
-    id: string;
-    status: ServiceHealth;
-    started?: boolean;
-    error: string | null;
-  }[];
   outcome_health?: { id: string; status: ServiceHealth; error: string | null }[];
 }

@@ -20,7 +20,7 @@ OutcomeHub 负责数字人身份、群聊、持久消息、目标与分工。CLI
 | `collaboration-storage-service`, `collaboration-store` | 存储服务及领域事务，独占生产数据库 |
 | `service-registry`, `collaboration-host` | 配置持久化与健康探测；应用启动和存储装配 |
 | `executor-service`, `sandbox-service` | 可替换执行器与有界沙箱；`service-workers` 保留组合启动器 |
-| `codex-adapter`, `outcome-service` | 可选厂商桥接、成果验证及仓外知识库更新 |
+| `codex-adapter`, `knowledge-service` | 可选厂商桥接及仓外知识库更新 |
 | `software-delivery`, `software-verification` | 研究软件交付/激活及共享验证参数，保留原门禁 |
 | `contracts` | 跨服务共享状态枚举及前端契约生成 |
 | `execution-config`, `execution-model` | 配置声明及冻结的任务、尝试记录 |

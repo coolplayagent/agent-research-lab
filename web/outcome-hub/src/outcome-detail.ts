@@ -1,10 +1,10 @@
 import { publishKnowledge } from "./knowledge-publish.js";
 import { uuid } from "/assets/shared/identity.js";
-import { OutcomeAcceptanceState, OutcomeVerificationState, OutcomePublicationState, OutcomeReferenceKind, OutcomeServiceKind, KnowledgeWriteState } from "/assets/shared/contracts.js";
+import { OutcomeAcceptanceState, OutcomeVerificationState, OutcomePublicationState, OutcomeReferenceKind, OutcomeServiceKind, KnowledgeWriteState, VerificationRunState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
 import { t, label } from "./i18n.js";
 import { el, button, actions } from "./dom.js";
-import { dialog, area, input, select, field, finish } from "./forms.js";
+import { dialog, area, check, select, field, finish } from "./forms.js";
 import { outcomeCommand, publicationForm } from "./outcome-forms.js";
 import type { OutcomeView, OutcomeHistory, OutcomePath } from "./outcome-types.js";
 import type { ServiceView } from "./service-types.js";
@@ -43,6 +43,7 @@ export async function showOutcome(id: string): Promise<void> {
   controls.append(button(t("outcome.reuse"), async () => { const paths = await outcomePaths(entry.topic_id); box.dialog.close(); publicationForm({ id: entry.topic_id }, paths, async () => showOutcome(id), { outcome_id: id, kind: OutcomeReferenceKind.Uses, reason: "" }); }));
   controls.append(button(t("outcome.newVersion"), async () => { const paths = await outcomePaths(entry.topic_id); box.dialog.close(); publicationForm({ id: entry.topic_id }, paths, async () => showOutcome(id), undefined, entry); }));
   if (view.publication === OutcomePublicationState.Published) {
+    controls.append(button(t("outcome.hostVerify"), () => hostVerify(view, reload)));
     controls.append(button(t("outcome.withdraw"), () => reasonForm(t("outcome.withdraw"), async reason => { await outcomeCommand({ operation: "withdraw", id, reason }); await reload(); })));
     const accept = button(t("outcome.accept"), () => decision(OutcomeAcceptanceState.Accepted));
     accept.disabled = view.verification !== OutcomeVerificationState.Passed;
@@ -70,13 +71,6 @@ function reasonForm(title: string, save: (reason: string) => Promise<void>): voi
 }
 function renderServices(panel: HTMLElement, view: OutcomeView, services: ServiceView, reload: () => Promise<void>): void {
   const config = services.configuration, entry = view.outcome.input;
-  const verifiers = (config.outcome_services || []).filter(s => s.kind === OutcomeServiceKind.Verifier && s.outcome_kinds.includes(entry.kind));
-  panel.append(el("h3", t("outcome.verify")));
-  if (verifiers.length && view.publication === OutcomePublicationState.Published) {
-    const selected = select(verifiers.map(s => [s.id, s.id]), config.outcome_bindings?.[entry.topic_id]?.verifiers[entry.kind] || verifiers[0].id);
-    panel.append(field(t("outcome.verifier"), selected), button(t("outcome.verify"), async () => { await api("/api/v1/collaboration/outcomes/verify", { request_id: "verify-" + uuid(), outcome_id: entry.id, verifier_id: selected.value, configuration_revision: config.revision }, "manage-outcomes"); await reload(); }));
-  } else panel.append(el("p", t("outcome.noVerifier")));
-  const target = config.outcome_bindings?.[entry.topic_id]?.knowledge;
   panel.append(el("h3", t("outcome.knowledge")), el("p", t("outcome.knowledgeNote")));
   const write = view.latest_write;
   if (write) {
@@ -86,8 +80,25 @@ function renderServices(panel: HTMLElement, view: OutcomeView, services: Service
     if ((state === KnowledgeWriteState.Pending || state === KnowledgeWriteState.Unknown)) panel.append(button(t("outcome.reconcile"), async () => { await api("/api/v1/collaboration/outcomes/reconcile", { outcome_id: entry.id, request_id: write.input.id }, "manage-outcomes"); await reload(); }));
   }
   if (!(config.outcome_services || []).some(s => s.enabled && s.kind === OutcomeServiceKind.Knowledge)) { panel.append(el("p", t("outcome.unbound"))); return; }
-  if (target) panel.append(el("p", target.repository));
   const publish = button(t("outcome.write"), () => publishKnowledge(config, view, reload));
   publish.disabled = view.acceptance !== OutcomeAcceptanceState.Accepted || !!(write && (!write.result || (write.result.state === KnowledgeWriteState.Pending || write.result.state === KnowledgeWriteState.Unknown)));
   panel.append(publish);
+}
+function hostVerify(view: OutcomeView, reload: () => Promise<void>): void {
+  const box = dialog(t("outcome.hostVerify"));
+  const state = select([[VerificationRunState.Passed, label("VerificationRunState", VerificationRunState.Passed)], [VerificationRunState.Failed, label("VerificationRunState", VerificationRunState.Failed)]], VerificationRunState.Passed);
+  const summary = area(""); summary.required = true; summary.maxLength = 4096;
+  box.form.append(el("p", t("outcome.hostVerifyNote")), field(t("outcome.verificationResult"), state), field(t("outcome.reason"), summary));
+  const selections = view.outcome.input.evidence.map((reference, index) => {
+    const node = check(false);
+    box.form.append(field(`${reference.repository} · ${reference.commit} · ${reference.path} · sha256:${reference.sha256}`, node));
+    return { index, node };
+  });
+  const request_id = "host-verify-" + uuid();
+  finish(box, async () => {
+    const evidence_indices = selections.filter(item => item.node.checked).map(item => item.index);
+    if (!evidence_indices.length) throw new Error(t("outcome.evidenceRequired"));
+    await api("/api/v1/collaboration/outcomes/host-verify", { request_id, outcome_id: view.outcome.input.id, state: state.value, summary: summary.value.trim(), evidence_indices }, "manage-outcomes");
+    await reload();
+  });
 }

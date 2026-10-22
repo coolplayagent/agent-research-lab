@@ -36,7 +36,7 @@ pub async fn write(State(web): State<Web>, request: Request) -> Response {
         let selected;
         let target = match (input.service_id,input.repository) {
             (Some(service_id),Some(repository)) => { selected=service_api::KnowledgeTarget {service_id,repository}; &selected },
-            (None,None) => config.knowledge_goals.get(&entry.outcome.input.goal_id).or_else(|| config.knowledge_groups.get(&goal.input.group_id)).or_else(|| config.outcome_bindings.get(&entry.outcome.input.topic_id).and_then(|binding|binding.knowledge.as_ref())).context(OutcomeErrorCode::NotFound)?,
+            (None,None) => config.knowledge_goals.get(&entry.outcome.input.goal_id).or_else(|| config.knowledge_groups.get(&goal.input.group_id)).context(OutcomeErrorCode::NotFound)?,
             _ => anyhow::bail!("{}",OutcomeErrorCode::Invalid),
         };
         let service = configured_service(&config,&target.service_id,OutcomeServiceKind::Knowledge)?;

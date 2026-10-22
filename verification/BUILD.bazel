@@ -6,7 +6,7 @@ _OPTIONAL_SCENARIOS = ["//crates/" + name + ":" for name in [
     "execution-targets", "agent-backend", "workflow-adapter", "software-delivery",
 ]] + ["//apps/cli:", "//apps/console:", "//apps/migrate:"]
 _DATABASE = ["//crates/collaboration-store:", "//crates/collaboration-storage-service:", "rusqlite", "libsqlite3"]
-_ADAPTERS = ["//crates/" + name + ":" for name in ["codex-adapter", "outcome-service", "sandbox-service", "executor-service", "service-workers", "knowledge-service", "knowledge-git", "knowledge-directory"]]
+_ADAPTERS = ["//crates/" + name + ":" for name in ["codex-adapter", "sandbox-service", "executor-service", "service-workers", "knowledge-service", "knowledge-git", "knowledge-directory"]]
 
 dependency_boundary_test(
     name = "model_is_storage_free",
@@ -52,9 +52,9 @@ dependency_boundary_test(
 [dependency_boundary_test(
     name = name.replace("-", "_") + "_is_replaceable",
     subject = "//crates/{}:{}".format(name, name.replace("-", "_")),
-    forbidden = _DATABASE + _OPTIONAL_SCENARIOS + ["//crates/collaboration-api:", "//crates/collaboration-host:"] + ["//crates/" + other + ":" for other in ["codex-adapter", "outcome-service", "executor-service", "sandbox-service"] if other != name],
+    forbidden = _DATABASE + _OPTIONAL_SCENARIOS + ["//crates/collaboration-api:", "//crates/collaboration-host:"] + ["//crates/" + other + ":" for other in ["codex-adapter", "executor-service", "sandbox-service"] if other != name],
     required = ["//crates/service-api:service_api"],
-) for name in ["codex-adapter", "outcome-service", "executor-service", "sandbox-service"]]
+) for name in ["codex-adapter", "executor-service", "sandbox-service"]]
 
 dependency_boundary_test(
     name = "console_does_not_depend_on_cli",
