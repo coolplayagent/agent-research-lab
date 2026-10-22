@@ -18,7 +18,7 @@ def run(archive, fixture):
         with tarfile.open(archive) as package:
             package.extractall(root, filter="data")
         binaries = root / "outcome-hub"
-        for name in ("outcome-hub", "outcome-hub-services", "outcome-hub-agent"):
+        for name in ("outcome-hub", "outcome-hub-services", "outcome-hub-agent", "outcome-hub-storage", "outcome-hub-knowledge"):
             assert (binaries / name).is_file(), name
         peer = root / "fixture-agent"
         shutil.copyfile(fixture, peer)
@@ -61,9 +61,27 @@ def run(archive, fixture):
         try:
             wait_ready()
             view = api("/api/v1/collaboration/services")
-            assert view["active_storage"] is None
-            assert len(view["configuration"]["services"]) == 2
-            assert children() == set(), "Unbound core must not launch execution workers"
+            assert view["active_storage"][0] == "storage"
+            assert len(view["configuration"]["services"]) == 3
+            storage_pids = children()
+            assert len(storage_pids) == 1, "Only durable storage starts before binding"
+            assert not (state / "crystal").exists()
+            assert (state / "private/managed-storage/messages.sqlite").is_file()
+            assert next(s for s in view["local_runtime"] if s["component"] == "storage")["state"] == "ready"
+            api("/api/v1/messaging/manage", {"operation":"person", "person":{"id":"persistent", "name":"Persistent"}}, "manage-crystal")
+            # Recovery reopens the same durable store, without replacing configuration.
+            import os, signal
+            os.kill(next(iter(storage_pids)), signal.SIGKILL)
+            for _ in range(100):
+                try:
+                    recovered = api("/api/v1/collaboration/people")
+                    if any(p["id"] == "persistent" for p in recovered["people"]): break
+                except OSError: pass
+                time.sleep(.1)
+            else: raise AssertionError("Storage did not recover persisted collaboration data")
+            storage_pids = children()
+            assert len(storage_pids) == 1
+
             worker = binaries / "outcome-hub-services"
             worker.rename(binaries / "missing-worker")
             try:
@@ -71,7 +89,7 @@ def run(archive, fixture):
                 raise AssertionError("Missing worker must fail preparation")
             except urllib.error.HTTPError as error:
                 assert error.code == 503
-                assert json.load(error)["error"]["code"] == "local_runtime_unavailable"
+                assert json.load(error)["error"]["code"] == "runtime_package_missing"
             finally:
                 (binaries / "missing-worker").rename(worker)
             assert api("/api/v1/collaboration/services")["configuration"] == view["configuration"]
@@ -87,7 +105,7 @@ def run(archive, fixture):
             for _ in range(2):
                 ready = api("/api/v1/collaboration/services/prepare", {"revision":view["configuration"]["revision"]})
                 assert all(h["status"] == "healthy" for h in ready["health"]), ready["health"]
-                current = children()
+                current = children() - storage_pids
                 assert len(current) == 2, current
                 if owned:
                     assert owned == current, "Preparation must reuse owned workers"
@@ -155,17 +173,20 @@ def run(archive, fixture):
             restored = api("/api/v1/collaboration/services")
             assert restored["configuration"] == saved, "Restart must preserve configuration and evidence"
             assert all(h["status"] == "healthy" for h in restored["health"]), restored["health"]
-            owned = children()
+            storage_pids = {pid for pid in children() if b"outcome-hub-storage" in Path(f"/proc/{pid}/cmdline").read_bytes()}
+            assert len(storage_pids) == 1
+            assert any(p["id"] == "persistent" for p in api("/api/v1/collaboration/people")["people"])
+            owned = children() - storage_pids
             assert len(owned) == 2, "Enabled adapters must restore their local workers"
             disabled = json.loads(json.dumps(saved))
             disabled["bindings"] = {}
             for adapter in disabled["adapters"]:
                 adapter["enabled"] = False
             for service in disabled["services"]:
-                service["enabled"] = False
+                if service["kind"] != "storage": service["enabled"] = False
             api("/api/v1/collaboration/services", disabled)
             wait_removed(owned)
-            assert children() == set(), "Disabled local services must stay stopped"
+            assert children() == storage_pids, "Disabling execution must keep durable storage alive"
             print("Packaged local runtime: four protocol bindings, reuse, restart and disable cleanup passed")
         finally:
             host.terminate()

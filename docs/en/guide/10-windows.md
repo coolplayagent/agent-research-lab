@@ -19,7 +19,7 @@ Open PowerShell in `outcome-hub-release\outcome-hub` and start the native core:
 
 Open `http://127.0.0.1:4877/` directly in a browser on this computer. No management credential is needed. The default state directory is `%LOCALAPPDATA%\OutcomeHub\state`; use an absolute `--state-dir` to choose another location. The app creates private access-control lists for its state. Back up the state directory before upgrades and stop the service before restoring a backup.
 
-The v0.2.1 package runs core collaboration with its separate embedded local store and includes local execution workers and the Agent bridge. Binding validation starts the managed execution and sandbox services when needed. Research and knowledge services remain optional external services. A configured adapter is not evidence of a completed task.
+The complete package built from current source includes separate storage, executor, sandbox, Agent bridge and knowledge services. New workspaces manage their own service addresses: storage starts with the core, execution and knowledge start on demand. **Settings → Local environment** shows readiness and preparation; external addresses are configured under advanced deployment. Git targets require Git for Windows; directory targets do not require Git. Existing deployments retain their storage locations and service choices.
 
 To build from source on Windows, install the pinned Rust toolchain and Bazelisk, then run `bazel build --lockfile_mode=error //:windows-package`. CI builds the archive on `windows-latest`, extracts it and smoke-tests the packaged executable.
 

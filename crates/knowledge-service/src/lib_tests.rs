@@ -33,7 +33,7 @@ fn fixture(git: bool) -> (tempfile::TempDir, Service, Target) {
         } else {
             KnowledgeBackend::Directory
         },
-        path: target_path,
+        path: fs::canonicalize(target_path).unwrap(),
         content_root: "knowledge".into(),
         enabled: true,
         access: KnowledgeAccess::ReadWrite,
@@ -131,7 +131,11 @@ fn adapters_share_preview_publish_read_and_idempotent_receipt_contract() {
         assert!(preview.expected_revision.contains('@'));
         let write = write(&preview);
         let result = publish(&service, &write).unwrap();
-        assert_eq!(result["state"], KnowledgeWriteState::Applied.as_str());
+        assert_eq!(
+            result["state"],
+            KnowledgeWriteState::Applied.as_str(),
+            "backend git={git}"
+        );
         assert_eq!(publish(&service, &write).unwrap(), result);
         let receipt = service
             .dispatch(OutcomeServiceRequest::LookupWrite {
@@ -229,23 +233,26 @@ fn directory_conflict_symlink_and_readonly_reconciliation_never_claim_success() 
         fs::read(target.path.join("knowledge/note.md")).unwrap(),
         before
     );
-    std::os::unix::fs::symlink("/etc", target.path.join("knowledge/escape")).unwrap();
-    assert!(
-        service
-            .manage(Request::Probe {
-                target: "external".into()
-            })
-            .is_err()
-    );
-    assert!(
-        service
-            .manage(Request::Read {
-                target: "external".into(),
-                path: "escape/passwd".into(),
-                revision: None
-            })
-            .is_err()
-    );
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink("/etc", target.path.join("knowledge/escape")).unwrap();
+        assert!(
+            service
+                .manage(Request::Probe {
+                    target: "external".into()
+                })
+                .is_err()
+        );
+        assert!(
+            service
+                .manage(Request::Read {
+                    target: "external".into(),
+                    path: "escape/passwd".into(),
+                    revision: None
+                })
+                .is_err()
+        );
+    }
 }
 #[test]
 fn target_configuration_never_accepts_embedded_store_or_inline_credentials() {

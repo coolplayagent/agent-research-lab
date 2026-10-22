@@ -10,7 +10,9 @@ Each digital person retains only its latest validation process and private diagn
 
 Execution services forward configured proxy variables by name. Codex native tool hosts are mounted read-only and included in installation evidence. Linux sandbox processes have a 16 GiB virtual address ceiling to accommodate the tool host reservation; this is a virtual address limit, not a resident-memory guarantee. Existing lifetime, file, output and challenge checks still apply.
 
-Use the Linux `//:local-package` or the Windows package for local execution. Keep `outcome-hub`, `outcome-hub-services` and `outcome-hub-agent` together (with `.exe` on Windows). A fresh workspace uses a separate embedded development store and starts its managed executor and sandbox on demand. **Execution status → Prepare local runtime** checks the local services without invoking a model. Enabled adapters restore their local services on the next host start. Host shutdown cleans up the processes it owns. Core chat can still start without these optional executables; Agent validation then reports the missing runtime.
+Install the Linux `//:local-package` or Windows `//:windows-package`. Keep `outcome-hub`, `outcome-hub-storage`, `outcome-hub-services`, `outcome-hub-agent` and `outcome-hub-knowledge` together (with `.exe` on Windows). New workspaces automatically start a separate storage service. Execution, sandbox and knowledge services start on demand without endpoint entry. **Local environment → Prepare** starts and checks the execution services without invoking a model. First binding or execution also prepares them; enabled adapters restore services after restart. Install and authenticate your Agent CLI separately.
+
+Existing `services.json`, external deployments and legacy `crystal` directories retain their storage choice without database migration. Storage recovery makes at most three attempts against the same data; missing data or failed recovery is an error. `serve --embedded-development` explicitly selects the embedded development store for a fresh workspace. Missing execution or knowledge binaries do not prevent core chat; missing storage on a new normal installation prevents startup and requires restoring the complete package.
 
 Create a digital person directly in Agent bindings; the new person is selected while your Agent, program and model choices are preserved. Knowledge repositories and group/goal defaults live under **Settings → Knowledge**. Topic-level service bindings have been retired.
 
@@ -24,7 +26,7 @@ HEAD or an empty repository requires preparing a usable branch first. Write acce
 requires an explicit existing publication branch that is not checked out. Adding a
 store does not clone, create branches, commit, publish, or create a default binding.
 
-The Linux local package includes the optional `outcome-hub-knowledge` executable.
+The Linux and Windows complete packages include the optional `outcome-hub-knowledge` executable.
 The host starts it on demand with private state and cleans it up on shutdown. Core
 collaboration still starts without it. Knowledge settings accept only this host-managed
 service; external knowledge service connections are no longer configurable or usable.
@@ -54,7 +56,7 @@ path/size/limit parameters, rendered by frontend locale resources.
 
 ## Advanced deployment
 
-The collapsed **Advanced settings** section contains service connections, execution adapters and storage. Existing deep links still open their page. Leaving unsaved forms prompts a warning.
+The collapsed **Advanced settings** section contains external service connections, execution adapters and storage. Existing deep links still open their page. Leaving unsaved forms prompts a warning.
 
 | Component | Responsibility |
 | --- | --- |

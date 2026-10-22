@@ -19,7 +19,7 @@ Expand-Archive .\outcome-hub-windows-x86_64.zip -DestinationPath .\outcome-hub-r
 
 在这台计算机的浏览器中直接打开 `http://127.0.0.1:4877/`，无需管理凭据。默认状态目录是 `%LOCALAPPDATA%\OutcomeHub\state`；使用绝对路径 `--state-dir` 可更换目录。程序为状态设置私有访问控制列表。升级前备份状态目录，恢复备份前停止服务。
 
-v0.2.1 包提供核心协作、独立的嵌入式本地存储、本地执行进程和 Agent 桥接程序。绑定验证按需启动托管的执行与沙箱服务。研究与知识库服务仍是可选的外部服务。配置完成不等于任务已执行成功。
+当前源码构建的完整包包括独立存储、执行器、沙箱、Agent bridge 和知识库服务。新工作空间自动管理服务地址：存储随核心启动，执行与知识服务按需准备。“设置 → 本机环境”显示状态与“一键准备”；外部地址仅在高级部署中配置。使用 Git 知识库需已安装 Git for Windows；目录知识库不需要 Git。已有部署保留原数据位置与服务选择。
 
 从源码构建需安装仓库固定版本的 Rust 工具链及 Bazelisk，然后运行 `bazel build --lockfile_mode=error //:windows-package`。CI 在 `windows-latest` 上构建、解压并实际启动包内的可执行文件。
 

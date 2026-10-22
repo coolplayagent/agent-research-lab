@@ -51,6 +51,11 @@ node_test(
     script = "settings-tests.cjs",
     data = [":policy_sources", "//web/shared:policy_sources"],
 )
+node_test(
+    name = "runtime_tests",
+    script = "runtime-tests.cjs",
+    data = [":policy_sources", "//web/shared:policy_sources"],
+)
 
 node_test(
     name = "binding_knowledge_tests",

@@ -75,7 +75,7 @@ def run(archive):
             raise AssertionError("Invalid knowledge setup was accepted")
         def children():
             result = subprocess.run(["ps", "-o", "pid=", "--ppid", str(host.pid)], capture_output=True, text=True)
-            return {int(value) for value in result.stdout.split()}
+            return {int(value) for value in result.stdout.split() if b"outcome-hub-storage" not in Path(f"/proc/{value}/cmdline").read_bytes()}
         def stopped(pids):
             for _ in range(100):
                 if all(not Path(f"/proc/{pid}").exists() for pid in pids):

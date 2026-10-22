@@ -1,0 +1,120 @@
+use super::*;
+fn binary() -> PathBuf {
+    let logical =
+        std::env::var("TEST_STORAGE_BINARY").expect("run storage lifecycle tests through Bazel");
+    if let Some(manifest) = std::env::var_os("RUNFILES_MANIFEST_FILE") {
+        for line in std::fs::read_to_string(manifest).unwrap().lines() {
+            let escaped = line.starts_with(' ');
+            if let Some((key, value)) = line.trim_start_matches(' ').split_once(' ') {
+                let decode = |value: &str| {
+                    if escaped {
+                        value
+                            .replace("\\s", " ")
+                            .replace("\\n", "\n")
+                            .replace("\\b", "\\")
+                    } else {
+                        value.into()
+                    }
+                };
+                if decode(key) == logical {
+                    return std::fs::canonicalize(decode(value)).unwrap();
+                }
+            }
+        }
+        panic!("storage fixture missing from runfiles manifest");
+    }
+    std::fs::canonicalize(PathBuf::from(std::env::var_os("TEST_SRCDIR").unwrap()).join(logical))
+        .unwrap()
+}
+
+fn service(root: &Path) -> Service {
+    service_api::Configuration::local(root)
+        .services
+        .into_iter()
+        .find(|s| s.kind == ServiceKind::Storage)
+        .unwrap()
+}
+#[tokio::test]
+async fn owned_storage_recovers_the_same_database_and_rejects_missing_data() {
+    let root = tempfile::tempdir().unwrap();
+    let service = service(root.path());
+    let mut managed = ManagedStorage::default();
+    managed
+        .prepare(&service, root.path(), &binary())
+        .await
+        .unwrap();
+    let database = root.path().join("private/managed-storage/messages.sqlite");
+    assert!(database.is_file());
+    let marker = std::fs::read(root.path().join("private/storage-owner-storage.json")).unwrap();
+    let mut competitor = ManagedStorage::default();
+    assert!(
+        competitor
+            .prepare(&service, root.path(), &binary())
+            .await
+            .is_err()
+    );
+    managed
+        .prepare(&service, root.path(), &binary())
+        .await
+        .unwrap();
+    managed.child = None;
+    managed.recover().await;
+    assert!(managed.child.is_some());
+    assert_eq!(
+        std::fs::read(root.path().join("private/storage-owner-storage.json")).unwrap(),
+        marker
+    );
+    managed.child = None;
+    std::fs::rename(&database, database.with_extension("saved")).unwrap();
+    managed.retry_after = None;
+    managed.recover().await;
+    assert_eq!(managed.error, Some(Code::DataMissing));
+    assert!(!database.exists());
+}
+#[tokio::test]
+async fn recovery_is_bounded_and_never_selects_another_store() {
+    let root = tempfile::tempdir().unwrap();
+    let mut managed = ManagedStorage::default();
+    managed
+        .prepare(&service(root.path()), root.path(), &binary())
+        .await
+        .unwrap();
+    managed.child = None;
+    managed.active.as_mut().unwrap().2 = root.path().join("missing");
+    for _ in 0..5 {
+        managed.retry_after = None;
+        managed.recover().await;
+    }
+    assert_eq!(managed.attempts, 3);
+    assert_eq!(managed.error, Some(Code::RecoveryExhausted));
+    assert!(!root.path().join("crystal").exists());
+}
+#[tokio::test]
+async fn occupied_endpoint_and_missing_package_do_not_create_database() {
+    let root = tempfile::tempdir().unwrap();
+    let service = service(root.path());
+    let _listener = service_protocol::Listener::bind(&service.endpoint).unwrap();
+    let mut managed = ManagedStorage::default();
+    let error = managed
+        .launch(&service, root.path(), &binary())
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error.downcast_ref::<Failure>().unwrap().0,
+        Code::EndpointInUse
+    );
+    let error = managed
+        .launch(&service, root.path(), &root.path().join("missing"))
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error.downcast_ref::<Failure>().unwrap().0,
+        Code::PackageMissing
+    );
+    assert!(
+        !root
+            .path()
+            .join("private/managed-storage/messages.sqlite")
+            .exists()
+    );
+}

@@ -1,7 +1,9 @@
 //! Owned execution processes. External endpoints are only probed, never replaced.
 pub(super) mod child;
 use anyhow::{Context, Result, ensure};
+use contracts::LocalRuntimeErrorCode as Code;
 use contracts::{ServiceKind, ServiceManagement};
+use service_api::LocalRuntimeFailure as Failure;
 use service_api::{Configuration, Service};
 use std::{
     path::Path,
@@ -11,6 +13,7 @@ use std::{
 pub(super) struct Managed {
     children: Vec<(Service, child::Child)>,
     pub started: std::collections::BTreeSet<String>,
+    pub error: Option<Code>,
 }
 pub(super) fn validate_locations(config: &Configuration, state: &Path) -> Result<()> {
     for service in &config.services {
@@ -43,7 +46,12 @@ impl Managed {
         } else {
             "outcome-hub-services"
         });
-        self.prepare_with(config, state, executor_id, &binary).await
+        let result = self.prepare_with(config, state, executor_id, &binary).await;
+        self.error = result.as_ref().err().map(|e| {
+            e.downcast_ref::<Failure>()
+                .map_or(Code::StartupFailed, |e| e.0)
+        });
+        result
     }
     async fn prepare_with(
         &mut self,
@@ -70,8 +78,13 @@ impl Managed {
                     .any(|(owned, _)| owned.id == service.id)
             {
                 self.started.insert(service.id.clone());
-                ensure!(binary.is_file(), "packaged execution service is missing");
-                let child = child::Child::spawn(binary, service, state)?;
+                ensure!(binary.is_file(), Failure(Code::PackageMissing));
+                ensure!(
+                    service_protocol::connect(&service.endpoint).await.is_err(),
+                    Failure(Code::EndpointInUse)
+                );
+                let child = child::Child::spawn(binary, service, state)
+                    .context(Failure(Code::StartupFailed))?;
                 self.children.push((service.clone(), child));
             }
             let deadline = Instant::now() + Duration::from_secs(15);
@@ -82,12 +95,12 @@ impl Managed {
                         if service.management == ServiceManagement::External
                             || Instant::now() >= deadline
                         {
-                            return Err(error.context("execution runtime is not ready"));
+                            return Err(error.context(Failure(Code::ReadinessTimeout)));
                         }
                         if let Some((_, child)) =
                             self.children.iter_mut().find(|(s, _)| s.id == service.id)
                         {
-                            ensure!(child.running(), "managed service exited before readiness");
+                            ensure!(child.running(), Failure(Code::StartupFailed));
                         }
                     }
                 }

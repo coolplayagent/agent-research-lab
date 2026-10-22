@@ -1,14 +1,17 @@
 //! Descriptor-relative, bounded content snapshots with explicit repository ignore rules.
-use super::{anchored, child, read};
+use super::{
+    anchored, child,
+    platform::{self, Directory, identity},
+    read,
+};
 use anyhow::{Context, Result, ensure};
 use contracts::{KnowledgeError as Error, KnowledgeErrorCode as Code};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
-    fs::{self, File, OpenOptions},
+    fs,
     io::Read,
-    os::unix::fs::{MetadataExt, OpenOptionsExt},
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -69,8 +72,14 @@ impl Budget {
     }
 }
 fn reserved(path: &Path) -> bool {
-    path.components()
-        .any(|c| c.as_os_str() == ".git" || c.as_os_str() == ".outcomehub")
+    path.components().any(|c| {
+        let name = c.as_os_str().to_string_lossy();
+        if cfg!(windows) {
+            name.eq_ignore_ascii_case(".git") || name.eq_ignore_ascii_case(".outcomehub")
+        } else {
+            name == ".git" || name == ".outcomehub"
+        }
+    })
 }
 fn ignored(filters: &[Gitignore], path: &Path, directory: bool) -> bool {
     let absolute = Path::new(VIRTUAL_ROOT).join(path);
@@ -86,7 +95,11 @@ fn ignored(filters: &[Gitignore], path: &Path, directory: bool) -> bool {
     }
     excluded
 }
-fn rules(root: &File, prefix: &Path, budget: &mut Budget) -> Result<(Gitignore, Option<String>)> {
+fn rules(
+    root: &Directory,
+    prefix: &Path,
+    budget: &mut Budget,
+) -> Result<(Gitignore, Option<String>)> {
     budget.check(prefix)?;
     let content = read(root, Path::new(".gitignore"))?;
     let mut builder = GitignoreBuilder::new(Path::new(VIRTUAL_ROOT).join(prefix));
@@ -119,7 +132,7 @@ fn rules(root: &File, prefix: &Path, budget: &mut Budget) -> Result<(Gitignore, 
     ))
 }
 /// Validate the same policy for direct reads and future publication paths, including missing parents.
-pub(super) fn allowed(root: &File, path: &Path, budget: &mut Budget) -> Result<()> {
+pub(super) fn allowed(root: &Directory, path: &Path, budget: &mut Budget) -> Result<()> {
     ensure!(
         !reserved(path),
         Error::new(Code::ExcludedPath).parameter("path", path.display())
@@ -159,22 +172,8 @@ pub(super) fn allowed(root: &File, path: &Path, budget: &mut Budget) -> Result<(
     }
     Ok(())
 }
-fn identity(meta: &fs::Metadata) -> (u64, u64, u64, i64, i64, i64, i64) {
-    (
-        meta.dev(),
-        meta.ino(),
-        meta.len(),
-        meta.mtime(),
-        meta.mtime_nsec(),
-        meta.ctime(),
-        meta.ctime_nsec(),
-    )
-}
-fn hash(root: &File, name: &Path, path: &Path, budget: &mut Budget) -> Result<String> {
-    let mut file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(anchored(root).join(name))?;
+fn hash(root: &Directory, name: &Path, path: &Path, budget: &mut Budget) -> Result<String> {
+    let mut file = platform::open_file(&anchored(root).join(name))?;
     let before = file.metadata()?;
     ensure!(
         before.is_file(),
@@ -199,9 +198,9 @@ fn hash(root: &File, name: &Path, path: &Path, budget: &mut Budget) -> Result<St
     );
     Ok(format!("{:x}", digest.finalize()))
 }
-pub(super) fn snapshot(root: &File, budget: &mut Budget) -> Result<String> {
+pub(super) fn snapshot(root: &Directory, budget: &mut Budget) -> Result<String> {
     fn walk(
-        root: &File,
+        root: &Directory,
         prefix: &Path,
         filters: &mut Vec<Gitignore>,
         entries: &mut BTreeMap<String, String>,
@@ -224,7 +223,7 @@ pub(super) fn snapshot(root: &File, budget: &mut Budget) -> Result<String> {
                     .join(".gitignore")
                     .to_str()
                     .context("knowledge_invalid_path")?
-                    .into(),
+                    .replace('\\', "/"),
                 digest,
             );
         }
@@ -243,12 +242,17 @@ pub(super) fn snapshot(root: &File, budget: &mut Budget) -> Result<String> {
                 continue;
             }
             ensure!(
-                !meta.file_type().is_symlink(),
+                !platform::linked(&meta),
                 Error::new(Code::SymlinkRejected).parameter("path", path.display())
             );
             if meta.is_dir() {
                 entries.insert(
-                    format!("{}/", path.to_str().context("knowledge_invalid_path")?),
+                    format!(
+                        "{}/",
+                        path.to_str()
+                            .context("knowledge_invalid_path")?
+                            .replace('\\', "/")
+                    ),
                     String::new(),
                 );
                 walk(
@@ -266,7 +270,9 @@ pub(super) fn snapshot(root: &File, budget: &mut Budget) -> Result<String> {
                 );
                 let digest = hash(root, &name, &path, budget)?;
                 entries.insert(
-                    path.to_str().context("knowledge_invalid_path")?.into(),
+                    path.to_str()
+                        .context("knowledge_invalid_path")?
+                        .replace('\\', "/"),
                     digest,
                 );
             }

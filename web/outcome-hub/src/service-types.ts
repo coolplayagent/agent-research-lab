@@ -4,6 +4,9 @@ import type {
   ServiceKind,
   ServiceHealth,
   ServiceManagement,
+  LocalRuntimeComponent,
+  LocalRuntimeState,
+  LocalRuntimeErrorCode,
 } from "/assets/shared/contracts.js";
 import type { OutcomeService } from "./outcome-types.js";
 export interface Service {
@@ -38,6 +41,7 @@ export interface Configuration {
   knowledge_goals?: Record<string, { service_id: string; repository: string }>;
 }
 export interface ServiceView {
+  local_runtime?: { component: LocalRuntimeComponent; state: LocalRuntimeState; packaged: boolean; can_prepare: boolean; error: LocalRuntimeErrorCode | null; health: ServiceHealth | null }[];
   configuration: Configuration;
   health: {
     id: string;

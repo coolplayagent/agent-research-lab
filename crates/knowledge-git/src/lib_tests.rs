@@ -19,8 +19,10 @@ fn setup() -> (tempfile::TempDir, BTreeMap<String, GitTarget>, String) {
         credential_env: vec![],
     };
     git.call(&["init", "-b", "main"]).unwrap();
+    let empty = root.path().join("empty");
+    fs::write(&empty, "").unwrap();
     let tree = git
-        .call(&["hash-object", "-t", "tree", "-w", "/dev/null"])
+        .call(&["hash-object", "-t", "tree", "-w", empty.to_str().unwrap()])
         .unwrap();
     let head = git
         .call(&["commit-tree", &tree, "-m", "Initial knowledge"])

@@ -51,9 +51,7 @@ function render(view: ServiceView): void {
   renderKnowledgeSettings(view, save, () => loadServices(true));
   get("services-status").textContent = view.restart_required
     ? t("services.restart")
-    : t("services.activeStorage", {
-        p0: view.active_storage?.[0] || t("services.embedded"),
-      });
+    : t("runtime.settingsNote");
   const list = get("service-list");
   list.replaceChildren();
   for (const service of config.services) {

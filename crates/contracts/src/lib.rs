@@ -106,8 +106,11 @@ states! {
     ServiceKind { Storage => "storage", Executor => "executor", Sandbox => "sandbox" }
     #[derive(Default)]
     ServiceManagement { #[default] External => "external", LocalManaged => "local_managed" }
-    ServiceConfigurationErrorCode { KindImmutable => "service_kind_immutable", CommandRequired => "adapter_command_required", ValidationRequired => "adapter_validation_required", Invalid => "service_configuration_invalid", RuntimeUnavailable => "local_runtime_unavailable", RevisionConflict => "service_revision_conflict" }
+    ServiceConfigurationErrorCode { ManagementImmutable => "service_management_immutable", KindImmutable => "service_kind_immutable", CommandRequired => "adapter_command_required", ValidationRequired => "adapter_validation_required", Invalid => "service_configuration_invalid", RuntimeUnavailable => "local_runtime_unavailable", RevisionConflict => "service_revision_conflict" }
     ServiceHealth { Healthy => "healthy", Unavailable => "unavailable", Disabled => "disabled", ProtocolMismatch => "protocol_mismatch", RestartRequired => "restart_required" }
+    LocalRuntimeComponent { Storage => "storage", Execution => "execution", Knowledge => "knowledge" }
+    LocalRuntimeState { Ready => "ready", Standby => "standby", Failed => "failed", Missing => "missing", Disabled => "disabled", External => "external", Development => "development", Unsupported => "unsupported" }
+    LocalRuntimeErrorCode { PackageMissing => "runtime_package_missing", EndpointInUse => "runtime_endpoint_in_use", StartupFailed => "runtime_startup_failed", ReadinessTimeout => "runtime_readiness_timeout", DataMissing => "runtime_data_missing", RecoveryExhausted => "runtime_recovery_exhausted", PlatformUnsupported => "runtime_platform_unsupported" }
     CodingAgent { ClaudeCode => "cc", Codex => "codex", DeepseekHarness => "hds", Pi => "pi", Custom => "custom" }
     AgentProtocol { JsonStdioV1 => "json_stdio_v1" }
     OriginStateKind { Active => "active", Completed => "completed", Revoked => "revoked" }

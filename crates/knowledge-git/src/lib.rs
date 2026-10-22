@@ -1,5 +1,6 @@
 //! Export accepted outcome records into a prepared external Git branch with compare-and-swap.
 use anyhow::{Context, Result, ensure};
+mod command;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use service_api::OutcomeServiceRequest;
@@ -42,9 +43,14 @@ impl Git<'_> {
         let duration = self.deadline.saturating_duration_since(Instant::now());
         ensure!(!duration.is_zero(), "knowledge operation deadline expired");
         let capture = tempfile::tempdir_in(self.run.path())?;
+        let scratch = command::path(self.run.path())?;
+        let hooks = scratch.join("empty-hooks");
+        fs::create_dir_all(&hooks)?;
+        let empty_config = scratch.join("empty-config");
+        fs::write(&empty_config, "")?;
         let mut arguments: Vec<String> = [
             "-c",
-            "core.hooksPath=/dev/null",
+            &format!("core.hooksPath={}", hooks.display()),
             "-c",
             "core.fsmonitor=false",
             "-c",
@@ -55,21 +61,22 @@ impl Git<'_> {
         .map(str::to_string)
         .collect();
         arguments.push(
-            self.target
-                .path
+            command::path(&self.target.path)?
                 .to_str()
                 .context("repository path must be UTF-8")?
                 .into(),
         );
         arguments.extend(args.iter().map(|s| s.to_string()));
         let mut env = vec![
-            ("PATH".into(), "/usr/bin:/bin".into()),
             ("GIT_CONFIG_NOSYSTEM".into(), "1".into()),
-            ("GIT_CONFIG_GLOBAL".into(), "/dev/null".into()),
+            (
+                "GIT_CONFIG_GLOBAL".into(),
+                empty_config.display().to_string(),
+            ),
             ("GIT_TERMINAL_PROMPT".into(), "0".into()),
             (
                 "GIT_INDEX_FILE".into(),
-                self.run.path().join("index").display().to_string(),
+                scratch.join("index").display().to_string(),
             ),
             (
                 "GIT_AUTHOR_NAME".into(),
@@ -82,33 +89,22 @@ impl Git<'_> {
             ),
             ("GIT_COMMITTER_EMAIL".into(), "outcome-hub@localhost".into()),
         ];
+        command::environment(&mut env);
         for name in &self.credential_env {
             env.push((
                 name.clone(),
                 std::env::var(name).context("knowledge credential environment is unavailable")?,
             ));
         }
-        let mut child = process::Process::spawn_clean(
-            "/usr/bin/git",
+        command::capture(
             &arguments,
             self.run.path(),
             capture.path(),
             duration.min(Duration::from_secs(20)),
             &env,
-            None,
-        )?;
-        loop {
-            if let Some(status) = child.poll()? {
-                ensure!(status.success(), "knowledge Git operation failed");
-                ensure!(
-                    fs::metadata(&child.stdout)?.len() <= 2 * 1024 * 1024,
-                    "knowledge output exceeds bound"
-                );
-                return Ok(fs::read_to_string(&child.stdout)?);
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        }
+        )
     }
+
     fn head(&self) -> Result<String> {
         self.call(&["check-ref-format", &self.target.reference])?;
         let value = self.call(&[
@@ -184,7 +180,9 @@ impl Git<'_> {
                 "-w",
                 "--no-filters",
                 "--",
-                file.to_str().context("non-UTF-8 temporary path")?,
+                command::path(&file)?
+                    .to_str()
+                    .context("non-UTF-8 temporary path")?,
             ])?;
             hash(&blob)?;
             self.call(&[
@@ -210,7 +208,9 @@ impl Git<'_> {
             "-p",
             &head,
             "-F",
-            message.to_str().context("non-UTF-8 temporary path")?,
+            command::path(&message)?
+                .to_str()
+                .context("non-UTF-8 temporary path")?,
         ])?;
         hash(&commit)?;
         if let Some(remote) = &self.remote {
@@ -499,7 +499,7 @@ pub fn inspect(
         }
         .to_str()
         .context("knowledge_invalid_path")?
-        .to_string();
+        .replace('\\', "/");
         let entry = git.call(&["ls-tree", revision, "--", &full])?;
         if entry.is_empty() {
             return Ok((head, None));

@@ -450,6 +450,7 @@ export declare const ServiceManagement: {
 };
 export type ServiceManagement = (typeof ServiceManagement)[keyof typeof ServiceManagement];
 export declare const ServiceConfigurationErrorCode: {
+    readonly ManagementImmutable: "service_management_immutable";
     readonly KindImmutable: "service_kind_immutable";
     readonly CommandRequired: "adapter_command_required";
     readonly ValidationRequired: "adapter_validation_required";
@@ -466,6 +467,33 @@ export declare const ServiceHealth: {
     readonly RestartRequired: "restart_required";
 };
 export type ServiceHealth = (typeof ServiceHealth)[keyof typeof ServiceHealth];
+export declare const LocalRuntimeComponent: {
+    readonly Storage: "storage";
+    readonly Execution: "execution";
+    readonly Knowledge: "knowledge";
+};
+export type LocalRuntimeComponent = (typeof LocalRuntimeComponent)[keyof typeof LocalRuntimeComponent];
+export declare const LocalRuntimeState: {
+    readonly Ready: "ready";
+    readonly Standby: "standby";
+    readonly Failed: "failed";
+    readonly Missing: "missing";
+    readonly Disabled: "disabled";
+    readonly External: "external";
+    readonly Development: "development";
+    readonly Unsupported: "unsupported";
+};
+export type LocalRuntimeState = (typeof LocalRuntimeState)[keyof typeof LocalRuntimeState];
+export declare const LocalRuntimeErrorCode: {
+    readonly PackageMissing: "runtime_package_missing";
+    readonly EndpointInUse: "runtime_endpoint_in_use";
+    readonly StartupFailed: "runtime_startup_failed";
+    readonly ReadinessTimeout: "runtime_readiness_timeout";
+    readonly DataMissing: "runtime_data_missing";
+    readonly RecoveryExhausted: "runtime_recovery_exhausted";
+    readonly PlatformUnsupported: "runtime_platform_unsupported";
+};
+export type LocalRuntimeErrorCode = (typeof LocalRuntimeErrorCode)[keyof typeof LocalRuntimeErrorCode];
 export declare const CodingAgent: {
     readonly ClaudeCode: "cc";
     readonly Codex: "codex";

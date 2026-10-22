@@ -272,6 +272,11 @@ pub fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<Value> 
     let (shutdown, _) = tokio::sync::watch::channel(false);
     std::fs::create_dir_all(&c.state_dir)?;
     let services = Arc::new(service_registry::Registry::open(&c.state_dir)?);
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()?;
+    runtime.block_on(services.prepare_storage())?;
     let hub = collaboration_host::storage(&services.configuration(), &c.state_dir)?;
     let mut web = transport::Web::new(
         hub,
@@ -284,10 +289,6 @@ pub fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<Value> 
     web.services = Some(services.clone());
     web.operator = Some(Arc::new(operator::Operator::local(&c.state_dir, addr)?));
     eprintln!("Research dashboard: http://{addr} (event-driven, {max_seconds}s)");
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(4)
-        .enable_all()
-        .build()?;
     runtime.block_on(async {
         web.hub.register_operator().await?;
         research_scenario::sync_people(&web.hub, Arc::new(c.clone())).await
@@ -302,6 +303,12 @@ pub fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<Value> 
             }
         });
         let result = runtime.block_on(async {
+            let supervisor_registry = services.clone();
+            let supervisor_shutdown = shutdown.subscribe();
+            let supervisor =
+                tokio::spawn(
+                    async move { supervisor_registry.supervise(supervisor_shutdown).await },
+                );
             let scenarios = transport::scenarios(web.config.as_ref());
             let iterations = tokio::spawn(collaboration_api::iteration::run_with_registry(
                 web.hub.clone(),
@@ -340,6 +347,8 @@ pub fn serve(c: &Config, listen: SocketAddr, max_seconds: u64) -> Result<Value> 
             let _ = iterations.await;
             let _ = execution.await;
             let _ = scenario.await;
+            supervisor.abort();
+            let _ = supervisor.await;
             served??;
             Ok::<_, anyhow::Error>(())
         });
