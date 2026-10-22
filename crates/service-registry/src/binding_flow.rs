@@ -2,10 +2,9 @@ use crate::{Registry, bindings};
 use anyhow::{Context, Result, ensure};
 use contracts::{
     BindingErrorCode as Code, BindingOperationState as State, BindingStage as Stage,
-    BindingStepState as Step, CodingAgent, ServiceKind,
+    BindingStepState as Step,
 };
 use service_api::*;
-use service_protocol as rpc;
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -37,10 +36,16 @@ impl Registry {
             config.adapters.iter().any(|a| a.id == request.adapter_id),
             "binding adapter is missing"
         );
+        let permit = self
+            .validation_slots
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Failure(Code::Busy))?;
         let (record, cancel) = self.bindings.begin(request.clone())?;
         if let Some(mut cancel) = cancel {
             let registry = self.clone();
             tokio::spawn(async move {
+                let _permit = permit;
                 let id = &request.request_id;
                 let cancellation = cancel.clone();
                 let result = tokio::select! {
@@ -120,174 +125,41 @@ impl Registry {
             .iter()
             .position(|a| a.id == request.adapter_id)
             .context("binding adapter is missing")?;
-        let agent = config.adapters[index].agent;
         let started = self.stage(id, Stage::Discover)?;
-        let program = request.program.clone();
-        let resolved = if agent == CodingAgent::Custom {
-            ensure!(
-                program.is_none() && request.model.is_none(),
-                Failure(Code::ConfigurationInvalid)
-            );
-            let adapter = &config.adapters[index];
-            let executable = std::path::PathBuf::from(
-                adapter
-                    .command
-                    .first()
-                    .context("custom protocol command is missing")?,
-            );
-            let arguments = adapter.command[1..].to_vec();
-            let digest = agent_adapter::executable_digest(&executable, &arguments)?;
-            ResolvedAgent {
-                agent,
-                executable,
-                arguments,
-                digest,
-                version: "json_stdio.v1".into(),
-            }
-        } else {
-            tokio::task::spawn_blocking(move || agent_adapter::discover(agent, program.as_deref()))
-                .await??
-        };
+        let resolved = crate::validation::discover(
+            &config.adapters[index],
+            request.program.clone(),
+            request.model.as_deref(),
+        )
+        .await?;
         self.bindings.change(id, |r| {
             r.program = Some(resolved.clone());
             Ok(())
         })?;
         self.passed(id, Stage::Discover, started)?;
-
         let started = self.stage(id, Stage::Runtime)?;
-        self.prepare_execution(&config, &config.adapters[index].executor_id)
-            .await
-            .map_err(|error| error.context(Failure(Code::ServiceUnavailable)))?;
-        let executor = config
-            .service(&config.adapters[index].executor_id, ServiceKind::Executor)?
-            .clone();
-        let sandbox = config
-            .service(
-                executor
-                    .sandbox_id
-                    .as_deref()
-                    .context("executor sandbox is missing")?,
-                ServiceKind::Sandbox,
-            )?
-            .clone();
-        let deadline = Instant::now() + Duration::from_secs(15);
-        loop {
-            if service_api::probe(&executor.endpoint, ServiceKind::Executor)
-                .await
-                .is_ok()
-            {
-                break;
-            }
-            ensure!(Instant::now() < deadline, Failure(Code::ServiceUnavailable));
-            tokio::time::sleep(Duration::from_millis(200)).await;
-        }
-        service_api::probe(&sandbox.endpoint, ServiceKind::Sandbox)
-            .await
-            .map_err(|e| e.context(Failure(Code::IsolationUnavailable)))?;
+        let (executor, sandbox) = self
+            .validation_runtime(&config, &config.adapters[index])
+            .await?;
         self.passed(id, Stage::Runtime, started)?;
-
         let started = self.stage(id, Stage::Configuration)?;
-        let adapter = &mut config.adapters[index];
-        if agent != CodingAgent::Custom {
-            let configuration_digest = agent_adapter::configuration_digest(agent)?;
-            let bridge = std::env::current_exe()?.with_file_name(if cfg!(windows) {
-                "outcome-hub-agent.exe"
-            } else {
-                "outcome-hub-agent"
-            });
-            ensure!(bridge.is_file(), "packaged agent bridge is missing");
-            adapter.command = vec![
-                bridge.to_string_lossy().into_owned(),
-                "--agent".into(),
-                agent.to_string(),
-                "--program".into(),
-                resolved.executable.to_string_lossy().into_owned(),
-                "--digest".into(),
-                resolved.digest.clone(),
-            ];
-            for argument in &resolved.arguments {
-                adapter
-                    .command
-                    .extend(["--launcher-argument".into(), argument.clone()]);
-            }
-            adapter
-                .command
-                .extend(["--configuration-digest".into(), configuration_digest]);
-            let selected_model = if agent == CodingAgent::DeepseekHarness && request.model.is_none()
-            {
-                let resolved = resolved.clone();
-                Some(
-                    tokio::task::spawn_blocking(move || agent_adapter::selected_model(&resolved))
-                        .await??,
-                )
-            } else {
-                request.model.clone()
-            };
-            if let Some(model) = &selected_model {
-                adapter.command.extend(["--model".into(), model.clone()]);
-            }
-            adapter.enabled = true;
-            adapter.env_names = agent_adapter::environment_names(agent);
-            adapter.read_only_paths = agent_adapter::runtime_paths(&resolved)?;
-            adapter.read_only_paths.push(bridge);
-        }
-        adapter.enabled = true;
-        adapter.validate()?;
-        self.passed(id, Stage::Configuration, started)?;
-
-        let started = self.stage(id, Stage::Execute)?;
-        let input = AgentInput {
-            protocol_version: rpc::VERSION,
-            request_id: id.clone(),
-            person_id: request.person_id.clone(),
-            goal_id: "binding-validation".into(),
-            work_id: "binding-validation".into(),
-            attempt: 1,
-            objective: "Validate the installed coding agent with one bounded workspace task."
-                .into(),
-            acceptance: "The host verifies the resulting artifact.".into(),
-            instruction: String::new(),
-            messages: vec![],
-        };
-        let receipt: BindingProbeReceipt = rpc::call(
-            &executor.endpoint,
-            &ExecutorRequest::Validate {
-                adapter: adapter.clone(),
-                sandbox: sandbox.endpoint,
-                input: Box::new(input),
-                seconds: adapter.max_seconds.min(90),
-            },
-            Duration::from_secs(95),
+        crate::validation::configure(
+            &mut config.adapters[index],
+            &resolved,
+            request.model.clone(),
         )
-        .await
-        .map_err(|error| {
-            let code = execution_failure_code(agent, &error);
-            error.context(Failure(code))
-        })?;
-        ensure!(
-            receipt.challenge_verified && receipt.execution.output.succeeded,
-            Failure(Code::VerificationFailed)
-        );
-        ensure!(
-            receipt.execution.adapter_sha256 == storage::digest(&serde_json::to_vec(adapter)?)
-                && receipt.execution.output.request_id == *id,
-            Failure(Code::InvalidResponse)
-        );
-        ensure!(
-            agent_adapter::executable_digest(&resolved.executable, &resolved.arguments)?
-                == resolved.digest,
-            Failure(Code::ProgramInvalid)
-        );
-        if let Some(pair) = adapter
-            .command
-            .windows(2)
-            .find(|pair| pair[0] == "--configuration-digest")
-        {
-            ensure!(
-                agent_adapter::configuration_digest(agent)? == pair[1],
-                Failure(Code::ConfigurationInvalid)
-            );
-        }
+        .await?;
+        self.passed(id, Stage::Configuration, started)?;
+        let started = self.stage(id, Stage::Execute)?;
+        let input = crate::validation::input(id, &request.person_id, "binding-validation");
+        let receipt = crate::validation::execute(
+            &config.adapters[index],
+            &resolved,
+            executor,
+            sandbox,
+            input,
+        )
+        .await?;
         self.passed(id, Stage::Execute, started)?;
 
         let started = self.stage(id, Stage::Persist)?;
@@ -314,6 +186,7 @@ impl Registry {
         // Configuration and evidence have one atomic commit point. Recovery reconciles
         // a successful commit if writing the subsequent operation journal fails.
         self.bindings.change(id, |r| {
+            ensure!(!*cancelled.borrow(), Failure(Code::Cancelled));
             let saved = self.save(config)?;
             r.state = State::Succeeded;
             r.evidence = Some(evidence);
@@ -344,20 +217,3 @@ pub fn binding_failure_code(error: &anyhow::Error) -> Code {
         .downcast_ref::<Failure>()
         .map_or(Code::ConfigurationInvalid, |failure| failure.0)
 }
-
-fn execution_failure_code(agent: CodingAgent, error: &anyhow::Error) -> Code {
-    if agent == CodingAgent::Codex
-        && let Some(details) = rpc::private_details(error)
-        && ((details.contains("codex_login::auth") && details.contains("refresh_token_reused"))
-            || (details.contains("401") && details.contains("token_expired")))
-    {
-        // Map known provider failures to a public code, never public stderr.
-        // Unknown failures retain the failed validation state and private details.
-        return Code::AuthenticationRequired;
-    }
-    Code::VerificationFailed
-}
-
-#[cfg(test)]
-#[path = "binding_flow_tests.rs"]
-mod tests;

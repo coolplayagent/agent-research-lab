@@ -62,6 +62,14 @@ export const BindingStage = {
   Persist: "persist",
 } as const;
 export type BindingStage = (typeof BindingStage)[keyof typeof BindingStage];
+export const AdapterTestStage = {
+  Discover: "discover",
+  Runtime: "runtime",
+  Configuration: "configuration",
+  Execute: "execute",
+  Persist: "persist",
+} as const;
+export type AdapterTestStage = (typeof AdapterTestStage)[keyof typeof AdapterTestStage];
 export const BindingOperationState = {
   Running: "running",
   Succeeded: "succeeded",
@@ -70,6 +78,14 @@ export const BindingOperationState = {
   Interrupted: "interrupted",
 } as const;
 export type BindingOperationState = (typeof BindingOperationState)[keyof typeof BindingOperationState];
+export const AdapterTestOperationState = {
+  Running: "running",
+  Succeeded: "succeeded",
+  Failed: "failed",
+  Cancelled: "cancelled",
+  Interrupted: "interrupted",
+} as const;
+export type AdapterTestOperationState = (typeof AdapterTestOperationState)[keyof typeof AdapterTestOperationState];
 export const BindingStepState = {
   Pending: "pending",
   Running: "running",
@@ -78,6 +94,14 @@ export const BindingStepState = {
   Skipped: "skipped",
 } as const;
 export type BindingStepState = (typeof BindingStepState)[keyof typeof BindingStepState];
+export const AdapterTestStepState = {
+  Pending: "pending",
+  Running: "running",
+  Passed: "passed",
+  Failed: "failed",
+  Skipped: "skipped",
+} as const;
+export type AdapterTestStepState = (typeof AdapterTestStepState)[keyof typeof AdapterTestStepState];
 export const BindingErrorCode = {
   ProgramMissing: "program_missing",
   ProgramInvalid: "program_invalid",
@@ -98,6 +122,26 @@ export const BindingErrorCode = {
   Superseded: "superseded",
 } as const;
 export type BindingErrorCode = (typeof BindingErrorCode)[keyof typeof BindingErrorCode];
+export const AdapterTestErrorCode = {
+  ProgramMissing: "program_missing",
+  ProgramInvalid: "program_invalid",
+  LaunchFailed: "launch_failed",
+  ConfigurationInvalid: "configuration_invalid",
+  ServiceUnavailable: "service_unavailable",
+  IsolationUnavailable: "isolation_unavailable",
+  VerificationFailed: "verification_failed",
+  AuthenticationRequired: "authentication_required",
+  InvalidResponse: "invalid_response",
+  Timeout: "timeout",
+  Cancelled: "cancelled",
+  RevisionConflict: "revision_conflict",
+  PersistenceFailed: "persistence_failed",
+  Interrupted: "interrupted",
+  Busy: "busy",
+  ValidationRequired: "validation_required",
+  Superseded: "superseded",
+} as const;
+export type AdapterTestErrorCode = (typeof AdapterTestErrorCode)[keyof typeof AdapterTestErrorCode];
 export const KnowledgeErrorCode = {
   Failed: "knowledge_failed",
   ExternalServiceRemoved: "knowledge_external_service_removed",

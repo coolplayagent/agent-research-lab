@@ -22,6 +22,8 @@ pub struct Configuration {
     pub bindings: Bindings,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub binding_evidence: BTreeMap<String, crate::BindingEvidence>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub adapter_test_evidence: BTreeMap<String, crate::AdapterTestEvidence>,
     #[serde(default)]
     pub scenarios: Vec<ScenarioRegistration>,
     #[serde(default)]
@@ -96,6 +98,7 @@ impl Configuration {
             adapters,
             bindings: Bindings::new(),
             binding_evidence: BTreeMap::new(),
+            adapter_test_evidence: BTreeMap::new(),
             scenarios: vec![],
             outcome_services: vec![],
             outcome_bindings: BTreeMap::new(),
@@ -111,6 +114,24 @@ impl Configuration {
             .context("service reference has wrong kind or is missing")?;
         ensure!(service.enabled, "referenced service is disabled");
         Ok(service)
+    }
+    /// Scope test evidence to the adapter and its execution dependencies.
+    pub fn adapter_test_configuration(&self, id: &str) -> Result<String> {
+        let adapter = self
+            .adapters
+            .iter()
+            .find(|a| a.id == id)
+            .context("adapter is missing")?;
+        let executor = self.service(&adapter.executor_id, ServiceKind::Executor)?;
+        let sandbox = self.service(
+            executor
+                .sandbox_id
+                .as_deref()
+                .context("sandbox is missing")?,
+            ServiceKind::Sandbox,
+        )?;
+        // The API crate has no storage implementation dependency.
+        Ok(serde_json::to_string(&(adapter, executor, sandbox))?)
     }
     pub fn validate(&self) -> Result<()> {
         ensure!(
@@ -132,6 +153,10 @@ impl Configuration {
                 .count()
                 <= 1,
             "knowledge_local_service_limit"
+        );
+        ensure!(
+            self.adapter_test_evidence.len() <= 64,
+            "adapter test evidence exceeds bound"
         );
         let mut ids = std::collections::BTreeSet::new();
         for s in &self.services {

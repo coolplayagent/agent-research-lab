@@ -36,6 +36,7 @@ export interface Configuration {
   adapters: Adapter[];
   bindings: Record<string, string>;
   binding_evidence?: Record<string, { request_id: string; verified_unix_ms: number; adapter_digest: string }>;
+  adapter_test_evidence?: Record<string, { request_id: string; verified_unix_ms: number; adapter_digest: string }>;
   outcome_services?: OutcomeService[];
   knowledge_groups?: Record<string, { service_id: string; repository: string }>;
   knowledge_goals?: Record<string, { service_id: string; repository: string }>;

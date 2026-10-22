@@ -56,7 +56,21 @@ export const BindingStage = {
     Execute: "execute",
     Persist: "persist",
 };
+export const AdapterTestStage = {
+    Discover: "discover",
+    Runtime: "runtime",
+    Configuration: "configuration",
+    Execute: "execute",
+    Persist: "persist",
+};
 export const BindingOperationState = {
+    Running: "running",
+    Succeeded: "succeeded",
+    Failed: "failed",
+    Cancelled: "cancelled",
+    Interrupted: "interrupted",
+};
+export const AdapterTestOperationState = {
     Running: "running",
     Succeeded: "succeeded",
     Failed: "failed",
@@ -70,7 +84,33 @@ export const BindingStepState = {
     Failed: "failed",
     Skipped: "skipped",
 };
+export const AdapterTestStepState = {
+    Pending: "pending",
+    Running: "running",
+    Passed: "passed",
+    Failed: "failed",
+    Skipped: "skipped",
+};
 export const BindingErrorCode = {
+    ProgramMissing: "program_missing",
+    ProgramInvalid: "program_invalid",
+    LaunchFailed: "launch_failed",
+    ConfigurationInvalid: "configuration_invalid",
+    ServiceUnavailable: "service_unavailable",
+    IsolationUnavailable: "isolation_unavailable",
+    VerificationFailed: "verification_failed",
+    AuthenticationRequired: "authentication_required",
+    InvalidResponse: "invalid_response",
+    Timeout: "timeout",
+    Cancelled: "cancelled",
+    RevisionConflict: "revision_conflict",
+    PersistenceFailed: "persistence_failed",
+    Interrupted: "interrupted",
+    Busy: "busy",
+    ValidationRequired: "validation_required",
+    Superseded: "superseded",
+};
+export const AdapterTestErrorCode = {
     ProgramMissing: "program_missing",
     ProgramInvalid: "program_invalid",
     LaunchFailed: "launch_failed",

@@ -44,3 +44,47 @@ fn unknown_execution_errors_stay_failed_without_guessing_authentication() {
         Code::VerificationFailed
     );
 }
+
+#[test]
+fn saved_launcher_arguments_and_model_are_preserved_without_reinterpreting_other_commands() {
+    let mut adapter = Configuration::defaults(std::path::Path::new("/fixture"))
+        .adapters
+        .remove(0);
+    adapter.command = vec![
+        "/release/outcome-hub-agent".into(),
+        "--agent".into(),
+        "cc".into(),
+        "--program".into(),
+        "/runtime/node".into(),
+        "--launcher-argument".into(),
+        "--preserve-symlinks-main".into(),
+        "--launcher-argument".into(),
+        "/package/agent.js".into(),
+        "--model".into(),
+        "saved-model".into(),
+    ];
+    assert_eq!(
+        saved_launch(&adapter),
+        Some((
+            PathBuf::from("/runtime/node"),
+            vec![
+                "--preserve-symlinks-main".into(),
+                "/package/agent.js".into()
+            ]
+        ))
+    );
+    assert_eq!(
+        saved_option(&adapter, "--model").as_deref(),
+        Some("saved-model")
+    );
+    adapter
+        .command
+        .splice(7..7, ["--launcher-argument".into(), "--model".into()]);
+    assert_eq!(
+        saved_option(&adapter, "--model").as_deref(),
+        Some("saved-model")
+    );
+    adapter.command[0] = "/custom/program".into();
+    assert!(saved_launch(&adapter).is_none());
+    assert!(saved_option(&adapter, "--model").is_none());
+}

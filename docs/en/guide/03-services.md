@@ -4,7 +4,7 @@
 
 ## Bind an Agent
 
-System settings opens **Agent bindings**. Create a digital person, select Claude Code, Codex, DeepSeek Harness or Pi, then choose **Validate and bind**. The installed Agent must already be authenticated. The validation performs a model request and may consume provider quota; its progress and failure stage appear on this page. Only successful validation enables the adapter and saves binding evidence. Creating an identity or saving an adapter template does not invoke a model.
+System settings opens **Digital person management**. Create a digital person, select Claude Code, Codex, DeepSeek Harness or Pi, then choose **Validate and bind**. The installed Agent must already be authenticated. The validation performs a model request and may consume provider quota; its progress and failure stage appear on this page. Successful validation enables the adapter and saves binding evidence. Creating an identity or saving an adapter template does not invoke a model.
 
 Each digital person retains only its latest validation process and private diagnostic. Starting another validation removes the previous process log, including after restart; the active binding changes only after a successful validation. A bounded journal of request fingerprints prevents obsolete requests from repeating model calls. Use a new request ID for a deliberate retry. Failed execution output is bounded and redacted in the private `binding-<request-id>.diagnostic.json` file; HTTP responses contain stable codes and the diagnostic identifier, not stderr.
 
@@ -16,7 +16,7 @@ Install the Linux `//:local-package` or Windows `//:windows-package`. Keep `outc
 
 Existing `services.json`, external deployments and legacy `crystal` directories retain their storage choice without database migration. Storage recovery makes at most three attempts against the same data; missing data or failed recovery is an error. `serve --embedded-development` explicitly selects the embedded development store for a fresh workspace. Missing execution or knowledge binaries do not prevent core chat; missing storage on a new normal installation prevents startup and requires restoring the complete package.
 
-Create a digital person directly in Agent bindings; the new person is selected while your Agent, program and model choices are preserved. Knowledge repositories and group/goal defaults live under **Settings → Knowledge**. Topic-level service bindings have been retired.
+Create a digital person directly in Digital person management; the new person is selected while your Agent, program and model choices are preserved. Knowledge repositories and group/goal defaults live under **Settings → Knowledge**. Topic-level service bindings have been retired.
 
 ## Add an optional knowledge store
 
@@ -69,7 +69,7 @@ The collapsed **Advanced settings** section contains external service connection
 
 Existing service IDs and roles are fixed when editing; create a separate connection to use another role. Only enabled sandboxes are eligible executor dependencies. Configuration updates validate references and revisions atomically.
 
-Built-in Agent profiles start disabled. Saving one stores a template; **Validate and bind** generates its bridge command. Changing its executor or time limit requires revalidation. Custom adapters retain the advanced `json_stdio_v1` command-array editor and require a command before being enabled. A configured profile or healthy service alone is not model/task compatibility evidence.
+Built-in Agent profiles start disabled. Saving one stores a template; **Test and enable** generates its bridge command and saves it after an actual bounded task succeeds. Changing its executor or time limit requires revalidation. Custom adapters retain the advanced `json_stdio_v1` command-array editor and require a command before being enabled. A configured profile or healthy service alone is not model/task compatibility evidence.
 
 Service management is explicit: `local_managed` starts packaged workers at their private workspace endpoints; `external` connects to separately managed services. Existing configurations without this field remain external, including disabled entries and custom endpoints. Installing a new package never takes over them. To use an existing external setup, start its configured services before validation.
 
@@ -117,3 +117,9 @@ Lists use shards/cursors. `agents close` prevents new membership; `agents prune`
 ## Retired service configuration
 
 External scenario services, verifier services and topic-level service bindings are retired. If private `services.json` still contains nonempty `scenarios`, `outcome_bindings` or a verifier-kind `outcome_services` entry, startup fails without rewriting the file. Back up and remove those entries before restart; historical outcomes and goals remain intact. Built-in collaboration and design review scenarios remain available.
+
+## Test an execution adapter
+
+Under **Execution adapters**, choose **Test and enable** or **Retest**. No digital person is required. Optional program and model overrides use saved values when left blank; first-time tests discover the installed CLI and use its default model. Testing invokes a real bounded task and may consume model quota. Logs appear below the adapter cards, with discovery, environment, configuration, execution and persistence stages, cancellation and a diagnostic ID.
+
+A successful test saves and enables the adapter atomically. Failure, cancellation, timeout or a configuration revision conflict preserves the prior configuration. Tests do not create identities, groups, goals, bindings or binding evidence. Each adapter retains its latest test journal and bounded request fingerprints. Diagnostics are private `adapter-test-<request-id>.diagnostic.json` files. Adapter or execution-service changes invalidate the corresponding test evidence. **Digital person management** retains identity creation and validated binding; it reuses the saved program/model unless explicitly overridden.

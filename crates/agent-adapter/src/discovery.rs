@@ -156,6 +156,14 @@ pub fn discover(agent: CodingAgent, hint: Option<&Path>) -> Result<ResolvedAgent
     } else {
         (path, vec![])
     };
+    rediscover(agent, executable, arguments)
+}
+/// Recheck a previously resolved native or Node launcher without losing its arguments.
+pub fn rediscover(
+    agent: CodingAgent,
+    executable: PathBuf,
+    arguments: Vec<String>,
+) -> Result<ResolvedAgent> {
     let version = crate::process::version(&executable, &arguments)
         .context(DiscoveryFailure(contracts::BindingErrorCode::LaunchFailed))?;
     let digest = executable_digest(&executable, &arguments)?;

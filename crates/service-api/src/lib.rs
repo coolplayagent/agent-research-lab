@@ -1,4 +1,6 @@
 //! Versioned service and coding-agent contracts. Implementations live in independent processes.
+mod adapter_tests;
+pub use adapter_tests::*;
 mod bindings;
 mod configuration_error;
 pub use bindings::*;

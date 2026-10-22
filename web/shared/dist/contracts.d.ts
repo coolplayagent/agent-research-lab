@@ -61,6 +61,14 @@ export declare const BindingStage: {
     readonly Persist: "persist";
 };
 export type BindingStage = (typeof BindingStage)[keyof typeof BindingStage];
+export declare const AdapterTestStage: {
+    readonly Discover: "discover";
+    readonly Runtime: "runtime";
+    readonly Configuration: "configuration";
+    readonly Execute: "execute";
+    readonly Persist: "persist";
+};
+export type AdapterTestStage = (typeof AdapterTestStage)[keyof typeof AdapterTestStage];
 export declare const BindingOperationState: {
     readonly Running: "running";
     readonly Succeeded: "succeeded";
@@ -69,6 +77,14 @@ export declare const BindingOperationState: {
     readonly Interrupted: "interrupted";
 };
 export type BindingOperationState = (typeof BindingOperationState)[keyof typeof BindingOperationState];
+export declare const AdapterTestOperationState: {
+    readonly Running: "running";
+    readonly Succeeded: "succeeded";
+    readonly Failed: "failed";
+    readonly Cancelled: "cancelled";
+    readonly Interrupted: "interrupted";
+};
+export type AdapterTestOperationState = (typeof AdapterTestOperationState)[keyof typeof AdapterTestOperationState];
 export declare const BindingStepState: {
     readonly Pending: "pending";
     readonly Running: "running";
@@ -77,6 +93,14 @@ export declare const BindingStepState: {
     readonly Skipped: "skipped";
 };
 export type BindingStepState = (typeof BindingStepState)[keyof typeof BindingStepState];
+export declare const AdapterTestStepState: {
+    readonly Pending: "pending";
+    readonly Running: "running";
+    readonly Passed: "passed";
+    readonly Failed: "failed";
+    readonly Skipped: "skipped";
+};
+export type AdapterTestStepState = (typeof AdapterTestStepState)[keyof typeof AdapterTestStepState];
 export declare const BindingErrorCode: {
     readonly ProgramMissing: "program_missing";
     readonly ProgramInvalid: "program_invalid";
@@ -97,6 +121,26 @@ export declare const BindingErrorCode: {
     readonly Superseded: "superseded";
 };
 export type BindingErrorCode = (typeof BindingErrorCode)[keyof typeof BindingErrorCode];
+export declare const AdapterTestErrorCode: {
+    readonly ProgramMissing: "program_missing";
+    readonly ProgramInvalid: "program_invalid";
+    readonly LaunchFailed: "launch_failed";
+    readonly ConfigurationInvalid: "configuration_invalid";
+    readonly ServiceUnavailable: "service_unavailable";
+    readonly IsolationUnavailable: "isolation_unavailable";
+    readonly VerificationFailed: "verification_failed";
+    readonly AuthenticationRequired: "authentication_required";
+    readonly InvalidResponse: "invalid_response";
+    readonly Timeout: "timeout";
+    readonly Cancelled: "cancelled";
+    readonly RevisionConflict: "revision_conflict";
+    readonly PersistenceFailed: "persistence_failed";
+    readonly Interrupted: "interrupted";
+    readonly Busy: "busy";
+    readonly ValidationRequired: "validation_required";
+    readonly Superseded: "superseded";
+};
+export type AdapterTestErrorCode = (typeof AdapterTestErrorCode)[keyof typeof AdapterTestErrorCode];
 export declare const KnowledgeErrorCode: {
     readonly Failed: "knowledge_failed";
     readonly ExternalServiceRemoved: "knowledge_external_service_removed";

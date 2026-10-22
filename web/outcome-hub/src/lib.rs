@@ -16,6 +16,18 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/knowledge-form.js").as_slice(),
         )),
+        "/assets/adapter-settings.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../dist/adapter-settings.js").as_slice(),
+        )),
+        "/assets/adapter-progress.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../dist/adapter-progress.js").as_slice(),
+        )),
+        "/assets/adapter-test-types.js" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../dist/adapter-test-types.js").as_slice(),
+        )),
         "/assets/adapter-forms.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/adapter-forms.js").as_slice(),

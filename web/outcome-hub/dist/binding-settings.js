@@ -8,8 +8,6 @@ import { savedSettings, trackSettings } from "./settings-guard.js";
 import { bindingEndpoint, showProgress } from "./binding-progress.js";
 import { openPerson } from "./people.js";
 let generation = 0;
-let preferredAdapter = "";
-export function chooseBinding(id) { preferredAdapter = id; location.hash = "#settings/bindings"; }
 function adapterTitle(config, id) {
     const adapter = config.adapters.find(a => a.id === id);
     if (!adapter)
@@ -59,7 +57,7 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
     form.className = "settings-form binding-form";
     trackSettings(form);
     const person = select(people.filter((p) => p.id !== "operator").map((p) => [p.id, p.name]), people.find((p) => p.id !== "operator")?.id || "");
-    const adapter = select(config.adapters.map((a) => [a.id, adapterTitle(config, a.id)]), config.adapters.some(a => a.id === preferredAdapter) ? preferredAdapter : config.adapters[0]?.id || "");
+    const adapter = select(config.adapters.map((a) => [a.id, adapterTitle(config, a.id)]), config.adapters[0]?.id || "");
     const program = input(""), model = input("");
     program.placeholder = t("binding.programPlaceholder");
     model.placeholder = t("binding.modelPlaceholder");
