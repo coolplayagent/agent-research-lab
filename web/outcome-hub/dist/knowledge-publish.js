@@ -26,6 +26,6 @@ export async function publishKnowledge(config, view, reload) {
     }), content, el("p", t("outcome.writeNote")));
     const request_id = "write-" + uuid();
     finish(box, async () => { if (!preview)
-        throw new Error(t("knowledge.previewRequired")); await api("/api/v1/collaboration/outcomes/write", { request_id, outcome_id: view.outcome.input.id, expected_revision: preview.expected_revision, configuration_revision: config.revision, service_id: service.value, repository: target.value }, "manage-outcomes"); await reload(); });
+        throw new Error(t("knowledge.previewRequired")); await api("/api/v2/collaboration/outcomes/write", { request_id, outcome_id: view.outcome.input.id, expected_revision: preview.expected_revision, configuration_revision: config.revision, service_id: service.value, repository: target.value }, "manage-outcomes"); await reload(); });
     await load();
 }

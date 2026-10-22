@@ -16,8 +16,9 @@ fn fixture() -> (tempfile::TempDir, Target, PathBuf, KnowledgeWrite, Outcome) {
     let state = temp.path().join("service-state");
     fs::create_dir(&state).unwrap();
     let input = OutcomeInput {
+        node_id: None,
         id: "outcome".into(),
-        topic_id: "topic".into(),
+        group_id: "topic".into(),
         goal_id: "goal".into(),
         kind: contracts::OutcomeKind::Artifact,
         title: "Artifact".into(),

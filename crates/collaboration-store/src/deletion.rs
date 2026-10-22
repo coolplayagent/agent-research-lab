@@ -18,24 +18,11 @@ fn ids(db: &Connection, sql: &str, id: &str) -> Result<Vec<String>> {
         .query_map([id], |row| row.get(0))?
         .collect::<rusqlite::Result<_>>()?)
 }
-fn topic_references(db: &Connection, id: &str) -> Result<Vec<String>> {
-    ids(
-        db,
-        "SELECT goal_id FROM outcome_paths WHERE topic_id=?1 UNION SELECT id FROM outcomes WHERE topic_id=?1 LIMIT 100",
-        id,
-    )
-}
-fn remove_topic(db: &Connection, id: &str) -> Result<()> {
-    db.execute("DELETE FROM research_subjects WHERE topic_id=?1", [id])?;
-    db.execute("DELETE FROM research_topics WHERE id=?1", [id])?;
-    Ok(())
-}
 impl Store {
     pub(crate) fn delete(&mut self, target: &DeleteTarget) -> Result<DeletionResult> {
         let tx = self.connection.transaction()?;
         let (id, revision, table) = match target {
             DeleteTarget::Group { id, revision } => (id, revision, "groups"),
-            DeleteTarget::Topic { id, revision } => (id, revision, "research_topics"),
             DeleteTarget::Announcement {
                 group_id, revision, ..
             } => (group_id, revision, "groups"),
@@ -55,13 +42,6 @@ impl Store {
             return Ok(result(DeletionCode::RevisionConflict, vec![]));
         }
         match target {
-            DeleteTarget::Topic { .. } => {
-                let refs = topic_references(&tx, id)?;
-                if !refs.is_empty() {
-                    return Ok(result(DeletionCode::EvidenceReferences, refs));
-                }
-                remove_topic(&tx, id)?;
-            }
             DeleteTarget::Group { .. } => {
                 let kind: String =
                     tx.query_row("SELECT kind FROM groups WHERE id=?1", [id], |r| r.get(0))?;
@@ -78,17 +58,11 @@ impl Store {
                 }
                 let mut refs = ids(
                     &tx,
-                    "SELECT goal_id FROM outcome_paths WHERE goal_id IN (SELECT id FROM goals WHERE group_id=?1) UNION SELECT id FROM outcomes WHERE goal_id IN (SELECT id FROM goals WHERE group_id=?1) LIMIT 100",
+                    "SELECT id FROM outcomes WHERE group_id=?1 UNION SELECT id FROM outcome_tasks WHERE group_id=?1 LIMIT 100",
                     id,
                 )?;
                 let historical = tx.prepare("SELECT DISTINCT json_extract(event,'$.goal_id') FROM messages WHERE group_id=?1 AND json_extract(event,'$.kind') IN (?2,?3) LIMIT 100")?.query_map(params![id, contracts::GoalEventKind::Submitted.as_str(), contracts::GoalEventKind::Failed.as_str()], |row| row.get::<_, String>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
                 refs.extend(historical);
-                let topics = ids(&tx, "SELECT id FROM research_topics WHERE group_id=?1", id)?;
-                for topic in &topics {
-                    if !topic_references(&tx, topic)?.is_empty() {
-                        refs.push(topic.clone());
-                    }
-                }
                 for value in ids(&tx, "SELECT value FROM goals WHERE group_id=?1", id)? {
                     let goal: Goal = serde_json::from_str(&value)?;
                     if goal.work.iter().any(|work| work.result.is_some()) {
@@ -98,9 +72,6 @@ impl Store {
                 if !refs.is_empty() {
                     refs.truncate(100);
                     return Ok(result(DeletionCode::EvidenceReferences, refs));
-                }
-                for topic in &topics {
-                    remove_topic(&tx, topic)?;
                 }
                 tx.execute("DELETE FROM goal_assignees WHERE goal_id IN (SELECT id FROM goals WHERE group_id=?1)", [id])?;
                 tx.execute("DELETE FROM goals WHERE group_id=?1", [id])?;

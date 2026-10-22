@@ -27,8 +27,8 @@ pub struct Options {
     pub seconds: u64,
 }
 pub fn schema() -> Value {
-    json!({"type":"object","additionalProperties":false,"required":["protocol_version","request_id","summary","succeeded","evidence"],"properties":{
-        "protocol_version":{"type":"integer"},"request_id":{"type":"string"},"summary":{"type":"string"},"succeeded":{"type":"boolean"},"evidence":{"type":"object","additionalProperties":false,"properties":{},"required":[]}
+    json!({"type":"object","additionalProperties":false,"required":["protocol_version","request_id","summary","succeeded","evidence_json"],"properties":{
+        "protocol_version":{"type":"integer"},"request_id":{"type":"string"},"summary":{"type":"string"},"succeeded":{"type":"boolean"},"evidence_json":{"type":"string","description":"A JSON object encoded as a string. Preserve all requested evidence fields, including nested coordinator proposals and artifact references."}
     }})
 }
 pub fn execute(options: &Options, input: &AgentInput) -> Result<AgentOutput> {
@@ -48,7 +48,7 @@ pub fn execute(options: &Options, input: &AgentInput) -> Result<AgentOutput> {
     }
     let agent = CodingAgent::parse(&options.agent)?;
     let prompt = format!(
-        "Perform the following OutcomeHub task in the current disposable workspace. Return ONLY a JSON object matching this schema: {}. Copy protocol_version and request_id exactly from the request. Set succeeded only when this request's assigned work and acceptance criteria are satisfied. This reports your execution result; only the host can accept the overall goal. Request:\n{}",
+        "Perform the following OutcomeHub task in the current disposable workspace. Return ONLY a JSON object matching this schema: {}. Encode the complete requested evidence object as a JSON string in evidence_json; never discard its fields. Copy protocol_version and request_id exactly from the request. Set succeeded only when this request's assigned work and acceptance criteria are satisfied. This reports your execution result; only the host can accept the overall goal. Request:\n{}",
         schema(),
         serde_json::to_string(input)?
     );
@@ -59,8 +59,34 @@ pub fn execute(options: &Options, input: &AgentInput) -> Result<AgentOutput> {
         CodingAgent::DeepseekHarness => dsh::execute(options, &prompt, &input.request_id)?,
         CodingAgent::Custom => bail!("custom adapters use the JSON stdio protocol directly"),
     };
-    let output: AgentOutput =
+    decode(input, value)
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NativeOutput {
+    protocol_version: u32,
+    request_id: String,
+    summary: String,
+    succeeded: bool,
+    evidence_json: String,
+}
+fn decode(input: &AgentInput, value: Value) -> Result<AgentOutput> {
+    let native: NativeOutput =
         serde_json::from_value(value).context("invalid agent response schema")?;
+    ensure!(
+        native.evidence_json.len() <= 8192,
+        "agent evidence exceeds bound"
+    );
+    let evidence: Value =
+        serde_json::from_str(&native.evidence_json).context("invalid agent evidence")?;
+    ensure!(evidence.is_object(), "agent evidence must be an object");
+    let output = AgentOutput {
+        protocol_version: native.protocol_version,
+        request_id: native.request_id,
+        summary: native.summary,
+        succeeded: native.succeeded,
+        evidence,
+    };
     output.validate(input)?;
     Ok(output)
 }

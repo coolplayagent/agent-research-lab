@@ -15,6 +15,8 @@ pub struct Service {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Configuration {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coordinator: Option<CoordinatorConfiguration>,
     pub revision: u64,
     pub storage_id: Option<String>,
     pub services: Vec<Service>,
@@ -92,6 +94,7 @@ impl Configuration {
         })
         .collect();
         Self {
+            coordinator: None,
             revision: 0,
             storage_id: None,
             services,
@@ -192,6 +195,35 @@ impl Configuration {
                 self.service(&adapter.executor_id, ServiceKind::Executor)?;
             }
         }
+        if let Some(coordinator) = &self.coordinator {
+            collaboration_model::id(&coordinator.adapter_id)?;
+            ensure!(
+                self.adapters.iter().any(|a| a.id == coordinator.adapter_id),
+                "coordinator adapter missing"
+            );
+            ensure!(
+                coordinator.adapter_digest.len() == 64
+                    && coordinator
+                        .adapter_digest
+                        .bytes()
+                        .all(|b| b.is_ascii_hexdigit()),
+                "invalid coordinator digest"
+            );
+            ensure!(
+                coordinator
+                    .protocol_evidence
+                    .as_ref()
+                    .is_none_or(|s| s.len() <= 160),
+                "invalid coordinator evidence"
+            );
+            ensure!(
+                coordinator
+                    .model
+                    .as_ref()
+                    .is_none_or(|s| !s.trim().is_empty() && s.len() <= 128 && !s.contains('\0')),
+                "invalid coordinator model"
+            );
+        }
         for (person, adapter) in &self.bindings {
             collaboration_model::id(person)?;
             ensure!(person != "operator", "operator cannot bind an executor");
@@ -241,4 +273,13 @@ impl Configuration {
         }
         Ok(())
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CoordinatorConfiguration {
+    pub adapter_id: String,
+    pub model: Option<String>,
+    pub adapter_digest: String,
+    pub protocol_evidence: Option<String>,
 }

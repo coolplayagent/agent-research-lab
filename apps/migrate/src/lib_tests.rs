@@ -22,7 +22,7 @@ fn storage_source(root: &Path, version: u64) -> std::path::PathBuf {
 }
 #[tokio::test]
 async fn every_storage_version_preserves_messages_identity_and_cursors() {
-    for version in 1..=9 {
+    for version in 1..=10 {
         let temp = tempfile::tempdir().unwrap();
         let source = storage_source(temp.path(), version);
         let before = inventory(&source).unwrap();

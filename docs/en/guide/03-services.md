@@ -125,3 +125,8 @@ External scenario services, verifier services and topic-level service bindings a
 Under **Execution adapters**, choose **Test and enable** or **Retest**. No digital person is required. Optional program and model overrides use saved values when left blank; first-time tests discover the installed CLI and use its default model. Testing invokes a real bounded task and may consume model quota. Logs appear below the adapter cards, with discovery, environment, configuration, execution and persistence stages, cancellation and a diagnostic ID.
 
 A successful test saves and enables the adapter atomically. Failure, cancellation, timeout or a configuration revision conflict preserves the prior configuration. Tests do not create identities, groups, goals, bindings or binding evidence. Each adapter retains its latest test journal and bounded request fingerprints. Diagnostics are private `adapter-test-<request-id>.diagnostic.json` files. Adapter or execution-service changes invalidate the corresponding test evidence. **Digital person management** retains identity creation and validated binding; it reuses the saved program/model unless explicitly overridden.
+
+
+## Built-in coordinator
+
+Coordinator settings select an existing adapter and an optional model override. No extra service address is required. The selected configuration is pinned and does not silently switch when an adapter changes. Test the coordination protocol, then repair or reselect configuration if it becomes unavailable. Bundled local knowledge services upgrade to outcome protocol v2 together with this release.

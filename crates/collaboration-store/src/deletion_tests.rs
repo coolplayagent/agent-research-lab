@@ -1,5 +1,4 @@
 use super::*;
-use contracts::{SubjectKind, TopicState};
 async fn setup(kind: GroupKind) -> (tempfile::TempDir, Hub) {
     let root = tempfile::tempdir().unwrap();
     let hub = Hub::open(root.path()).unwrap();
@@ -22,32 +21,6 @@ fn group(revision: u64) -> DeleteTarget {
         id: "group".into(),
         revision,
     }
-}
-async fn topic(hub: &Hub) {
-    hub.research_change(ResearchChange::Topic {
-        topic: CollaborationTopic {
-            id: "topic".into(),
-            group_id: "group".into(),
-            title: "Topic".into(),
-            objective: "Explore".into(),
-            state: TopicState::Active,
-            revision: 0,
-        },
-    })
-    .await
-    .unwrap();
-    hub.research_change(ResearchChange::Subject {
-        subject: CollaborationSubject {
-            id: "subject".into(),
-            topic_id: "topic".into(),
-            name: "Subject".into(),
-            kind: SubjectKind::Tool,
-            reference: "external/tool".into(),
-            revision: 0,
-        },
-    })
-    .await
-    .unwrap();
 }
 #[tokio::test]
 async fn deletes_group_and_private_chat_durably_with_revision_guard() {
@@ -86,28 +59,6 @@ async fn deletes_group_and_private_chat_durably_with_revision_guard() {
         assert!(reopened.group("group").is_err());
         assert_eq!(reopened.metrics()["stored_messages"], 0);
     }
-}
-#[tokio::test]
-async fn unreferenced_topic_and_subject_are_removed() {
-    let (_root, hub) = setup(GroupKind::Conversation).await;
-    topic(&hub).await;
-    assert_eq!(
-        hub.delete(DeleteTarget::Topic {
-            id: "topic".into(),
-            revision: 1
-        })
-        .await
-        .unwrap()
-        .code,
-        DeletionCode::Deleted
-    );
-    assert!(
-        hub.topics("", "").await.unwrap()["topics"]
-            .as_array()
-            .unwrap()
-            .is_empty()
-    );
-    assert!(hub.group("group").is_ok());
 }
 #[tokio::test]
 async fn announcement_body_is_erased_without_breaking_reply_or_cursor() {

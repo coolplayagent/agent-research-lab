@@ -14,12 +14,37 @@ pub(crate) fn prepare(db: &Connection) -> Result<()> {
         CREATE TEMP TABLE retired_outcomes(id TEXT PRIMARY KEY);
         CREATE TEMP TABLE retired_messages(sequence INTEGER PRIMARY KEY);",
     )?;
-    if !exists(db, "evolution_goal_bindings")? {
+    if exists(db, "crystal_meta")?
+        && db.query_row(
+            "SELECT value FROM crystal_meta WHERE key='schema'",
+            [],
+            |r| r.get::<_, u64>(0),
+        )? >= 10
+    {
         return Ok(());
     }
-    db.execute_batch("INSERT INTO retired_goals SELECT goal_id FROM evolution_goal_bindings;
-        INSERT OR IGNORE INTO retired_goals SELECT id FROM goals WHERE scenario='software-evolution';
-        INSERT INTO retired_messages SELECT sequence FROM messages WHERE json_extract(event,'$.goal_id') IN (SELECT id FROM retired_goals);")?;
+    if exists(db, "evolution_goal_bindings")? {
+        db.execute_batch("INSERT INTO retired_goals SELECT goal_id FROM evolution_goal_bindings;")?;
+    }
+    if exists(db, "goals")? {
+        db.execute_batch("INSERT OR IGNORE INTO retired_goals SELECT id FROM goals WHERE scenario='software-evolution';")?;
+    }
+    if exists(db, "research_topics")? {
+        db.execute_batch("INSERT OR IGNORE INTO retired_goals SELECT id FROM goals WHERE group_id IN (SELECT group_id FROM research_topics);")?;
+    }
+    if exists(db, "outcome_paths")? {
+        db.execute_batch("INSERT OR IGNORE INTO retired_goals SELECT goal_id FROM outcome_paths;")?;
+    }
+    if exists(db, "outcomes")? {
+        db.execute_batch("INSERT OR IGNORE INTO retired_goals SELECT goal_id FROM outcomes;")?;
+    }
+    if db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM pragma_table_info('messages') WHERE name='event')",
+        [],
+        |r| r.get::<_, bool>(0),
+    )? {
+        db.execute_batch("INSERT INTO retired_messages SELECT sequence FROM messages WHERE json_extract(event,'$.goal_id') IN (SELECT id FROM retired_goals);")?;
+    }
     if exists(db, "outcomes")? {
         db.execute_batch("INSERT INTO retired_outcomes SELECT id FROM outcomes WHERE goal_id IN (SELECT id FROM retired_goals);")?;
         ensure!(!db.query_row("SELECT EXISTS(SELECT 1 FROM outcome_references WHERE parent_id IN (SELECT id FROM retired_outcomes) AND child_id NOT IN (SELECT id FROM retired_outcomes))", [], |r| r.get::<_, bool>(0))?, "retirement blocked: an independent outcome references iteration evidence");

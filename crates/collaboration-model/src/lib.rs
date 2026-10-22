@@ -18,3 +18,7 @@ pub fn digest(bytes: &[u8]) -> String {
 
 /// Shared scenario protocol for ordinary collaboration and optional adapters.
 pub const SCENARIO_PROTOCOL_VERSION: u32 = 1;
+
+mod task_model;
+pub use task_model::*;
+mod task_machine;

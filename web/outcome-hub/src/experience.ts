@@ -49,5 +49,4 @@ export function initExperience(): void {
     get("dismiss-notice").hidden = true;
   };
   searchKeys(get<HTMLInputElement>("people-search"), () => get("search-people").click());
-  searchKeys(get<HTMLInputElement>("topic-search"), () => get("topic-search-button").click());
 }

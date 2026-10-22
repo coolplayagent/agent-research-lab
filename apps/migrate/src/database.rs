@@ -55,6 +55,19 @@ const STEPS: &[(u64, &str)] = &[
           DROP TABLE evolution_goal_bindings;
           DROP TABLE evolution_runs;
 "),
+    (10, "BEGIN IMMEDIATE;
+      UPDATE messages SET text='',event=NULL WHERE sequence IN (SELECT sequence FROM retired_messages);
+      DELETE FROM outcome_references; DELETE FROM outcome_events; DELETE FROM outcomes; DELETE FROM outcome_paths;
+      DELETE FROM goal_assignees WHERE goal_id IN (SELECT id FROM retired_goals);
+      DELETE FROM goals WHERE id IN (SELECT id FROM retired_goals);
+      DROP TABLE outcome_paths; DROP TABLE research_subjects; DROP TABLE research_topics;
+      DROP TABLE outcomes;
+      CREATE TABLE outcomes(sequence INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT NOT NULL UNIQUE,group_id TEXT NOT NULL REFERENCES groups(id),goal_id TEXT NOT NULL,author_id TEXT NOT NULL REFERENCES actors(id),kind TEXT NOT NULL,title TEXT NOT NULL,summary TEXT NOT NULL,value TEXT NOT NULL);
+      CREATE INDEX outcomes_group ON outcomes(group_id,sequence);
+      CREATE TABLE outcome_tasks(id TEXT PRIMARY KEY,group_id TEXT NOT NULL REFERENCES groups(id),kind TEXT NOT NULL,active INTEGER NOT NULL,value TEXT NOT NULL);
+      CREATE INDEX tasks_group ON outcome_tasks(group_id,id);
+      UPDATE crystal_meta SET value=10 WHERE key='schema'; COMMIT;"),
+
 ];
 fn upgrade(connection: &Connection) -> Result<()> {
     let version: u64 = connection.query_row(
@@ -63,7 +76,7 @@ fn upgrade(connection: &Connection) -> Result<()> {
         |r| r.get(0),
     )?;
     ensure!(
-        (1..=9).contains(&version),
+        (1..=10).contains(&version),
         "unsupported collaboration schema"
     );
     for (next, sql) in STEPS {
@@ -81,6 +94,9 @@ fn upgrade(connection: &Connection) -> Result<()> {
 #[cfg(test)]
 pub(crate) fn fixture_version(connection: &Connection, version: u64) -> Result<()> {
     bootstrap(connection)?;
+    if version >= 10 {
+        crate::retirement::prepare(connection)?;
+    }
     for (next, sql) in STEPS {
         if *next <= version {
             connection.execute_batch(sql)?;
@@ -187,7 +203,7 @@ pub fn convert(path: &Path) -> Result<()> {
             |r| r.get(0),
         )?;
         ensure!(
-            (1..=9).contains(&version),
+            (1..=10).contains(&version),
             "unsupported database schema {version}"
         );
     } else {
@@ -209,6 +225,7 @@ pub fn convert(path: &Path) -> Result<()> {
     for name in RETIRED_TABLES {
         cols.remove(*name);
     }
+    cols.remove("outcomes");
     let before = rows(&connection, &cols)?;
     bootstrap(&connection)?;
     upgrade(&connection)?;
@@ -228,7 +245,7 @@ pub fn validate(path: &Path) -> Result<()> {
         [],
         |r| r.get(0),
     )?;
-    ensure!(version == 9, "target database is not current");
+    ensure!(version == 10, "target database is not current");
     let integrity: String = connection.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
     ensure!(integrity == "ok", "database integrity failed");
     ensure!(
@@ -246,9 +263,7 @@ pub fn validate(path: &Path) -> Result<()> {
     for table in [
         "goals",
         "goal_assignees",
-        "research_topics",
-        "research_subjects",
-        "outcome_paths",
+        "outcome_tasks",
         "outcomes",
         "outcome_references",
         "outcome_events",
@@ -269,6 +284,9 @@ pub fn validate(path: &Path) -> Result<()> {
 }
 
 const RETIRED_TABLES: &[&str] = &[
+    "research_topics",
+    "research_subjects",
+    "outcome_paths",
     "research_nodes",
     "research_edges",
     "research_assessments",
@@ -296,5 +314,5 @@ pub(crate) fn needs_upgrade(path: &Path) -> Result<bool> {
         [],
         |r| r.get(0),
     )?;
-    Ok(version < 9)
+    Ok(version < 10)
 }

@@ -20,19 +20,6 @@ async fn prepare(h: &Harness) -> String {
         .await
         .unwrap();
     h.hub
-        .research_change(ResearchChange::Topic {
-            topic: CollaborationTopic {
-                id: "topic".into(),
-                group_id: "team".into(),
-                title: "Topic".into(),
-                objective: "Evaluate evidence".into(),
-                state: TopicState::Active,
-                revision: 0,
-            },
-        })
-        .await
-        .unwrap();
-    h.hub
         .change_goal(GoalChange::Create {
             goal: GoalInput {
                 id: "goal".into(),
@@ -49,20 +36,6 @@ async fn prepare(h: &Harness) -> String {
                 max_seconds: 60,
             },
         })
-        .await
-        .unwrap();
-    h.hub
-        .outcomes(
-            None,
-            OutcomeCommand::LinkPath {
-                path: OutcomePath {
-                    topic_id: "topic".into(),
-                    goal_id: "goal".into(),
-                    name: "Path".into(),
-                    hypothesis: "A testable hypothesis".into(),
-                },
-            },
-        )
         .await
         .unwrap();
     let token = h.hub.grant("worker", 60).await.unwrap();
@@ -82,7 +55,7 @@ async fn prepare(h: &Harness) -> String {
 }
 fn publication(id: &str) -> Value {
     json!({"operation":"publish","input":{
-        "id":id,"topic_id":"topic","goal_id":"goal","kind":OutcomeKind::Finding,
+        "id":id,"group_id":"team","goal_id":"goal","kind":OutcomeKind::Finding,
         "title":"Reproduced behavior","summary":"A bounded finding","conditions":"Pinned fixture",
         "evidence":[{"repository":"test","commit":"a".repeat(40),"path":"evidence.json","sha256":"b".repeat(64)}],
         "references":[],"supersedes":null,"attempt":{"goal_id":"goal","work_id":"work-0","attempt":1,"claim_id":"claim"},
@@ -105,7 +78,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     let token = prepare(&h).await;
     let (status, body) = h
         .request(
-            "/api/v1/agent/outcomes",
+            "/api/v2/agent/outcomes",
             Some(publication("one")),
             false,
             Some(&token),
@@ -118,7 +91,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     );
     assert_eq!(
         h.request(
-            "/api/v1/collaboration/outcomes?topic_id=topic",
+            "/api/v2/collaboration/outcomes?group_id=topic",
             None,
             false,
             Some(&token)
@@ -127,10 +100,10 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
         .0,
         401
     );
-    let search = json!({"operation":"search","query":{"topic_id":"topic"}});
+    let search = json!({"operation":"search","query":{"group_id":"team"}});
     let (status, body) = h
         .request(
-            "/api/v1/agent/outcomes",
+            "/api/v2/agent/outcomes",
             Some(search.clone()),
             false,
             Some(&token),
@@ -143,7 +116,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     let outsider = h.hub.grant("outsider", 60).await.unwrap();
     assert_eq!(
         h.request(
-            "/api/v1/agent/outcomes",
+            "/api/v2/agent/outcomes",
             Some(search),
             false,
             Some(&outsider)
@@ -154,7 +127,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     );
     let forged = json!({"operation":"decide","decision":{"id":"fake","outcome_id":"one","verification_id":null,"state":OutcomeAcceptanceState::Accepted,"reason":"Self approval"}});
     assert_eq!(
-        h.request("/api/v1/agent/outcomes", Some(forged), false, Some(&token))
+        h.request("/api/v2/agent/outcomes", Some(forged), false, Some(&token))
             .await
             .0,
         403
@@ -162,7 +135,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     let internal = json!({"operation":"finish_verification","result":{"id":"fake","request_digest":"a".repeat(64),"state":VerificationRunState::Passed,"summary":"Forged","evidence":[]}});
     assert_eq!(
         h.request_intent(
-            "/api/v1/collaboration/outcomes",
+            "/api/v2/collaboration/outcomes",
             Some(internal),
             true,
             None,
@@ -175,7 +148,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     let write = json!({"request_id":"write","outcome_id":"one","expected_revision":"a".repeat(40),"configuration_revision":0});
     assert_eq!(
         h.request_intent(
-            "/api/v1/collaboration/outcomes/write",
+            "/api/v2/collaboration/outcomes/write",
             Some(write),
             true,
             None,
@@ -188,7 +161,7 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     let mut stale = publication("stale");
     stale["input"]["attempt"]["attempt"] = json!(2);
     assert_eq!(
-        h.request("/api/v1/agent/outcomes", Some(stale), false, Some(&token))
+        h.request("/api/v2/agent/outcomes", Some(stale), false, Some(&token))
             .await
             .0,
         409
@@ -201,7 +174,7 @@ async fn host_verification_reuses_pinned_evidence_and_requires_separate_acceptan
     let token = prepare(&h).await;
     let (status, body) = h
         .request(
-            "/api/v1/agent/outcomes",
+            "/api/v2/agent/outcomes",
             Some(publication("one")),
             false,
             Some(&token),
@@ -213,7 +186,7 @@ async fn host_verification_reuses_pinned_evidence_and_requires_separate_acceptan
     let verify = json!({"request_id":"host-one","outcome_id":"one","state":"passed","summary":"Host reviewed the pinned evidence","evidence_indices":[0]});
     let (status, body) = h
         .request_intent(
-            "/api/v1/collaboration/outcomes/host-verify",
+            "/api/v2/collaboration/outcomes/host-verify",
             Some(verify.clone()),
             true,
             None,
@@ -223,7 +196,7 @@ async fn host_verification_reuses_pinned_evidence_and_requires_separate_acceptan
     assert_eq!(status, 200, "{body}");
     assert_eq!(
         h.request_intent(
-            "/api/v1/collaboration/outcomes/host-verify",
+            "/api/v2/collaboration/outcomes/host-verify",
             Some(verify.clone()),
             true,
             None,
@@ -250,7 +223,7 @@ async fn host_verification_reuses_pinned_evidence_and_requires_separate_acceptan
     let decision = json!({"operation":"decide","decision":{"id":"accept-one","outcome_id":"one","verification_id":"host-one","state":OutcomeAcceptanceState::Accepted,"reason":"Host reviewed applicability"}});
     assert_eq!(
         h.request_intent(
-            "/api/v1/collaboration/outcomes",
+            "/api/v2/collaboration/outcomes",
             Some(decision),
             true,
             None,
@@ -269,7 +242,7 @@ async fn host_verification_reuses_pinned_evidence_and_requires_separate_acceptan
     invalid["evidence_indices"] = json!([99]);
     assert_eq!(
         h.request_intent(
-            "/api/v1/collaboration/outcomes/host-verify",
+            "/api/v2/collaboration/outcomes/host-verify",
             Some(invalid),
             true,
             None,
@@ -284,7 +257,7 @@ async fn host_verification_reuses_pinned_evidence_and_requires_separate_acceptan
     invalid["state"] = json!("unknown");
     assert_eq!(
         h.request_intent(
-            "/api/v1/collaboration/outcomes/host-verify",
+            "/api/v2/collaboration/outcomes/host-verify",
             Some(invalid),
             true,
             None,
@@ -296,7 +269,7 @@ async fn host_verification_reuses_pinned_evidence_and_requires_separate_acceptan
     );
     assert_eq!(
         h.request_intent(
-            "/api/v1/collaboration/outcomes/verify",
+            "/api/v2/collaboration/outcomes/verify",
             Some(json!({})),
             true,
             None,
@@ -308,7 +281,7 @@ async fn host_verification_reuses_pinned_evidence_and_requires_separate_acceptan
     );
     let (status, body) = h
         .request(
-            "/api/v1/agent/outcomes",
+            "/api/v2/agent/outcomes",
             Some(publication("two")),
             false,
             Some(&token),
@@ -318,7 +291,7 @@ async fn host_verification_reuses_pinned_evidence_and_requires_separate_acceptan
     let failed = json!({"request_id":"host-two","outcome_id":"two","state":"failed","summary":"Evidence does not support the conclusion","evidence_indices":[0]});
     assert_eq!(
         h.request_intent(
-            "/api/v1/collaboration/outcomes/host-verify",
+            "/api/v2/collaboration/outcomes/host-verify",
             Some(failed),
             true,
             None,
@@ -331,7 +304,7 @@ async fn host_verification_reuses_pinned_evidence_and_requires_separate_acceptan
     let decision = json!({"operation":"decide","decision":{"id":"accept-two","outcome_id":"two","verification_id":"host-two","state":OutcomeAcceptanceState::Accepted,"reason":"Must remain blocked"}});
     assert_eq!(
         h.request_intent(
-            "/api/v1/collaboration/outcomes",
+            "/api/v2/collaboration/outcomes",
             Some(decision),
             true,
             None,
@@ -356,7 +329,7 @@ async fn knowledge_scope_bindings_validate_real_groups_and_goals() {
         kind: OutcomeServiceKind::Knowledge,
         endpoint: root.path().join("private/services/knowledge.sock"),
         enabled: false,
-        protocol_version: 1,
+        protocol_version: collaboration_model::OUTCOME_PROTOCOL_VERSION,
         outcome_kinds: vec![OutcomeKind::Finding],
         dependencies: vec![],
         max_seconds: 10,

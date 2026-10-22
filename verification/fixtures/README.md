@@ -18,3 +18,5 @@ in an isolated worktree, deserialize the frozen inputs into those original types
 and serialize them using that commit's dependencies. Review changes to byte
 order, omitted/default fields and tags explicitly. Do not update expected bytes
 from the new code merely to make a compatibility test pass.
+
+Topic/subject commands and outcome v1 fixture records were retired with schema 10 and the outcome v2 API. The remaining v1 records continue checking unchanged wire bytes; task state and group-owned outcomes are covered by model, storage and HTTP regression tests.

@@ -158,6 +158,38 @@ fn publish_batch(store: &mut Store, shared: &Shared, batch: Vec<Command>) {
 }
 fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
     let result = match op {
+        Control::Task(command) => {
+            let read = matches!(
+                &*command,
+                TaskCommand::Get { .. } | TaskCommand::List { .. }
+            );
+            let result = store.task_command(*command)?;
+            if read {
+                return Ok(result);
+            }
+            let task = if result.get("task").is_some() {
+                &result["task"]
+            } else {
+                &result
+            };
+            if let Some(group) = task["input"]["group_id"].as_str() {
+                let after = shared
+                    .catalog
+                    .read()
+                    .unwrap()
+                    .groups
+                    .get(group)
+                    .map_or(0, |g| g.last_sequence);
+                let messages = store.history(group, after, 100)?;
+                *shared.catalog.write().unwrap() = store.catalog()?;
+                for message in messages {
+                    if let Some(feed) = shared.feeds.lock().unwrap().get(group) {
+                        let _ = feed.send(Arc::new(message));
+                    }
+                }
+            }
+            result
+        }
         Control::Outcome {
             actor,
             credential,
@@ -166,14 +198,6 @@ fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
             let read = command.is_read();
             let result = store.outcome_command(&actor, credential.as_deref(), *command)?;
             if read {
-                return Ok(result);
-            }
-            result
-        }
-        Control::Research(command) => {
-            let write = matches!(&command, crate::coordination::ResearchCommand::Change(_));
-            let result = store.research_command(command)?;
-            if !write {
                 return Ok(result);
             }
             result
@@ -280,8 +304,8 @@ fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
                 return Ok(json!(result));
             }
             *shared.catalog.write().unwrap() = store.catalog()?;
-            if let DeleteTarget::Group { id, .. }
-            | DeleteTarget::Announcement { group_id: id, .. } = &target
+            let (DeleteTarget::Group { id, .. } | DeleteTarget::Announcement { group_id: id, .. }) =
+                &target;
             {
                 // Drop buffered pre-deletion payloads. Subscribers reconnect and replay durable state.
                 shared.feeds.lock().unwrap().remove(id);

@@ -52,6 +52,35 @@ pub(super) fn migrate(path: &Path, config: &mut Configuration) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn upgrade_local_protocol(path: &Path, config: &mut Configuration) -> Result<()> {
+    if !config
+        .outcome_services
+        .iter()
+        .any(|s| s.management == ServiceManagement::LocalManaged && s.protocol_version == 1)
+    {
+        return Ok(());
+    }
+    let mut next = config.clone();
+    for service in &mut next.outcome_services {
+        if service.management == ServiceManagement::LocalManaged && service.protocol_version == 1 {
+            service.protocol_version = service_api::OUTCOME_PROTOCOL_VERSION;
+        }
+    }
+    next.revision = next
+        .revision
+        .checked_add(1)
+        .ok_or_else(|| anyhow::anyhow!("configuration revision exhausted"))?;
+    next.validate()?;
+    let digest = storage::digest(&serde_json::to_vec(config)?);
+    let backup = path.with_file_name(format!("outcome-v1-before-{}.json", &digest[..16]));
+    if !backup.exists() {
+        storage::write(&backup, config)?;
+    }
+    storage::write(path, &next)?;
+    *config = next;
+    Ok(())
+}
+
 #[cfg(test)]
 #[path = "knowledge_migration_tests.rs"]
 mod tests;

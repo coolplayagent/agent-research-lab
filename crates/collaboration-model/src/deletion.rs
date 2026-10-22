@@ -7,10 +7,6 @@ pub enum DeleteTarget {
         id: String,
         revision: u64,
     },
-    Topic {
-        id: String,
-        revision: u64,
-    },
     Announcement {
         group_id: String,
         sequence: u64,

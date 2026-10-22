@@ -263,7 +263,7 @@ export function initMessages() {
                 drafts.setDiscussion(pending, await prepareDiscussion(id, text));
             const goal = drafts.discussion(pending);
             const result = goal
-                ? await api("/api/v1/collaboration/discussion", { message: pending, goal })
+                ? await api("/api/v2/collaboration/questions", { message: pending, people: goal.people })
                 : await change({ operation: "send", message: pending });
             drafts.complete(pending);
             if (group?.id !== id)

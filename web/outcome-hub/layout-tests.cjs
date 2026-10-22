@@ -29,49 +29,6 @@ const base = "web/outcome-hub/src/", contracts = load("web/shared/src/contracts.
 const pending = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
 const textOf = node => [node.textContent, ...node.children.map(textOf)].join(" ");
 (async () => {
-  const a = { id: "a", title: "First topic", group_id: "group-a", state: contracts.TopicState.Active, revision: 1 };
-  const b = { ...a, id: "b", title: "Second topic", group_id: "group-b" };
-  const subject = owner => ({ subject: { id: owner + "-subject", topic_id: owner, name: owner + " subject", kind: contracts.SubjectKind.Repository, reference: "source:main", revision: 1 }, node_count: 0 });
-  let catalog = [a, b], heldTopics, heldSubjects, editDone;
-  const topics = load(base + "topics.ts", {
-    "./deletion.js": { deleteObject: async target => { catalog = catalog.filter(topic => topic.id !== target.id); return true; } },
-    "./outcome-board.js": { outcomeBoard: topic => {
-      const board = new Node("section", topic.id);
-      board.remove = () => { get("topic-detail").children = get("topic-detail").children.filter(node => node !== board); };
-      return board;
-    } },
-    "/assets/shared/contracts.js": contracts, "./dom.js": dom, "./i18n.js": i18n,
-    "./icons.js": { icon: () => new Node("svg") }, "./workspace.js": { revealResearch: () => {} }, "./conversation.js": { openGroup: async () => {} },
-    "./research-forms.js": { topicForm: async (_old, done) => { editDone = done; }, subjectForm: () => {} },
-    "./api.js": { query: params => new URLSearchParams(params).toString(), api: async url => {
-      if (url.startsWith("/api/v1/collaboration/topics")) return heldTopics ? heldTopics.promise : { topics: catalog.map(topic => ({ topic, goal_count: 0, subject_count: 1 })), next_after: null };
-      const id = new URL(url, "http://local").searchParams.get("topic_id");
-      return heldSubjects?.id === id ? heldSubjects.promise : { subjects: [subject(id)], next_after: null };
-    } },
-  }, { location: { hash: "" }, sessionStorage: { setItem() {} }, document: { addEventListener() {}, getElementById: id => get("topic-detail").children.find(node => node.id === id) } });
-  topics.initTopics(); await topics.loadTopics();
-  const oldCard = get("topic-list").children[0];
-  await oldCard.children.at(-1).children[0].onclick();
-  await oldCard.children.at(-1).children[1].onclick();
-  const renamed = { ...a, title: "Renamed topic", state: contracts.TopicState.Archived, revision: 2 };
-  catalog = [renamed, b]; await editDone(renamed);
-  assert.equal(get("topic-detail-title").textContent, "Renamed topic", "Use the saved topic identity, never search by its obsolete name");
-  assert(get("new-subject").disabled);
-  assert(get("subject-list").children[0].children.at(-1).children[0].disabled, "Archived topic edits match backend authority");
-  catalog = [a, b]; await topics.loadTopics();
-  heldSubjects = { id: "a", ...pending() };
-  const first = get("topic-list").children[0].children.at(-1).children[0].onclick();
-  await get("topic-list").children[1].children.at(-1).children[0].onclick();
-  heldSubjects.resolve({ subjects: [subject("a")], next_after: null }); await first;
-  assert.equal(get("topic-detail-title").textContent, "Second topic");
-  assert.equal(get("topic-detail").children.find(node => node.id === "topic-outcomes").textContent, "b", "The outcome board must follow the selected topic even when older subject reads finish later");
-  assert(textOf(get("subject-list")).includes("b subject"));
-  assert(!textOf(get("subject-list")).includes("a subject"), "An earlier topic response must not replace the current topic's subjects");
-  heldTopics = pending(); const oldSearch = topics.loadTopics(); const response = heldTopics; heldTopics = null; catalog = [b]; await topics.loadTopics();
-  response.resolve({ topics: [{ topic: a, subject_count: 1, goal_count: 0 }], next_after: null }); await oldSearch;
-  assert(textOf(get("topic-list")).includes("Second topic")); assert(!textOf(get("topic-list")).includes("First topic"));
-  get("close-topic").onclick(); assert(get("topic-detail").hidden);
-
   const person = { id: "researcher", name: "Researcher", application_id: "research", presence: contracts.Presence.Offline, connections: 0 };
   let writes = [], visible = [person]; const document = new EventTarget(); let refreshed = 0;
   document.addEventListener("workspace-people", () => refreshed++);

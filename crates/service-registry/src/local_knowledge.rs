@@ -172,7 +172,7 @@ impl Registry {
             kind: OutcomeServiceKind::Knowledge,
             enabled: true,
             management: ServiceManagement::LocalManaged,
-            protocol_version: 1,
+            protocol_version: service_api::OUTCOME_PROTOCOL_VERSION,
             outcome_kinds: OutcomeKind::ALL.to_vec(),
             dependencies: vec![],
             max_seconds: 120,

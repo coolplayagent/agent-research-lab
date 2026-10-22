@@ -20,7 +20,7 @@ fn retirement_erases_nonempty_feature_tables_and_preserves_unrelated_rows() {
     let preserved = columns(&db)
         .unwrap()
         .into_iter()
-        .filter(|(name, _)| !RETIRED_TABLES.contains(&name.as_str()))
+        .filter(|(name, _)| !RETIRED_TABLES.contains(&name.as_str()) && name != "outcomes")
         .collect();
     let before = rows(&db, &preserved).unwrap();
     drop(db);
@@ -46,7 +46,8 @@ fn retirement_removes_all_round_goals_and_results_but_keeps_chat_reply_identity(
     db.execute_batch(r#"INSERT INTO actors(id) VALUES('operator');
         INSERT INTO groups(id,title,topic,private,created_ms,last_sequence) VALUES('room','Room','Topic',0,1,3);
         INSERT INTO members VALUES('room','operator',3);
-        INSERT INTO goals VALUES('ordinary','room','collaboration',1,'unchanged ordinary result');
+        INSERT INTO groups(id,title,topic,private,created_ms) VALUES('independent','Independent','Independent',0,1);
+        INSERT INTO goals VALUES('ordinary','independent','collaboration',1,'unchanged ordinary result');
         INSERT INTO goals VALUES('round-one','room','design-review',0,'first round result');
         INSERT INTO goals VALUES('round-two','room','design-review',1,'current round result');
         INSERT INTO goals VALUES('software','room','software-evolution',1,'retired software result');
@@ -74,7 +75,7 @@ fn retirement_removes_all_round_goals_and_results_but_keeps_chat_reply_identity(
             .unwrap(),
         "unchanged ordinary result"
     );
-    for table in ["outcome_paths", "outcomes", "outcome_events"] {
+    for table in ["outcomes", "outcome_events"] {
         assert_eq!(
             db.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r
                 .get::<_, u64>(0))

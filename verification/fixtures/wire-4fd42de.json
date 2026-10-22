@@ -47,60 +47,6 @@
     },
     {
       "input": {
-        "input": {
-          "attempt": {
-            "attempt": 1,
-            "claim_id": "replace-with-current-claim",
-            "goal_id": "goal-example",
-            "work_id": "work-0"
-          },
-          "conditions": "Replace with applicability conditions and limitations",
-          "evidence": [
-            {
-              "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-              "path": "reports/evidence.json",
-              "repository": "source-repository",
-              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-            }
-          ],
-          "goal_id": "goal-example",
-          "id": "outcome-example",
-          "kind": "finding",
-          "knowledge": null,
-          "pins": {
-            "policy": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-            "prompt": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "source": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "superpod": null
-          },
-          "references": [],
-          "summary": "Replace with the conclusion supported by the evidence",
-          "supersedes": null,
-          "title": "A reproducible finding",
-          "topic_id": "topic-example"
-        },
-        "operation": "publish"
-      },
-      "kind": "outcome_command",
-      "wire": "{\"operation\":\"publish\",\"input\":{\"id\":\"outcome-example\",\"topic_id\":\"topic-example\",\"goal_id\":\"goal-example\",\"kind\":\"finding\",\"title\":\"A reproducible finding\",\"summary\":\"Replace with the conclusion supported by the evidence\",\"conditions\":\"Replace with applicability conditions and limitations\",\"evidence\":[{\"repository\":\"source-repository\",\"commit\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"path\":\"reports/evidence.json\",\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}],\"references\":[],\"supersedes\":null,\"attempt\":{\"goal_id\":\"goal-example\",\"work_id\":\"work-0\",\"attempt\":1,\"claim_id\":\"replace-with-current-claim\"},\"pins\":{\"source\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"prompt\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"policy\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"superpod\":null},\"knowledge\":null}}"
-    },
-    {
-      "input": {
-        "operation": "topic",
-        "topic": {
-          "group_id": "room",
-          "id": "topic",
-          "objective": "Compare",
-          "revision": 0,
-          "state": "active",
-          "title": "Topic"
-        }
-      },
-      "kind": "coordination",
-      "wire": "{\"operation\":\"topic\",\"topic\":{\"id\":\"topic\",\"group_id\":\"room\",\"title\":\"Topic\",\"objective\":\"Compare\",\"state\":\"active\",\"revision\":0}}"
-    },
-    {
-      "input": {
         "operation": "probe"
       },
       "kind": "storage_request",
@@ -159,67 +105,6 @@
       },
       "kind": "storage_request",
       "wire": "{\"operation\":\"changes\"}"
-    },
-    {
-      "input": {
-        "command": {
-          "input": {
-            "attempt": {
-              "attempt": 1,
-              "claim_id": "replace-with-current-claim",
-              "goal_id": "goal-example",
-              "work_id": "work-0"
-            },
-            "conditions": "Replace with applicability conditions and limitations",
-            "evidence": [
-              {
-                "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                "path": "reports/evidence.json",
-                "repository": "source-repository",
-                "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-              }
-            ],
-            "goal_id": "goal-example",
-            "id": "outcome-example",
-            "kind": "finding",
-            "knowledge": null,
-            "pins": {
-              "policy": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-              "prompt": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "source": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-              "superpod": null
-            },
-            "references": [],
-            "summary": "Replace with the conclusion supported by the evidence",
-            "supersedes": null,
-            "title": "A reproducible finding",
-            "topic_id": "topic-example"
-          },
-          "operation": "publish"
-        },
-        "operation": "outcomes",
-        "token": null
-      },
-      "kind": "storage_request",
-      "wire": "{\"operation\":\"outcomes\",\"token\":null,\"command\":{\"operation\":\"publish\",\"input\":{\"id\":\"outcome-example\",\"topic_id\":\"topic-example\",\"goal_id\":\"goal-example\",\"kind\":\"finding\",\"title\":\"A reproducible finding\",\"summary\":\"Replace with the conclusion supported by the evidence\",\"conditions\":\"Replace with applicability conditions and limitations\",\"evidence\":[{\"repository\":\"source-repository\",\"commit\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"path\":\"reports/evidence.json\",\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}],\"references\":[],\"supersedes\":null,\"attempt\":{\"goal_id\":\"goal-example\",\"work_id\":\"work-0\",\"attempt\":1,\"claim_id\":\"replace-with-current-claim\"},\"pins\":{\"source\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"prompt\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"policy\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"superpod\":null},\"knowledge\":null}}}"
-    },
-    {
-      "input": {
-        "change": {
-          "operation": "topic",
-          "topic": {
-            "group_id": "room",
-            "id": "topic",
-            "objective": "Compare",
-            "revision": 0,
-            "state": "active",
-            "title": "Topic"
-          }
-        },
-        "operation": "research_change"
-      },
-      "kind": "storage_request",
-      "wire": "{\"operation\":\"research_change\",\"change\":{\"operation\":\"topic\",\"topic\":{\"id\":\"topic\",\"group_id\":\"room\",\"title\":\"Topic\",\"objective\":\"Compare\",\"state\":\"active\",\"revision\":0}}}"
     },
     {
       "input": {

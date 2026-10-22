@@ -13,7 +13,7 @@ fn service(
         management,
         enabled: true,
         endpoint: state.join(format!("private/services/{id}.sock")),
-        protocol_version: 1,
+        protocol_version: service_api::OUTCOME_PROTOCOL_VERSION,
         outcome_kinds: contracts::OutcomeKind::ALL.to_vec(),
         dependencies: vec![],
         max_seconds: 120,
@@ -85,4 +85,43 @@ fn new_external_knowledge_connections_are_rejected_without_mutating_settings() {
     );
     assert_eq!(registry.configuration().revision, 0);
     assert!(registry.configuration().outcome_services.is_empty());
+}
+
+#[test]
+fn owned_protocol_upgrade_is_backed_up_and_idempotent() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = dir.path();
+    let mut config = Configuration::defaults(state);
+    config.outcome_services.push(service(
+        "local",
+        OutcomeServiceKind::Knowledge,
+        ServiceManagement::LocalManaged,
+        state,
+    ));
+    config.outcome_services[0].protocol_version = 1;
+    let original = serde_json::to_value(&config).unwrap();
+    let path = state.join("private/services.json");
+    storage::write(&path, &config).unwrap();
+    upgrade_local_protocol(&path, &mut config).unwrap();
+    assert_eq!(
+        config.outcome_services[0].protocol_version,
+        service_api::OUTCOME_PROTOCOL_VERSION
+    );
+    assert_eq!(config.revision, 1);
+    let backup = std::fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .map(|p| p.unwrap().path())
+        .find(|p| {
+            p.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("outcome-v1-before-")
+        })
+        .unwrap();
+    assert_eq!(
+        storage::read::<serde_json::Value>(&backup).unwrap(),
+        original
+    );
+    upgrade_local_protocol(&path, &mut config).unwrap();
+    assert_eq!(config.revision, 1);
 }

@@ -18,20 +18,16 @@ async fn setup() -> (tempfile::TempDir, Hub, String) {
     })
     .await
     .unwrap();
-    for topic in ["topic", "other"] {
-        hub.research_change(ResearchChange::Topic {
-            topic: CollaborationTopic {
-                id: topic.into(),
-                group_id: "team".into(),
-                title: topic.into(),
-                objective: "Explore hypotheses".into(),
-                state: TopicState::Active,
-                revision: 0,
-            },
-        })
-        .await
-        .unwrap();
-    }
+    hub.create_group(NewGroup {
+        id: "other".into(),
+        title: "Other".into(),
+        topic: "Other".into(),
+        kind: GroupKind::Conversation,
+        private: true,
+        members: vec!["operator".into(), "a".into()],
+    })
+    .await
+    .unwrap();
     for goal in ["left", "right"] {
         hub.change_goal(GoalChange::Create {
             goal: GoalInput {
@@ -49,19 +45,6 @@ async fn setup() -> (tempfile::TempDir, Hub, String) {
                 max_seconds: 600,
             },
         })
-        .await
-        .unwrap();
-        hub.outcomes(
-            None,
-            OutcomeCommand::LinkPath {
-                path: OutcomePath {
-                    topic_id: "topic".into(),
-                    goal_id: goal.into(),
-                    name: goal.into(),
-                    hypothesis: "A falsifiable hypothesis".into(),
-                },
-            },
-        )
         .await
         .unwrap();
     }
@@ -89,8 +72,9 @@ fn evidence() -> Vec<OutcomeEvidence> {
 }
 fn input(id: &str) -> OutcomeInput {
     OutcomeInput {
+        node_id: None,
         id: id.into(),
-        topic_id: "topic".into(),
+        group_id: "team".into(),
         goal_id: "left".into(),
         kind: OutcomeKind::Finding,
         title: "A reproducible finding".into(),
@@ -238,7 +222,7 @@ async fn direct_publication_requires_current_authority_and_never_completes_a_goa
         OutcomeCommand::Get { id: "one".into() },
         OutcomeCommand::Search {
             query: OutcomeQuery {
-                topic_id: "topic".into(),
+                group_id: "team".into(),
                 ..Default::default()
             },
         },
@@ -298,21 +282,8 @@ async fn references_cross_paths_but_not_topics_and_survive_member_exit_and_resta
     )
     .await
     .unwrap();
-    hub.outcomes(
-        None,
-        OutcomeCommand::LinkPath {
-            path: OutcomePath {
-                topic_id: "other".into(),
-                goal_id: "right".into(),
-                name: "Another topic".into(),
-                hypothesis: "Separate question".into(),
-            },
-        },
-    )
-    .await
-    .unwrap();
     other.id = "cross-topic".into();
-    other.topic_id = "other".into();
+    other.group_id = "other".into();
     assert!(
         hub.outcomes(
             Some(&token_b),
@@ -606,7 +577,7 @@ async fn discovery_is_bounded_and_snapshot_pagination_keeps_new_publications_out
         .unwrap();
     }
     let mut query = OutcomeQuery {
-        topic_id: "topic".into(),
+        group_id: "team".into(),
         query: "reproducible".into(),
         ..Default::default()
     };

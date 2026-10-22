@@ -260,7 +260,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   const settingLinks = ["services", "knowledge", "bindings"].map(name => Object.assign(el("a"), { dataset: { setting: name } }));
   const location = { hash: "#settings/knowledge" };
   const navigation = load(base + "navigation.ts", {
-    "./topics.js": { loadTopics() {} }, "./outcome-detail.js": { showOutcome() {} }, "./dom.js": dom, "./i18n.js": i18n,
+    "./tasks.js": { loadTasks() {}, loadCoordinator() {} }, "./outcome-detail.js": { showOutcome() {} }, "./dom.js": dom, "./i18n.js": i18n,
     "./binding-settings.js": { resetBindingProgress: () => progressResets++ },
     "./settings.js": { loadServices: () => servicesLoaded++ }, "./icons.js": { icon() {} }, "./people.js": { loadPeople() {} },
     "./applications.js": { loadApplications() {} }, "./settings-guard.js": { allowSettingsLeave: () => true, initSettingsGuard() {} },
@@ -284,8 +284,8 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
 
   for (const hash of ["#evolution", "#iterations", "#settings/status"]) {
     location.hash = hash; navigation.navigate();
-    assert.equal(location.hash, hash.startsWith("#settings/") ? "#settings/bindings" : "#groups");
-    assert.equal(get("page-title").textContent, hash.startsWith("#settings/") ? "workspace.bindings" : "navigation.f3f8bcf3f5");
+    assert.equal(location.hash, hash.startsWith("#settings/") ? "#settings/bindings" : "#tasks");
+    assert.equal(get("page-title").textContent, hash.startsWith("#settings/") ? "workspace.bindings" : "tasks.title");
   }
 
   let bindingRendered = false;

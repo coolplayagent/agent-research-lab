@@ -4,6 +4,22 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
         return Some(asset);
     }
     match path {
+        "/assets/question-runs.js" => Some((
+            "text/javascript",
+            include_bytes!("../dist/question-runs.js").as_slice(),
+        )),
+        "/assets/tasks.js" => Some((
+            "text/javascript",
+            include_bytes!("../dist/tasks.js").as_slice(),
+        )),
+        "/assets/task-render.js" => Some((
+            "text/javascript",
+            include_bytes!("../dist/task-render.js").as_slice(),
+        )),
+        "/assets/task-types.js" => Some((
+            "text/javascript",
+            include_bytes!("../dist/task-types.js").as_slice(),
+        )),
         "/assets/knowledge-bindings.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/knowledge-bindings.js").as_slice(),
@@ -49,17 +65,9 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/outcome-types.js").as_slice(),
         )),
-        "/assets/outcome-forms.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/outcome-forms.js").as_slice(),
-        )),
         "/assets/outcome-detail.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/outcome-detail.js").as_slice(),
-        )),
-        "/assets/outcome-board.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/outcome-board.js").as_slice(),
         )),
 
         "/assets/scenario-catalog.js" => Some((
@@ -231,21 +239,9 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/service-types.js").as_slice(),
         )),
-        "/assets/topics.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/topics.js").as_slice(),
-        )),
-        "/assets/research-types.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/research-types.js").as_slice(),
-        )),
         "/assets/forms.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/forms.js").as_slice(),
-        )),
-        "/assets/research-forms.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/research-forms.js").as_slice(),
         )),
         "/assets/knowledge-settings.js" => Some((
             "text/javascript; charset=utf-8",

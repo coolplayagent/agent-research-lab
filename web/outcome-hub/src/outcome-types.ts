@@ -1,16 +1,15 @@
 import type { OutcomeKind, OutcomeReferenceKind, OutcomePublicationState, OutcomeVerificationState, OutcomeAcceptanceState, VerificationRunState, KnowledgeWriteState, OutcomeServiceKind, OutcomeEventKind, ServiceManagement } from "/assets/shared/contracts.js";
-export interface OutcomePath { topic_id: string; goal_id: string; name: string; hypothesis: string }
 export interface OutcomeEvidence { repository: string; commit: string; path: string; sha256: string }
 export interface OutcomeReference { outcome_id: string; kind: OutcomeReferenceKind; reason: string }
 export interface OutcomeInput {
-  id: string; topic_id: string; goal_id: string; kind: OutcomeKind; title: string; summary: string; conditions: string;
+  id: string; group_id: string; goal_id: string; kind: OutcomeKind; title: string; summary: string; conditions: string;
   evidence: OutcomeEvidence[]; references: OutcomeReference[]; supersedes: string | null;
   attempt: { goal_id: string; work_id: string; attempt: number; claim_id: string } | null;
   pins: { source: string | null; prompt: string | null; policy: string | null; superpod: string | null };
   knowledge: { service_id: string; repository: string; revision: string } | null;
 }
 export interface OutcomeSummary {
-  id: string; topic_id: string; goal_id: string; kind: OutcomeKind; title: string; summary: string;
+  id: string; group_id: string; goal_id: string; kind: OutcomeKind; title: string; summary: string;
   author_id: string; created_ms: number; publication: OutcomePublicationState;
   verification: OutcomeVerificationState; acceptance: OutcomeAcceptanceState; reference_count: number;
 }

@@ -30,6 +30,7 @@ export interface Adapter {
   max_seconds: number;
 }
 export interface Configuration {
+  coordinator?: { adapter_id: string; model: string | null; adapter_digest: string; protocol_evidence: string | null } | null;
   revision: number;
   storage_id: string | null;
   services: Service[];

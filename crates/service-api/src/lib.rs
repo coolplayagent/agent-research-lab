@@ -238,3 +238,5 @@ pub type Bindings = BTreeMap<String, String>;
 #[cfg(test)]
 #[path = "lib_tests.rs"]
 mod tests;
+
+pub use collaboration_model::OUTCOME_PROTOCOL_VERSION;

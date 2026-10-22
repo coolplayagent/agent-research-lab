@@ -5,24 +5,16 @@ import { api, query } from "./api.js";
 import { t, label } from "./i18n.js";
 import { el, button, actions } from "./dom.js";
 import { dialog, area, check, select, field, finish } from "./forms.js";
-import { outcomeCommand, publicationForm } from "./outcome-forms.js";
-import type { OutcomeView, OutcomeHistory, OutcomePath } from "./outcome-types.js";
+const outcomeCommand = <T>(command: unknown): Promise<T> => api<T>("/api/v2/collaboration/outcomes", command, "manage-outcomes");
+import type { OutcomeView, OutcomeHistory } from "./outcome-types.js";
 import type { ServiceView } from "./service-types.js";
-export async function outcomePaths(topic_id: string): Promise<OutcomePath[]> {
-  const paths: OutcomePath[] = []; let after = "";
-  do {
-    const page = await outcomeCommand<{ paths: OutcomePath[]; next_after: string | null }>({ operation: "paths", topic_id, after });
-    paths.push(...page.paths); after = page.next_after || "";
-  } while (after && paths.length < 4096);
-  return paths;
-}
 export function outcomeLink(id: string, title = id): HTMLAnchorElement {
-  const link = el("a", title); link.href = "#topics/outcomes/" + encodeURIComponent(id);
+  const link = el("a", title); link.href = "#outcomes/" + encodeURIComponent(id);
   link.onclick = () => { if (location.hash === link.hash) void showOutcome(id).catch(error => { document.getElementById("notice")!.textContent = String(error); }); };
   return link;
 }
 export async function showOutcome(id: string): Promise<void> {
-  const view = await api<OutcomeView>("/api/v1/collaboration/outcomes?" + query({ id }));
+  const view = await api<OutcomeView>("/api/v2/collaboration/outcomes?" + query({ id }));
   document.getElementById("outcome-dialog")?.remove();
   const box = dialog(view.outcome.input.title), entry = view.outcome.input;
   box.dialog.id = "outcome-dialog"; box.dialog.classList.add("outcome-dialog");
@@ -39,9 +31,7 @@ export async function showOutcome(id: string): Promise<void> {
   if (view.latest_verification?.result) box.form.append(el("h3", t("outcome.verifierResult")), el("p", view.latest_verification.result.summary), el("pre", JSON.stringify(view.latest_verification.result.evidence, null, 2)));
   if (view.latest_decision) box.form.append(el("h3", t("outcome.decision")), el("p", view.latest_decision.reason));
   const reload = async () => { box.dialog.close(); await showOutcome(id); };
-  const controls = actions(button(t("outcome.refresh"), reload), button(t("outcome.copyLink"), async () => { await navigator.clipboard.writeText(location.href.split("#")[0] + "#topics/outcomes/" + encodeURIComponent(id)); box.status.textContent = t("outcome.linkCopied"); }));
-  controls.append(button(t("outcome.reuse"), async () => { const paths = await outcomePaths(entry.topic_id); box.dialog.close(); publicationForm({ id: entry.topic_id }, paths, async () => showOutcome(id), { outcome_id: id, kind: OutcomeReferenceKind.Uses, reason: "" }); }));
-  controls.append(button(t("outcome.newVersion"), async () => { const paths = await outcomePaths(entry.topic_id); box.dialog.close(); publicationForm({ id: entry.topic_id }, paths, async () => showOutcome(id), undefined, entry); }));
+  const controls = actions(button(t("outcome.refresh"), reload), button(t("outcome.copyLink"), async () => { await navigator.clipboard.writeText(location.href.split("#")[0] + "#outcomes/" + encodeURIComponent(id)); box.status.textContent = t("outcome.linkCopied"); }));
   if (view.publication === OutcomePublicationState.Published) {
     controls.append(button(t("outcome.hostVerify"), () => hostVerify(view, reload)));
     controls.append(button(t("outcome.withdraw"), () => reasonForm(t("outcome.withdraw"), async reason => { await outcomeCommand({ operation: "withdraw", id, reason }); await reload(); })));
@@ -77,7 +67,7 @@ function renderServices(panel: HTMLElement, view: OutcomeView, services: Service
     const state = write.result?.state || (write.deadline_ms > Date.now() ? KnowledgeWriteState.Pending : KnowledgeWriteState.Unknown);
     panel.append(el("p", label("KnowledgeWriteState", state)), el("p", write.result?.summary || ""));
     if (write.result?.reference) panel.append(el("pre", write.result.reference + "\n" + write.result.revision));
-    if ((state === KnowledgeWriteState.Pending || state === KnowledgeWriteState.Unknown)) panel.append(button(t("outcome.reconcile"), async () => { await api("/api/v1/collaboration/outcomes/reconcile", { outcome_id: entry.id, request_id: write.input.id }, "manage-outcomes"); await reload(); }));
+    if ((state === KnowledgeWriteState.Pending || state === KnowledgeWriteState.Unknown)) panel.append(button(t("outcome.reconcile"), async () => { await api("/api/v2/collaboration/outcomes/reconcile", { outcome_id: entry.id, request_id: write.input.id }, "manage-outcomes"); await reload(); }));
   }
   if (!(config.outcome_services || []).some(s => s.enabled && s.kind === OutcomeServiceKind.Knowledge)) { panel.append(el("p", t("outcome.unbound"))); return; }
   const publish = button(t("outcome.write"), () => publishKnowledge(config, view, reload));
@@ -98,7 +88,7 @@ function hostVerify(view: OutcomeView, reload: () => Promise<void>): void {
   finish(box, async () => {
     const evidence_indices = selections.filter(item => item.node.checked).map(item => item.index);
     if (!evidence_indices.length) throw new Error(t("outcome.evidenceRequired"));
-    await api("/api/v1/collaboration/outcomes/host-verify", { request_id, outcome_id: view.outcome.input.id, state: state.value, summary: summary.value.trim(), evidence_indices }, "manage-outcomes");
+    await api("/api/v2/collaboration/outcomes/host-verify", { request_id, outcome_id: view.outcome.input.id, state: state.value, summary: summary.value.trim(), evidence_indices }, "manage-outcomes");
     await reload();
   });
 }

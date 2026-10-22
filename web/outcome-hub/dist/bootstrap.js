@@ -1,6 +1,6 @@
 import { initWorkspace } from "./workspace.js";
 import { initCollaboration } from "./collaboration.js";
-import { initTopics } from "./topics.js";
+import { initTasks } from "./tasks.js";
 import { initServices } from "./settings.js";
 import { apply } from "./i18n.js";
 import { t } from "./i18n.js";
@@ -11,7 +11,6 @@ import { initGroups } from "./groups.js";
 import { initMembers } from "./members.js";
 import { initMessages } from "./messages.js";
 import { initPeople } from "./people.js";
-import { initGoals } from "./goal-form.js";
 import { initNavigation } from "./navigation.js";
 import { initExperience } from "./experience.js";
 import { loadScenarioCatalog } from "./scenario-catalog.js";
@@ -29,9 +28,8 @@ async function start() {
     initMembers();
     initMessages();
     initPeople();
-    initGoals();
     initServices();
-    initTopics();
+    initTasks();
     initWorkspace();
     initCollaboration();
     initExperience();
