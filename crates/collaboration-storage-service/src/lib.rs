@@ -78,6 +78,7 @@ async fn execute(hub: &Hub, request: Request) -> Result<Value> {
         }
         Request::Register { actors } => Ok(json!(hub.register(actors).await?)),
         Request::SavePerson { person } => Ok(json!(hub.save_person(person).await?)),
+        Request::ArchiveUnbound { retained } => Ok(json!(hub.archive_unbound(retained).await?)),
         Request::RegisterOperator {} => Ok(json!(hub.register_operator().await?)),
         Request::Convert {
             group,

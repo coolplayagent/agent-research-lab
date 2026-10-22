@@ -21,6 +21,8 @@ class Node extends EventTarget {
   getAttribute(key) { return this.attributes.get(key); }
   reset() {}
   querySelector() { return new Node("button"); }
+  scrollIntoView() {}
+  focus() { this.focused = true; }
 }
 const nodes = new Map(), get = id => { if (!nodes.has(id)) { const n = new Node("div"); n.connected = true; nodes.set(id, n); } return nodes.get(id); };
 const el = (tag, text) => new Node(tag, text), textOf = n => [n.textContent, ...n.children.map(textOf)].join(" ");
@@ -110,6 +112,14 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   held = null; await buttonIn(panel.children[1], "bindings.refreshPeople").onclick();
   initial.resolve({ people: [person("late")], next_after: null }); await tick();
   assert.equal(field(panel.children[1], "services.person").value, "a", "Older refreshes cannot overwrite the latest directory");
+
+  const configured = config(); configured.bindings = { b: "second" };
+  render(configured); await tick();
+  form = panel.children[1];
+  await buttonIn(panel, "binding.reverify").onclick();
+  assert.equal(field(form, "services.person").value, "b");
+  assert.equal(field(form, "services.agent").value, "second");
+  assert.equal(buttonIn(form, "binding.validate").focused, true);
 
   const noAdapters = config(); noAdapters.adapters = []; render(noAdapters); await tick();
   assert(buttonIn(panel.children[1], "binding.validate").disabled);

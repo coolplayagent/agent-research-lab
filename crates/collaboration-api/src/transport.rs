@@ -52,6 +52,10 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
             get(super::services::view).post(super::services::save),
         )
         .route(
+            "/api/v1/collaboration/people/cleanup",
+            post(super::services::cleanup_people),
+        )
+        .route(
             "/api/v1/collaboration/services/prepare",
             post(super::services::prepare),
         )

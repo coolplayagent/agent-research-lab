@@ -17,7 +17,7 @@ use anyhow::{Context, Result, anyhow, ensure};
 use metrics::Metrics;
 use serde_json::{Value, json};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     path::Path,
     sync::{
         Arc, Mutex, RwLock,
@@ -42,6 +42,7 @@ pub(crate) enum Control {
     ReadOnlyFault,
     Register(Vec<String>),
     Person(Person),
+    ArchiveUnbound(BTreeSet<String>),
     Convert {
         group: String,
         revision: u64,
@@ -227,6 +228,11 @@ impl Hub {
     pub async fn save_person(&self, person: Person) -> Result<()> {
         self.control(Control::Person(person)).await?;
         Ok(())
+    }
+    pub async fn archive_unbound(&self, retained: BTreeSet<String>) -> Result<usize> {
+        Ok(serde_json::from_value(
+            self.control(Control::ArchiveUnbound(retained)).await?,
+        )?)
     }
     pub async fn convert(&self, group: &str, revision: u64, title: String) -> Result<Group> {
         Ok(serde_json::from_value(

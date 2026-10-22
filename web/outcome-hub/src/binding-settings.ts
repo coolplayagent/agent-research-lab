@@ -23,6 +23,7 @@ export function renderBindings(config: Configuration, people: Person[], save: (n
   const render = ++generation, container = get("binding-list"); container.replaceChildren();
   if (!Object.keys(config.bindings).length) container.append(element("p", t("layout.noBindings")));
   const rowNames = new Map<string, { node: HTMLElement; adapter: string }>();
+  let focusBinding: (personId: string, adapterId: string) => Promise<void> = async () => {};
   for (const [person, adapter] of Object.entries(config.bindings)) {
     const row = element("div"); row.className = "binding-row";
     const unbind = element("button", t("services.unbind")); unbind.type = "button";
@@ -33,7 +34,9 @@ export function renderBindings(config: Configuration, people: Person[], save: (n
     };
     const name = element("span", `${people.find((p) => p.id === person)?.name || person} → ${adapterTitle(config, adapter)}`);
     rowNames.set(person, { node: name, adapter });
-    row.append(name, element("span", config.binding_evidence?.[person] ? t("binding.verified") : t("binding.unverified")), unbind); container.append(row);
+    row.append(name, element("span", config.binding_evidence?.[person] ? t("binding.verified") : t("binding.unverified")),
+      button(t("binding.reverify"), () => focusBinding(person, adapter)), unbind);
+    container.append(row);
   }
   const form = element("form"); form.className = "settings-form binding-form"; trackSettings(form);
   const person = select(people.filter((p) => p.id !== "operator").map((p) => [p.id, p.name]), people.find((p) => p.id !== "operator")?.id || "");
@@ -63,6 +66,14 @@ export function renderBindings(config: Configuration, people: Person[], save: (n
         hint.append(element("span", t("bindings.noAdapters")), link);
       }
     }
+  };
+  focusBinding = async (personId, adapterId) => {
+    await loadDirectory();
+    person.value = personId;
+    adapter.value = adapterId;
+    update();
+    form.scrollIntoView({ block: "center" });
+    submit.focus();
   };
   person.onchange = update; adapter.onchange = update; update();
   const loadDirectory = async () => {
@@ -97,7 +108,14 @@ export function renderBindings(config: Configuration, people: Person[], save: (n
     person.value = identity.id; person.dispatchEvent(new Event("change", { bubbles: true }));
     void loadDirectory();
   }));
-  form.append(element("p", t("bindings.directoryNote")), actions(create, button(t("bindings.refreshPeople"), loadDirectory)), directoryStatus, hint);
+  const cleanup = button(t("bindings.cleanupPeople"), async () => {
+    if (!confirm(t("bindings.confirmCleanup"))) return;
+    const result = await api<{ archived: number }>("/api/v1/collaboration/people/cleanup", { revision: config.revision }, "manage-services");
+    await loadDirectory();
+    directoryStatus.textContent = t("bindings.cleanupDone", { count: result.archived });
+    document.dispatchEvent(new Event("workspace-people"));
+  });
+  form.append(element("p", t("bindings.directoryNote")), actions(create, button(t("bindings.refreshPeople"), loadDirectory), cleanup), directoryStatus, hint);
   void loadDirectory();
   const poll = async () => {
     if (polling || render !== generation) return;

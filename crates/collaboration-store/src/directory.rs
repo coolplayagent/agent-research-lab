@@ -8,7 +8,7 @@ impl Store {
     pub fn save_person(&mut self, person: &Person) -> Result<()> {
         person.validate()?;
         let tx = self.connection.transaction()?;
-        tx.execute("INSERT INTO actors(id,name,application_id) VALUES(?1,?2,?3) ON CONFLICT(id) DO UPDATE SET name=excluded.name,application_id=excluded.application_id", params![person.id, person.name, person.application_id])?;
+        tx.execute("INSERT INTO actors(id,name,application_id) VALUES(?1,?2,?3) ON CONFLICT(id) DO UPDATE SET name=excluded.name,application_id=excluded.application_id,archived=0", params![person.id, person.name, person.application_id])?;
         ensure!(
             tx.query_row("SELECT COUNT(*) FROM actors", [], |r| r.get::<_, usize>(0))?
                 <= MAX_ACTORS,
@@ -16,6 +16,37 @@ impl Store {
         );
         tx.commit()?;
         Ok(())
+    }
+    pub fn archive_unbound(
+        &mut self,
+        retained: &std::collections::BTreeSet<String>,
+    ) -> Result<usize> {
+        ensure!(
+            retained.len() <= 20_000,
+            "retained actor list exceeds bound"
+        );
+        for id in retained {
+            collaboration_model::id(id)?;
+        }
+        let tx = self.connection.transaction()?;
+        let ids = {
+            let mut query =
+                tx.prepare("SELECT id FROM actors WHERE archived=0 AND id!='operator'")?;
+            query
+                .query_map([], |row| row.get::<_, String>(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        let mut count = 0;
+        for id in ids.into_iter().filter(|id| !retained.contains(id)) {
+            tx.execute(
+                "UPDATE actors SET archived=1,presence='offline' WHERE id=?1",
+                [&id],
+            )?;
+            tx.execute("DELETE FROM grants WHERE actor_id=?1", [&id])?;
+            count += 1;
+        }
+        tx.commit()?;
+        Ok(count)
     }
 }
 impl Hub {
@@ -30,7 +61,9 @@ impl Hub {
             .people
             .values()
             .filter(|p| {
-                p.id.as_str() > after
+                p.id != "operator"
+                    && !catalog.archived_people.contains(&p.id)
+                    && p.id.as_str() > after
                     && (p.name.to_lowercase().contains(&query)
                         || p.id.to_lowercase().contains(&query))
             })
@@ -38,7 +71,9 @@ impl Hub {
             .cloned()
             .collect();
         let next = (rows.len() > limit).then(|| rows[limit - 1].id.clone());
-        let total = catalog.people.len();
+        let total = catalog.people.len()
+            - catalog.archived_people.len()
+            - usize::from(catalog.people.contains_key("operator"));
         drop(catalog);
         let people = rows.into_iter().take(limit).map(|p| {
             let status = self.presence(&p.id)?;
@@ -87,3 +122,6 @@ impl Hub {
         self.set_presence("operator", Presence::Online).await
     }
 }
+#[cfg(test)]
+#[path = "directory_tests.rs"]
+mod tests;

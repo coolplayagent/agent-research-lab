@@ -23,6 +23,7 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
     if (!Object.keys(config.bindings).length)
         container.append(element("p", t("layout.noBindings")));
     const rowNames = new Map();
+    let focusBinding = async () => { };
     for (const [person, adapter] of Object.entries(config.bindings)) {
         const row = element("div");
         row.className = "binding-row";
@@ -42,7 +43,7 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
         };
         const name = element("span", `${people.find((p) => p.id === person)?.name || person} → ${adapterTitle(config, adapter)}`);
         rowNames.set(person, { node: name, adapter });
-        row.append(name, element("span", config.binding_evidence?.[person] ? t("binding.verified") : t("binding.unverified")), unbind);
+        row.append(name, element("span", config.binding_evidence?.[person] ? t("binding.verified") : t("binding.unverified")), button(t("binding.reverify"), () => focusBinding(person, adapter)), unbind);
         container.append(row);
     }
     const form = element("form");
@@ -86,6 +87,14 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
                 hint.append(element("span", t("bindings.noAdapters")), link);
             }
         }
+    };
+    focusBinding = async (personId, adapterId) => {
+        await loadDirectory();
+        person.value = personId;
+        adapter.value = adapterId;
+        update();
+        form.scrollIntoView({ block: "center" });
+        submit.focus();
     };
     person.onchange = update;
     adapter.onchange = update;
@@ -141,7 +150,15 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
         person.dispatchEvent(new Event("change", { bubbles: true }));
         void loadDirectory();
     }));
-    form.append(element("p", t("bindings.directoryNote")), actions(create, button(t("bindings.refreshPeople"), loadDirectory)), directoryStatus, hint);
+    const cleanup = button(t("bindings.cleanupPeople"), async () => {
+        if (!confirm(t("bindings.confirmCleanup")))
+            return;
+        const result = await api("/api/v1/collaboration/people/cleanup", { revision: config.revision }, "manage-services");
+        await loadDirectory();
+        directoryStatus.textContent = t("bindings.cleanupDone", { count: result.archived });
+        document.dispatchEvent(new Event("workspace-people"));
+    });
+    form.append(element("p", t("bindings.directoryNote")), actions(create, button(t("bindings.refreshPeople"), loadDirectory), cleanup), directoryStatus, hint);
     void loadDirectory();
     const poll = async () => {
         if (polling || render !== generation)

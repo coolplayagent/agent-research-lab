@@ -13,6 +13,7 @@ pub(crate) struct Catalog {
     pub members: BTreeMap<String, BTreeSet<String>>,
     pub actors: BTreeMap<String, Presence>,
     pub people: BTreeMap<String, Person>,
+    pub archived_people: BTreeSet<String>,
     pub grants: BTreeMap<String, (String, u64)>,
     pub messages: u64,
 }
@@ -62,17 +63,24 @@ impl Store {
         }
         ensure!(actors.len() <= MAX_ACTORS, "actor capacity exceeded");
         let mut people = BTreeMap::new();
+        let mut archived_people = BTreeSet::new();
         let mut query = self
             .connection
-            .prepare("SELECT id,name,application_id FROM actors ORDER BY id")?;
+            .prepare("SELECT id,name,application_id,archived FROM actors ORDER BY id")?;
         for row in query.query_map([], |r| {
-            Ok(Person {
-                id: r.get(0)?,
-                name: r.get(1)?,
-                application_id: r.get(2)?,
-            })
+            Ok((
+                Person {
+                    id: r.get(0)?,
+                    name: r.get(1)?,
+                    application_id: r.get(2)?,
+                },
+                r.get::<_, bool>(3)?,
+            ))
         })? {
-            let person = row?;
+            let (person, archived) = row?;
+            if archived {
+                archived_people.insert(person.id.clone());
+            }
             people.insert(person.id.clone(), person);
         }
         let mut members: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -138,6 +146,7 @@ impl Store {
         Ok(Catalog {
             actors,
             people,
+            archived_people,
             groups,
             members,
             grants,
