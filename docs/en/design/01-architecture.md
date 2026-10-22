@@ -19,7 +19,7 @@ use the `outcome-hub-` prefix, while Rust library names retain the existing modu
 | `collaboration-storage-service`, `collaboration-store` | Storage service and domain transactions; sole production database ownership |
 | `service-registry`, `collaboration-host` | Configuration persistence/probes and application/storage composition |
 | `executor-service`, `sandbox-service` | Replaceable execution and bounded sandbox; `service-workers` retains the combined launcher |
-| `codex-adapter`, `outcome-service` | Optional vendor bridge, outcome verification and external knowledge updates |
+| `codex-adapter`, `knowledge-service` | Optional vendor bridge and external knowledge updates |
 | `software-delivery`, `software-verification` | Research software delivery/activation and shared verification parameters; original gates retained |
 | `contracts` | Shared state enums and frontend contract generation |
 | `execution-config`, `execution-model` | Configuration declarations and frozen task/attempt records |

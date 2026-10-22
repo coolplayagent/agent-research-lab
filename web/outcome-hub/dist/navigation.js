@@ -21,7 +21,6 @@ const settings = {
     services: t("workspace.services"),
     knowledge: t("knowledge.title"),
     adapters: t("workspace.adapters"),
-    scenarios: t("scenarioSettings.title"),
     bindings: t("workspace.bindings"),
     storage: t("workspace.storage"),
     status: t("workspace.status"),
@@ -91,7 +90,7 @@ export function navigate() {
     if (page === "applications")
         void loadApplications();
     if (setting) {
-        if (["services", "adapters", "scenarios", "storage"].includes(setting))
+        if (["services", "adapters", "storage"].includes(setting))
             get("advanced-settings").open = true;
         for (const panel of document.querySelectorAll("[data-settings-panel]"))
             panel.hidden = panel.dataset.settingsPanel !== setting;

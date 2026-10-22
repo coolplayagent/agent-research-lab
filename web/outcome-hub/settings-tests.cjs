@@ -63,5 +63,8 @@ const config={revision:1,services:[{id:'executor',kind:contracts.ServiceKind.Exe
   const html=fs.readFileSync(path.join(root,'web/outcome-hub/index.html'),'utf8');
   assert(html.includes('id="advanced-settings"'));
   assert(!html.includes('id="advanced-settings" open'));
+  assert(!html.includes('data-settings-panel="scenarios"'));
+  assert(!html.includes('data-setting="scenarios"'));
+  assert(!fs.readFileSync(path.join(root,'web/outcome-hub/src/settings.ts'),'utf8').includes('renderOutcomeSettings'));
   console.log('Settings behavior verified');
 })().catch(e=>{console.error(e);process.exitCode=1;});

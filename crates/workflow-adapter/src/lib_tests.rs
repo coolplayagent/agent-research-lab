@@ -58,12 +58,15 @@ fn fake_transport_keeps_business_failure_and_rejects_invalid_json() {
     )
     .unwrap();
     fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+    // Let sandbox filesystems release the new script before the first exec.
+    std::thread::sleep(std::time::Duration::from_millis(20));
     let workflow = Workflow::new(&binary, temp.path().join("db"), temp.path());
     assert_eq!(
         status_name(&workflow.status("test").unwrap()).unwrap(),
         "failed"
     );
     fs::write(&binary, "#!/bin/sh\nprintf invalid-json\n").unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(20));
     assert!(workflow.status("test").is_err());
 }
 /// Explicit opt-in because this invokes an installed external CLI, never a simulated worker.

@@ -7,7 +7,7 @@ import { select, field, dialog, finish } from "./forms.js";
 import { knowledgeRequest } from "./knowledge-settings.js";
 export async function publishKnowledge(config, view, reload) {
     const goal = await api("/api/v1/collaboration/goals?id=" + encodeURIComponent(view.outcome.input.goal_id));
-    const preferred = config.knowledge_goals?.[goal.input.id] || config.knowledge_groups?.[goal.input.group_id] || config.outcome_bindings?.[view.outcome.input.topic_id]?.knowledge;
+    const preferred = config.knowledge_goals?.[goal.input.id] || config.knowledge_groups?.[goal.input.group_id];
     const box = dialog(t("outcome.write")), services = (config.outcome_services || []).filter(s => s.enabled && s.kind === OutcomeServiceKind.Knowledge), service = select(services.map(s => [s.id, s.id]), preferred?.service_id || services[0]?.id || ""), target = select([], ""), content = el("section");
     service.required = target.required = true;
     let preview;

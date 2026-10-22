@@ -38,17 +38,6 @@ pub(super) fn migrate(path: &Path, config: &mut Configuration) -> Result<()> {
         .retain(|_, b| !removed.contains(&b.service_id));
     next.knowledge_goals
         .retain(|_, b| !removed.contains(&b.service_id));
-    for binding in next.outcome_bindings.values_mut() {
-        if binding
-            .knowledge
-            .as_ref()
-            .is_some_and(|b| removed.contains(&b.service_id))
-        {
-            binding.knowledge = None;
-        }
-    }
-    next.outcome_bindings
-        .retain(|_, b| b.knowledge.is_some() || !b.verifiers.is_empty());
     next.revision = next
         .revision
         .checked_add(1)

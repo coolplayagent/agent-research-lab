@@ -16,10 +16,6 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/knowledge-form.js").as_slice(),
         )),
-        "/assets/outcome-service-settings.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/outcome-service-settings.js").as_slice(),
-        )),
         "/assets/adapter-forms.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/adapter-forms.js").as_slice(),
@@ -57,10 +53,6 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/outcome-board.js").as_slice(),
         )),
-        "/assets/outcome-settings.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/outcome-settings.js").as_slice(),
-        )),
 
         "/assets/scenario-catalog.js" => Some((
             "text/javascript; charset=utf-8",
@@ -85,10 +77,6 @@ pub fn get(path: &str) -> Option<(&'static str, &'static [u8])> {
         "/assets/iterations.js" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../dist/iterations.js").as_slice(),
-        )),
-        "/assets/scenario-settings.js" => Some((
-            "text/javascript; charset=utf-8",
-            include_bytes!("../dist/scenario-settings.js").as_slice(),
         )),
         "/" => Some((
             "text/html; charset=utf-8",

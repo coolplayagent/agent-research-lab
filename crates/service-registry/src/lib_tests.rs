@@ -105,37 +105,60 @@ fn configuration_is_revision_checked_and_dependencies_are_typed() {
     );
 }
 #[test]
-fn scenario_configuration_is_optional_versioned_and_dependency_checked() {
+fn retired_configuration_is_rejected_without_rewriting_private_state() {
     let root = tempfile::tempdir().unwrap();
     let mut config = Configuration::defaults(root.path());
-    let mut legacy = serde_json::to_value(&config).unwrap();
-    legacy.as_object_mut().unwrap().remove("scenarios");
-    assert!(
-        serde_json::from_value::<Configuration>(legacy)
-            .unwrap()
-            .scenarios
-            .is_empty()
-    );
-    for service in &mut config.services {
-        service.enabled = true;
-    }
     config.scenarios.push(ScenarioRegistration {
         id: "planning".into(),
         endpoint: root.path().join("private/planning.sock"),
-        enabled: true,
+        enabled: false,
         protocol_version: 1,
         capabilities: vec![contracts::ScenarioCapability::Execute],
-        dependencies: vec!["executor".into()],
+        dependencies: vec![],
     });
-    config.validate().unwrap();
-    config.scenarios[0].protocol_version = 2;
-    assert!(config.validate().is_err());
-    config.scenarios[0].protocol_version = 1;
-    config.scenarios[0].dependencies = vec!["missing".into()];
-    assert!(config.validate().is_err());
-    config.scenarios[0].dependencies = vec![];
-    config.scenarios.push(config.scenarios[0].clone());
-    assert!(config.validate().is_err());
+    assert!(
+        config
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("legacy scenario")
+    );
+    config.scenarios.clear();
+    config
+        .outcome_bindings
+        .insert("topic".into(), OutcomeServicesBinding::default());
+    assert!(
+        config
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("legacy topic")
+    );
+    config.outcome_bindings.clear();
+    config.outcome_services.push(OutcomeService {
+        id: "verifier".into(),
+        kind: contracts::OutcomeServiceKind::Verifier,
+        management: contracts::ServiceManagement::External,
+        endpoint: root.path().join("private/verifier.sock"),
+        enabled: false,
+        protocol_version: 1,
+        outcome_kinds: vec![contracts::OutcomeKind::Finding],
+        dependencies: vec![],
+        max_seconds: 10,
+    });
+    assert!(
+        config
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("legacy verifier")
+    );
+    let path = root.path().join("private/services.json");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let original = serde_json::to_vec(&config).unwrap();
+    std::fs::write(&path, &original).unwrap();
+    assert!(Registry::open(root.path()).is_err());
+    assert_eq!(std::fs::read(path).unwrap(), original);
 }
 
 #[test]

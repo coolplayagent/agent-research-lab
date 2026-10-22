@@ -109,9 +109,7 @@ The detail panel presents candidate assessment, independent evaluation and actua
 activation separately. Its host review dialog references the evaluator's recorded
 work evidence and current goal revision. Candidate authors cannot evaluate their
 own candidates. Scenarios declare whether manual review is allowed. Policy-managed
-software evolution and external scenario services reject manual candidate,
-evaluation, acceptance and activation operations at the HTTP boundary; their
-adapter owns those gated transitions. An accepted result does not imply deployment; no-candidate,
+software evolution rejects manual candidate, evaluation, acceptance and activation operations at the HTTP boundary; its adapter owns those gated transitions. An accepted result does not imply deployment; no-candidate,
 unassessed, failed and unknown results remain distinct. A completed iteration may
 also mean its configured round limit has been reached, so inspect its individual
 round outcomes. Public tool traces are shown only for scenarios advertising the

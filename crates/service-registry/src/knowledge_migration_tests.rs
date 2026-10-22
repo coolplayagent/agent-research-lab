@@ -1,6 +1,6 @@
 use super::*;
 use service_api::KnowledgeTarget;
-use service_api::{OutcomeService, OutcomeServicesBinding};
+use service_api::OutcomeService;
 fn service(
     id: &str,
     kind: OutcomeServiceKind,
@@ -37,12 +37,6 @@ fn migration_removes_only_external_knowledge_connections_and_their_current_bindi
             ServiceManagement::LocalManaged,
             &state,
         ),
-        service(
-            "verify",
-            OutcomeServiceKind::Verifier,
-            ServiceManagement::External,
-            &state,
-        ),
     ];
     let binding = |service: &str| KnowledgeTarget {
         service_id: service.into(),
@@ -54,26 +48,14 @@ fn migration_removes_only_external_knowledge_connections_and_their_current_bindi
     config
         .knowledge_goals
         .insert("goal".into(), binding("local"));
-    config.outcome_bindings.insert(
-        "topic".into(),
-        OutcomeServicesBinding {
-            verifiers: std::collections::BTreeMap::from([(
-                contracts::OutcomeKind::Artifact,
-                "verify".into(),
-            )]),
-            knowledge: Some(binding("external")),
-        },
-    );
     let path = state.join("private/services.json");
     storage::write(&path, &config).unwrap();
     let original = serde_json::to_value(&config).unwrap();
     migrate(&path, &mut config).unwrap();
     assert_eq!(config.revision, 1);
-    assert_eq!(config.outcome_services.len(), 2);
+    assert_eq!(config.outcome_services.len(), 1);
     assert!(config.knowledge_groups.is_empty());
     assert_eq!(config.knowledge_goals.len(), 1);
-    assert!(config.outcome_bindings["topic"].knowledge.is_none());
-    assert_eq!(config.outcome_bindings["topic"].verifiers.len(), 1);
     let summary: serde_json::Value =
         storage::read(&path.with_file_name("knowledge-external-migration.json")).unwrap();
     let backup: serde_json::Value =

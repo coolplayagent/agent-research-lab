@@ -238,40 +238,13 @@ impl Registry {
             health.push(result?);
         }
         health.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
-        for scenario in config.scenarios.clone() {
-            probes.spawn(async move {
-                let (status, info, error) = if !scenario.enabled {
-                    (ServiceHealth::Disabled, None, None)
-                } else {
-                    match probe_scenario(&scenario).await {
-                        Ok(info) => (ServiceHealth::Healthy, Some(info), None),
-                        Err(error) => {
-                            let message = error.to_string();
-                            let status =
-                                if message.contains("mismatch") || message.contains("version") {
-                                    ServiceHealth::ProtocolMismatch
-                                } else {
-                                    ServiceHealth::Unavailable
-                                };
-                            (status, None, Some(message))
-                        }
-                    }
-                };
-                serde_json::json!({"id":scenario.id,"status":status,"info":info,"error":error})
-            });
-        }
-        let mut scenario_health = Vec::new();
-        while let Some(result) = probes.join_next().await {
-            scenario_health.push(result?);
-        }
-        scenario_health.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
         let mut outcome_health = Vec::new();
         while let Some(result) = outcome_probes.join_next().await {
             outcome_health.push(result?);
         }
         outcome_health.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
         Ok(
-            serde_json::json!({"configuration":config,"health":health,"scenario_health":scenario_health,"outcome_health":outcome_health,"restart_required":pending!=self.active_storage,"active_storage":self.active_storage,"protocol_version":rpc::VERSION}),
+            serde_json::json!({"configuration":config,"health":health,"outcome_health":outcome_health,"restart_required":pending!=self.active_storage,"active_storage":self.active_storage,"protocol_version":rpc::VERSION}),
         )
     }
 }

@@ -12,7 +12,7 @@ Execution services forward configured proxy variables by name. Codex native tool
 
 Use the Linux `//:local-package` or the Windows package for local execution. Keep `outcome-hub`, `outcome-hub-services` and `outcome-hub-agent` together (with `.exe` on Windows). A fresh workspace uses a separate embedded development store and starts its managed executor and sandbox on demand. **Execution status → Prepare local runtime** checks the local services without invoking a model. Enabled adapters restore their local services on the next host start. Host shutdown cleans up the processes it owns. Core chat can still start without these optional executables; Agent validation then reports the missing runtime.
 
-Create a digital person directly in Agent bindings; the new person is selected while your Agent, program and model choices are preserved. Knowledge service connections, repositories and group/goal/topic knowledge bindings live under **Settings → Knowledge**. Topic knowledge and verifier edits preserve each other.
+Create a digital person directly in Agent bindings; the new person is selected while your Agent, program and model choices are preserved. Knowledge repositories and group/goal defaults live under **Settings → Knowledge**. Topic-level service bindings have been retired.
 
 ## Add an optional knowledge store
 
@@ -54,7 +54,7 @@ path/size/limit parameters, rendered by frontend locale resources.
 
 ## Advanced deployment
 
-The collapsed **Advanced settings** section contains service connections, execution adapters, scenario services and storage. Existing deep links still open their page. Leaving unsaved forms prompts a warning.
+The collapsed **Advanced settings** section contains service connections, execution adapters and storage. Existing deep links still open their page. Leaving unsaved forms prompts a warning.
 
 | Component | Responsibility |
 | --- | --- |
@@ -110,14 +110,6 @@ outcome-hub-cli --config local.toml agents simulate --agent-count 10000
 
 Lists use shards/cursors. `agents close` prevents new membership; `agents prune` requires closure and expiry, with required evidence archived first. Tombstones remain; neither operation restores quotas or publishes knowledge. Simulations test logical routing/resource bounds, not 10,000 model processes or research-quality gains. Actual execution remains limited to eight workers.
 
-## Scenario services
+## Retired service configuration
 
-System settings include a **Scenario services** page. Optional `configuration.scenarios`
-entries specify stable ID, private Unix endpoint, enabled state, protocol version,
-declared capabilities and dependencies on configured services. Existing agent
-bindings select execution adapters independently. The versioned scenario protocol
-supports probe, goal validation and revision/attempt-bound reconciliation. A
-reconciliation request retains the same identity for retries; external effects
-must reconcile uncertain responses before being repeated. Configuration, protocol
-health and actual task results are shown separately. Credentials stay in service
-environments and are not returned in configuration responses.
+External scenario services, verifier services and topic-level service bindings are retired. If private `services.json` still contains nonempty `scenarios`, `outcome_bindings` or a verifier-kind `outcome_services` entry, startup fails without rewriting the file. Back up and remove those entries before restart; historical outcomes and goals remain intact. Built-in collaboration and design review scenarios remain available.

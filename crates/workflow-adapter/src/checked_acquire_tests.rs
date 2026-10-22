@@ -29,6 +29,8 @@ impl Fixture {
         // it does not represent a production transaction or execution result.
         fs::write(&binary, "#!/bin/sh\nset -eu\nprintf '%s\\n' invoked >> invocations\nprintf '%s\\n' \"$@\" > argv\ncat \"$4\" > received.json\ncat reply\ncat diagnostics >&2\nexit \"$(cat exit-code)\"\n").unwrap();
         fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+        // Some sandbox filesystems briefly report ETXTBSY after closing a new script.
+        std::thread::sleep(std::time::Duration::from_millis(20));
         let workflow = Workflow::new(binary, root.path().join("private.db"), root.path());
         Self { root, workflow }
     }

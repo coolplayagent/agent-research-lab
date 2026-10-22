@@ -2,7 +2,7 @@
 
 ## 正式入口
 
-仅分发 `outcome-hub`、`outcome-hub-cli`、`outcome-hub-storage`、`outcome-hub-services`、`outcome-hub-codex-adapter`、`outcome-hub-outcomes` 和 `outcome-hub-knowledge`。旧 `ai-im*`、`agent-research-lab` 可执行入口与旧 Bazel 标签已删除。
+仅分发 `outcome-hub`、`outcome-hub-cli`、`outcome-hub-storage`、`outcome-hub-services`、`outcome-hub-codex-adapter` 和 `outcome-hub-knowledge`。旧 `ai-im*`、`agent-research-lab` 可执行入口与旧 Bazel 标签已删除。
 
 HTTP 使用 `/api/v1/collaboration/*`、`/api/v1/messaging/*`、`/api/v1/agent/outcomes`；协调操作使用 `/api/v1/collaboration/coordination`，控制台使用 `/apps/console/`。旧 `/api/im/*`、`/api/crystal/*`、`/apps/research/` 不再提供服务。管理与 Agent 的权限边界保持独立。
 

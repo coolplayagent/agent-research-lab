@@ -27,4 +27,3 @@ export interface OutcomeView {
 export interface OutcomePage { outcomes: OutcomeSummary[]; snapshot: number; next_after: number | null }
 export interface OutcomeHistory { events: { sequence: number; kind: OutcomeEventKind; record: unknown; created_ms: number }[]; next_after: number | null }
 export interface OutcomeService { management?: ServiceManagement; id: string; kind: OutcomeServiceKind; endpoint: string; enabled: boolean; protocol_version: number; outcome_kinds: OutcomeKind[]; dependencies: string[]; max_seconds: number }
-export interface OutcomeBinding { verifiers: Partial<Record<OutcomeKind, string>>; knowledge: { service_id: string; repository: string } | null }

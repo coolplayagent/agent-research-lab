@@ -33,7 +33,6 @@ test_suite(
         "//crates/service-registry:tests",
         "//crates/sandbox-service:tests",
         "//crates/executor-service:tests",
-        "//crates/outcome-service:tests",
         "//crates/codex-adapter:tests",
         "//crates/collaboration-host:tests",
         "//crates/collaboration-client:tests",
@@ -84,7 +83,6 @@ pkg_tar(
         "//crates/collaboration-storage-service:outcome-hub-storage",
         "//crates/collaboration-storage-service:units",
         "//crates/codex-adapter:outcome-hub-codex-adapter",
-        "//crates/outcome-service:outcome-hub-outcomes",
         "//crates/service-workers:units",
         "//deploy/systemd:outcome-hub-cli.service",
     ] + glob(["docs/**", "examples/**", "prompts/**", "assets/**", "*.md"]),
@@ -110,7 +108,6 @@ filegroup(name = "policy_sources", srcs = [
     "//crates/collaboration-client:policy_sources",
     "//crates/collaboration-host:policy_sources",
     "//crates/codex-adapter:policy_sources",
-    "//crates/outcome-service:policy_sources",
     "//crates/sandbox-service:policy_sources",
     "//crates/executor-service:policy_sources",
     "//apps/console:policy_sources",
@@ -160,7 +157,7 @@ genrule(name = "source_inventory", srcs = [":policy_sources"], outs = ["source_i
 # Optional execution and knowledge services are installed separately from core collaboration.
 pkg_tar(
     name = "adapter-package",
-    srcs = ["//crates/knowledge-service:outcome-hub-knowledge", "//crates/service-workers:outcome-hub-services", "//crates/agent-adapter:outcome-hub-agent", "//crates/codex-adapter:outcome-hub-codex-adapter", "//crates/outcome-service:outcome-hub-outcomes", "//crates/service-workers:units", ],
+    srcs = ["//crates/knowledge-service:outcome-hub-knowledge", "//crates/service-workers:outcome-hub-services", "//crates/agent-adapter:outcome-hub-agent", "//crates/codex-adapter:outcome-hub-codex-adapter", "//crates/service-workers:units"],
     package_dir = "outcome-hub-adapters", extension = "tar.gz", mode = "0755",
     visibility = ["//visibility:public"],
 )

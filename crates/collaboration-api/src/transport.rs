@@ -119,8 +119,8 @@ pub fn router(web: Web, application: Router<Web>) -> Router {
             get(crate::outcomes::list).post(crate::outcomes::manage),
         )
         .route(
-            "/api/v1/collaboration/outcomes/verify",
-            post(crate::outcomes::verify),
+            "/api/v1/collaboration/outcomes/host-verify",
+            post(crate::outcomes::host_verify),
         )
         .route(
             "/api/v1/collaboration/outcomes/write",

@@ -41,7 +41,7 @@ const feedback = { busy: node => { if (node.pending) return null; node.pending =
 const contracts = load("web/shared/src/contracts.ts"), { OutcomeKind, OutcomeServiceKind, Presence } = contracts;
 const tick = () => new Promise(setImmediate), pending = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
 const person = (id, name = id) => ({ id, name, application_id: null, presence: Presence.Offline, connections: 0 });
-const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, { id: "second" }], bindings: {}, outcome_services: [], outcome_bindings: {} });
+const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, { id: "second" }], bindings: {}, outcome_services: [] });
 (async () => {
   let bindingWrites = [];
   let catalog = [person("operator")], failRead = false, failCreate = false, held, saved, changes = [];
@@ -118,30 +118,11 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
 
   const kind = Object.values(OutcomeKind)[0], cfg = config();
   cfg.outcome_services = [
-    { id: "verify", kind: OutcomeServiceKind.Verifier, enabled: true, endpoint: "unix:///verify", max_seconds: 120, dependencies: [], outcome_kinds: [kind] },
     { id: "knowledge", kind: OutcomeServiceKind.Knowledge, management: contracts.ServiceManagement.LocalManaged, enabled: true, endpoint: "unix:///knowledge", max_seconds: 120, dependencies: [], outcome_kinds: [kind] },
     { id: "disabled-knowledge", kind: OutcomeServiceKind.Knowledge, enabled: false, endpoint: "unix:///disabled", max_seconds: 120, dependencies: [], outcome_kinds: [kind] },
   ];
-  cfg.outcome_bindings.topic = { verifiers: { [kind]: "verify" }, knowledge: { service_id: "knowledge", repository: "repo" } };
+  cfg.knowledge_groups = { group: { service_id: "knowledge", repository: "repo" } };
   const view = { configuration: cfg, outcome_health: [] }, save = async next => saved = next;
-  const serviceSettings = load(base + "outcome-service-settings.ts", {
-    "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms,
-  }, { confirm: () => true });
-  const verifierPanel = get("outcome-services");
-  const documentWithNodes = { getElementById: get };
-  const outcome = load(base + "outcome-settings.ts", {
-    "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms,
-    "./api.js": { api: async () => ({ topics: [{ topic: { id: "topic", title: "Topic" } }], next_after: null }), query: () => "" },
-    "./outcome-service-settings.js": serviceSettings,
-  }, { document: documentWithNodes });
-  outcome.renderOutcomeSettings(view, save);
-  assert(textOf(verifierPanel).includes("unix:///verify")); assert(!textOf(verifierPanel).includes("unix:///knowledge"));
-  await buttonIn(verifierPanel, "outcome.bind").onclick();
-  field(box.form, `OutcomeKind.${kind}`).value = ""; await box.save();
-  assert.deepEqual(saved.outcome_bindings.topic.knowledge, cfg.outcome_bindings.topic.knowledge);
-  await buttonIn(verifierPanel.children.at(-1), "services.unbind").onclick();
-  assert.deepEqual(saved.outcome_bindings.topic, { verifiers: {}, knowledge: cfg.outcome_bindings.topic.knowledge });
-
   const targetForms = load(base + "knowledge-form.ts", {
     "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms,
     "./settings-guard.js": { trackSettings() {} },
@@ -156,7 +137,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   const knowledge = load(base + "knowledge-settings.ts", {
     "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom,
     "./knowledge-form.js": targetForms, "./knowledge-card.js": cards, "./knowledge-bindings.js": bindingForms,
-    "./outcome-service-settings.js": serviceSettings, "./api.js": { api: async (_url, body, intent) => {
+    "./api.js": { api: async (_url, body, intent) => {
       requests.push({ body, intent });
       if (body.request.operation === "probe") return { revision: "abc123" };
       if (body.request.operation === "save") targetConfig = structuredClone(body.request.configuration);
@@ -164,27 +145,22 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
     } },
   }, { confirm: () => true });
   knowledge.renderKnowledgeSettings(view, save); await tick();
-  const knowledgePanel = get("knowledge-services"), targetsPanel = get("knowledge-targets");
-  assert.equal(knowledgePanel.children.length, 0, "External knowledge service configuration is removed");
+  const targetsPanel = get("knowledge-targets");
   assert(buttonIn(targetsPanel, "knowledge.add"));
   assert(!buttonIn(targetsPanel, "knowledge.addGit") && !buttonIn(targetsPanel, "knowledge.addDirectory"), "Both types share one add entry");
   assert(textOf(targetsPanel).includes("/external"), "Stored details load automatically");
   assert(!textOf(targetsPanel).includes("unix:///knowledge"));
   assert(!textOf(targetsPanel).includes("disabled-knowledge"));
-  const beforeRetiredEditor = box;
-  serviceSettings.editOutcomeService(cfg, undefined, save, OutcomeServiceKind.Knowledge);
-  assert.equal(box, beforeRetiredEditor, "Generic service editors cannot reopen external knowledge setup");
   await buttonIn(targetsPanel, "knowledge.binding").onclick(); await tick();
-  field(box.form, "knowledge.scope").value = "topic"; field(box.form, "knowledge.scopeId").value = "topic";
+  field(box.form, "knowledge.scope").value = "group"; field(box.form, "knowledge.scopeId").value = "group";
   await field(box.form, "knowledge.scope").onchange();
   const targetPicker = field(box.form, "knowledge.selectTarget");
   assert.equal(targetPicker.tag, "select"); assert.equal(targetPicker.value, "repo");
   assert.deepEqual(targetPicker.children.map(n => n.value), ["repo", "new-repo"], "Only added, enabled knowledge bases can be bound");
   targetPicker.value = "new-repo"; await box.save();
-  assert.deepEqual(saved.outcome_bindings.topic.verifiers, { [kind]: "verify" });
-  assert.equal(saved.outcome_bindings.topic.knowledge.repository, "new-repo");
+  assert.equal(saved.knowledge_groups.group.repository, "new-repo");
   await buttonIn(targetsPanel.children.at(-1), "services.unbind").onclick();
-  assert.deepEqual(saved.outcome_bindings.topic, { verifiers: { [kind]: "verify" }, knowledge: null });
+  assert.equal(saved.knowledge_groups.group, undefined);
   const targetServiceCard = targetsPanel.children[1].children[0];
   assert.equal(requests[0].intent, "manage-knowledge"); assert.equal(requests[0].body.configuration_revision, 12);
   const repoCard = find(targetServiceCard, n => n.tag === "article" && textOf(n).includes("repo"))[0];
@@ -201,20 +177,19 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
   assert.equal(field(box.form, "knowledge.selectTarget").value, "new-repo", "Entering a new scope ID preserves the chosen store");
   await box.save();
   assert.deepEqual(saved.knowledge_groups["group-one"], { service_id: "knowledge", repository: "new-repo" });
-  assert.deepEqual(saved.outcome_bindings, cfg.outcome_bindings);
   await buttonIn(targetsPanel, "knowledge.binding").onclick(); await tick();
   field(box.form, "knowledge.scope").value = "goal"; field(box.form, "knowledge.scopeId").value = "goal-one";
   await field(box.form, "knowledge.scope").onchange();
   await box.save(); assert.deepEqual(saved.knowledge_goals["goal-one"], { service_id: "knowledge", repository: "new-repo" });
-  assert.deepEqual(saved.outcome_bindings, cfg.outcome_bindings);
 
   // A missing existing default requires explicit replacement and may not silently switch.
-  bindingForms.bindScope(cfg, save, async () => targetConfig, "topic", "topic"); await tick();
+  const missingCfg = structuredClone(cfg); missingCfg.knowledge_groups = { group: { service_id: "knowledge", repository: "missing" } };
+  bindingForms.bindScope(missingCfg, save, async () => targetConfig, "group", "group"); await tick();
   assert.equal(field(box.form, "knowledge.selectTarget").value, "");
   await assert.rejects(box.save(), /knowledge.noAvailableTargets/);
   field(box.form, "knowledge.selectTarget").value = "new-repo"; await box.save();
-  assert.equal(saved.outcome_bindings.topic.knowledge.repository, "new-repo");
-  const secondCfg = structuredClone(cfg); secondCfg.outcome_services.push({ ...cfg.outcome_services[1], id: "second-knowledge" });
+  assert.equal(saved.knowledge_groups.group.repository, "new-repo");
+  const secondCfg = structuredClone(cfg); secondCfg.outcome_services.push({ ...cfg.outcome_services[0], id: "second-knowledge" });
   const late = pending();
   bindingForms.bindScope(secondCfg, save, service => service === "knowledge" ? late.promise : Promise.resolve({ revision: 1, targets: { second: directory } }));
   field(box.form, "knowledge.service").value = "second-knowledge";
@@ -269,8 +244,7 @@ const config = () => ({ revision: 12, services: [], adapters: [{ id: "first" }, 
     "/assets/shared/contracts.js": contracts, "./i18n.js": i18n, "./dom.js": dom, "./forms.js": forms, "./feedback.js": feedback,
     "./api.js": { api: async url => { assert.equal(url, "/api/v1/collaboration/services", "Directory reads must not block service settings"); return { ...view, health: [], restart_required: false }; } },
     "./settings-guard.js": { trackSettings() {}, savedSettings() {}, allowSettingsLeave: () => true, hasUnsavedSettings: () => false },
-    "./knowledge-settings.js": { renderKnowledgeSettings() {} }, "./outcome-settings.js": { renderOutcomeSettings() {} },
-    "./scenario-settings.js": { renderScenarios() {} }, "./service-forms.js": {}, "./adapter-forms.js": {}, "./execution-status.js": { renderExecutionStatus() {} },
+    "./knowledge-settings.js": { renderKnowledgeSettings() {} }, "./service-forms.js": {}, "./adapter-forms.js": {}, "./execution-status.js": { renderExecutionStatus() {} },
     "./binding-settings.js": { renderBindings() { bindingRendered = true; } },
   });
   await settings.loadServices(); assert(bindingRendered, "Service settings render before independent directory requests");

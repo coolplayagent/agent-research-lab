@@ -80,7 +80,7 @@ fn external_publication_is_cas_idempotent_and_reconciles_after_a_lost_receipt() 
     fs::create_dir(&state).unwrap();
     let (write, outcome) = proposal(&head);
     let request = OutcomeServiceRequest::Write {
-        write: write.clone(),
+        write: Box::new(write.clone()),
         outcome: Box::new(outcome.clone()),
     };
     let published = dispatch("knowledge", &repositories, &state, request.clone()).unwrap();
@@ -137,7 +137,7 @@ fn external_publication_is_cas_idempotent_and_reconciles_after_a_lost_receipt() 
         &repositories,
         &state,
         OutcomeServiceRequest::Write {
-            write: stale,
+            write: Box::new(stale),
             outcome: Box::new(outcome),
         },
     )
@@ -169,7 +169,7 @@ fn checked_out_branches_and_path_injection_cannot_be_written() {
         &repositories,
         &state,
         OutcomeServiceRequest::Write {
-            write: write.clone(),
+            write: Box::new(write.clone()),
             outcome: Box::new(outcome.clone()),
         },
     )
@@ -189,7 +189,7 @@ fn checked_out_branches_and_path_injection_cannot_be_written() {
             &repositories,
             &state,
             OutcomeServiceRequest::Write {
-                write: invalid,
+                write: Box::new(invalid),
                 outcome: Box::new(outcome)
             }
         )

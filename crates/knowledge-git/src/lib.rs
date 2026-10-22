@@ -275,6 +275,7 @@ fn dispatch_with_target(
     let _lock = storage::lock(&state.join("publication.lock"))?;
     match request {
         OutcomeServiceRequest::Write { write, outcome } => {
+            let write = *write;
             outcome.validate_digest()?;
             collaboration_model::id(&write.input.id)?;
             collaboration_model::id(&write.input.outcome_id)?;

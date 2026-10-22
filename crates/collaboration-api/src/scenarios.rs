@@ -110,29 +110,7 @@ pub fn default_scenarios() -> Arc<Vec<Arc<dyn ScenarioAdapter>>> {
 
 pub(crate) fn configured(
     builtins: &Arc<Vec<Arc<dyn ScenarioAdapter>>>,
-    registry: Option<&service_registry::Registry>,
+    _registry: Option<&service_registry::Registry>,
 ) -> Result<Arc<Vec<Arc<dyn ScenarioAdapter>>>> {
-    let Some(registry) = registry else {
-        return Ok(builtins.clone());
-    };
-    let config = registry.configuration();
-    let mut adapters = builtins.as_ref().clone();
-    for registration in config.scenarios.iter().filter(|scenario| scenario.enabled) {
-        ensure!(
-            !adapters
-                .iter()
-                .any(|adapter| adapter.descriptor().id == registration.id),
-            "registered scenario conflicts with an installed adapter"
-        );
-        adapters.push(Arc::new(crate::remote_scenario::RemoteScenario {
-            registration: registration.clone(),
-            dependencies: config
-                .services
-                .iter()
-                .filter(|service| registration.dependencies.contains(&service.id))
-                .cloned()
-                .collect(),
-        }));
-    }
-    Ok(Arc::new(adapters))
+    Ok(builtins.clone())
 }

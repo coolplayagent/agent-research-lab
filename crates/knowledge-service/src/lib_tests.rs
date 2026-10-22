@@ -110,7 +110,7 @@ fn write(preview: &Preview) -> KnowledgeWrite {
 }
 fn publish(service: &Service, write: &KnowledgeWrite) -> Result<Value> {
     service.dispatch(OutcomeServiceRequest::Write {
-        write: write.clone(),
+        write: Box::new(write.clone()),
         outcome: Box::new(outcome()),
     })
 }
@@ -305,7 +305,7 @@ fn preview_is_bound_to_outcome_version_and_never_authorizes_replacement_content(
     assert!(
         service
             .dispatch(OutcomeServiceRequest::Write {
-                write,
+                write: Box::new(write),
                 outcome: Box::new(replacement)
             })
             .unwrap_err()
@@ -443,7 +443,7 @@ fn local_git_detects_read_branch_without_writes_and_requires_prepared_write_bran
     request.request_digest = storage::digest(&serde_json::to_vec(&request.input).unwrap());
     let result = service
         .dispatch(OutcomeServiceRequest::Write {
-            write: request,
+            write: Box::new(request),
             outcome: Box::new(outcome()),
         })
         .unwrap();

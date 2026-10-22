@@ -2,7 +2,6 @@ use crate::tests::Harness;
 use crate::*;
 use collaboration_model::*;
 use contracts::*;
-use std::collections::BTreeMap;
 
 async fn prepare(h: &Harness) -> String {
     h.hub
@@ -197,131 +196,152 @@ async fn bearer_publication_is_usable_without_research_or_knowledge_and_cannot_f
     h.close().await;
 }
 #[tokio::test]
-async fn automatic_verification_checks_protocol_results_and_requires_separate_host_acceptance() {
-    let root = tempfile::tempdir().unwrap();
-    let socket = root.path().join("private/verifier.sock");
-    let listener = service_protocol::Listener::bind(&socket).unwrap();
-    let worker = tokio::spawn(async move {
-        loop {
-            let mut stream = listener.accept().await.unwrap();
-            let request: service_protocol::Envelope<service_api::OutcomeServiceRequest> =
-                service_protocol::read(&mut stream).await.unwrap();
-            let result = match request.request {
-                service_api::OutcomeServiceRequest::Probe => {
-                    json!(service_api::OutcomeServiceHandshake {
-                        protocol_version: 1,
-                        id: "verifier".into(),
-                        kind: OutcomeServiceKind::Verifier,
-                        outcome_kinds: vec![OutcomeKind::Finding],
-                        ready: true
-                    })
-                }
-                service_api::OutcomeServiceRequest::Verify { run, outcome } => {
-                    let mut result = json!(OutcomeVerificationResult {
-                        id: run.input.id,
-                        request_digest: run.request_digest,
-                        state: VerificationRunState::Passed,
-                        summary: "Fixture evidence verified".into(),
-                        evidence: outcome.input.evidence
-                    });
-                    if outcome.input.id == "unknown" {
-                        result["state"] = json!("future_terminal_value");
-                    }
-                    result
-                }
-                _ => panic!("unexpected operation"),
-            };
-            service_protocol::write(
-                &mut stream,
-                &service_protocol::Reply::from_result(Ok(result)),
-            )
-            .await
-            .unwrap();
-        }
-    });
-    let config = service_api::Configuration {
-        revision: 0,
-        storage_id: None,
-        services: vec![],
-        adapters: vec![],
-        bindings: BTreeMap::new(),
-        binding_evidence: BTreeMap::new(),
-        scenarios: vec![],
-        outcome_services: vec![service_api::OutcomeService {
-            management: Default::default(),
-            id: "verifier".into(),
-            kind: OutcomeServiceKind::Verifier,
-            endpoint: socket,
-            enabled: true,
-            protocol_version: 1,
-            outcome_kinds: vec![OutcomeKind::Finding],
-            dependencies: vec![],
-            max_seconds: 10,
-        }],
-        knowledge_groups: BTreeMap::new(),
-        knowledge_goals: BTreeMap::new(),
-        outcome_bindings: BTreeMap::from([(
-            "topic".into(),
-            service_api::OutcomeServicesBinding {
-                verifiers: BTreeMap::from([(OutcomeKind::Finding, "verifier".into())]),
-                knowledge: None,
-            },
-        )]),
-    };
-    let h = Harness::with_services(config).await;
+async fn host_verification_reuses_pinned_evidence_and_requires_separate_acceptance() {
+    let h = Harness::new().await;
     let token = prepare(&h).await;
-    for id in ["one", "unknown"] {
-        let (status, body) = h
-            .request(
-                "/api/v1/agent/outcomes",
-                Some(publication(id)),
-                false,
-                Some(&token),
-            )
-            .await;
-        assert_eq!(status, 200, "{body}");
-        let mut entry = value(&h, id).await;
-        for _ in 0..100 {
-            if entry.verification != OutcomeVerificationState::Running {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-            entry = value(&h, id).await;
-        }
-        assert_eq!(
-            entry.verification,
-            if id == "one" {
-                OutcomeVerificationState::Passed
-            } else {
-                OutcomeVerificationState::Unknown
-            }
-        );
-        assert_eq!(entry.acceptance, OutcomeAcceptanceState::Pending);
-        let decision = json!({"operation":"decide","decision":{"id":format!("accept-{id}"),"outcome_id":id,"verification_id":entry.latest_verification.unwrap().input.id,"state":OutcomeAcceptanceState::Accepted,"reason":"Host reviewed applicability"}});
-        assert_eq!(
-            h.request_intent(
-                "/api/v1/collaboration/outcomes",
-                Some(decision),
-                true,
-                None,
-                "manage-outcomes"
-            )
-            .await
-            .0,
-            if id == "one" { 200 } else { 400 }
-        );
-    }
+    let (status, body) = h
+        .request(
+            "/api/v1/agent/outcomes",
+            Some(publication("one")),
+            false,
+            Some(&token),
+        )
+        .await;
+    assert_eq!(status, 200, "{body}");
+    let entry = value(&h, "one").await;
+    assert_eq!(entry.verification, OutcomeVerificationState::Unverified);
+    let verify = json!({"request_id":"host-one","outcome_id":"one","state":"passed","summary":"Host reviewed the pinned evidence","evidence_indices":[0]});
+    let (status, body) = h
+        .request_intent(
+            "/api/v1/collaboration/outcomes/host-verify",
+            Some(verify.clone()),
+            true,
+            None,
+            "manage-outcomes",
+        )
+        .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(
+        h.request_intent(
+            "/api/v1/collaboration/outcomes/host-verify",
+            Some(verify.clone()),
+            true,
+            None,
+            "manage-outcomes"
+        )
+        .await
+        .0,
+        200
+    );
+    let entry = value(&h, "one").await;
+    assert_eq!(entry.verification, OutcomeVerificationState::Passed);
+    assert_eq!(entry.acceptance, OutcomeAcceptanceState::Pending);
+    assert_eq!(
+        entry
+            .latest_verification
+            .as_ref()
+            .unwrap()
+            .result
+            .as_ref()
+            .unwrap()
+            .evidence,
+        entry.outcome.input.evidence
+    );
+    let decision = json!({"operation":"decide","decision":{"id":"accept-one","outcome_id":"one","verification_id":"host-one","state":OutcomeAcceptanceState::Accepted,"reason":"Host reviewed applicability"}});
+    assert_eq!(
+        h.request_intent(
+            "/api/v1/collaboration/outcomes",
+            Some(decision),
+            true,
+            None,
+            "manage-outcomes"
+        )
+        .await
+        .0,
+        200
+    );
     assert_eq!(
         value(&h, "one").await.acceptance,
         OutcomeAcceptanceState::Accepted
     );
+    let mut invalid = verify.clone();
+    invalid["request_id"] = json!("host-invalid");
+    invalid["evidence_indices"] = json!([99]);
     assert_eq!(
-        h.hub.goals("team", "", "", false).await.unwrap()["goals"][0]["state"],
-        GoalState::Active.as_str()
+        h.request_intent(
+            "/api/v1/collaboration/outcomes/host-verify",
+            Some(invalid),
+            true,
+            None,
+            "manage-outcomes"
+        )
+        .await
+        .0,
+        400
+    );
+    let mut invalid = verify;
+    invalid["request_id"] = json!("host-unknown");
+    invalid["state"] = json!("unknown");
+    assert_eq!(
+        h.request_intent(
+            "/api/v1/collaboration/outcomes/host-verify",
+            Some(invalid),
+            true,
+            None,
+            "manage-outcomes"
+        )
+        .await
+        .0,
+        400
+    );
+    assert_eq!(
+        h.request_intent(
+            "/api/v1/collaboration/outcomes/verify",
+            Some(json!({})),
+            true,
+            None,
+            "manage-outcomes"
+        )
+        .await
+        .0,
+        404
+    );
+    let (status, body) = h
+        .request(
+            "/api/v1/agent/outcomes",
+            Some(publication("two")),
+            false,
+            Some(&token),
+        )
+        .await;
+    assert_eq!(status, 200, "{body}");
+    let failed = json!({"request_id":"host-two","outcome_id":"two","state":"failed","summary":"Evidence does not support the conclusion","evidence_indices":[0]});
+    assert_eq!(
+        h.request_intent(
+            "/api/v1/collaboration/outcomes/host-verify",
+            Some(failed),
+            true,
+            None,
+            "manage-outcomes"
+        )
+        .await
+        .0,
+        200
+    );
+    let decision = json!({"operation":"decide","decision":{"id":"accept-two","outcome_id":"two","verification_id":"host-two","state":OutcomeAcceptanceState::Accepted,"reason":"Must remain blocked"}});
+    assert_eq!(
+        h.request_intent(
+            "/api/v1/collaboration/outcomes",
+            Some(decision),
+            true,
+            None,
+            "manage-outcomes"
+        )
+        .await
+        .0,
+        400
     );
     h.close().await;
-    worker.abort();
-    let _ = worker.await;
 }
 
 #[tokio::test]
@@ -334,7 +354,7 @@ async fn knowledge_scope_bindings_validate_real_groups_and_goals() {
         management: contracts::ServiceManagement::LocalManaged,
         id: "knowledge".into(),
         kind: OutcomeServiceKind::Knowledge,
-        endpoint: root.path().join("knowledge.sock"),
+        endpoint: root.path().join("private/services/knowledge.sock"),
         enabled: false,
         protocol_version: 1,
         outcome_kinds: vec![OutcomeKind::Finding],

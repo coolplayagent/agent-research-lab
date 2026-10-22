@@ -240,6 +240,7 @@ impl Service {
                 self.lookup(&id, &request_digest)
             }
             OutcomeServiceRequest::Write { write, outcome } => {
+                let write = *write;
                 let _lock = storage::lock(&self.state.join("operation.lock"))?;
                 knowledge_model::validate_write(&self.id, &write, &outcome)?;
                 ensure!(
@@ -288,7 +289,7 @@ impl Service {
                         &target,
                         &target_state,
                         OutcomeServiceRequest::Write {
-                            write: write.clone(),
+                            write: Box::new(write.clone()),
                             outcome,
                         },
                     )
@@ -302,9 +303,6 @@ impl Service {
                 }
                 storage::write(&path, &receipt)?;
                 Ok(json!(receipt.result))
-            }
-            OutcomeServiceRequest::Verify { .. } => {
-                anyhow::bail!("knowledge_verification_unsupported")
             }
         }
     }
