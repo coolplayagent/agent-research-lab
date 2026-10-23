@@ -94,7 +94,7 @@ function detail(id) {
         return;
     }
     const panel = get("collaboration-detail");
-    panel.replaceChildren(avatar(id), button(`@${display(id)}`, () => insertMention(id)), el("p", presence(member.presence)));
+    panel.replaceChildren(avatar(id), button(`@${display(id)}`, () => insertMention(id)), el("p", presence(member.presence, member.archived)));
     if (id !== "operator") {
         panel.append(el("p", bindings === null
             ? t("workspace.bindingUnknown")
@@ -138,7 +138,7 @@ function render() {
         row.append(avatar(member.person_id), button(display(member.person_id), () => {
             revealResearch("collaboration");
             detail(member.person_id);
-        }), el("small", presence(member.presence)));
+        }), el("small", presence(member.presence, member.archived)));
         list.append(row);
     }
     if (after)

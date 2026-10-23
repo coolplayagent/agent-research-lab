@@ -374,3 +374,35 @@ async fn presence_follows_concurrent_leases_and_survives_restart_without_connect
     .unwrap();
     assert_eq!(hub.presence("worker").unwrap().presence, Presence::Online);
 }
+
+#[tokio::test]
+async fn archived_historical_members_are_explicit_without_changing_active_wire_shape() {
+    let dir = tempfile::tempdir().unwrap();
+    let hub = Hub::open(dir.path()).unwrap();
+    hub.register_operator().await.unwrap();
+    hub.register(vec!["worker".into()]).await.unwrap();
+    room(&hub, "team").await;
+    let active = serde_json::to_value(hub.presence("worker").unwrap()).unwrap();
+    assert!(active.get("archived").is_none());
+    assert_eq!(active["presence"], "online");
+    hub.archive_unbound(BTreeSet::new()).await.unwrap();
+    let historical = hub.members("team", "", 100).unwrap();
+    let worker = historical["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["person_id"] == "worker")
+        .unwrap();
+    assert_eq!(worker["archived"], true);
+    assert_eq!(worker["presence"], "offline");
+    hub.save_person(Person {
+        id: "worker".into(),
+        name: "Worker".into(),
+        application_id: None,
+    })
+    .await
+    .unwrap();
+    let restored = hub.presence("worker").unwrap();
+    assert!(!restored.archived);
+    assert_eq!(restored.presence, Presence::Online);
+}

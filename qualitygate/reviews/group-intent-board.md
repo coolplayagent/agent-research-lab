@@ -29,6 +29,9 @@ remain supported. No message or artifact text is used to infer lifecycle state.
 Presence displays execution availability from the maximum valid node/legacy-work lease
 across groups. Expired leases never imply busy. Transport delivery preferences retain a
 separate accessor and the embedded/remote subscription contract remains unchanged.
+Historical members removed from the active directory carry an optional archived flag,
+so the UI can label them archived without suggesting they are idle executors. Active
+member wire shapes omit the flag; restoring an identity clears it.
 All reads and writes to production collaboration data still belong to the storage service.
 
 ## Verification and limits

@@ -11,6 +11,10 @@ const dom={get,el:(tag,text)=>new Node(tag,text),button:(text,onclick)=>Object.a
 const contracts=load('web/shared/src/contracts.ts'),i18n={t:key=>key,label:(domain,key)=>`${domain}.${key}`};
 const pending=()=>{let resolve;return {promise:new Promise(r=>resolve=r),resolve:v=>resolve(v)}};
 (async()=>{
+  const actualDom=load('web/outcome-hub/src/dom.ts',{'./i18n.js':i18n,'./feedback.js':{}});
+  assert.equal(actualDom.presence(contracts.Presence.Offline,true),'members.archived');
+  assert.equal(actualDom.presence(contracts.Presence.Online,false),'Presence.online');
+  assert.equal(actualDom.presence(contracts.Presence.Busy,false),'Presence.busy');
   const requests=[],location={hash:'#groups'},gate=pending();
   const task=(id,group)=>({input:{id,group_id:group,intent:id},title:id,state:contracts.TaskState.Planning,kind:contracts.TaskKind.Outcome,revision:1,nodes:[],deliveries:[],events:[]});
   const tasks=load('web/outcome-hub/src/tasks.ts',{

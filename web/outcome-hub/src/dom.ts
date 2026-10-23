@@ -1,4 +1,4 @@
-import { label } from "./i18n.js";
+import { label, t } from "./i18n.js";
 import { busy } from "./feedback.js";
 export function get<T extends HTMLElement = HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -47,4 +47,4 @@ export function initDialogs(): void {
     .querySelectorAll<HTMLElement>("[data-close]")
     .forEach((node) => (node.onclick = () => close(node.dataset.close!)));
 }
-export const presence = (value: string): string => label("Presence", value);
+export const presence = (value: string, archived = false): string => archived ? t("members.archived") : label("Presence", value);

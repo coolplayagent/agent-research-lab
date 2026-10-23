@@ -96,7 +96,7 @@ function detail(id: string): void {
   panel.replaceChildren(
     avatar(id),
     button(`@${display(id)}`, () => insertMention(id)),
-    el("p", presence(member.presence)),
+    el("p", presence(member.presence, member.archived)),
   );
   if (id !== "operator") {
     panel.append(
@@ -156,7 +156,7 @@ function render(): void {
         revealResearch("collaboration");
         detail(member.person_id);
       }),
-      el("small", presence(member.presence)),
+      el("small", presence(member.presence, member.archived)),
     );
     list.append(row);
   }

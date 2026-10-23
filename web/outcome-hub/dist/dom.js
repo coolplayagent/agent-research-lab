@@ -1,4 +1,4 @@
-import { label } from "./i18n.js";
+import { label, t } from "./i18n.js";
 import { busy } from "./feedback.js";
 export function get(id) {
     const node = document.getElementById(id);
@@ -55,4 +55,4 @@ export function initDialogs() {
         .querySelectorAll("[data-close]")
         .forEach((node) => (node.onclick = () => close(node.dataset.close)));
 }
-export const presence = (value) => label("Presence", value);
+export const presence = (value, archived = false) => archived ? t("members.archived") : label("Presence", value);
