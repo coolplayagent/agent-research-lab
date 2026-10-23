@@ -2,7 +2,7 @@ use crate::process::Session;
 use anyhow::{Context, Result, bail, ensure};
 use contracts::{ClaudeResultState, CodexEventKind, CodingAgent};
 use serde_json::{Value, json};
-use service_api::{AgentInput, AgentOutput};
+use service_api::{AGENT_EVIDENCE_MAX_BYTES, AGENT_SUMMARY_MAX_BYTES, AgentInput, AgentOutput};
 use std::path::PathBuf;
 #[path = "dsh.rs"]
 mod dsh;
@@ -28,8 +28,18 @@ pub struct Options {
 }
 pub fn schema() -> Value {
     json!({"type":"object","additionalProperties":false,"required":["protocol_version","request_id","summary","succeeded","evidence_json"],"properties":{
-        "protocol_version":{"type":"integer"},"request_id":{"type":"string"},"summary":{"type":"string"},"succeeded":{"type":"boolean"},"evidence_json":{"type":"string","description":"A JSON object encoded as a string. Preserve all requested evidence fields, including nested coordinator proposals and artifact references."}
+        "protocol_version":{"type":"integer"},"request_id":{"type":"string"},
+        "summary":{"type":"string","description":format!("The substantive deliverable, at most {AGENT_SUMMARY_MAX_BYTES} UTF-8 bytes. Use concise prose or a compact table.")},
+        "succeeded":{"type":"boolean"},
+        "evidence_json":{"type":"string","description":format!("A compact JSON object encoded as a string. Its decoded value must be at most {AGENT_EVIDENCE_MAX_BYTES} UTF-8 bytes. Preserve all requested evidence fields, including complete nested coordinator proposals and artifact references. Use concise citations and limitations; do not duplicate the full deliverable from summary.")}
     }})
+}
+fn prompt(input: &AgentInput) -> Result<String> {
+    Ok(format!(
+        "Perform the following OutcomeHub task in the current disposable workspace. Return ONLY a JSON object matching this schema: {}. Encode the complete requested evidence object as a compact JSON string in evidence_json; never discard required fields. Copy protocol_version and request_id exactly from the request. Set succeeded only when this request's assigned work and acceptance criteria are satisfied. This reports your execution result; only the host can accept the overall goal. Output limits are UTF-8 bytes, not characters: summary <= {AGENT_SUMMARY_MAX_BYTES} bytes; the decoded evidence_json string <= {AGENT_EVIDENCE_MAX_BYTES} bytes. Put the concise substantive deliverable in summary and compact sources, limitations and required structured fields in evidence_json. Avoid duplicate prose, unnecessary whitespace and unnecessary Unicode escapes. Preserve complete coordinator proposals when requested. Leave room below the limits; use tools to check UTF-8 byte lengths before submitting. If the assignment cannot fit, report that limitation rather than truncate required evidence or claim completion. Request:\n{}",
+        schema(),
+        serde_json::to_string(input)?
+    ))
 }
 pub fn execute(options: &Options, input: &AgentInput) -> Result<AgentOutput> {
     ensure!(
@@ -47,11 +57,7 @@ pub fn execute(options: &Options, input: &AgentInput) -> Result<AgentOutput> {
         );
     }
     let agent = CodingAgent::parse(&options.agent)?;
-    let prompt = format!(
-        "Perform the following OutcomeHub task in the current disposable workspace. Return ONLY a JSON object matching this schema: {}. Encode the complete requested evidence object as a JSON string in evidence_json; never discard its fields. Copy protocol_version and request_id exactly from the request. Set succeeded only when this request's assigned work and acceptance criteria are satisfied. This reports your execution result; only the host can accept the overall goal. Request:\n{}",
-        schema(),
-        serde_json::to_string(input)?
-    );
+    let prompt = prompt(input)?;
     let value = match agent {
         CodingAgent::Codex => codex(options, &prompt)?,
         CodingAgent::ClaudeCode => claude(options, &prompt)?,
@@ -74,8 +80,9 @@ fn decode(input: &AgentInput, value: Value) -> Result<AgentOutput> {
     let native: NativeOutput =
         serde_json::from_value(value).context("invalid agent response schema")?;
     ensure!(
-        native.evidence_json.len() <= 8192,
-        "agent evidence exceeds bound"
+        native.evidence_json.len() <= AGENT_EVIDENCE_MAX_BYTES,
+        "agent evidence exceeds bound ({} UTF-8 bytes; maximum {AGENT_EVIDENCE_MAX_BYTES})",
+        native.evidence_json.len()
     );
     let evidence: Value =
         serde_json::from_str(&native.evidence_json).context("invalid agent evidence")?;

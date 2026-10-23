@@ -50,9 +50,8 @@ fn external_unknown_completion_reasons_are_rejected() {
     assert!(CodexEventKind::parse("turn.maybe_completed").is_err());
 }
 
-#[test]
-fn native_evidence_preserves_nested_proposals_and_rejects_invalid_content() {
-    let input = AgentInput {
+fn input() -> AgentInput {
+    AgentInput {
         protocol_version: 1,
         request_id: "probe".into(),
         person_id: "coordinator".into(),
@@ -63,7 +62,12 @@ fn native_evidence_preserves_nested_proposals_and_rejects_invalid_content() {
         acceptance: "A graph".into(),
         instruction: "Plan".into(),
         messages: vec![],
-    };
+    }
+}
+
+#[test]
+fn native_evidence_preserves_nested_proposals_and_rejects_invalid_content() {
+    let input = input();
     let evidence = json!({"coordinator":{"protocol_version":1,"proposal":{"action":"clarify","question":"Scope?"}}});
     let mut native = json!({"protocol_version":1,"request_id":"probe","summary":"Ready","succeeded":true,"evidence_json":evidence.to_string()});
     assert_eq!(decode(&input, native.clone()).unwrap().evidence, evidence);
@@ -71,4 +75,32 @@ fn native_evidence_preserves_nested_proposals_and_rejects_invalid_content() {
         native["evidence_json"] = json!(invalid);
         assert!(decode(&input, native.clone()).is_err());
     }
+}
+
+#[test]
+fn native_output_keeps_exact_utf8_bounds_and_original_user_content() {
+    let sample = include_str!("fixtures/utf8.txt").trim();
+    let fill = |bytes: usize| {
+        let value = sample.repeat(bytes / sample.len());
+        let remainder = bytes - value.len();
+        value + &"x".repeat(remainder)
+    };
+    let mut input = input();
+    input.instruction = sample.into();
+    let evidence = json!({"sources":fill(8192 - json!({"sources":""}).to_string().len())});
+    let mut native = json!({"protocol_version":1,"request_id":"probe","summary":fill(8000),"succeeded":true,"evidence_json":evidence.to_string()});
+    let output = decode(&input, native.clone()).unwrap();
+    assert_eq!(output.summary.len(), 8000);
+    assert_eq!(output.evidence.to_string().len(), 8192);
+    assert_eq!(output.evidence, evidence);
+    native["evidence_json"] = json!(evidence.to_string() + " ");
+    let error = decode(&input, native.clone()).unwrap_err().to_string();
+    assert!(error.contains("8193 UTF-8 bytes; maximum 8192"));
+    native["evidence_json"] = json!(evidence.to_string());
+    native["summary"] = json!(fill(8001));
+    assert!(decode(&input, native).is_err());
+    let prompt = prompt(&input).unwrap();
+    assert!(prompt.contains("summary <= 8000 bytes"));
+    assert!(prompt.contains("evidence_json string <= 8192 bytes"));
+    assert!(prompt.ends_with(&serde_json::to_string(&input).unwrap()));
 }

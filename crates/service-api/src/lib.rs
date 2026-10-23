@@ -128,6 +128,8 @@ pub struct AgentOutput {
     #[serde(default)]
     pub evidence: serde_json::Value,
 }
+pub const AGENT_SUMMARY_MAX_BYTES: usize = 8000;
+pub const AGENT_EVIDENCE_MAX_BYTES: usize = 8192;
 impl AgentOutput {
     pub fn validate(&self, input: &AgentInput) -> Result<()> {
         ensure!(
@@ -135,11 +137,11 @@ impl AgentOutput {
             "adapter response identity or version mismatch"
         );
         ensure!(
-            !self.summary.trim().is_empty() && self.summary.len() <= 8000,
+            !self.summary.trim().is_empty() && self.summary.len() <= AGENT_SUMMARY_MAX_BYTES,
             "invalid adapter summary"
         );
         ensure!(
-            serde_json::to_vec(&self.evidence)?.len() <= 8192,
+            serde_json::to_vec(&self.evidence)?.len() <= AGENT_EVIDENCE_MAX_BYTES,
             "adapter evidence exceeds bound"
         );
         Ok(())
