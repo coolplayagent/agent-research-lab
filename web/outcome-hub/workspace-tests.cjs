@@ -283,8 +283,8 @@ const deferred = () => {
   await goals.loadGoals(); await goals.loadGoals(true);
   assert.equal(goals.goalSnapshot().length,3,"The current goal is available before its historical page is loaded");
   assert.equal(get("goal-list").children.length,2,"The current projection does not consume a historical page");
-  assert(get("goal-summary").textContent.includes('"title":"third"'));
-  assert(get("goal-summary").textContent.includes("progress.running"));
+  assert(get("legacy-goal-summary").textContent.includes('"title":"third"'));
+  assert(get("legacy-goal-summary").textContent.includes("progress.running"));
   const secondCard = get("goal-list").children[1]; secondCard.open = true;
   const allText = node => [node.textContent, ...node.children.map(allText)].join(" ");
   secondCard.querySelectorAll("[data-evidence-key]")[0].open = true;
@@ -298,26 +298,26 @@ const deferred = () => {
   assert.equal(goals.goalSnapshot().find(goal=>goal.input.id==="third").revision,2,"An older historical revision cannot overwrite the current projection");
   projectedGoal = {...projectedGoal,revision:3,work:[{...projectedGoal.work[0],state:contracts.WorkState.Submitted}]};
   await goals.loadGoals();
-  assert(get("goal-summary").textContent.includes("progress.review"));
-  assert(!get("goal-summary").textContent.includes("completed"),"Waiting for host acceptance is not completion");
-  const stableSnapshot = JSON.stringify(goals.goalSnapshot()), stableSummary = get("goal-summary").textContent;
+  assert(get("legacy-goal-summary").textContent.includes("progress.review"));
+  assert(!get("legacy-goal-summary").textContent.includes("completed"),"Waiting for host acceptance is not completion");
+  const stableSnapshot = JSON.stringify(goals.goalSnapshot()), stableSummary = get("legacy-goal-summary").textContent;
   projectedGoal = {...projectedGoal,revision:4,state:contracts.GoalState.Completed};
   for (const failingPart of ["current","history"]) {
     failCurrent = failingPart === "current"; failHistory = failingPart === "history";
     await goals.loadGoals();
     assert.equal(JSON.stringify(goals.goalSnapshot()),stableSnapshot,"A failed half of the concurrent load must not publish a partial snapshot");
-    assert.equal(get("goal-summary").textContent,stableSummary);
+    assert.equal(get("legacy-goal-summary").textContent,stableSummary);
   }
   failCurrent = false; failHistory = false;
   for (const page of Object.values(goalPages)) for (const goal of page.goals) goal.state = contracts.GoalState.Completed;
   await goals.loadGoals();
-  assert(get("goal-summary").textContent.startsWith("workspace.latestGoal"));
-  assert(get("goal-summary").textContent.includes('"title":"third"'));
-  assert(get("goal-summary").textContent.includes("GoalState.completed"),"Only the host-completed goal has an accepted summary");
+  assert(get("legacy-goal-summary").textContent.startsWith("workspace.latestGoal"));
+  assert(get("legacy-goal-summary").textContent.includes('"title":"third"'));
+  assert(get("legacy-goal-summary").textContent.includes("GoalState.completed"),"Only the host-completed goal has an accepted summary");
   const refreshesBeforeUnknownLease = scheduledRefreshes;
   projectedGoal = {...projectedGoal,revision:5,state:contracts.GoalState.Active,work:[{...projectedGoal.work[0],state:contracts.WorkState.Running,deadline_ms:Infinity}]};
   await goals.loadGoals();
-  assert(get("goal-summary").textContent.includes("progress.unavailable"));
+  assert(get("legacy-goal-summary").textContent.includes("progress.unavailable"));
   assert.equal(scheduledRefreshes,refreshesBeforeUnknownLease,"An unknown lease cannot create an immediate-refresh timer loop");
   projectedGoal = {...projectedGoal,revision:6,state:contracts.GoalState.Cancelled,work:[{...projectedGoal.work[0],deadline_ms:Date.now()+60000}]};
   await goals.loadGoals();
@@ -519,6 +519,7 @@ const deferred = () => {
     {
       "./deletion.js": { deleteObject: async () => false },
       "./question-runs.js": { selectQuestionRuns() {} },
+      "./tasks.js": { selectTasks() {} },
       "./workspace.js": { syncControls() {} },
       "/assets/shared/contracts.js": contracts,
       "./i18n.js": i18n,

@@ -1,7 +1,18 @@
 export declare const messages: {
+    readonly "MessageProcessingState.queued": "等待协调者处理";
+    readonly "MessageProcessingState.processing": "协调者正在处理";
+    readonly "MessageProcessingState.waiting_input": "等待补充信息";
+    readonly "MessageProcessingState.paused": "处理暂停，可重试";
+    readonly "MessageProcessingState.responded": "已回复";
+    readonly "MessageProcessingState.attached": "已补充已有意图";
+    readonly "MessageProcessingState.planned": "已形成成果任务";
+    readonly "MessageProcessingState.cancelled": "已取消处理";
     readonly "OutcomeErrorCode.outcome_protocol_upgrade_required": "成果接口已升级，请使用新版工作台";
     readonly "api.outcome_protocol_upgrade_required": "成果接口已升级，请使用新版工作台";
     readonly "TaskKind.outcome": "成果任务";
+    readonly "TaskKind.message": "群消息处理";
+    readonly "TaskEventKind.responded": "协调者已回复";
+    readonly "TaskEventKind.attached": "已关联已有意图";
     readonly "TaskKind.question": "直接问答";
     readonly "TaskState.planning": "正在规划";
     readonly "TaskState.running": "正在协作";

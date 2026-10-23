@@ -34,3 +34,13 @@ pub(crate) fn worker(task: &OutcomeTask, node: &TaskNode) -> String {
 #[cfg(test)]
 #[path = "task_prompt_tests.rs"]
 mod tests;
+
+/// Intake shares the leased coordinator protocol but does not require a work graph.
+pub(crate) fn routing(task: &OutcomeTask, people: &Value, candidates: &Value) -> String {
+    format!(
+        "{}\nThis is a NEW HUMAN MESSAGE awaiting intent routing, not yet an outcome task. First decide whether to reply conversationally, ask for clarification, supplement an existing intent, or plan a genuinely new outcome. Never manufacture tasks for greetings or simple status questions. Additional proposals allowed ONLY for this message: {{\"action\":\"respond\",\"message\":\"reply in user's language\"}} and {{\"action\":\"attach\",\"task_id\":\"exact existing ID\",\"revision\":123,\"text\":\"faithful supplementary human intent\"}}. Use the exact supplied revision. A reply association selects its existing intent: use attach when supplementing it, respond for discussion/status, or clarify if unclear; do not create a duplicate plan. Completed/cancelled intents cannot be changed; offer a new follow-up. Never attach to your own ID or a question run. When no explicit association exists, attach only if the intended task is unambiguous. Otherwise clarify. New actionable intents use plan; essential missing inputs use clarify. With no available members, explain what configuration is missing instead of inventing assignees. The candidates list is bounded; do not infer absence from truncation. Reply association: {:?}. Candidate intents: {}",
+        coordinator(task, people),
+        task.reply_task_id,
+        candidates
+    )
+}

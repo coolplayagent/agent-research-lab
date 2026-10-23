@@ -47,10 +47,11 @@ macro_rules! states {
 }
 
 states! {
-    TaskKind { Outcome => "outcome", Question => "question" }
+    MessageProcessingState { Queued => "queued", Processing => "processing", WaitingInput => "waiting_input", Paused => "paused", Responded => "responded", Attached => "attached", Planned => "planned", Cancelled => "cancelled" }
+    TaskKind { Outcome => "outcome", Question => "question", Message => "message" }
     TaskState { Planning => "planning", Running => "running", WaitingInput => "waiting_input", Paused => "paused", Review => "review", Completed => "completed", Cancelled => "cancelled" }
     TaskNodeState { Pending => "pending", Running => "running", Submitted => "submitted", Approved => "approved", Failed => "failed", Stale => "stale" }
-    TaskEventKind { Created => "created", Claimed => "claimed", Submitted => "submitted", Checked => "checked", Planned => "planned", Revised => "revised", Clarification => "clarification", Supplemented => "supplemented", Paused => "paused", BudgetChanged => "budget_changed", Delivered => "delivered", Accepted => "accepted", Returned => "returned", Cancelled => "cancelled", Expired => "expired" }
+    TaskEventKind { Created => "created", Claimed => "claimed", Submitted => "submitted", Checked => "checked", Planned => "planned", Revised => "revised", Clarification => "clarification", Supplemented => "supplemented", Paused => "paused", BudgetChanged => "budget_changed", Delivered => "delivered", Accepted => "accepted", Returned => "returned", Cancelled => "cancelled", Expired => "expired", Responded => "responded", Attached => "attached" }
     TaskErrorCode { Invalid => "task_invalid", Conflict => "task_conflict", StaleAttempt => "task_stale_attempt", Budget => "task_budget_exhausted", Unavailable => "task_executor_unavailable", NotFound => "task_not_found", Forbidden => "task_forbidden", Protocol => "task_protocol_invalid" }
 
     DeletionCode { Deleted => "deleted", NotFound => "not_found", RevisionConflict => "revision_conflict", ActiveGoals => "active_goals", EvidenceReferences => "evidence_references", Unsupported => "unsupported" }

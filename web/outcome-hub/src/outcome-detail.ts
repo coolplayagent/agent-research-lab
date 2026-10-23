@@ -9,7 +9,7 @@ const outcomeCommand = <T>(command: unknown): Promise<T> => api<T>("/api/v2/coll
 import type { OutcomeView, OutcomeHistory } from "./outcome-types.js";
 import type { ServiceView } from "./service-types.js";
 export function outcomeLink(id: string, title = id): HTMLAnchorElement {
-  const link = el("a", title); link.href = "#outcomes/" + encodeURIComponent(id);
+  const link = el("a", title); link.href = (location.hash.match(/^#groups\/[^/]+\/tasks\/[^/]+/)?.[0] || "#") + "/outcomes/" + encodeURIComponent(id); link.href = link.href.replace("#/outcomes/", "#outcomes/");
   link.onclick = () => { if (location.hash === link.hash) void showOutcome(id).catch(error => { document.getElementById("notice")!.textContent = String(error); }); };
   return link;
 }

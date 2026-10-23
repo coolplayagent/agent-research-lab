@@ -42,18 +42,29 @@ pub struct Page {
 }
 pub async fn list(State(web): State<Web>, Query(page): Query<Page>) -> Response {
     response(
-        web.hub
-            .tasks(if page.id.is_empty() {
-                TaskCommand::List {
-                    group_id: page.group_id,
-                    after: page.after,
-                    active: false,
-                    questions: false,
-                }
+        async {
+            if page.id.is_empty() {
+                ensure!(!page.group_id.is_empty(), "{}", TaskErrorCode::Invalid);
+                web.hub
+                    .tasks(TaskCommand::List {
+                        group_id: page.group_id,
+                        after: page.after,
+                        active: false,
+                        questions: false,
+                    })
+                    .await
             } else {
-                TaskCommand::Get { id: page.id }
-            })
-            .await,
+                let value = web.hub.tasks(TaskCommand::Get { id: page.id }).await?;
+                ensure!(
+                    page.group_id.is_empty()
+                        || value["input"]["group_id"].as_str() == Some(page.group_id.as_str()),
+                    "{}",
+                    TaskErrorCode::Forbidden
+                );
+                Ok(value)
+            }
+        }
+        .await,
     )
 }
 pub async fn manage(State(web): State<Web>, request: Request) -> Response {

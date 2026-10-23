@@ -63,7 +63,7 @@ pub async fn manage(State(web): State<Web>, request: Request) -> Response {
         match change {
             Change::Delete { target } => Ok(json!(web.hub.delete(target).await?)),
             Change::Person { person } => { ensure!(person.id != "operator", "operator identity is reserved"); web.hub.save_person(person).await?; Ok(json!({"saved":true})) },
-            Change::Send { message } => Ok(json!(web.hub.publish_as("operator", message).await?)),
+            Change::Send { message } => web.hub.tasks(collaboration_model::TaskCommand::Message { message }).await,
             Change::Convert { group_id, revision, title } => Ok(json!(web.hub.convert(&group_id, revision, title).await?)),
             Change::Fork { source, group, history_from } => Ok(json!(web.hub.fork(&source, group, history_from).await?)),
             Change::Create{mut group}=>{

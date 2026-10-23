@@ -1190,3 +1190,15 @@ button.knowledge-danger:hover { background: #fff3f1; border-color: #e3bcb8; }
 @media(max-width:700px){.task-heading{flex-direction:column}.task-graph{display:block;overflow:visible}.task-layer{max-width:none}.task-cards{grid-template-columns:1fr}.task-node-detail{padding:12px}#tasks-page header{flex-wrap:wrap}.task-delivery{padding:14px}}
 
 .question-run{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:5px 12px;font-size:12px}.question-run button{margin-left:auto;font-size:12px}
+
+/* The outcome board belongs to the selected conversation. */
+.group-outcomes { min-width: 0; }
+.group-outcomes header, .group-outcomes .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.group-outcomes header { justify-content: space-between; }
+.group-outcomes .task-cards { grid-template-columns: 1fr; }
+.group-outcomes .task-graph { overflow-x: auto; max-width: 100%; }
+.group-outcomes .task-layer { min-width: 220px; }
+.group-outcomes pre { overflow: auto; max-width: 100%; }
+.group-outcomes textarea { width: 100%; box-sizing: border-box; }
+.message.agent-contribution > .message-body { min-width: 0; max-width: 100%; }
+.message-actions a { font-size: 12px; }

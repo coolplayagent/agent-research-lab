@@ -115,6 +115,7 @@ export async function loadGroups(append = false): Promise<void> {
     render();
     if (!restored) {
       restored = true;
+      if (/^#(?:groups|tasks|outcomes)\//.test(location.hash)) return;
       const saved = sessionStorage.getItem("workspace-group");
       const found = rows.find((g) => g.id === saved);
       if (found) choose(found);

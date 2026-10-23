@@ -16,7 +16,7 @@ export function taskCard(task: OutcomeTask, select: () => void): HTMLElement {
 }
 export function taskGraph(task: OutcomeTask, choose: (id: string) => void): HTMLElement {
   const graph = el("div", undefined, "task-graph");
-  if (!task.nodes.length) { graph.append(el("p", t("tasks.planning"))); return graph; }
+  if (!task.nodes.length) { graph.append(el("p", t(task.kind === TaskKind.Message ? "tasks.routing" : "tasks.planning"))); return graph; }
   const depths = new Map<string, number>();
   for (let i = 0; i < task.nodes.length; i++) for (const n of task.nodes) if (!depths.has(n.input.id) && n.input.dependencies.every(d => depths.has(d))) depths.set(n.input.id, n.input.dependencies.length ? 1 + Math.max(...n.input.dependencies.map(d => depths.get(d)!)) : 0);
   for (let layer = 0; layer <= Math.max(0, ...depths.values()); layer++) {
@@ -57,8 +57,8 @@ function attemptLogs(runs: TaskAttempt[], title: string): HTMLElement {
 
 export function taskContent(task: OutcomeTask, change: (action: object) => Promise<void>, chooseNode: (id: string) => void, selectedNode: string): HTMLElement {
   const root = el("div"), head = el("header", undefined, "task-heading"), status = el("div");
-  status.append(el("h2", task.title), el("span", label("TaskState", task.state), "task-state"));
-  head.append(status, actions(...(task.state === TaskState.Paused ? [button(t("tasks.resume"), () => change({ operation: "resume" }))] : []), button(t("tasks.back"), () => { location.hash = "tasks"; }), ...(task.state === TaskState.Review ? [button(t("tasks.accept"), () => change({ operation: "accept" }))] : []), ...(![TaskState.Completed, TaskState.Cancelled].includes(task.state as typeof TaskState.Completed) ? [button(t("tasks.cancel"), () => change({ operation: "cancel" }))] : []))); root.append(head);
+  status.append(el("h2", task.title), el("span", task.kind === TaskKind.Message && task.message_processing ? label("MessageProcessingState", task.message_processing) : label("TaskState", task.state), "task-state"));
+  head.append(status, actions(...(task.state === TaskState.Paused ? [button(t("tasks.resume"), () => change({ operation: "resume" }))] : []), button(t("tasks.back"), () => { location.hash = "groups/" + encodeURIComponent(task.input.group_id) + "/tasks"; }), ...(task.state === TaskState.Review ? [button(t("tasks.accept"), () => change({ operation: "accept" }))] : []), ...(![TaskState.Completed, TaskState.Cancelled].includes(task.state as typeof TaskState.Completed) ? [button(t("tasks.cancel"), () => change({ operation: "cancel" }))] : []))); root.append(head);
   root.append(el("p", task.input.intent, "task-prose")); if (task.acceptance) root.append(el("p", t("tasks.criteria", { text: task.acceptance })));
   root.append(el("small", t("tasks.budgetSummary", { minutes: Math.ceil(task.active_ms / 60000), limit: Math.ceil(task.input.budget.active_seconds / 60), revisions: task.revisions_used, maxRevisions: task.input.budget.max_revisions })));
   if (task.question) root.append(el("p", task.question, "task-attention"));
@@ -67,9 +67,9 @@ export function taskContent(task: OutcomeTask, change: (action: object) => Promi
   const delivery = task.deliveries.at(-1), outcomes = el("section", undefined, "task-delivery"); outcomes.append(el("h3", t("tasks.delivery")));
   if (delivery) { outcomes.append(el("div", delivery.summary, "task-prose")); if (delivery.return_reason) outcomes.append(el("p", t("tasks.returnedReason", { text: delivery.return_reason }))); } else outcomes.append(el("p", t("tasks.deliveryPending")));
   outcomes.append(el("small", t("tasks.acceptanceNote"))); root.append(outcomes); }
-  root.append(el("h3", t(task.kind === TaskKind.Outcome ? "tasks.graph" : "tasks.directQuestion")), taskGraph(task, chooseNode));
+  root.append(el("h3", t(task.kind === TaskKind.Outcome ? "tasks.graph" : task.kind === TaskKind.Message ? "tasks.routing" : "tasks.directQuestion")), taskGraph(task, chooseNode));
   const n = task.nodes.find(n => n.input.id === selectedNode); if (n) root.append(nodeDetail(task, n));
-  if (task.kind === TaskKind.Outcome) { root.append(attemptLogs(task.coordinator_attempts, "tasks.coordinatorLogs")); const graphs = el("details"); graphs.append(el("summary", t("tasks.graphHistory"))); task.graph_history.forEach((nodes, i) => { graphs.append(el("h4", t("tasks.graphRevision", { revision: i + 1 }))); for (const n of nodes) graphs.append(el("p", n.title + " · " + display(n.person_id) + (n.dependencies.length ? " ← " + n.dependencies.join(", ") : ""))); }); root.append(graphs); }
+  if (task.kind !== TaskKind.Question) { root.append(attemptLogs(task.coordinator_attempts, "tasks.coordinatorLogs")); const graphs = el("details"); graphs.append(el("summary", t("tasks.graphHistory"))); task.graph_history.forEach((nodes, i) => { graphs.append(el("h4", t("tasks.graphRevision", { revision: i + 1 }))); for (const n of nodes) graphs.append(el("p", n.title + " · " + display(n.person_id) + (n.dependencies.length ? " ← " + n.dependencies.join(", ") : ""))); }); root.append(graphs); }
   const history = el("details"); history.append(el("summary", t("tasks.activity"))); const list = el("ol");
   for (const event of task.events) { const item = el("li"); item.append(el("time", new Date(event.created_ms).toLocaleTimeString()), el("strong", label("TaskEventKind", event.kind)), el("span", event.node_id ? task.nodes.find(n => n.input.id === event.node_id)?.input.title || event.node_id : ""), el("p", Object.values(TaskErrorCode).includes(event.text as TaskErrorCode) ? label("TaskErrorCode", event.text) : event.text)); list.append(item); } history.append(list); root.append(history);
   return root;

@@ -1,6 +1,18 @@
+export declare const MessageProcessingState: {
+    readonly Queued: "queued";
+    readonly Processing: "processing";
+    readonly WaitingInput: "waiting_input";
+    readonly Paused: "paused";
+    readonly Responded: "responded";
+    readonly Attached: "attached";
+    readonly Planned: "planned";
+    readonly Cancelled: "cancelled";
+};
+export type MessageProcessingState = (typeof MessageProcessingState)[keyof typeof MessageProcessingState];
 export declare const TaskKind: {
     readonly Outcome: "outcome";
     readonly Question: "question";
+    readonly Message: "message";
 };
 export type TaskKind = (typeof TaskKind)[keyof typeof TaskKind];
 export declare const TaskState: {
@@ -38,6 +50,8 @@ export declare const TaskEventKind: {
     readonly Returned: "returned";
     readonly Cancelled: "cancelled";
     readonly Expired: "expired";
+    readonly Responded: "responded";
+    readonly Attached: "attached";
 };
 export type TaskEventKind = (typeof TaskEventKind)[keyof typeof TaskEventKind];
 export declare const TaskErrorCode: {

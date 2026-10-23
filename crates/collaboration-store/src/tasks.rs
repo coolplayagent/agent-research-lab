@@ -26,7 +26,7 @@ pub(crate) fn member_active(db: &Connection, group: &str, actor: &str) -> Result
     }
     Ok(false)
 }
-fn members(db: &Connection, group: &str) -> Result<BTreeSet<String>> {
+pub(crate) fn members(db: &Connection, group: &str) -> Result<BTreeSet<String>> {
     Ok(db.prepare("SELECT m.actor_id FROM members m JOIN actors a ON a.id=m.actor_id WHERE m.group_id=?1 AND a.archived=0")?.query_map([group],|r|r.get(0))?.collect::<rusqlite::Result<_>>()?)
 }
 impl Store {
@@ -34,6 +34,7 @@ impl Store {
         let tx = self.connection.transaction()?;
         let now = now_ms();
         let result = match command {
+            TaskCommand::Message { message } => crate::task_messages::intake(&tx, message, now)?,
             TaskCommand::Get { id } => {
                 let task = read(&tx, &id)?;
                 goals::member(&tx, &task.input.group_id, "operator")?;
@@ -105,6 +106,7 @@ impl Store {
                     );
                     let mut task = OutcomeTask::new(input, now)?;
                     task.record(contracts::TaskEventKind::Created, None, String::new(), now);
+                    crate::task_messages::project(&tx, &mut task, 0)?;
                     insert(&tx, &task)?;
                     json!(task)
                 }
@@ -191,62 +193,13 @@ impl Store {
                 if !matches!(action, TaskAction::Cancel | TaskAction::Tick) {
                     goals::available(&tx, &task.input.group_id)?;
                 }
-                let submission = match &action {
-                    TaskAction::Submit {
-                        node_id, summary, ..
-                    } if task.kind == contracts::TaskKind::Question => {
-                        Some((node_id.clone(), summary.clone()))
-                    }
-                    _ => None,
-                };
-                task.transition(action, &members(&tx, &task.input.group_id)?, now)?;
-                if let Some((node, summary)) = submission {
-                    let person = &task
-                        .nodes
-                        .iter()
-                        .find(|n| n.input.id == node)
-                        .unwrap()
-                        .input
-                        .person_id;
-                    let mut body = summary.as_str();
-                    let mut part = 0;
-                    while !body.is_empty() {
-                        let mut end = body.len().min(MAX_TEXT);
-                        while !body.is_char_boundary(end) {
-                            end -= 1;
-                        }
-                        let count = tx.query_row("SELECT COUNT(*) FROM messages", [], |r| {
-                            r.get::<_, u64>(0)
-                        })?;
-                        store::append(
-                            &tx,
-                            person,
-                            &Publish {
-                                group_id: task.input.group_id.clone(),
-                                request_id: format!(
-                                    "answer-{}-{}-{}-{part}",
-                                    &storage::digest(id.as_bytes())[..20],
-                                    task.nodes
-                                        .iter()
-                                        .find(|n| n.input.id == node)
-                                        .unwrap()
-                                        .attempt,
-                                    node
-                                ),
-                                text: body[..end].into(),
-                                reply_to: task.reply_to,
-                            },
-                            &mut MAX_MESSAGES.saturating_sub(count),
-                            true,
-                        )?;
-                        body = &body[end..];
-                        part += 1;
-                    }
-                }
-                tx.execute(
-                    "UPDATE outcome_tasks SET active=?2,value=?3 WHERE id=?1",
-                    params![id, task.active(), serde_json::to_string(&task)?],
-                )?;
+                crate::task_messages::validate_route(&tx, &task, &action)?;
+                let start = task.events.len();
+                let original = task.clone();
+                task.transition(action.clone(), &members(&tx, &task.input.group_id)?, now)?;
+                crate::task_messages::attach(&tx, &original, &action, now)?;
+                crate::task_messages::project(&tx, &mut task, start)?;
+                crate::task_messages::save(&tx, &task)?;
                 crate::outcomes::record_task_artifacts(&tx, &task)?;
                 json!(task)
             }
@@ -255,7 +208,7 @@ impl Store {
         Ok(result)
     }
 }
-fn insert(db: &Connection, task: &OutcomeTask) -> Result<()> {
+pub(crate) fn insert(db: &Connection, task: &OutcomeTask) -> Result<()> {
     ensure!(
         db.query_row("SELECT COUNT(*) FROM outcome_tasks", [], |r| r
             .get::<_, u64>(0))?

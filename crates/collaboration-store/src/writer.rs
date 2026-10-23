@@ -172,7 +172,10 @@ fn control(store: &mut Store, shared: &Shared, op: Control) -> Result<Value> {
             } else {
                 &result
             };
-            if let Some(group) = task["input"]["group_id"].as_str() {
+            if let Some(group) = task["input"]["group_id"]
+                .as_str()
+                .or_else(|| result["message"]["group_id"].as_str())
+            {
                 let after = shared
                     .catalog
                     .read()

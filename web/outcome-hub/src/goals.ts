@@ -24,9 +24,10 @@ export function suspendGoals(): void {
   historySnapshot = [];
   get("goal-list").replaceChildren();
   get("more-goals").hidden = true;
-  get("goal-summary").textContent = t("workspace.goalSummary");
+  get("legacy-goal-summary").textContent = t("tasks.legacy");
 }
 export async function focusGoal(id: string): Promise<void> {
+  get<HTMLDetailsElement>("goal-section").open = true;
   const groupId = selected?.id;
   revealResearch("goals");
   while (selected?.id === groupId && !historySnapshot.some((goal) => goal.input.id === id) && next) {
@@ -192,6 +193,7 @@ export async function loadGoals(append = false): Promise<void> {
     if (generation !== request || selected?.id !== groupId) return;
     const { loaded, cursor } = history;
     historySnapshot = append ? [...historySnapshot, ...loaded] : loaded;
+    get("goal-section").hidden = !historySnapshot.length && !current.goals.length;
     const combined = new Map(historySnapshot.map(goal => [goal.input.id, goal]));
     for (const goal of current.goals) {
       const known = combined.get(goal.input.id);
@@ -211,11 +213,11 @@ export async function loadGoals(append = false): Promise<void> {
         Math.max(1, Math.min(...deadlines) - now + 50),
       );
     const active = currentGoal(snapshot, now);
-    get("goal-summary").textContent = active
+    get("legacy-goal-summary").textContent = active
       ? t(active.state === GoalState.Active ? "workspace.currentGoal" : "workspace.latestGoal", {
           title: active.input.title, status: progressSummary(active, now),
         })
-      : t("workspace.goalSummary");
+      : t("tasks.legacy");
     document.dispatchEvent(new Event("workspace-goals"));
     const list = get("goal-list");
     const opened = new Set(

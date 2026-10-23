@@ -1,5 +1,6 @@
 """Exercise the actual packaged local runtime using deterministic vendor peers."""
 import json
+import os
 from pathlib import Path
 import shutil
 import socket
@@ -13,7 +14,7 @@ import urllib.error
 
 
 def run(archive, fixture):
-    with tempfile.TemporaryDirectory(prefix="oh-runtime-", dir="/tmp") as temporary:
+    with tempfile.TemporaryDirectory(prefix="oh-runtime-", dir=os.environ.get("TEST_TMPDIR")) as temporary, tempfile.TemporaryDirectory(prefix="oh-rs-", dir="/tmp") as state_temp:
         root = Path(temporary)
         with tarfile.open(archive) as package:
             package.extractall(root, filter="data")
@@ -27,7 +28,7 @@ def run(archive, fixture):
             reserved.bind(("127.0.0.1", 0))
             port = reserved.getsockname()[1]
         base = f"http://127.0.0.1:{port}"
-        state = root / "state"
+        state = Path(state_temp)
         isolated = root / "profile"
         isolated.mkdir(mode=0o700)
         environment = {"PATH": "/usr/bin:/bin", "HOME": str(isolated), "TMPDIR": str(root)}
@@ -70,7 +71,7 @@ def run(archive, fixture):
             assert next(s for s in view["local_runtime"] if s["component"] == "storage")["state"] == "ready"
             api("/api/v1/messaging/manage", {"operation":"person", "person":{"id":"persistent", "name":"Persistent"}}, "manage-crystal")
             # Recovery reopens the same durable store, without replacing configuration.
-            import os, signal
+            import signal
             os.kill(next(iter(storage_pids)), signal.SIGKILL)
             for _ in range(100):
                 try:

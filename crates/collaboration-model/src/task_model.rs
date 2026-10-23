@@ -126,6 +126,16 @@ pub struct OutcomeTask {
     pub question: String,
     pub error: Option<TaskErrorCode>,
     pub reply_to: Option<u64>,
+    #[serde(default)]
+    pub message_sequences: Vec<u64>,
+    #[serde(default)]
+    pub linked_task_id: Option<String>,
+    #[serde(default)]
+    pub reply_task_id: Option<String>,
+    #[serde(default)]
+    pub last_intent_revision: u64,
+    #[serde(default)]
+    pub message_processing: Option<contracts::MessageProcessingState>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -137,6 +147,14 @@ pub struct NodeReview {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CoordinatorProposal {
+    Respond {
+        message: String,
+    },
+    Attach {
+        task_id: String,
+        revision: u64,
+        text: String,
+    },
     Clarify {
         question: String,
     },
@@ -221,6 +239,9 @@ impl TaskAction {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TaskCommand {
+    Message {
+        message: crate::Publish,
+    },
     Create {
         input: TaskInput,
     },
