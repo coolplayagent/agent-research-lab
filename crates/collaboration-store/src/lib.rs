@@ -11,6 +11,7 @@ mod metrics;
 mod outcomes;
 mod schema;
 mod store;
+mod task_messages;
 mod tasks;
 mod writer;
 use anyhow::{Context, Result, anyhow, ensure};
@@ -462,15 +463,33 @@ impl Hub {
             json!({"members":rows.into_iter().take(limit).map(|id|self.presence(&id)).collect::<Result<Vec<_>>>()?,"next_after":next}),
         )
     }
-    pub fn presence(&self, actor: &str) -> Result<ActorStatus> {
-        let desired = *self
+    /// Transport delivery preference is independent of execution availability.
+    pub fn receives(&self, actor: &str) -> Result<bool> {
+        Ok(self
             .shared
             .catalog
             .read()
             .unwrap()
             .actors
             .get(actor)
-            .context("unknown digital person")?;
+            .context("unknown digital person")?
+            .receives())
+    }
+    pub fn presence(&self, actor: &str) -> Result<ActorStatus> {
+        let catalog = self.shared.catalog.read().unwrap();
+        ensure!(catalog.actors.contains_key(actor), "unknown digital person");
+        let presence = if catalog.archived_people.contains(actor) {
+            Presence::Offline
+        } else if catalog
+            .busy_until
+            .get(actor)
+            .is_some_and(|deadline| *deadline > now_ms())
+        {
+            Presence::Busy
+        } else {
+            Presence::Online
+        };
+        drop(catalog);
         let connections = self
             .shared
             .connections
@@ -481,11 +500,7 @@ impl Hub {
             .unwrap_or(0);
         Ok(ActorStatus {
             person_id: actor.into(),
-            presence: if connections == 0 {
-                Presence::Offline
-            } else {
-                desired
-            },
+            presence,
             connections,
         })
     }

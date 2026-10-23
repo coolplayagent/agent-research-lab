@@ -8,7 +8,8 @@ import { dialog, area, check, select, field, finish } from "./forms.js";
 const outcomeCommand = (command) => api("/api/v2/collaboration/outcomes", command, "manage-outcomes");
 export function outcomeLink(id, title = id) {
     const link = el("a", title);
-    link.href = "#outcomes/" + encodeURIComponent(id);
+    link.href = (location.hash.match(/^#groups\/[^/]+\/tasks\/[^/]+/)?.[0] || "#") + "/outcomes/" + encodeURIComponent(id);
+    link.href = link.href.replace("#/outcomes/", "#outcomes/");
     link.onclick = () => { if (location.hash === link.hash)
         void showOutcome(id).catch(error => { document.getElementById("notice").textContent = String(error); }); };
     return link;

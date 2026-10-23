@@ -42,3 +42,39 @@ async fn task_http_separates_operator_intent_from_execution_authority() {
     );
     h.close().await;
 }
+
+#[tokio::test]
+async fn group_message_intake_is_operator_only_and_task_lists_require_a_group() {
+    let h = Harness::new().await;
+    h.manage(json!({"operation":"person","person":{"id":"worker","name":"Worker"}}))
+        .await;
+    h.manage(json!({"operation":"create","group":{"id":"team","title":"Team","topic":"Work","private":false,"members":["worker"]}})).await;
+    let body = json!({"operation":"send","message":{"group_id":"team","request_id":"intent","text":"Please propose a plan"}});
+    let first = h.manage(body.clone()).await;
+    assert_eq!(first["task"]["kind"], "message");
+    assert_eq!(
+        h.manage(body).await["task"]["input"]["id"],
+        first["task"]["input"]["id"]
+    );
+    let id = first["task"]["input"]["id"].as_str().unwrap();
+    assert_eq!(
+        h.request(
+            &format!("/api/v2/collaboration/tasks?id={id}&group_id=elsewhere"),
+            None,
+            true,
+            None
+        )
+        .await
+        .0,
+        403
+    );
+    assert_eq!(
+        h.request("/api/v2/collaboration/tasks", None, true, None)
+            .await
+            .0,
+        400
+    );
+    let token = h.hub.grant("worker", 60).await.unwrap();
+    assert_eq!(h.request("/api/v1/messaging/manage",Some(json!({"operation":"send","message":{"group_id":"team","request_id":"forged","text":"Run"}})),false,Some(&token)).await.0,401);
+    h.close().await;
+}

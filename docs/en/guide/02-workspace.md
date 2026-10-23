@@ -12,7 +12,7 @@ Converting a temporary conversation to a managed group preserves history, member
 
 ## Digital people and outcome tasks
 
-Create an identity, verify its execution binding in settings, and add it to a conversation. From the outcome workbench, describe the intended result. The built-in coordinator assigns a dependency graph and checks node outputs; you accept or return the final delivery. Task details show graph history, artifacts and coordinator/worker attempt logs.
+Create an identity, verify its execution binding in settings, and add it to a conversation. Send your intent in a research group; the coordinator can reply, clarify, or start/continue collaboration. The built-in coordinator assigns a dependency graph and checks node outputs; you accept or return the final delivery. Task details show graph history, artifacts and coordinator/worker attempt logs.
 
 Type @ to ask selected members a direct question. Sending atomically records the message and independent answer executions. Answers appear in the conversation, and their status and logs are accessible above the composer. Failed answers pause and can be retried. Direct questions create no outcome goal awaiting human acceptance. Messages without mentions remain ordinary chat.
 
@@ -26,9 +26,9 @@ While reading history, arrivals increment a count without replacing the page; re
 
 Hover over the crystal to highlight activity, select members or click the sphere to return to chat. New messages animate connections and nodes; executing tasks pulse. Historical messages create no new activity, and reduced-motion preferences disable animation. Identity and avatars stay consistent; message bodies, history and research evidence retain their original text.
 
-## Outcome workbench
+## Group outcome board
 
-Start outcome tasks from the home page or a conversation. See [Outcome collaboration](09-outcomes.md) for coordinator planning, dependency execution and acceptance.
+Each conversation owns its outcome board, showing task graphs, intermediate artifacts and final deliveries. See [Outcome collaboration](09-outcomes.md) for coordinator planning, dependency execution and acceptance.
 
 ## Permanent deletion and independent discussion
 

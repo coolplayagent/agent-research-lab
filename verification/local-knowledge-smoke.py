@@ -13,14 +13,14 @@ import urllib.error
 
 
 def run(archive):
-    with tempfile.TemporaryDirectory(prefix="oh-knowledge-", dir="/tmp") as temp:
+    with tempfile.TemporaryDirectory(prefix="oh-knowledge-", dir=os.environ.get("TEST_TMPDIR")) as temp, tempfile.TemporaryDirectory(prefix="oh-ks-", dir="/tmp") as state_temp:
         root = Path(temp)
         with tarfile.open(archive) as package:
             package.extractall(root, filter="data")
         binaries = root / "outcome-hub"
         knowledge = binaries / "outcome-hub-knowledge"
         assert knowledge.is_file()
-        state = root / "state"
+        state = Path(state_temp)
         directory = root / "notes"
         directory.mkdir()
         (directory / "note.md").write_text("original source\n")
@@ -132,7 +132,7 @@ def run(archive):
                     assert diagnostic["code"] == expected, diagnostic
                     assert diagnostic["parameters"]["path"] == path
             rejected = config()
-            rejected["outcome_services"].append({**rejected["outcome_services"][0], "id":"external-knowledge", "management":"external", "endpoint":str(root / "external.sock")})
+            rejected["outcome_services"].append({**rejected["outcome_services"][0], "id":"external-knowledge", "management":"external", "endpoint":str(state / "external.sock")})
             before_rejected = config()
             try:
                 api("/api/v1/collaboration/services", rejected, "manage-services")

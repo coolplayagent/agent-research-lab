@@ -20,7 +20,7 @@ export function taskCard(task, select) {
 export function taskGraph(task, choose) {
     const graph = el("div", undefined, "task-graph");
     if (!task.nodes.length) {
-        graph.append(el("p", t("tasks.planning")));
+        graph.append(el("p", t(task.kind === TaskKind.Message ? "tasks.routing" : "tasks.planning")));
         return graph;
     }
     const depths = new Map();
@@ -89,8 +89,8 @@ function attemptLogs(runs, title) {
 }
 export function taskContent(task, change, chooseNode, selectedNode) {
     const root = el("div"), head = el("header", undefined, "task-heading"), status = el("div");
-    status.append(el("h2", task.title), el("span", label("TaskState", task.state), "task-state"));
-    head.append(status, actions(...(task.state === TaskState.Paused ? [button(t("tasks.resume"), () => change({ operation: "resume" }))] : []), button(t("tasks.back"), () => { location.hash = "tasks"; }), ...(task.state === TaskState.Review ? [button(t("tasks.accept"), () => change({ operation: "accept" }))] : []), ...(![TaskState.Completed, TaskState.Cancelled].includes(task.state) ? [button(t("tasks.cancel"), () => change({ operation: "cancel" }))] : [])));
+    status.append(el("h2", task.title), el("span", task.kind === TaskKind.Message && task.message_processing ? label("MessageProcessingState", task.message_processing) : label("TaskState", task.state), "task-state"));
+    head.append(status, actions(...(task.state === TaskState.Paused ? [button(t("tasks.resume"), () => change({ operation: "resume" }))] : []), button(t("tasks.back"), () => { location.hash = "groups/" + encodeURIComponent(task.input.group_id) + "/tasks"; }), ...(task.state === TaskState.Review ? [button(t("tasks.accept"), () => change({ operation: "accept" }))] : []), ...(![TaskState.Completed, TaskState.Cancelled].includes(task.state) ? [button(t("tasks.cancel"), () => change({ operation: "cancel" }))] : [])));
     root.append(head);
     root.append(el("p", task.input.intent, "task-prose"));
     if (task.acceptance)
@@ -113,11 +113,11 @@ export function taskContent(task, change, chooseNode, selectedNode) {
         outcomes.append(el("small", t("tasks.acceptanceNote")));
         root.append(outcomes);
     }
-    root.append(el("h3", t(task.kind === TaskKind.Outcome ? "tasks.graph" : "tasks.directQuestion")), taskGraph(task, chooseNode));
+    root.append(el("h3", t(task.kind === TaskKind.Outcome ? "tasks.graph" : task.kind === TaskKind.Message ? "tasks.routing" : "tasks.directQuestion")), taskGraph(task, chooseNode));
     const n = task.nodes.find(n => n.input.id === selectedNode);
     if (n)
         root.append(nodeDetail(task, n));
-    if (task.kind === TaskKind.Outcome) {
+    if (task.kind !== TaskKind.Question) {
         root.append(attemptLogs(task.coordinator_attempts, "tasks.coordinatorLogs"));
         const graphs = el("details");
         graphs.append(el("summary", t("tasks.graphHistory")));

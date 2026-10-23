@@ -57,3 +57,9 @@ node_test(
     script = "deletion-tests.cjs",
     data = [":policy_sources", "//web/shared:policy_sources"],
 )
+
+node_test(
+    name = "group_collaboration_tests",
+    script = "group-collaboration-tests.cjs",
+    data = [":policy_sources", "//web/shared:policy_sources"],
+)

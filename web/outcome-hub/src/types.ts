@@ -2,6 +2,7 @@ import type {
   GroupKind,
   Presence,
   GoalEventKind,
+  TaskEventKind,
 } from "/assets/shared/contracts.js";
 export type Kind = GroupKind;
 export interface Group {
@@ -31,6 +32,7 @@ export interface Member {
 }
 export interface Message {
   deleted?: boolean;
+  activity?: { has_content: boolean; task_id: string; kind: TaskEventKind; title: string; node_id: string | null; person_id: string | null };
   event?: {
     kind: GoalEventKind;
     goal_id: string;

@@ -92,7 +92,7 @@ async fn membership_rotation_presence_and_replay_have_enforced_boundaries() {
     assert!(hub.publish(&token, input("revoked")).await.is_err());
     hub.publish(&new_token, input("allowed")).await.unwrap();
     drop(sub);
-    assert_eq!(hub.presence("cedar").unwrap().presence, Presence::Offline);
+    assert_eq!(hub.presence("cedar").unwrap().presence, Presence::Online);
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn concurrent_retries_commit_once_and_publish_one_live_event() {

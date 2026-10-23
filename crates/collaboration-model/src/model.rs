@@ -141,6 +141,8 @@ pub struct Message {
     pub deleted: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event: Option<GoalEvent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub activity: Option<TaskMessage>,
     pub sequence: u64,
     pub group_id: String,
     pub sender_id: String,
@@ -184,4 +186,16 @@ pub struct GoalEvent {
     pub person_id: Option<String>,
     pub work_id: Option<String>,
     pub attempt: Option<u32>,
+}
+
+/// Host-owned collaboration event; never accepted in a worker publish request.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TaskMessage {
+    #[serde(default)]
+    pub has_content: bool,
+    pub task_id: String,
+    pub kind: contracts::TaskEventKind,
+    pub title: String,
+    pub node_id: Option<String>,
+    pub person_id: Option<String>,
 }

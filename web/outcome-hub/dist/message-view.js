@@ -1,4 +1,4 @@
-import { GoalEventKind } from "/assets/shared/contracts.js";
+import { GoalEventKind, TaskEventKind } from "/assets/shared/contracts.js";
 import { t, label } from "./i18n.js";
 import { button, el } from "./dom.js";
 import { avatar } from "./avatar.js";
@@ -6,6 +6,8 @@ import { display } from "./people.js";
 import { contributionText } from "./contribution-text.js";
 import { resultForMessage } from "./message-results.js";
 function preview(message) {
+    if (message.activity)
+        return message.activity.has_content ? message.text : label("TaskEventKind", message.activity.kind);
     if (message.deleted)
         return t("deletion.deletedAnnouncement");
     if (message.event && message.sender_id !== message.event.person_id)
@@ -13,6 +15,8 @@ function preview(message) {
     return contributionText(message.text, display(message.sender_id));
 }
 export function messageRow(message, history, goals, actions) {
+    if (message.activity)
+        return activityRow(message, actions);
     const contribution = message.event?.kind === GoalEventKind.Submitted && message.sender_id === message.event.person_id;
     const submission = resultForMessage(message, goals);
     const author = submission?.work.person_id || message.sender_id;
@@ -60,5 +64,21 @@ export function messageRow(message, history, goals, actions) {
         footer.append(button(t("messages.reviewResult"), () => actions.review(message.event.goal_id)));
     body.append(heading, bubble, footer);
     row.append(face, body);
+    return row;
+}
+function activityRow(message, actions) {
+    const event = message.activity, row = el("article", undefined, "message agent-contribution"), body = el("div", undefined, "message-body");
+    row.dataset.sequence = String(message.sequence);
+    const header = el("header", undefined, "message-header");
+    header.append(el("strong", event.person_id ? display(event.person_id) : [TaskEventKind.Accepted, TaskEventKind.Returned, TaskEventKind.Supplemented, TaskEventKind.Cancelled].includes(event.kind) ? display("operator") : t("tasks.coordinator")), el("small", label("TaskEventKind", event.kind)));
+    const content = el("div", undefined, "chat-bubble");
+    content.append(el("strong", event.title));
+    content.append(el("p", event.has_content ? message.text : t("tasks.event." + event.kind), "message-text"));
+    const link = el("a", t("tasks.viewRun"));
+    link.href = "#groups/" + encodeURIComponent(message.group_id) + "/tasks/" + encodeURIComponent(event.task_id);
+    const footer = el("footer", undefined, "message-actions");
+    footer.append(button(t("messages.cf945e21dd"), actions.reply), link);
+    body.append(header, content, footer);
+    row.append(body);
     return row;
 }

@@ -1,3 +1,4 @@
+import { selectTasks } from "./tasks.js";
 import { selectQuestionRuns } from "./question-runs.js";
 import { deleteObject } from "./deletion.js";
 import { syncControls } from "./workspace.js";
@@ -60,6 +61,7 @@ export async function select(group: Group): Promise<void> {
   selectCollaboration(null);
   selectMentions("");
   selectQuestionRuns("");
+  selectTasks(null);
   const request = ++generation;
   stream?.close();
   stream = null;
@@ -74,6 +76,7 @@ export async function select(group: Group): Promise<void> {
     if (request !== generation) return;
     current = page.group;
     selectQuestionRuns(page.group.id);
+    selectTasks(page.group);
     get("workspace").classList.remove("directory-open");
     syncControls();
     setSelected(group.id);

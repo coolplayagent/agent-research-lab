@@ -1,5 +1,5 @@
 import { uuid } from "/assets/shared/identity.js";
-import { GroupKind, TaskKind, TaskState } from "/assets/shared/contracts.js";
+import { TaskKind, TaskState } from "/assets/shared/contracts.js";
 import { api, query } from "./api.js";
 import { get, el, button, actions, notice } from "./dom.js";
 import { area, input, select, field, dialog, finish } from "./forms.js";
@@ -7,19 +7,34 @@ import { t } from "./i18n.js";
 import { current } from "./conversation.js";
 import { taskCard, taskContent } from "./task-render.js";
 import type { OutcomeTask, TaskPage } from "./task-types.js";
-import type { Directory, Group } from "./types.js";
+import type { Group } from "./types.js";
 import type { ServiceView } from "./service-types.js";
 let selected: OutcomeTask | null = null, selectedNode = "", generation = 0, filter = "", next: string | null = null, rows: OutcomeTask[] = [], loading = false;
 const endpoint = "/api/v2/collaboration/tasks";
-async function groups(): Promise<Group[]> { const all: Group[] = []; let after = ""; do { const page = await api<Directory>("/api/v1/messaging/view?" + query({ after })); all.push(...page.directory.groups.filter(g => g.kind !== GroupKind.Board && !g.archived)); after = page.directory.next_after || ""; } while (after); return all; }
-export async function newTask(groupId = current?.id): Promise<void> {
-  const choices = await groups(), box = dialog(t("tasks.new")), intent = area(""), scope = select(choices.map(g => [g.id, g.title]), groupId || choices[0]?.id || ""); intent.required = true; intent.maxLength = 8000;
-  box.form.append(el("p", t("tasks.newNote")), field(t("tasks.intent"), intent), field(t("tasks.conversation"), scope));
-  if (!choices.length) { box.form.append(el("p", t("tasks.needConversation"))); box.dialog.showModal(); return; }
-  const id = "task-" + uuid();
-  finish(box, async () => { const task = await api<OutcomeTask>(endpoint, { operation: "create", input: { id, group_id: scope.value, intent: intent.value.trim() } }); location.hash = "tasks/" + encodeURIComponent(task.input.id); });
+let group: Group | null = null;
+export function taskRoute(groupId: string, taskId = ""): string { return "groups/" + encodeURIComponent(groupId) + "/tasks" + (taskId ? "/" + encodeURIComponent(taskId) : ""); }
+export function selectTasks(value: Group | null): void {
+  group = value; generation++; selected = null; rows = []; next = null; selectedNode = "";
+  get("task-list").replaceChildren(); get("task-detail-content").replaceChildren();
+  get<HTMLTextAreaElement>("task-note").value = "";
+  get("task-list-view").hidden = false; get("task-detail-view").hidden = true;
+  get("tasks-status").textContent = value ? "" : t("tasks.needConversation");
+  get<HTMLButtonElement>("new-task").disabled = !value || value.archived;
+  if (value) void loadTasks();
 }
-async function change(action: object): Promise<void> { if (!selected) return; selected = await api<OutcomeTask>(endpoint, { operation: "change", id: selected.input.id, revision: selected.revision, action }); renderDetail(); }
+export async function newTask(groupId = current?.id): Promise<void> {
+  if (!group || group.id !== groupId || group.archived) return;
+  const scope = group.id, box = dialog(t("tasks.new")), intent = area(""); intent.required = true; intent.maxLength = 8000;
+  box.form.append(el("p", group.title), el("p", t("tasks.newNote")), field(t("tasks.intent"), intent));
+  const id = "task-" + uuid();
+  finish(box, async () => { const task = await api<OutcomeTask>(endpoint, { operation: "create", input: { id, group_id: scope, intent: intent.value.trim() } }); location.hash = taskRoute(scope, task.input.id); });
+}
+async function change(action: object): Promise<void> {
+  if (!selected) return; const task = selected, epoch = generation;
+  const updated = await api<OutcomeTask>(endpoint, { operation: "change", id: task.input.id, revision: task.revision, action });
+  if (epoch !== generation || selected?.input.id !== task.input.id) return;
+  selected = updated; renderDetail();
+}
 function renderDetail(): void {
   if (!selected) return;
   const root = get("task-detail-content"), opened = new Set([...root.querySelectorAll("details[open]")].map(n => n.querySelector("summary")?.textContent));
@@ -30,26 +45,28 @@ function renderDetail(): void {
 }
 function renderList(): void {
   const root = get("task-list"); root.replaceChildren();
-  for (const task of rows.filter(task => !filter || task.state === filter)) root.append(taskCard(task, () => { location.hash = "tasks/" + encodeURIComponent(task.input.id); }));
+  for (const task of rows.filter(task => !filter || task.state === filter)) root.append(taskCard(task, () => { location.hash = taskRoute(task.input.group_id, task.input.id); }));
   if (!root.childElementCount) root.append(el("p", t("tasks.empty"), "task-empty"));
   get("more-tasks").hidden = !next;
 }
 export async function loadTasks(more = false): Promise<void> {
-  const path = location.hash.slice(1); if (!path.startsWith("tasks") || loading) return;
+  const path = location.hash.slice(1); if (!group || get("conversations").hidden || loading) return;
+  const scope = group.id;
   const request = ++generation; loading = true;
   try {
-    const id = path.startsWith("tasks/") ? decodeURIComponent(path.slice(6)) : "";
+    const parts = path.split("/"), id = parts[2] === "tasks" && parts[3] ? decodeURIComponent(parts[3]) : "";
     get("task-list-view").hidden = !!id; get("task-detail-view").hidden = !id;
     if (id) {
-      const task = await api<OutcomeTask>(endpoint + "?" + query({ id })); if (request !== generation || location.hash.slice(1) !== path) return;
+      const task = await api<OutcomeTask>(endpoint + "?" + query({ id, group_id: scope })); if (request !== generation || location.hash.slice(1) !== path) return;
+      if (task.input.group_id !== scope) throw new Error(t("tasks.changed"));
       if (selected?.input.id !== id) { selectedNode = ""; get<HTMLTextAreaElement>("task-note").value = ""; }
       if (selected?.input.id !== id || selected.revision !== task.revision) { selected = task; renderDetail(); }
     } else {
-      selected = null; const page = await api<TaskPage>(endpoint + "?" + query({ after: more ? next || "" : "" })); if (request !== generation || location.hash.slice(1) !== path) return;
+      selected = null; const page = await api<TaskPage>(endpoint + "?" + query({ group_id: scope, after: more ? next || "" : "" })); if (request !== generation || location.hash.slice(1) !== path) return;
       rows = more ? [...rows, ...page.tasks] : page.tasks; next = page.next_after; renderList();
     }
     get("tasks-status").textContent = "";
-  } catch (e) { get("tasks-status").textContent = String(e); } finally { loading = false; }
+  } catch (e) { if (request === generation && group?.id === scope) get("tasks-status").textContent = String(e); } finally { loading = false; }
 }
 async function budget(): Promise<void> {
   if (!selected) return; const task = selected, box = dialog(t("tasks.budget")), values = { ...task.input.budget }, controls = new Map<string, HTMLInputElement>();

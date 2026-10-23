@@ -204,7 +204,7 @@ async fn advance(
     )
     .await?;
     let outcome=async {
-        let instruction=if let Some(id)=&node_id {crate::task_prompt::worker(&task,task.nodes.iter().find(|n|n.input.id==*id).unwrap())}else{let members=people(&hub,&config,&task.input.group_id).await?;ensure!(members.as_array().is_some_and(|p|!p.is_empty()),"{}",Code::Unavailable);crate::task_prompt::coordinator(&task,&members)};
+        let instruction=if let Some(id)=&node_id {crate::task_prompt::worker(&task,task.nodes.iter().find(|n|n.input.id==*id).unwrap())}else{let members=people(&hub,&config,&task.input.group_id).await?;if task.kind == contracts::TaskKind::Message { let candidates = routing_candidates(&hub, &task).await?; crate::task_prompt::routing(&task, &members, &candidates) } else { ensure!(members.as_array().is_some_and(|p|!p.is_empty()),"{}",Code::Unavailable);crate::task_prompt::coordinator(&task,&members) }};
         let node=node_id.as_ref().and_then(|id|task.nodes.iter().find(|n|n.input.id==*id));
         let input=AgentInput{protocol_version:service_protocol::VERSION,request_id:claim_id.clone(),person_id:node.map_or("coordinator",|n|n.input.person_id.as_str()).into(),goal_id:task.input.id.clone(),work_id:node_id.clone().unwrap_or_else(||"coordinator".into()),attempt:node.map_or(task.coordinator_calls,|n|n.attempt),objective:task.input.intent.clone(),acceptance:node.map_or("Return a valid coordinator proposal",|n|n.input.acceptance.as_str()).into(),instruction,messages:hub.history_before(&task.input.group_id,i64::MAX as u64,16).await?};
         ensure!(input.instruction.len()<=1024*1024,"{}",Code::Budget);
@@ -243,7 +243,9 @@ async fn advance(
     });
     if let Err(e) = commit(&hub, &task.input.id, action).await {
         registry.record_task_diagnostic(&task.input.id, &claim_id, &e);
-        let code = if e.to_string().contains(Code::Budget.as_str()) {
+        let code = if e.to_string().contains(Code::Conflict.as_str()) {
+            Code::Unavailable
+        } else if e.to_string().contains(Code::Budget.as_str()) {
             Code::Budget
         } else {
             Code::Protocol
@@ -317,4 +319,33 @@ pub(crate) async fn probe(registry: &Registry, force: bool) -> Result<Configurat
     );
     registry.record_coordinator_probe(&config, receipt.output_sha256)?;
     Ok(registry.configuration())
+}
+
+async fn routing_candidates(
+    hub: &collaboration_client::Client,
+    task: &OutcomeTask,
+) -> Result<Value> {
+    let page = hub
+        .tasks(TaskCommand::List {
+            group_id: task.input.group_id.clone(),
+            after: String::new(),
+            active: false,
+            questions: true,
+        })
+        .await?;
+    let mut candidates: Vec<OutcomeTask> = serde_json::from_value(page["tasks"].clone())?;
+    if let Some(id) = &task.reply_task_id
+        && !candidates.iter().any(|t| &t.input.id == id)
+    {
+        let target = read(hub, id).await?;
+        ensure!(
+            target.input.group_id == task.input.group_id,
+            "{}",
+            Code::Forbidden
+        );
+        candidates.push(target);
+    }
+    Ok(
+        json!({"has_older":!page["next_after"].is_null(),"tasks":candidates.iter().filter(|t|t.input.id!=task.input.id && t.kind!=contracts::TaskKind::Question && (t.kind==contracts::TaskKind::Outcome || t.state==contracts::TaskState::WaitingInput)).map(|t|json!({"id":t.input.id,"revision":t.revision,"kind":t.kind,"state":t.state,"intent":t.input.intent.chars().take(1000).collect::<String>(),"title":t.title,"question":t.question,"latest_note":t.notes.last(),"progress":t.nodes.iter().map(|n|json!({"title":n.input.title,"state":n.state})).collect::<Vec<_>>()})).collect::<Vec<_>>()}),
+    )
 }

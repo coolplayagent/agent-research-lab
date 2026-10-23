@@ -13,7 +13,7 @@
     <div id="workspace" hidden="">
       <aside id="left-sidebar" class="sidebar">
         <div id="workspace-navigation">
-          <a class="brand" href="#tasks"
+          <a class="brand" href="#groups"
             ><span class="orb small">◈</span
             ><span data-i18n="workspace.brand"></span
           ></a>
@@ -40,7 +40,6 @@
             ></button>
           </div>
           <nav class="workspace-links" data-i18n-aria-label="html.9bae680405">
-            <a href="#tasks" data-page="tasks"><span id="task-nav-icon" class="nav-icon"></span><span data-i18n="tasks.title"></span></a>
             <a
               href="#people"
               data-page="people"
@@ -177,7 +176,7 @@
                 ></textarea>
                 <div class="compose-actions">
                   <small id="message-count"></small>
-                  <small data-i18n="mentions.hint"></small>
+                  <small id="composer-hint" data-i18n="mentions.hint"></small>
                   <span id="reply-status"></span
                   ><button
                     id="cancel-reply"
@@ -223,16 +222,7 @@
             data-i18n="html.435e8f4a1f"
           ></button>
         </section>
-        <section id="tasks-page" class="content-page" hidden>
-          <p id="tasks-status" role="status"></p>
-          <div id="task-list-view">
-            <header><div><h2 data-i18n="tasks.title"></h2><p data-i18n="tasks.note"></p></div><div class="toolbar"><button id="refresh-tasks" data-i18n="tasks.refresh"></button><button id="new-task" class="primary" data-i18n="tasks.new"></button></div></header>
-            <label class="task-filter"><span data-i18n="tasks.filter"></span><select id="task-filter">
-              <option value="" data-i18n="tasks.all"></option><option value="planning" data-i18n="TaskState.planning"></option><option value="running" data-i18n="TaskState.running"></option><option value="waiting_input" data-i18n="TaskState.waiting_input"></option><option value="paused" data-i18n="TaskState.paused"></option><option value="review" data-i18n="TaskState.review"></option><option value="completed" data-i18n="TaskState.completed"></option><option value="cancelled" data-i18n="TaskState.cancelled"></option>
-            </select></label><div id="task-list" class="task-cards"></div><button id="more-tasks" hidden data-i18n="tasks.more"></button>
-          </div>
-          <div id="task-detail-view" hidden><div id="task-detail-content"></div><section id="task-followup"><label><span data-i18n="tasks.followup"></span><textarea id="task-note" rows="3" maxlength="8000"></textarea></label><div class="toolbar"><button id="task-followup-send" class="primary" data-i18n="tasks.supplement"></button><button id="task-budget" data-i18n="tasks.budget"></button></div></section></div>
-        </section>
+
 
         <section id="settings-page" class="content-page" hidden>
           <p id="services-status" role="status"></p>
@@ -339,11 +329,22 @@
             <div id="collaboration-detail"></div>
           </section>
           <section id="goals-page" class="research-tab" hidden>
-            <section id="goal-section" class="goal-section">
+        <section id="tasks-page" class="group-outcomes">
+          <p id="tasks-status" role="status"></p>
+          <div id="task-list-view">
+            <header><div><h2 data-i18n="tasks.title"></h2><p data-i18n="tasks.note"></p></div><div class="toolbar"><button id="refresh-tasks" data-i18n="tasks.refresh"></button><button id="new-task" class="primary" data-i18n="tasks.new"></button></div></header>
+            <label class="task-filter"><span data-i18n="tasks.filter"></span><select id="task-filter">
+              <option value="" data-i18n="tasks.all"></option><option value="planning" data-i18n="TaskState.planning"></option><option value="running" data-i18n="TaskState.running"></option><option value="waiting_input" data-i18n="TaskState.waiting_input"></option><option value="paused" data-i18n="TaskState.paused"></option><option value="review" data-i18n="TaskState.review"></option><option value="completed" data-i18n="TaskState.completed"></option><option value="cancelled" data-i18n="TaskState.cancelled"></option>
+            </select></label><div id="task-list" class="task-cards"></div><button id="more-tasks" hidden data-i18n="tasks.more"></button>
+          </div>
+          <div id="task-detail-view" hidden><div id="task-detail-content"></div><section id="task-followup"><label><span data-i18n="tasks.followup"></span><textarea id="task-note" rows="3" maxlength="8000"></textarea></label><div class="toolbar"><button id="task-followup-send" class="primary" data-i18n="tasks.supplement"></button><button id="task-budget" data-i18n="tasks.budget"></button></div></section></div>
+        </section>
+            <details id="goal-section" class="goal-section">
+              <summary id="legacy-goal-summary" data-i18n="tasks.legacy"></summary>
               <header>
                 <h3 data-i18n="html.769481704b"></h3>
                 <button
-                  id="new-goal"
+                  id="new-goal" hidden
                   class="primary"
                   data-i18n="html.ead1d713cf"
                 ></button>
@@ -354,7 +355,7 @@
                 hidden=""
                 data-i18n="html.29ddbd408f"
               ></button>
-            </section>
+            </details>
           </section>
           <section id="members-page" class="research-tab" hidden>
             <div id="research-members"></div>

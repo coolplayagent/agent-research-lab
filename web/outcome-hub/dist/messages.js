@@ -67,6 +67,9 @@ export function resetMessages(selected, initial) {
 export function updateComposer(selected) {
     group = selected;
     const input = get("message-text"), submit = get("send-message"), sending = drafts.isSending(selected.id);
+    const coordinates = selected.kind === GroupKind.Conversation && !selected.private;
+    input.placeholder = t(coordinates ? "messages.intentPlaceholder" : "html.09f02f8e33");
+    get("composer-hint").textContent = t(coordinates ? "messages.intentHint" : "mentions.hint");
     input.disabled = selected.archived;
     input.readOnly = sending;
     submit.disabled = selected.archived || sending || !input.value.trim();

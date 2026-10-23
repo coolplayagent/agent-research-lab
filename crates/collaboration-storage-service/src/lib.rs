@@ -59,7 +59,7 @@ async fn execute(hub: &Hub, request: Request) -> Result<Value> {
         Request::Receives { actor, group } => {
             hub.authorize(&actor, &group)?;
             ensure!(hub.metrics()["healthy"] == true, "durable writer fault");
-            Ok(json!(hub.presence(&actor)?.presence.receives()))
+            Ok(json!(hub.receives(&actor)?))
         }
         Request::Register { actors } => Ok(json!(hub.register(actors).await?)),
         Request::SavePerson { person } => Ok(json!(hub.save_person(person).await?)),

@@ -161,7 +161,7 @@ export function renderBindings(config, people, save, refresh, onDirectory) {
     const create = button(t("bindings.createPerson"), () => openPerson(null, identity => {
         if (render !== generation || !form.isConnected)
             return;
-        people = [...people.filter(p => p.id !== identity.id), { ...identity, presence: Presence.Offline, connections: 0 }];
+        people = [...people.filter(p => p.id !== identity.id), { ...identity, presence: Presence.Online, connections: 0 }];
         person.replaceChildren(...select(people.filter(p => p.id !== "operator").map(p => [p.id, p.name]), "").children);
         person.value = identity.id;
         person.dispatchEvent(new Event("change", { bubbles: true }));

@@ -16,6 +16,7 @@ pub(crate) struct Catalog {
     pub archived_people: BTreeSet<String>,
     pub grants: BTreeMap<String, (String, u64)>,
     pub messages: u64,
+    pub busy_until: BTreeMap<String, u64>,
 }
 pub(crate) struct Store {
     pub connection: Connection,
@@ -151,6 +152,7 @@ impl Store {
             members,
             grants,
             messages,
+            busy_until: crate::task_messages::busy_until(&self.connection)?,
         })
     }
     pub fn register(&mut self, actors: &[String]) -> Result<()> {
@@ -252,18 +254,8 @@ fn message_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
         text: row.get(4)?,
         reply_to: row.get(5)?,
         accepted_ms: row.get(6)?,
-        event: row
-            .get::<_, Option<String>>(7)?
-            .map(|s| {
-                serde_json::from_str(&s).map_err(|e| {
-                    rusqlite::Error::FromSqlConversionFailure(
-                        7,
-                        rusqlite::types::Type::Text,
-                        Box::new(e),
-                    )
-                })
-            })
-            .transpose()?,
+        event: decode_event(row, false)?,
+        activity: decode_event(row, true)?,
     })
 }
 /// Only the writer calls this within its bounded commit batch.
@@ -337,6 +329,7 @@ pub(crate) fn append(
         message: Message {
             deleted: false,
             event: None,
+            activity: None,
             sequence,
             group_id: input.group_id.clone(),
             sender_id: actor.into(),
@@ -347,5 +340,24 @@ pub(crate) fn append(
         },
         duplicate: false,
         durable: true,
+    })
+}
+
+fn decode_event<T: serde::de::DeserializeOwned>(
+    row: &rusqlite::Row<'_>,
+    activity: bool,
+) -> rusqlite::Result<Option<T>> {
+    let Some(raw) = row.get::<_, Option<String>>(7)? else {
+        return Ok(None);
+    };
+    let parse = || -> serde_json::Result<Option<T>> {
+        let value: serde_json::Value = serde_json::from_str(&raw)?;
+        if value.get("task_id").is_some() != activity {
+            return Ok(None);
+        }
+        serde_json::from_value(value).map(Some)
+    };
+    parse().map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(7, rusqlite::types::Type::Text, Box::new(e))
     })
 }

@@ -57,6 +57,11 @@ impl OutcomeTask {
             question: String::new(),
             error: None,
             reply_to: None,
+            message_sequences: vec![],
+            linked_task_id: None,
+            reply_task_id: None,
+            last_intent_revision: 1,
+            message_processing: None,
         })
     }
     pub fn active(&self) -> bool {
@@ -75,7 +80,7 @@ impl OutcomeTask {
             })
     }
     pub fn needs_coordinator(&self) -> bool {
-        self.kind == TaskKind::Outcome
+        self.kind != TaskKind::Question
             && self.active()
             && self.coordinator_lease.is_none()
             && !self.nodes.iter().any(|n| n.state == TaskNodeState::Running)
@@ -251,6 +256,9 @@ impl OutcomeTask {
                 || matches!(action, TaskAction::Tick),
             TaskErrorCode::Conflict,
         )?;
+        if action.operator_allowed() {
+            self.last_intent_revision = self.revision + 1;
+        }
         match action {
             TaskAction::Tick => {}
             TaskAction::Resume => {
@@ -270,7 +278,7 @@ impl OutcomeTask {
                 self.record(TaskEventKind::Cancelled, None, String::new(), now);
             }
             TaskAction::Supplement { text } => {
-                check(self.kind == TaskKind::Outcome, TaskErrorCode::Conflict)?;
+                check(self.kind != TaskKind::Question, TaskErrorCode::Conflict)?;
                 bounded(&text, 8000)?;
                 check(self.notes.len() < 64, TaskErrorCode::Budget)?;
                 self.notes.push(text.clone());
@@ -486,6 +494,22 @@ impl OutcomeTask {
         }
         self.finish_question(now);
         self.revision += 1;
+        if self.message_processing.is_some() {
+            use contracts::MessageProcessingState as M;
+            self.message_processing = Some(if self.kind == TaskKind::Outcome {
+                M::Planned
+            } else {
+                match self.state {
+                    TaskState::WaitingInput => M::WaitingInput,
+                    TaskState::Paused => M::Paused,
+                    TaskState::Cancelled => M::Cancelled,
+                    TaskState::Completed if self.linked_task_id.is_some() => M::Attached,
+                    TaskState::Completed => M::Responded,
+                    _ if self.coordinator_lease.is_some() => M::Processing,
+                    _ => M::Queued,
+                }
+            });
+        }
         check(
             self.events.len() <= 2048 && serde_json::to_vec(self)?.len() <= 4 * 1024 * 1024,
             TaskErrorCode::Budget,
@@ -498,6 +522,25 @@ impl OutcomeTask {
         now: u64,
     ) -> Result<()> {
         match proposal {
+            CoordinatorProposal::Respond { message } => {
+                check(self.kind == TaskKind::Message, TaskErrorCode::Conflict)?;
+                bounded(&message, 8000)?;
+                self.state = TaskState::Completed;
+                self.record(TaskEventKind::Responded, None, message, now);
+            }
+            CoordinatorProposal::Attach {
+                task_id,
+                revision: _,
+                text,
+            } => {
+                check(self.kind == TaskKind::Message, TaskErrorCode::Conflict)?;
+                id(&task_id)?;
+                check(task_id != self.input.id, TaskErrorCode::Invalid)?;
+                bounded(&text, 8000)?;
+                self.linked_task_id = Some(task_id);
+                self.state = TaskState::Completed;
+                self.record(TaskEventKind::Attached, None, text, now);
+            }
             CoordinatorProposal::Clarify { question } => {
                 bounded(&question, 8000)?;
                 self.question = question.clone();
@@ -513,6 +556,7 @@ impl OutcomeTask {
                 bounded(&title, 256)?;
                 bounded(&acceptance, 8000)?;
                 self.replace_graph(nodes, members, now)?;
+                self.kind = TaskKind::Outcome;
                 self.title = title;
                 self.acceptance = acceptance;
                 self.record(TaskEventKind::Planned, None, String::new(), now);
