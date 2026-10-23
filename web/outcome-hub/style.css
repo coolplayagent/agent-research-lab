@@ -716,6 +716,13 @@ dialog p {
 .crystal-center text { text-anchor: middle; fill: #315d56; }
 .crystal-title { font-size: 15px; font-weight: 600; }
 .crystal-sub { font-size: 11px; fill: #668e86; }
+.coordinator-symbol path { fill: none; stroke: #397a78; stroke-width: 2; stroke-linejoin: round; }
+.coordinator-symbol rect { fill: #f3fffc; stroke: #397a78; stroke-width: 1.5; }
+.coordinator-symbol rect:first-of-type { fill: #397a78; }
+.crystal-conversation { cursor: pointer; }
+.crystal-conversation rect { fill: #f4faf7; stroke: #dbece7; }
+.crystal-conversation text { text-anchor: middle; fill: #456f63; }
+.crystal-conversation:hover rect, .crystal-conversation:focus rect { fill: #e4f4ed; stroke: #4f9e8a; }
 .crystal-publish { stroke: #55a99d; stroke-width: 1.6; fill: none; }
 .agent-node > rect { fill: #ffffff; stroke: #cfdfda; filter: drop-shadow(0 3px 5px #294c3f12); }
 .agent-node:hover > rect, .agent-node:focus > rect { stroke: #4f9e8a; fill: #f6fcf9; }

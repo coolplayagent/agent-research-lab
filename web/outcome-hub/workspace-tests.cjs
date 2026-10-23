@@ -248,9 +248,10 @@ const deferred = () => {
     "./collaboration-model.js":{replyEdges},
   }, {document:{createElementNS:(_namespace,tag)=>new Node(tag)}});
   const graphHost = new Node(), graphMember = {person_id:"member",presence:contracts.Presence.Offline};
-  const draw = goals => {
+  let boardOpens = 0, conversationOpens = 0, memberSelections = 0;
+  const draw = (goals, members = [graphMember]) => {
     graphHost.replaceChildren();
-    graph.renderCrystal(graphHost,{id:"a",title:"Group"},[graphMember],[],goals,()=>{},new Set(),()=>{});
+    graph.renderCrystal(graphHost,{id:"a",title:"Group"},members,[],goals,()=>{memberSelections++;},new Set(),()=>{conversationOpens++;},()=>{boardOpens++;});
     return graphHost.children[0].children.find(node=>node.attributes.get("class")?.startsWith("agent-node"));
   };
   const liveGraphGoal = {...activeExecution,work:[{...activeExecution.work[0],deadline_ms:Date.now()+60000}]};
@@ -260,6 +261,19 @@ const deferred = () => {
     assert(!node.attributes.get("class").includes("working"),"Graph activity obeys the same goal state, group and live lease constraints");
     assert.equal(node.children.find(child=>child.attributes.get("class")==="agent-activity").textContent,contracts.Presence.Offline);
   }
+  for (const members of [[], [graphMember], Array.from({length:8},(_,i)=>({...graphMember,person_id:`member-${i}`}))]) {
+    draw([], members);
+    const nodes = graphHost.children[0].children;
+    const coordinator = nodes.find(node=>node.getAttribute("aria-label")==="workspace.openCoordinator");
+    assert(coordinator, "The built-in coordinator is visible even without group members");
+    assert.equal(coordinator.getAttribute("role"), "button");
+    assert.equal(coordinator.getAttribute("tabindex"), "0");
+    coordinator.onclick();
+    for (const key of ["Enter", " "]) { let prevented = false; coordinator.onkeydown({key,preventDefault(){prevented=true;}}); assert(prevented); }
+    assert.equal(nodes.filter(node=>node.getAttribute("class")?.startsWith("agent-node")).length, members.length, "The coordinator does not consume a member slot");
+    nodes.find(node=>node.getAttribute("aria-label")==="workspace.openConversation").onclick();
+  }
+  assert.equal(boardOpens, 9); assert.equal(conversationOpens, 3); assert.equal(memberSelections, 0, "The coordinator opens the board, never a member binding");
   const goalPages = {"":{goals:[goalFixture("first", 1)],next_after:"first"}, first:{goals:[goalFixture("second", 2)],next_after:"second"}, second:{goals:[goalFixture("third", 3)],next_after:null}};
   let projectedGoal = structuredClone(goalPages.second.goals[0]);
   projectedGoal.revision = 2;

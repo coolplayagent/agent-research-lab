@@ -132,7 +132,10 @@ function render() {
         : t("workspace.selectGroup");
     if (!view)
         return;
-    renderCrystal(host, view.group, members, messageSnapshot(), goalSnapshot(), detail, new Set([...pulses].filter(([, until]) => until > Date.now()).map(([id]) => id)), () => { get("workspace").classList.remove("research-expanded", "research-open"); get("message-text").focus(); });
+    renderCrystal(host, view.group, members, messageSnapshot(), goalSnapshot(), detail, new Set([...pulses].filter(([, until]) => until > Date.now()).map(([id]) => id)), () => { get("workspace").classList.remove("research-expanded", "research-open"); get("message-text").focus(); }, () => { if (view) {
+        location.hash = "groups/" + encodeURIComponent(view.group.id) + "/tasks";
+        revealResearch("goals");
+    } });
     for (const member of members) {
         const row = el("div", undefined, "member");
         row.append(avatar(member.person_id), button(display(member.person_id), () => {
