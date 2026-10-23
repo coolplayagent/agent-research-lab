@@ -20,7 +20,7 @@ function svg(tag, attrs = {}, text) {
         node.textContent = text;
     return node;
 }
-export function renderCrystal(host, group, members, messages, goals, select, pulses, openConversation) {
+export function renderCrystal(host, group, members, messages, goals, select, pulses, openConversation, openCoordinator) {
     const now = Date.now(), scopedGoals = goals.filter(goal => goal.input.group_id === group.id);
     const wide = host.clientWidth > 550;
     const width = wide ? 800 : 360, height = wide ? 490 : 440;
@@ -62,15 +62,27 @@ export function renderCrystal(host, group, members, messages, goals, select, pul
         path.append(svg("title", {}, t("workspace.replyEdge", { from: display(edge.from), to: display(edge.to) })));
         canvas.append(path);
     }
-    const orb = svg("g", { class: "crystal-center" + (pulses.size ? " receiving" : ""), role: "button", tabindex: 0, "aria-label": t("workspace.openConversation") });
-    orb.onclick = openConversation;
+    const orb = svg("g", { class: "crystal-center crystal-coordinator" + (pulses.size ? " receiving" : ""), role: "button", tabindex: 0, "aria-label": t("workspace.openCoordinator") });
+    orb.onclick = openCoordinator;
     orb.onkeydown = (event) => { if (["Enter", " "].includes(event.key)) {
+        event.preventDefault();
+        openCoordinator();
+    } };
+    orb.append(svg("circle", { cx, cy, r: radius, fill: "url(#crystal-fill)" }), svg("ellipse", { cx: cx - radius * .2, cy: cy - radius * .4, rx: radius * .46, ry: radius * .23, fill: "#fff", opacity: .6, transform: `rotate(-25 ${cx} ${cy})` }));
+    const coordinator = svg("g", { class: "coordinator-symbol", transform: `translate(${cx},${cy - 27})`, "aria-hidden": "true" });
+    coordinator.append(svg("path", { d: "M0 -7 V0 M-19 8 V0 H19 V8 M0 0 V8" }));
+    for (const [x, y] of [[0, -14], [-19, 15], [0, 15], [19, 15]])
+        coordinator.append(svg("rect", { x: x - 6, y: y - 6, width: 12, height: 12, rx: 4 }));
+    orb.append(coordinator, svg("text", { x: cx, y: cy + 15, class: "crystal-title" }, t("workspace.coordinator")), svg("text", { x: cx, y: cy + 33, class: "crystal-sub" }, t("workspace.coordinatorRole")), svg("title", {}, t("workspace.coordinatorDescription")));
+    const conversation = svg("g", { class: "crystal-conversation", role: "button", tabindex: 0, "aria-label": t("workspace.openConversation") });
+    const conversationY = cy + radius + (wide ? 8 : 2);
+    conversation.append(svg("rect", { x: cx - 66, y: conversationY, width: 132, height: 28, rx: 14 }), svg("text", { x: cx, y: conversationY + 18, class: "crystal-sub" }, t("workspace.crystalMessages", { count: messages.filter((m) => !m.event || m.sender_id === m.event.person_id).length })), svg("title", {}, group.title));
+    conversation.onclick = openConversation;
+    conversation.onkeydown = (event) => { if (["Enter", " "].includes(event.key)) {
         event.preventDefault();
         openConversation();
     } };
-    orb.append(svg("circle", { cx, cy, r: radius, fill: "url(#crystal-fill)" }), svg("ellipse", { cx: cx - radius * .2, cy: cy - radius * .4, rx: radius * .46, ry: radius * .23, fill: "#fff", opacity: .6, transform: `rotate(-25 ${cx} ${cy})` }), svg("text", { x: cx, y: cy - 6, class: "crystal-title" }, t("workspace.crystal")), svg("text", { x: cx, y: cy + 15, class: "crystal-sub" }, t("workspace.crystalMessages", { count: messages.filter((m) => !m.event || m.sender_id === m.event.person_id).length })));
-    orb.append(svg("title", {}, group.title));
-    canvas.append(orb);
+    canvas.append(orb, conversation);
     shown.forEach((member) => {
         const { x, y } = positions.get(member.person_id);
         const w = wide ? 166 : 112;
