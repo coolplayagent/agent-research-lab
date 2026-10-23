@@ -174,8 +174,7 @@ impl Session {
             if let Some(status) = self.child.try_wait()? {
                 ensure!(
                     status.success(),
-                    "agent exited unsuccessfully (exit code {:?}); verify its login, model and runtime configuration",
-                    status.code()
+                    "agent exited unsuccessfully ({status}); inspect the private execution diagnostic"
                 );
                 return Ok(());
             }
@@ -227,3 +226,7 @@ pub fn version(program: &Path, arguments: &[String]) -> Result<String> {
     );
     Ok(version.into())
 }
+
+#[cfg(test)]
+#[path = "process_tests.rs"]
+mod tests;

@@ -1,4 +1,7 @@
 //! Disposable execution with host-verified binding challenges.
+// Native plugin catalogs can exceed 16 MiB independently of task output.
+// Keep runtime files bounded while retaining the smaller protocol/log limits.
+const MAX_RUNTIME_FILE: u64 = 64 * 1024 * 1024;
 mod challenge;
 mod diagnostics;
 #[cfg(windows)]

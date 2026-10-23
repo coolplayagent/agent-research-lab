@@ -4,6 +4,7 @@ fn sandbox_mounts_are_read_only_and_work_is_isolated() {
     let args = arguments(&["/usr/bin/true".into()], &[], false, 4).unwrap();
     assert!(args.contains(&"--unshare-all".into()));
     assert!(args.contains(&"--as=17179869184:17179869184".into()));
+    assert!(args.contains(&"--fsize=67108864:67108864".into()));
     assert!(!args.contains(&"--share-net".into()));
     assert!(args.windows(2).any(|w| w == ["--tmpfs", "/workspace"]));
     assert!(!args.contains(&"/root".into()));
@@ -27,7 +28,7 @@ async fn native_runtime_files_are_bounded_separately_from_protocol_output() {
     let state = tempfile::tempdir().unwrap();
     let result = python(
             state.path(),
-            "with open('/workspace/runtime.db','wb') as f: f.write(b'x'*(8*1024*1024))\nprint('runtime file accepted')",
+            "import pathlib\np=pathlib.Path('/home/agent/.codex/cache/remote_plugin_catalog/catalog.json')\np.parent.mkdir(parents=True)\np.write_bytes(b'x'*41304532)\nprint('runtime file accepted')",
         )
         .await
         .unwrap();
@@ -35,7 +36,7 @@ async fn native_runtime_files_are_bounded_separately_from_protocol_output() {
     assert!(
         python(
             state.path(),
-            "with open('/workspace/runtime.db','wb') as f: f.write(b'x'*(16*1024*1024+1))"
+            "with open('/workspace/runtime.db','wb') as f: f.write(b'x'*(64*1024*1024+1))"
         )
         .await
         .is_err()
@@ -65,6 +66,7 @@ async fn native_runtime_files_are_bounded_separately_from_protocol_output() {
             .contains("diagnostic output exceeds bound")
     );
     assert!(python(state.path(), "raise SystemExit(7)").await.is_err());
+    assert_eq!(fs::read_dir(state.path()).unwrap().count(), 0);
 }
 
 #[tokio::test]

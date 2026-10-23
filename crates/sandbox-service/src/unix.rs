@@ -1,3 +1,4 @@
+use crate::MAX_RUNTIME_FILE;
 use anyhow::{Context, Result, ensure};
 use service_api::SandboxOutput;
 use std::{
@@ -7,12 +8,9 @@ use std::{
 };
 const BWRAP: &str = "/usr/bin/bwrap";
 const PRLIMIT: &str = "/usr/bin/prlimit";
-// Native adapters maintain disposable databases and caches independently of
-// their protocol output. Keep their file quota below the enclosing tmpfs bound.
 // V8's code-mode host reserves a multi-GiB virtual address cage before running
 // tools. A 4 GiB RLIMIT_AS aborts it even when its resident use is small.
 const MAX_ADDRESS_SPACE: u64 = 16 * 1024 * 1024 * 1024;
-const MAX_RUNTIME_FILE: u64 = 16 * 1024 * 1024;
 const MAX_PROTOCOL_OUTPUT: u64 = 256 * 1024;
 const MAX_DIAGNOSTIC_OUTPUT: u64 = 4 * 1024 * 1024;
 fn arguments(
