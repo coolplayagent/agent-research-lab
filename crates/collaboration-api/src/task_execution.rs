@@ -127,12 +127,16 @@ async fn advance(
     if node_id.is_none()
         && let Err(error) = probe(&registry, false).await
     {
-        registry.record_task_diagnostic(&task.input.id, "coordinator-probe", &error);
+        registry.record_task_diagnostic(&task.input.id, "coordinator-probe", &error, None);
         let _ = commit(
             &hub,
             &task.input.id,
             TaskAction::Pause {
-                code: Code::Protocol,
+                code: if error.to_string().contains(Code::Protocol.as_str()) {
+                    Code::Protocol
+                } else {
+                    Code::Unavailable
+                },
             },
         )
         .await;
@@ -203,18 +207,18 @@ async fn advance(
         },
     )
     .await?;
+    let mut diagnostic_receipt = None;
     let outcome=async {
         let instruction=if let Some(id)=&node_id {crate::task_prompt::worker(&task,task.nodes.iter().find(|n|n.input.id==*id).unwrap())}else{let members=people(&hub,&config,&task.input.group_id).await?;if task.kind == contracts::TaskKind::Message { let candidates = routing_candidates(&hub, &task).await?; crate::task_prompt::routing(&task, &members, &candidates) } else { ensure!(members.as_array().is_some_and(|p|!p.is_empty()),"{}",Code::Unavailable);crate::task_prompt::coordinator(&task,&members) }};
         let node=node_id.as_ref().and_then(|id|task.nodes.iter().find(|n|n.input.id==*id));
-        let input=AgentInput{protocol_version:service_protocol::VERSION,request_id:claim_id.clone(),person_id:node.map_or("coordinator",|n|n.input.person_id.as_str()).into(),goal_id:task.input.id.clone(),work_id:node_id.clone().unwrap_or_else(||"coordinator".into()),attempt:node.map_or(task.coordinator_calls,|n|n.attempt),objective:task.input.intent.clone(),acceptance:node.map_or("Return a valid coordinator proposal",|n|n.input.acceptance.as_str()).into(),instruction,messages:hub.history_before(&task.input.group_id,i64::MAX as u64,16).await?};
+        let input=AgentInput{protocol_version:service_protocol::VERSION,request_id:claim_id.clone(),person_id:node.map_or("coordinator",|n|n.input.person_id.as_str()).into(),goal_id:task.input.id.clone(),work_id:node_id.clone().unwrap_or_else(||"coordinator".into()),attempt:node.map_or(task.coordinator_calls,|n|n.attempt),objective:node.map_or_else(|| "Propose the next coordination action for the supplied user intent".into(), |_| task.input.intent.clone()),acceptance:node.map_or("Return one valid coordinator proposal. This turn succeeds when that proposal is ready for host validation; the overall user outcome may still be pending.",|n|n.input.acceptance.as_str()).into(),instruction,messages:hub.history_before(&task.input.group_id,i64::MAX as u64,16).await?};
         ensure!(input.instruction.len()<=1024*1024,"{}",Code::Budget);
         let execution=execute(&registry,&config,adapter.clone(),input,task.input.budget.execution_seconds);tokio::pin!(execution);
         let mut poll=tokio::time::interval(Duration::from_secs(2));
         let receipt=loop {tokio::select!{r=&mut execution=>break r?,_=poll.tick()=>{let current=read(&hub,&task.input.id).await?;let current_config=registry.configuration();ensure!(current.active() && current.graph_revision==task.graph_revision,"{}",Code::StaleAttempt);let lease=node_id.as_ref().and_then(|id|current.nodes.iter().find(|n|n.input.id==*id)).and_then(|n|n.lease.as_ref()).or_else(||if node_id.is_none(){current.coordinator_lease.as_ref()}else{None});ensure!(lease.is_some_and(|l|l.claim_id==claim_id && l.deadline_ms>now_ms()),"{}",Code::StaleAttempt);let current_adapter=if node_id.is_none(){Registry::coordinator_adapter(&current_config)?}else{worker_adapter(&current_config,&node.unwrap().input.person_id)?};ensure!(serde_json::to_value(&adapter)?==serde_json::to_value(current_adapter)?,"{}",Code::Unavailable);}}};
+        diagnostic_receipt = Some(receipt.clone());
         if let Some(node_id)=&node_id {Ok(TaskAction::Submit{node_id:node_id.clone(),claim_id:claim_id.clone(),summary:receipt.output.summary.clone(),evidence:receipt.output.evidence.clone(),succeeded:receipt.output.succeeded,receipt:json!(receipt)})}else{
-            ensure!(receipt.output.succeeded,"{}",Code::Protocol);
-            let output:CoordinatorOutput=serde_json::from_value(receipt.output.evidence["coordinator"].clone()).context(Code::Protocol)?;
-            if config.coordinator.as_ref().is_some_and(|c|c.protocol_evidence.is_none()) {ensure!(output.protocol_version==COORDINATOR_PROTOCOL_VERSION,"{}",Code::Protocol);}
+            let output = coordinator_output(&receipt)?;
             Ok(TaskAction::Coordinate{claim_id:claim_id.clone(),output,receipt:json!(receipt)})
         }
     }.await;
@@ -230,7 +234,7 @@ async fn advance(
         _ => None,
     };
     let action = outcome.unwrap_or_else(|e| {
-        registry.record_task_diagnostic(&task.input.id, &claim_id, &e);
+        registry.record_task_diagnostic(&task.input.id, &claim_id, &e, diagnostic_receipt.as_ref());
         TaskAction::Fail {
             node_id: node_id.clone(),
             claim_id: claim_id.clone(),
@@ -242,7 +246,12 @@ async fn advance(
         }
     });
     if let Err(e) = commit(&hub, &task.input.id, action).await {
-        registry.record_task_diagnostic(&task.input.id, &claim_id, &e);
+        registry.record_task_diagnostic(
+            &task.input.id,
+            &claim_id,
+            &anyhow::anyhow!("Storage rejected execution result: {e:#}"),
+            diagnostic_receipt.as_ref(),
+        );
         let code = if e.to_string().contains(Code::Conflict.as_str()) {
             Code::Unavailable
         } else if e.to_string().contains(Code::Budget.as_str()) {
@@ -307,10 +316,7 @@ pub(crate) async fn probe(registry: &Registry, force: bool) -> Result<Configurat
     let request_id = storage::digest(&random);
     let input=AgentInput{protocol_version:service_protocol::VERSION,request_id,person_id:"coordinator".into(),goal_id:"coordinator-probe".into(),work_id:"protocol-check".into(),attempt:1,objective:"Check the OutcomeHub coordinator protocol".into(),acceptance:"Return the exact typed proposal".into(),instruction:"This is a bounded protocol check, not a user task. Do not execute tools or modify files. Return succeeded=true, summary=Coordinator protocol ready, and evidence={\"coordinator\":{\"protocol_version\":1,\"proposal\":{\"action\":\"clarify\",\"question\":\"What outcome should the team deliver?\"}}}.".into(),messages:vec![]};
     let receipt = execute(registry, &config, adapter, input, 60).await?;
-    ensure!(receipt.output.succeeded, "{}", Code::Protocol);
-    let output: CoordinatorOutput =
-        serde_json::from_value(receipt.output.evidence["coordinator"].clone())
-            .context(Code::Protocol)?;
+    let output = coordinator_output(&receipt)?;
     ensure!(
         output.protocol_version == COORDINATOR_PROTOCOL_VERSION
             && matches!(output.proposal, CoordinatorProposal::Clarify { .. }),
@@ -349,3 +355,27 @@ async fn routing_candidates(
         json!({"has_older":!page["next_after"].is_null(),"tasks":candidates.iter().filter(|t|t.input.id!=task.input.id && t.kind!=contracts::TaskKind::Question && (t.kind==contracts::TaskKind::Outcome || t.state==contracts::TaskState::WaitingInput)).map(|t|json!({"id":t.input.id,"revision":t.revision,"kind":t.kind,"state":t.state,"intent":t.input.intent.chars().take(1000).collect::<String>(),"title":t.title,"question":t.question,"latest_note":t.notes.last(),"progress":t.nodes.iter().map(|n|json!({"title":n.input.title,"state":n.state})).collect::<Vec<_>>()})).collect::<Vec<_>>()}),
     )
 }
+
+/// Every response is validated, even after a successful configuration probe.
+fn coordinator_output(receipt: &ExecutionReceipt) -> Result<CoordinatorOutput> {
+    let result = (|| {
+        ensure!(
+            receipt.output.succeeded,
+            "Coordinator reported succeeded=false"
+        );
+        let output: CoordinatorOutput =
+            serde_json::from_value(receipt.output.evidence["coordinator"].clone())
+                .context("Invalid evidence.coordinator")?;
+        ensure!(
+            output.protocol_version == COORDINATOR_PROTOCOL_VERSION,
+            "Unsupported coordinator protocol version: {}",
+            output.protocol_version
+        );
+        Ok(output)
+    })();
+    result.context(Code::Protocol)
+}
+
+#[cfg(test)]
+#[path = "task_execution_tests.rs"]
+mod tests;

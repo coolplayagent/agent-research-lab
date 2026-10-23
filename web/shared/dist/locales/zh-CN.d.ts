@@ -49,7 +49,7 @@ export declare const messages: {
     readonly "TaskErrorCode.task_executor_unavailable": "执行配置或数字人不可用，请检查适配器和绑定后继续";
     readonly "TaskErrorCode.task_not_found": "找不到该任务";
     readonly "TaskErrorCode.task_forbidden": "无权执行此操作";
-    readonly "TaskErrorCode.task_protocol_invalid": "协调者输出不符合任务协议，请检查执行配置后重试";
+    readonly "TaskErrorCode.task_protocol_invalid": "协调者返回未通过协议校验，请查看执行记录；任务暂停后可重试";
     readonly "api.task_invalid": "任务输入不符合要求";
     readonly "api.task_conflict": "任务已变化，请刷新后重试";
     readonly "api.task_stale_attempt": "这次执行已过期，结果未被采用";
@@ -57,7 +57,7 @@ export declare const messages: {
     readonly "api.task_executor_unavailable": "执行配置或数字人不可用，请检查适配器和绑定后继续";
     readonly "api.task_not_found": "找不到该任务";
     readonly "api.task_forbidden": "无权执行此操作";
-    readonly "api.task_protocol_invalid": "协调者输出不符合任务协议，请检查执行配置后重试";
+    readonly "api.task_protocol_invalid": "协调者返回未通过协议校验，请查看执行记录；任务暂停后可重试";
     readonly "DeletionCode.deleted": "已删除";
     readonly "DeletionCode.not_found": "对象已不存在，请刷新页面。";
     readonly "DeletionCode.revision_conflict": "内容已发生变化，请刷新后重试。";

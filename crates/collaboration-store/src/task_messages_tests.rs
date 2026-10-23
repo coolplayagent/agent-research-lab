@@ -406,3 +406,128 @@ async fn archived_historical_members_are_explicit_without_changing_active_wire_s
     assert!(!restored.archived);
     assert_eq!(restored.presence, Presence::Online);
 }
+
+#[tokio::test]
+async fn rejected_proposal_retries_without_committing_partial_graph_or_acceptance() {
+    let dir = tempfile::tempdir().unwrap();
+    let hub = Hub::open(dir.path()).unwrap();
+    hub.register_operator().await.unwrap();
+    hub.save_person(Person {
+        id: "worker".into(),
+        name: "Worker".into(),
+        application_id: None,
+    })
+    .await
+    .unwrap();
+    room(&hub, "team").await;
+    let task = send(&hub, "repair", None).await;
+    let id = &task.input.id;
+    let claimed = edit(
+        &hub,
+        id,
+        TaskAction::Claim {
+            node_id: None,
+            claim_id: "invalid".into(),
+        },
+    )
+    .await
+    .unwrap();
+    let history = hub.history("team", 0, 100).await.unwrap();
+    let output = CoordinatorOutput {
+        protocol_version: 1,
+        proposal: CoordinatorProposal::Plan {
+            title: "Plan".into(),
+            acceptance: "Compare choices".into(),
+            nodes: vec![TaskNodeInput {
+                id: "first".into(),
+                person_id: "outsider".into(),
+                title: "Compare".into(),
+                instruction: "Compare choices".into(),
+                deliverable: "Comparison".into(),
+                acceptance: "Explain tradeoffs".into(),
+                dependencies: vec![],
+            }],
+        },
+    };
+    assert!(
+        edit(
+            &hub,
+            id,
+            TaskAction::Coordinate {
+                claim_id: "invalid".into(),
+                output: output.clone(),
+                receipt: json!({"private":"rejected"})
+            }
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(
+        hub.tasks(TaskCommand::Get { id: id.clone() })
+            .await
+            .unwrap(),
+        json!(claimed)
+    );
+    assert_eq!(
+        json!(hub.history("team", 0, 100).await.unwrap()),
+        json!(history)
+    );
+    let retry = edit(
+        &hub,
+        id,
+        TaskAction::Fail {
+            node_id: None,
+            claim_id: "invalid".into(),
+            code: contracts::TaskErrorCode::Protocol,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(retry.needs_coordinator());
+    assert!(retry.nodes.is_empty() && retry.artifacts.is_empty() && retry.deliveries.is_empty());
+    drop(hub);
+    let hub = Hub::open(dir.path()).unwrap();
+    let mut fixed = output;
+    if let CoordinatorProposal::Plan { nodes, .. } = &mut fixed.proposal {
+        nodes[0].person_id = "worker".into();
+    }
+    edit(
+        &hub,
+        id,
+        TaskAction::Claim {
+            node_id: None,
+            claim_id: "corrected".into(),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        edit(
+            &hub,
+            id,
+            TaskAction::Fail {
+                node_id: None,
+                claim_id: "invalid".into(),
+                code: contracts::TaskErrorCode::Protocol
+            }
+        )
+        .await
+        .is_err()
+    );
+    let planned = edit(
+        &hub,
+        id,
+        TaskAction::Coordinate {
+            claim_id: "corrected".into(),
+            output: fixed,
+            receipt: json!({}),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(planned.coordinator_calls, 2);
+    assert_eq!(planned.state, contracts::TaskState::Running);
+    assert!(planned.ready(&planned.nodes[0]));
+    assert!(planned.deliveries.is_empty());
+    assert!(edit(&hub, id, TaskAction::Accept).await.is_err());
+}
