@@ -82,10 +82,14 @@ pub(super) fn budget(
         }
     } else {
         ensure!(
-            metadata.len() <= *bytes && metadata.len() <= 16 * 1024 * 1024,
+            metadata.len() <= *bytes && metadata.len() <= crate::MAX_RUNTIME_FILE,
             "sandbox file quota exceeded"
         );
         *bytes -= metadata.len();
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "snapshots_tests.rs"]
+mod tests;
