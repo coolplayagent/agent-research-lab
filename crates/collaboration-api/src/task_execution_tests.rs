@@ -73,3 +73,23 @@ fn receipt_validation_detects_old_executors_that_drop_message_metadata() {
         assert!(format!("{error:#}").contains("input digest mismatch"));
     }
 }
+
+#[test]
+fn unavailable_workers_keep_the_specific_reason_in_private_diagnostics() {
+    let mut config = Configuration::defaults(std::path::Path::new("/fixture"));
+    assert!(
+        format!("{:#}", worker_adapter(&config, "worker").unwrap_err())
+            .contains("no adapter binding")
+    );
+    config
+        .bindings
+        .insert("worker".into(), config.adapters[0].id.clone());
+    assert!(
+        format!("{:#}", worker_adapter(&config, "worker").unwrap_err())
+            .contains("missing or disabled")
+    );
+    config.adapters[0].enabled = true;
+    let error = worker_adapter(&config, "worker").unwrap_err();
+    assert_eq!(error.to_string(), Code::Unavailable.as_str());
+    assert!(format!("{error:#}").contains("requires binding validation"));
+}

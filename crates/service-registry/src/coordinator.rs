@@ -50,32 +50,55 @@ impl Registry {
             });
             config = self.save(config)?;
         }
+        // Repair older persisted selections, then require a fresh protocol probe.
+        if Self::refresh_coordinator(&mut config)? {
+            config = self.save(config)?;
+        }
         Self::coordinator_adapter(&config)?;
+        Ok(config)
+    }
+    pub(super) fn refresh_coordinator(config: &mut Configuration) -> Result<bool> {
+        let Some(selected) = &mut config.coordinator else {
+            return Ok(false);
+        };
+        let mut changed = false;
+        if let Some(adapter) = config.adapters.iter().find(|a| a.id == selected.adapter_id) {
+            let digest = storage::digest(&serde_json::to_vec(adapter)?);
+            if selected.adapter_digest != digest {
+                selected.adapter_digest = digest;
+                selected.protocol_evidence = None;
+                changed = true;
+            }
+        }
         if config
             .coordinator
             .as_ref()
-            .is_some_and(|c| c.protocol_evidence.is_some())
-            && !Self::coordinator_probe_valid(&config)
+            .unwrap()
+            .protocol_evidence
+            .is_some()
+            && !Self::coordinator_probe_valid(config)
         {
             config.coordinator.as_mut().unwrap().protocol_evidence = None;
-            config = self.save(config)?;
+            changed = true;
         }
-        Ok(config)
+        Ok(changed)
     }
     pub fn coordinator_adapter(config: &Configuration) -> Result<Adapter> {
         let selected = config
             .coordinator
             .as_ref()
-            .context("task_executor_unavailable")?;
+            .context("Coordinator has no selected adapter")
+            .context(contracts::TaskErrorCode::Unavailable)?;
         let mut adapter = config
             .adapters
             .iter()
             .find(|a| a.id == selected.adapter_id && a.enabled)
-            .context("task_executor_unavailable")?
+            .context("Selected coordinator adapter is missing or disabled")
+            .context(contracts::TaskErrorCode::Unavailable)?
             .clone();
         ensure!(
             storage::digest(&serde_json::to_vec(&adapter)?) == selected.adapter_digest,
-            "task_executor_unavailable"
+            "task_executor_unavailable: Coordinator adapter revision requires protocol validation"
         );
         if let Some(model) = &selected.model {
             ensure!(
