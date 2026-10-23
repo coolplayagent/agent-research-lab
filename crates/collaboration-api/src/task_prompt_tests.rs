@@ -56,3 +56,66 @@ fn downstream_context_includes_host_checks_separately_from_worker_claims() {
     assert!(prompt.contains("Awaiting review"));
     assert!(prompt.contains("Source result"));
 }
+
+#[test]
+fn protocol_repair_uses_only_the_last_finished_attempt_and_preserves_intent() {
+    let mut task = OutcomeTask::new(
+        TaskInput {
+            id: "task".into(),
+            group_id: "team".into(),
+            intent: "Compare choices".into(),
+            budget: TaskBudget::default(),
+        },
+        1000,
+    )
+    .unwrap();
+    let members = ["worker".into()].into();
+    task.transition(
+        TaskAction::Claim {
+            node_id: None,
+            claim_id: "first".into(),
+        },
+        &members,
+        1001,
+    )
+    .unwrap();
+    task.transition(
+        TaskAction::Fail {
+            node_id: None,
+            claim_id: "first".into(),
+            code: TaskErrorCode::Protocol,
+        },
+        &members,
+        1002,
+    )
+    .unwrap();
+    task.transition(
+        TaskAction::Claim {
+            node_id: None,
+            claim_id: "retry".into(),
+        },
+        &members,
+        1003,
+    )
+    .unwrap();
+    let prompt = coordinator(&task, &json!([]));
+    assert!(prompt.contains("previous coordinator response was rejected"));
+    assert!(prompt.contains("Compare choices"));
+    assert!(prompt.contains("even while member work or human acceptance is pending"));
+    task.transition(
+        TaskAction::Coordinate {
+            claim_id: "retry".into(),
+            output: CoordinatorOutput {
+                protocol_version: 1,
+                proposal: CoordinatorProposal::Clarify {
+                    question: "Which alternatives?".into(),
+                },
+            },
+            receipt: json!({}),
+        },
+        &members,
+        1004,
+    )
+    .unwrap();
+    assert!(!coordinator(&task, &json!([])).contains("previous coordinator response was rejected"));
+}

@@ -184,7 +184,8 @@ impl OutcomeTask {
             .rev()
             .take_while(|a| a.error.is_some())
             .count();
-        if code == TaskErrorCode::Unavailable && failures < self.input.budget.max_attempts as usize
+        if matches!(code, TaskErrorCode::Unavailable | TaskErrorCode::Protocol)
+            && failures < self.input.budget.max_attempts as usize
         {
             self.record(TaskEventKind::Submitted, None, code.to_string(), now);
         } else {
