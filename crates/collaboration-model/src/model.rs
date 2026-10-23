@@ -172,6 +172,8 @@ pub struct GroupChange {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ActorStatus {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub archived: bool,
     pub person_id: String,
     pub presence: Presence,
     pub connections: usize,

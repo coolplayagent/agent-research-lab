@@ -40,7 +40,7 @@ export async function loadPeople(append = false): Promise<void> {
         el(
           "p",
           t("people.63daae1beb", {
-            p0: presence(person.presence),
+            p0: presence(person.presence, person.archived),
             p1: person.connections,
           }),
         ),

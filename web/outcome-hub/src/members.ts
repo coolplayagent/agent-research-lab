@@ -52,7 +52,7 @@ export function initMembers(): void {
             "small",
             member.person_id === "operator"
               ? t("members.e19796712f")
-              : presence(member.presence),
+              : presence(member.presence, member.archived),
           ),
         );
         if (

@@ -34,7 +34,7 @@ export function initMembers() {
                 const row = el("div", undefined, "member");
                 row.append(avatar(member.person_id), el("span", display(member.person_id)), el("small", member.person_id === "operator"
                     ? t("members.e19796712f")
-                    : presence(member.presence)));
+                    : presence(member.presence, member.archived)));
                 if (member.person_id !== "operator" &&
                     !selected.archived &&
                     !selected.private)

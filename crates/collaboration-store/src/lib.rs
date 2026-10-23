@@ -478,7 +478,8 @@ impl Hub {
     pub fn presence(&self, actor: &str) -> Result<ActorStatus> {
         let catalog = self.shared.catalog.read().unwrap();
         ensure!(catalog.actors.contains_key(actor), "unknown digital person");
-        let presence = if catalog.archived_people.contains(actor) {
+        let archived = catalog.archived_people.contains(actor);
+        let presence = if archived {
             Presence::Offline
         } else if catalog
             .busy_until
@@ -499,6 +500,7 @@ impl Hub {
             .copied()
             .unwrap_or(0);
         Ok(ActorStatus {
+            archived,
             person_id: actor.into(),
             presence,
             connections,

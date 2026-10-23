@@ -19,6 +19,7 @@ export interface Group {
   created_ms: number;
 }
 export interface Person {
+  archived?: boolean;
   id: string;
   name: string;
   application_id: string | null;
@@ -26,6 +27,7 @@ export interface Person {
   connections: number;
 }
 export interface Member {
+  archived?: boolean;
   person_id: string;
   presence: Presence;
   connections: number;

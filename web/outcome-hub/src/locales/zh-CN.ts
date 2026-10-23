@@ -1,5 +1,6 @@
 /** Simplified Chinese presentation resources. */
 export const messages = {
+  "members.archived": "已归档",
   "tasks.legacy": "历史目标与执行记录",
   "messages.intentPlaceholder": "描述希望达到的结果，Coordinator 会组织成员协作…",
   "messages.intentHint": "直接发送意图 · @成员直接问答 · Ctrl / ⌘ + Enter 发送",

@@ -33,7 +33,7 @@ export async function loadPeople(append = false) {
             const heading = el("header", undefined, "identity-heading");
             heading.append(avatar(person.id), el("h3", person.name));
             card.append(heading, el("code", person.id), el("p", t("people.63daae1beb", {
-                p0: presence(person.presence),
+                p0: presence(person.presence, person.archived),
                 p1: person.connections,
             })));
             if (person.application_id)
