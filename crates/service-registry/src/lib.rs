@@ -187,6 +187,7 @@ impl Registry {
             })
             .map(|(id, evidence)| (id.clone(), evidence.clone()))
             .collect();
+        Self::refresh_coordinator(&mut next)?;
         storage::write(&self.path, &next)?;
         *current = next.clone();
         Ok(next)

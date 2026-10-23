@@ -65,16 +65,27 @@ async fn people(
     Ok(json!(people))
 }
 fn worker_adapter(config: &Configuration, id: &str) -> Result<Adapter> {
-    let adapter_id = config.bindings.get(id).context(Code::Unavailable)?;
+    let adapter_id = config
+        .bindings
+        .get(id)
+        .with_context(|| format!("Worker {id} has no adapter binding"))
+        .context(Code::Unavailable)?;
     let adapter = config
         .adapters
         .iter()
         .find(|a| a.id == *adapter_id && a.enabled)
+        .with_context(|| format!("Worker {id} adapter {adapter_id} is missing or disabled"))
         .context(Code::Unavailable)?;
-    let evidence = config.binding_evidence.get(id).context(Code::Unavailable)?;
+    let evidence = config
+        .binding_evidence
+        .get(id)
+        .with_context(|| {
+            format!("Worker {id} requires binding validation for adapter {adapter_id}")
+        })
+        .context(Code::Unavailable)?;
     ensure!(
         storage::digest(&serde_json::to_vec(adapter)?) == evidence.adapter_digest,
-        "{}",
+        "{}: Worker {id} binding evidence belongs to an older adapter revision",
         Code::Unavailable
     );
     Ok(adapter.clone())
@@ -150,7 +161,8 @@ async fn advance(
     };
     let adapter = match selection {
         Ok(a) => a,
-        Err(_) => {
+        Err(error) => {
+            registry.record_task_diagnostic(&task.input.id, "adapter-selection", &error, None);
             let _ = commit(
                 &hub,
                 &task.input.id,

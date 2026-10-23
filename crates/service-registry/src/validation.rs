@@ -127,12 +127,12 @@ pub(super) async fn configure(
     let model = model.or_else(|| saved_option(adapter, "--model"));
     if agent != CodingAgent::Custom {
         let configuration_digest = agent_adapter::configuration_digest(agent)?;
-        let bridge = std::env::current_exe()?.with_file_name(if cfg!(windows) {
+        let packaged_bridge = std::env::current_exe()?.with_file_name(if cfg!(windows) {
             "outcome-hub-agent.exe"
         } else {
             "outcome-hub-agent"
         });
-        ensure!(bridge.is_file(), "packaged agent bridge is missing");
+        let bridge = bridge_path(adapter, packaged_bridge)?;
         adapter.command = vec![
             bridge.to_string_lossy().into_owned(),
             "--agent".into(),
@@ -170,6 +170,23 @@ pub(super) async fn configure(
     adapter.enabled = true;
     adapter.validate()?;
     Ok(())
+}
+fn bridge_path(adapter: &Adapter, packaged: PathBuf) -> Result<PathBuf> {
+    ensure!(packaged.is_file(), "packaged agent bridge is missing");
+    if adapter.enabled && saved_launch(adapter).is_some() {
+        let saved = PathBuf::from(&adapter.command[0]);
+        // A host-only release must not invalidate every binding by relocating an
+        // identical bridge. Changed or missing executables use the new package.
+        if saved == packaged
+            || agent_adapter::executable_digest(&saved, &[]).is_ok_and(|digest| {
+                agent_adapter::executable_digest(&packaged, &[])
+                    .is_ok_and(|current| current == digest)
+            })
+        {
+            return Ok(saved);
+        }
+    }
+    Ok(packaged)
 }
 pub(super) fn input(id: &str, person: &str, purpose: &str) -> AgentInput {
     AgentInput {

@@ -88,3 +88,35 @@ fn saved_launcher_arguments_and_model_are_preserved_without_reinterpreting_other
     assert!(saved_launch(&adapter).is_none());
     assert!(saved_option(&adapter, "--model").is_none());
 }
+
+#[test]
+fn identical_packaged_bridges_preserve_existing_binding_identity() {
+    let root = tempfile::tempdir().unwrap();
+    let prior = root.path().join("prior");
+    let current = root.path().join("current");
+    std::fs::create_dir_all(&prior).unwrap();
+    std::fs::create_dir_all(&current).unwrap();
+    let old = prior.join("outcome-hub-agent");
+    let new = current.join("outcome-hub-agent");
+    std::fs::write(&old, b"identical bridge fixture").unwrap();
+    std::fs::write(&new, b"identical bridge fixture").unwrap();
+    let mut adapter = Configuration::defaults(root.path()).adapters.remove(0);
+    adapter.enabled = true;
+    adapter.command = vec![
+        old.to_string_lossy().into_owned(),
+        "--program".into(),
+        "/runtime/agent".into(),
+    ];
+    let before = serde_json::to_value(&adapter).unwrap();
+    assert_eq!(bridge_path(&adapter, new.clone()).unwrap(), old);
+    assert_eq!(serde_json::to_value(&adapter).unwrap(), before);
+    adapter.enabled = false;
+    assert_eq!(bridge_path(&adapter, new.clone()).unwrap(), new);
+    adapter.enabled = true;
+    std::fs::write(&new, b"changed bridge fixture").unwrap();
+    assert_eq!(bridge_path(&adapter, new.clone()).unwrap(), new);
+    std::fs::remove_file(&old).unwrap();
+    assert_eq!(bridge_path(&adapter, new.clone()).unwrap(), new);
+    std::fs::remove_file(&new).unwrap();
+    assert!(bridge_path(&adapter, new).is_err());
+}
