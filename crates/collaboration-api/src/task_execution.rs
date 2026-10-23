@@ -79,7 +79,7 @@ fn worker_adapter(config: &Configuration, id: &str) -> Result<Adapter> {
     );
     Ok(adapter.clone())
 }
-pub(crate) async fn execute(
+async fn request_execution(
     registry: &Registry,
     config: &Configuration,
     adapter: Adapter,
@@ -106,16 +106,7 @@ pub(crate) async fn execute(
         Duration::from_secs(seconds + 15),
     )
     .await?;
-    receipt.output.validate(&input)?;
-    ensure!(
-        receipt.adapter_id == adapter.id
-            && receipt.agent == adapter.agent
-            && receipt.input_sha256 == storage::digest(&serde_json::to_vec(&input)?)
-            && receipt.adapter_sha256 == storage::digest(&serde_json::to_vec(&adapter)?)
-            && receipt.output_sha256 == storage::digest(&serde_json::to_vec(&receipt.output)?),
-        "{}",
-        Code::Protocol
-    );
+
     Ok(receipt)
 }
 async fn advance(
@@ -213,10 +204,11 @@ async fn advance(
         let node=node_id.as_ref().and_then(|id|task.nodes.iter().find(|n|n.input.id==*id));
         let input=AgentInput{protocol_version:service_protocol::VERSION,request_id:claim_id.clone(),person_id:node.map_or("coordinator",|n|n.input.person_id.as_str()).into(),goal_id:task.input.id.clone(),work_id:node_id.clone().unwrap_or_else(||"coordinator".into()),attempt:node.map_or(task.coordinator_calls,|n|n.attempt),objective:node.map_or_else(|| "Propose the next coordination action for the supplied user intent".into(), |_| task.input.intent.clone()),acceptance:node.map_or("Return one valid coordinator proposal. This turn succeeds when that proposal is ready for host validation; the overall user outcome may still be pending.",|n|n.input.acceptance.as_str()).into(),instruction,messages:hub.history_before(&task.input.group_id,i64::MAX as u64,16).await?};
         ensure!(input.instruction.len()<=1024*1024,"{}",Code::Budget);
-        let execution=execute(&registry,&config,adapter.clone(),input,task.input.budget.execution_seconds);tokio::pin!(execution);
+        let execution=request_execution(&registry,&config,adapter.clone(),input.clone(),task.input.budget.execution_seconds);tokio::pin!(execution);
         let mut poll=tokio::time::interval(Duration::from_secs(2));
         let receipt=loop {tokio::select!{r=&mut execution=>break r?,_=poll.tick()=>{let current=read(&hub,&task.input.id).await?;let current_config=registry.configuration();ensure!(current.active() && current.graph_revision==task.graph_revision,"{}",Code::StaleAttempt);let lease=node_id.as_ref().and_then(|id|current.nodes.iter().find(|n|n.input.id==*id)).and_then(|n|n.lease.as_ref()).or_else(||if node_id.is_none(){current.coordinator_lease.as_ref()}else{None});ensure!(lease.is_some_and(|l|l.claim_id==claim_id && l.deadline_ms>now_ms()),"{}",Code::StaleAttempt);let current_adapter=if node_id.is_none(){Registry::coordinator_adapter(&current_config)?}else{worker_adapter(&current_config,&node.unwrap().input.person_id)?};ensure!(serde_json::to_value(&adapter)?==serde_json::to_value(current_adapter)?,"{}",Code::Unavailable);}}};
         diagnostic_receipt = Some(receipt.clone());
+        validate_receipt(&receipt, &input, &adapter)?;
         if let Some(node_id)=&node_id {Ok(TaskAction::Submit{node_id:node_id.clone(),claim_id:claim_id.clone(),summary:receipt.output.summary.clone(),evidence:receipt.output.evidence.clone(),succeeded:receipt.output.succeeded,receipt:json!(receipt)})}else{
             let output = coordinator_output(&receipt)?;
             Ok(TaskAction::Coordinate{claim_id:claim_id.clone(),output,receipt:json!(receipt)})
@@ -314,15 +306,27 @@ pub(crate) async fn probe(registry: &Registry, force: bool) -> Result<Configurat
     let mut random = [0u8; 32];
     getrandom::fill(&mut random)?;
     let request_id = storage::digest(&random);
-    let input=AgentInput{protocol_version:service_protocol::VERSION,request_id,person_id:"coordinator".into(),goal_id:"coordinator-probe".into(),work_id:"protocol-check".into(),attempt:1,objective:"Check the OutcomeHub coordinator protocol".into(),acceptance:"Return the exact typed proposal".into(),instruction:"This is a bounded protocol check, not a user task. Do not execute tools or modify files. Return succeeded=true, summary=Coordinator protocol ready, and evidence={\"coordinator\":{\"protocol_version\":1,\"proposal\":{\"action\":\"clarify\",\"question\":\"What outcome should the team deliver?\"}}}.".into(),messages:vec![]};
-    let receipt = execute(registry, &config, adapter, input, 60).await?;
-    let output = coordinator_output(&receipt)?;
-    ensure!(
-        output.protocol_version == COORDINATOR_PROTOCOL_VERSION
-            && matches!(output.proposal, CoordinatorProposal::Clarify { .. }),
-        "{}",
-        Code::Protocol
-    );
+    let input = probe_input(request_id);
+    let receipt = request_execution(registry, &config, adapter.clone(), input.clone(), 60).await?;
+    let validation = (|| {
+        validate_receipt(&receipt, &input, &adapter)?;
+        let output = coordinator_output(&receipt)?;
+        ensure!(
+            matches!(output.proposal, CoordinatorProposal::Clarify { .. }),
+            "{}",
+            Code::Protocol
+        );
+        Ok(())
+    })();
+    if let Err(error) = validation {
+        registry.record_task_diagnostic(
+            "coordinator-probe",
+            &input.request_id,
+            &error,
+            Some(&receipt),
+        );
+        return Err(error);
+    }
     registry.record_coordinator_probe(&config, receipt.output_sha256)?;
     Ok(registry.configuration())
 }
@@ -354,6 +358,46 @@ async fn routing_candidates(
     Ok(
         json!({"has_older":!page["next_after"].is_null(),"tasks":candidates.iter().filter(|t|t.input.id!=task.input.id && t.kind!=contracts::TaskKind::Question && (t.kind==contracts::TaskKind::Outcome || t.state==contracts::TaskState::WaitingInput)).map(|t|json!({"id":t.input.id,"revision":t.revision,"kind":t.kind,"state":t.state,"intent":t.input.intent.chars().take(1000).collect::<String>(),"title":t.title,"question":t.question,"latest_note":t.notes.last(),"progress":t.nodes.iter().map(|n|json!({"title":n.input.title,"state":n.state})).collect::<Vec<_>>()})).collect::<Vec<_>>()}),
     )
+}
+
+fn validate_receipt(
+    receipt: &ExecutionReceipt,
+    input: &AgentInput,
+    adapter: &Adapter,
+) -> Result<()> {
+    let result = (|| {
+        receipt.output.validate(input)?;
+        ensure!(
+            receipt.adapter_id == adapter.id && receipt.agent == adapter.agent,
+            "Execution receipt adapter identity mismatch"
+        );
+        ensure!(
+            receipt.input_sha256 == storage::digest(&serde_json::to_vec(input)?),
+            "Execution receipt input digest mismatch; the executor must preserve the current message contract"
+        );
+        ensure!(
+            receipt.adapter_sha256 == storage::digest(&serde_json::to_vec(adapter)?),
+            "Execution receipt adapter digest mismatch"
+        );
+        ensure!(
+            receipt.output_sha256 == storage::digest(&serde_json::to_vec(&receipt.output)?),
+            "Execution receipt output digest mismatch"
+        );
+        Ok(())
+    })();
+    result.context(Code::Protocol)
+}
+
+fn probe_input(request_id: String) -> AgentInput {
+    AgentInput {
+        protocol_version: service_protocol::VERSION, request_id, person_id: "coordinator".into(), goal_id: "coordinator-probe".into(), work_id: "protocol-check".into(), attempt: 1,
+        objective: "Check the OutcomeHub coordinator protocol".into(), acceptance: "Return the exact typed proposal".into(),
+        instruction: "This is a bounded protocol check, not a user task. The supplied messages exercise the current message contract. Do not execute tools or modify files. Return succeeded=true, summary=Coordinator protocol ready, and evidence={\"coordinator\":{\"protocol_version\":1,\"proposal\":{\"action\":\"clarify\",\"question\":\"What outcome should the team deliver?\"}}}.".into(),
+        messages: vec![
+            Message { deleted: false, event: None, activity: Some(TaskMessage { has_content: false, task_id: "probe-task".into(), kind: contracts::TaskEventKind::Created, title: "Protocol fixture".into(), node_id: None, person_id: None }), sequence: 1, group_id: "probe-group".into(), sender_id: "operator".into(), request_id: "probe-message".into(), text: "Protocol fixture".into(), reply_to: None, accepted_ms: 1 },
+            Message { deleted: true, event: None, activity: None, sequence: 2, group_id: "probe-group".into(), sender_id: "operator".into(), request_id: "probe-deleted".into(), text: String::new(), reply_to: None, accepted_ms: 2 },
+        ],
+    }
 }
 
 /// Every response is validated, even after a successful configuration probe.

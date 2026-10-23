@@ -1,11 +1,14 @@
 # Coordinator protocol recovery review
 
 This is an author review of ownership and state-machine behavior, not independent
-approval. The reported paused intake retained only `task_protocol_invalid`, so
-its original rejected response cannot be reconstructed. A private replay with
-the same intent, available members and conversation context returned a valid
-plan. The fix addresses the observed immediate-stop behavior and missing
-failure evidence, without asserting which original response field was invalid.
+approval. The initial live task retained only a generic protocol error. A private
+replay exposed the direct cause: the deployed executor used an older Message
+contract, discarded activity metadata, and returned an input digest that matched
+the old serialized request exactly. The current host correctly rejected it.
+Full-stack deployment must update the executor together with the host/storage.
+The coordinator probe now includes task activity and deletion metadata, and its
+fingerprint invalidates previous empty-message probe evidence. Receipt validation
+keeps its strict digest checks and records the precise mismatch privately.
 
 - The collaboration storage writer still validates and commits each proposal in
   one transaction. Rejected proposals cannot partially publish a graph, chat

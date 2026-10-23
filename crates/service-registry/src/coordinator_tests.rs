@@ -49,3 +49,35 @@ fn rejected_task_receipts_are_private_bounded_and_bound_to_the_claim() {
     assert_eq!(diagnostic["claim_id"], "next-claim");
     assert!(diagnostic["receipt"].is_null());
 }
+
+#[test]
+fn previous_empty_message_probe_proof_cannot_skip_current_contract_validation() {
+    let mut config = Configuration::defaults(std::path::Path::new("/fixture"));
+    let adapter = &mut config.adapters[0];
+    adapter.enabled = true;
+    adapter.command = vec!["fixture".into()];
+    config.coordinator = Some(CoordinatorConfiguration {
+        adapter_id: adapter.id.clone(),
+        model: None,
+        adapter_digest: storage::digest(&serde_json::to_vec(&adapter).unwrap()),
+        protocol_evidence: None,
+    });
+    let adapter = Registry::coordinator_adapter(&config).unwrap();
+    let executor = config
+        .service(&adapter.executor_id, contracts::ServiceKind::Executor)
+        .unwrap();
+    let sandbox = config
+        .service(
+            executor.sandbox_id.as_deref().unwrap(),
+            contracts::ServiceKind::Sandbox,
+        )
+        .unwrap();
+    let old = storage::digest(&serde_json::to_vec(&(adapter, executor, sandbox)).unwrap());
+    config.coordinator.as_mut().unwrap().protocol_evidence =
+        Some(format!("{old}:{}", "a".repeat(64)));
+    assert!(!Registry::coordinator_probe_valid(&config));
+    let current = Registry::coordinator_fingerprint(&config).unwrap();
+    config.coordinator.as_mut().unwrap().protocol_evidence =
+        Some(format!("{current}:{}", "a".repeat(64)));
+    assert!(Registry::coordinator_probe_valid(&config));
+}

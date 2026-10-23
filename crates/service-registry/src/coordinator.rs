@@ -107,7 +107,10 @@ impl Registry {
             contracts::ServiceKind::Sandbox,
         )?;
         Ok(storage::digest(&serde_json::to_vec(&(
-            adapter, executor, sandbox,
+            "coordinator-probe.v2-message-contract",
+            adapter,
+            executor,
+            sandbox,
         ))?))
     }
     pub fn coordinator_probe_valid(config: &Configuration) -> bool {

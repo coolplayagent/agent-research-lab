@@ -42,3 +42,34 @@ fn coordinator_response_rejections_retain_specific_private_reasons() {
         assert!(format!("{error:#}").contains(reason));
     }
 }
+
+#[test]
+fn receipt_validation_detects_old_executors_that_drop_message_metadata() {
+    let input = probe_input("claim".into());
+    assert!(input.messages.iter().any(|m| m.activity.is_some()));
+    assert!(input.messages.iter().any(|m| m.deleted));
+    let mut adapter = Configuration::defaults(std::path::Path::new("/fixture"))
+        .adapters
+        .remove(0);
+    adapter.id = "fixture".into();
+    adapter.agent = contracts::CodingAgent::Custom;
+    let mut result = receipt();
+    result.input_sha256 = storage::digest(&serde_json::to_vec(&input).unwrap());
+    result.adapter_sha256 = storage::digest(&serde_json::to_vec(&adapter).unwrap());
+    result.output_sha256 = storage::digest(&serde_json::to_vec(&result.output).unwrap());
+    assert!(validate_receipt(&result, &input, &adapter).is_ok());
+    for remove_activity in [true, false] {
+        let mut old_input = input.clone();
+        for message in &mut old_input.messages {
+            if remove_activity {
+                message.activity = None;
+            } else {
+                message.deleted = false;
+            }
+        }
+        result.input_sha256 = storage::digest(&serde_json::to_vec(&old_input).unwrap());
+        let error = validate_receipt(&result, &input, &adapter).unwrap_err();
+        assert_eq!(error.to_string(), Code::Protocol.as_str());
+        assert!(format!("{error:#}").contains("input digest mismatch"));
+    }
+}
